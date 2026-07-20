@@ -59,18 +59,27 @@ const NAV_PAR_ROLE: Record<string, NavItem[]> = {
   ],
 };
 
-export default function Sidebar({ role, periodeLabel }: { role: string; periodeLabel?: string }) {
+export default function Sidebar({
+  role,
+  periodeLabel,
+  onNavigate,
+}: {
+  role: string;
+  periodeLabel?: string;
+  onNavigate?: () => void;
+}) {
   const pathname = usePathname();
   const items = NAV_PAR_ROLE[role] ?? [{ href: "/dashboard", label: "Tableau de bord" }];
 
   return (
-    <nav className="w-[236px] shrink-0 border-r border-line bg-white p-3">
+    <nav className="h-full w-[236px] shrink-0 overflow-y-auto border-r border-line bg-white p-3">
       {items.map((item) => {
         const active = pathname === item.href || (item.href !== "/dashboard" && pathname?.startsWith(item.href));
         return (
           <Link
             key={item.href}
             href={item.href}
+            onClick={onNavigate}
             className={`relative mb-0.5 flex items-center gap-2.5 rounded-md py-2.5 pl-4 pr-3 text-[13.5px] ${
               active ? "bg-primary-light font-bold text-primary-dark" : "font-medium text-ink-muted hover:bg-appbg"
             }`}
