@@ -22,7 +22,7 @@
     "docxtemplater": "^3.47.0",
     "exceljs": "^4.4.0",
     "lucide-react": "^0.378.0",
-    "next": "14.2.3",
+    "next": "^14.2.35",
     "next-auth": "^4.24.7",
     "node-cron": "^4.6.0",
     "pdfkit": "^0.19.1",
