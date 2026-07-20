@@ -1,0 +1,571 @@
+// ============================================================================
+// SID DDEPIA-MENOUA — Schéma de base de données (Prisma / PostgreSQL + PostGIS)
+// Version 1.0 — Conforme au Cahier des charges v1.0 du 08/07/2026
+// Intègre : référentiel paramétrable, registre des établissements,
+// 3 familles de tableaux, mapping collecte→rapport, workflow à 3 niveaux,
+// export DREPIA, audit complet, SIG.
+// ============================================================================
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [postgis]
+}
+
+// ============================================================================
+// 1. ACTEURS, RÔLES, TERRITOIRE
+// ============================================================================
+
+enum Role {
+  DD // Délégué Départemental (Super-Admin métier)
+  DA // Délégué d'Arrondissement
+  AGENT_SAISIE // Subalterne à qui le DA délègue la saisie — même arrondissement, ne peut jamais soumettre le rapport
+  CHEF_BAC // Bureau des Affaires Communes
+  CHEF_SSV // Services Vétérinaires
+  CHEF_PSA // Productions et Statistiques Animales
+  CHEF_SPAIH // Pêches, Aquaculture et Industries Halieutiques
+  ADMIN_TECH // Administrateur technique (pas de droits métier)
+}
+
+model User {
+  id                 String    @id @default(cuid())
+  nom                String
+  fonction           String?
+  telephone          String? // canal SMS
+  whatsapp           String? // canal WhatsApp (peut différer du téléphone)
+  email              String?   @unique
+  username           String    @unique
+  passwordHash       String
+  mustChangePassword Boolean   @default(true) // §4.1 : changement obligatoire à la 1ère connexion
+  role               Role
+  actif              Boolean   @default(true) // désactivation sans suppression (§4.1)
+  arrondissementId   String? // obligatoire si role = DA
+  sectionId          String? // obligatoire si role = CHEF_*
+  createdAt          DateTime  @default(now())
+  lastLoginAt        DateTime?
+
+  arrondissement Arrondissement? @relation(fields: [arrondissementId], references: [id])
+  section        Section?        @relation(fields: [sectionId], references: [id])
+
+  rapportsSoumis     RapportArrondissement[] @relation("SoumisPar")
+  corrections        Correction[]
+  syntheses          SyntheseSection[]       @relation("AuteurSynthese")
+  exports            ExportDocument[]
+  notifications      Notification[]
+  auditLogs          AuditLog[]
+  validationsSection ValidationSection[]
+
+  saisiesMatriceEnTantQueAuteur   SaisieMatrice[]    @relation("SaisiParMatrice")
+  saisiesNominativeEnTantQueAuteur SaisieNominative[] @relation("SaisiParNominative")
+  saisiesEvenementEnTantQueAuteur SaisieEvenement[]  @relation("SaisiParEvenement")
+  referentielsProposes            ReferentielItem[]  @relation("ReferentielProposePar")
+  referentielsValides             ReferentielItem[]  @relation("ReferentielValideParDD")
+
+  @@index([role, actif])
+}
+
+model Arrondissement {
+  id       String  @id @default(cuid())
+  code     String  @unique // "DSC", "FOK", "FGT", "NKN", "PKM", "STC"
+  nom      String // Dschang, Fokoué, Fongo-Tongo, Nkong-Ni, Penka-Michel, Santchou
+  ordre    Int // ordre d'affichage dans les tableaux officiels
+  // Géométrie des limites administratives (PostGIS) — module SIG §10.1
+  geometry Unsupported("geometry(MultiPolygon, 4326)")?
+
+  users          User[]
+  rapports       RapportArrondissement[]
+  etablissements Etablissement[]
+  pointsSIG      PointSIG[]
+}
+
+model Section {
+  id    String @id @default(cuid())
+  code  String @unique // "BAC", "PSA", "SSV", "SPAIH"
+  nom   String
+  ordre Int
+
+  users         User[]
+  formTemplates FormTemplate[]
+  validations   ValidationSection[]
+  syntheses     SyntheseSection[]
+}
+
+// ============================================================================
+// 2. RÉFÉRENTIEL PARAMÉTRABLE (§7.1 — exigence non négociable)
+// Le DD/admin peut ajouter ou désactiver une ligne sans casser les anciens
+// rapports : rien n'est jamais supprimé, tout est désactivable et daté.
+// ============================================================================
+
+enum CategorieReferentiel {
+  ESPECE // Bovins, Ovins, Caprins, Porcins, Camelins, Asins, Equins, Canins, Lapins, Aulacodes, Félins, Cobayes, Primates
+  VOLAILLE // Poulet de chair, Pondeuse, Poulet villageois, Canard, Oies, Dinde, Caille, Pigeon, Pintade, Paon
+  CATEGORIE_ANIMALE // Taurillon, Génisse, Castré, Taureau, Vache, Veau, Bélier, Brebis, Agneau...
+  MALADIE
+  VACCIN
+  ACTE_VETERINAIRE // consultation, déparasitage, castration...
+  MOTIF_SAISIE
+  ESPECE_HALIEUTIQUE // Clarias, Carpes, Kanga, Hemichromis, Tilapia, Crevette...
+  UNITE // tête, tonne, kg, litre, unité, FCFA, m²...
+  TYPE_ETABLISSEMENT
+  TYPE_POINT_SIG
+}
+
+model ReferentielItem {
+  id         String               @id @default(cuid())
+  categorie  CategorieReferentiel
+  code       String // code stable, JAMAIS modifié après création : "ESP_BOVIN", "VOL_PONDEUSE"
+  libelle    String
+  libelleEn  String? // en-têtes bilingues du canevas officiel
+  ordre      Int                  @default(0)
+  actif      Boolean              @default(true)
+  metadata   Json? // ex: rendement carcasse par catégorie (Tableau n°17)
+  createdAt  DateTime             @default(now())
+  disabledAt DateTime?
+
+  // Circuit de validation DD pour les catégories "structurelles" (ESPECE, VOLAILLE,
+  // ESPECE_HALIEUTIQUE) : un ajout par ADMIN_TECH crée de nouvelles colonnes dans
+  // les tableaux du canevas (1.1/1.2/1.7), donc doit être validé par le DD avant de
+  // prendre effet (demande explicite du DD — ne jamais changer le rapport final
+  // sans son accord). Les autres catégories restent effectives immédiatement.
+  enAttenteValidationDD Boolean   @default(false)
+  proposeParId          String?
+  valideParDDId         String?
+  valideLe              DateTime?
+
+  proposePar  User? @relation("ReferentielProposePar", fields: [proposeParId], references: [id])
+  valideParDD User? @relation("ReferentielValideParDD", fields: [valideParDDId], references: [id])
+
+  @@unique([categorie, code])
+  @@index([categorie, actif])
+}
+
+// ============================================================================
+// 3. STRUCTURE DES FORMULAIRES DE COLLECTE (canevas mensuel : ~30 tableaux)
+// Trois familles constatées dans le canevas STAT Menoua :
+//   MATRICE   : arrondissement × colonnes fixes (Tableaux 1.1, 1.2, 2.1, 2.2...)
+//   NOMINATIF : une ligne par établissement identifié (Tableaux 1.3, 1.4, 1.5, 2.3)
+//   EVENEMENT : liste à lignes variables (Tableau 3.2 vaccinations, foyers, saisies)
+// ============================================================================
+
+enum TypeTableau {
+  MATRICE
+  NOMINATIF
+  EVENEMENT
+}
+
+model FormTemplate {
+  id        String      @id @default(cuid())
+  code      String      @unique // "T1_1_CHEPTEL", "T1_4_OEUFS_TABLE", "T3_2_VACCINATIONS"
+  numero    String // "1.1", "1.4", "3.2" — numérotation du canevas officiel
+  titre     String // "Effectif du cheptel"
+  type      TypeTableau
+  sectionId String // section responsable du contrôle (PSA, SSV, SPAIH, BAC)
+  ordre     Int
+  actif     Boolean     @default(true)
+  // Pour les EVENEMENT : définition des colonnes attendues et de leurs
+  // catégories de référentiel, ex: [{key:"maladie",ref:"MALADIE"},{key:"espece",ref:"ESPECE"}]
+  schemaEvenement Json?
+
+  section  Section          @relation(fields: [sectionId], references: [id])
+  fields   FormField[]
+  saisiesN SaisieNominative[]
+  saisiesE SaisieEvenement[]
+  mappings MappingRapport[]
+}
+
+model FormField {
+  id         String   @id @default(cuid())
+  templateId String
+  code       String   @unique // CODE STABLE : "CHEPTEL_BOVIN", "VOL_MOD_PONDEUSE", "ABAT_PORCIN"
+  libelle    String // "Bovins", "Pondeuse (élevage moderne)"
+  uniteCode  String? // FK logique vers ReferentielItem(UNITE) par code
+  typeValeur String   @default("ENTIER") // ENTIER | DECIMAL | TEXTE
+  ordre      Int
+  actif      Boolean  @default(true)
+  disabledAt DateTime?
+
+  template        FormTemplate       @relation(fields: [templateId], references: [id])
+  saisiesMatrice  SaisieMatrice[]
+  saisiesNominatives SaisieNominative[]
+
+  @@index([templateId, actif])
+}
+
+// ============================================================================
+// 4. REGISTRE DES ÉTABLISSEMENTS (découverte de l'analyse documentaire :
+// les tableaux 1.3, 1.4, 1.5, 2.3 sont nominatifs par exploitation)
+// ============================================================================
+
+model Etablissement {
+  id               String   @id @default(cuid())
+  typeCode         String // FK logique ReferentielItem(TYPE_ETABLISSEMENT) : FERME_PONTE, FERME_CHAIR, COUVOIR, PROVENDERIE, ABATTOIR, AIRE_ABATTAGE, MARCHE, ETANG, CLINIQUE_PRIVEE
+  nom              String
+  localite         String
+  arrondissementId String
+  proprietaire     String?
+  telephone        String?
+  actif            Boolean  @default(true)
+  // Position GPS — alimente le module SIG (§10)
+  geom             Unsupported("geometry(Point, 4326)")?
+  sourceGPS        String? // agent collecteur (§10.3 : champs qualité obligatoires)
+  dateCollecteGPS  DateTime?
+  precisionGPS     Float?
+  createdAt        DateTime @default(now())
+
+  arrondissement Arrondissement     @relation(fields: [arrondissementId], references: [id])
+  saisies        SaisieNominative[]
+
+  @@index([arrondissementId, typeCode, actif])
+}
+
+// ============================================================================
+// 5. PÉRIODES ET WORKFLOW (§5 et §11.3)
+// Trois niveaux distincts, conformément à l'analyse :
+//   PeriodeReporting      → le cycle départemental (1 par mois)
+//   RapportArrondissement → la soumission DA (6 par mois)
+//   ValidationSection     → le contrôle sectoriel transversal (4 par mois)
+// ============================================================================
+
+enum TypePeriode {
+  MENSUEL
+  TRIMESTRIEL
+  SEMESTRIEL
+  ANNUEL
+}
+
+enum StatutPeriode {
+  OUVERTE
+  VERROUILLEE_DA // après le 28 : plus de soumission DA sans déverrouillage DD
+  VALIDEE_DD
+  ARCHIVEE
+}
+
+model PeriodeReporting {
+  id             String        @id @default(cuid())
+  type           TypePeriode
+  annee          Int
+  mois           Int? // 1-12 si MENSUEL ; null sinon
+  trimestre      Int? // 1-4 si TRIMESTRIEL
+  semestre       Int? // 1-2 si SEMESTRIEL
+  dateOuverture  DateTime
+  dateLimiteDA   DateTime // le 28 du mois
+  dateLimiteChef DateTime // le 29 du mois
+  dateLimiteDD   DateTime // le 02 du mois suivant
+  statut         StatutPeriode @default(OUVERTE)
+
+  rapports    RapportArrondissement[]
+  validations ValidationSection[]
+  syntheses   SyntheseSection[]
+  exports     ExportDocument[]
+
+  @@unique([type, annee, mois, trimestre, semestre])
+  @@index([statut, dateLimiteDA])
+}
+
+enum StatutRapportDA {
+  EN_SAISIE // synchronisé mais non soumis (SYNCHRONISÉ_DA du CDC)
+  SOUMIS // soumission officielle : verrouillage écriture DA
+  REJETE // renvoyé au DA pour correction (REJETÉ_SERVICE)
+  CLOTURE // intégré au rapport départemental validé
+}
+
+model RapportArrondissement {
+  id               String          @id @default(cuid())
+  periodeId        String
+  arrondissementId String
+  statut           StatutRapportDA @default(EN_SAISIE)
+  soumisParId      String?
+  dateSoumission   DateTime?
+  motifRejet       String?
+  // Déverrouillage exceptionnel post-28 (risque offline identifié) :
+  deverrouillePar  String?
+  motifDeverrouillage String?
+  dateDeverrouillage  DateTime?
+
+  periode        PeriodeReporting @relation(fields: [periodeId], references: [id])
+  arrondissement Arrondissement   @relation(fields: [arrondissementId], references: [id])
+  soumisPar      User?            @relation("SoumisPar", fields: [soumisParId], references: [id])
+
+  saisiesMatrice SaisieMatrice[]
+  saisiesNom     SaisieNominative[]
+  saisiesEvt     SaisieEvenement[]
+
+  @@unique([periodeId, arrondissementId])
+  @@index([statut])
+}
+
+enum StatutValidationSection {
+  EN_ATTENTE // tous les DA n'ont pas soumis
+  EN_CONTROLE
+  VALIDE
+  REJETE // la section a rejeté un ou plusieurs rapports DA
+}
+
+model ValidationSection {
+  id             String                  @id @default(cuid())
+  periodeId      String
+  sectionId      String
+  statut         StatutValidationSection @default(EN_ATTENTE)
+  valideParId    String?
+  dateValidation DateTime?
+
+  periode   PeriodeReporting @relation(fields: [periodeId], references: [id])
+  section   Section          @relation(fields: [sectionId], references: [id])
+  validePar User?            @relation(fields: [valideParId], references: [id])
+
+  @@unique([periodeId, sectionId])
+}
+
+// ============================================================================
+// 6. DONNÉES SAISIES — trois modèles pour trois familles de tableaux
+// Règle "0 vs non renseigné" (§4.3) : valeur=0 est un zéro réel ;
+// nonRenseigne=true exige un motif et est signalé dans les rapports.
+// ============================================================================
+
+model SaisieMatrice {
+  id          String  @id @default(cuid())
+  rapportId   String
+  fieldCode   String // FK vers FormField.code (code stable)
+  valeur      Decimal? @db.Decimal(14, 3)
+  valeurTexte String? // champs MATRICE de type TEXTE (ex. T21_LIEUX) — non sommé, une valeur par arrondissement
+  nonRenseigne Boolean @default(false)
+  motifNonRenseigne String?
+  // Identifiant client généré offline (idempotence de la synchronisation)
+  clientId    String  @unique
+  syncedAt    DateTime @default(now())
+  // Traçabilité (DA délègue parfois la saisie à un AGENT_SAISIE) : dernier auteur réel de la valeur.
+  saisiParId  String?
+
+  rapport RapportArrondissement @relation(fields: [rapportId], references: [id])
+  field   FormField             @relation(fields: [fieldCode], references: [code])
+  saisiPar User?                @relation("SaisiParMatrice", fields: [saisiParId], references: [id])
+
+  corrections Correction[]
+
+  @@unique([rapportId, fieldCode])
+  @@index([fieldCode])
+}
+
+model SaisieNominative {
+  id              String  @id @default(cuid())
+  rapportId       String
+  templateId      String
+  etablissementId String
+  fieldCode       String
+  valeur          Decimal? @db.Decimal(14, 3)
+  valeurTexte     String?
+  nonRenseigne    Boolean @default(false)
+  clientId        String  @unique
+  syncedAt        DateTime @default(now())
+  saisiParId      String?
+
+  rapport       RapportArrondissement @relation(fields: [rapportId], references: [id])
+  template      FormTemplate          @relation(fields: [templateId], references: [id])
+  etablissement Etablissement         @relation(fields: [etablissementId], references: [id])
+  field         FormField             @relation(fields: [fieldCode], references: [code])
+  saisiPar      User?                 @relation("SaisiParNominative", fields: [saisiParId], references: [id])
+
+  corrections Correction[]
+
+  @@unique([rapportId, etablissementId, fieldCode])
+  @@index([templateId, etablissementId])
+}
+
+model SaisieEvenement {
+  id         String   @id @default(cuid())
+  rapportId  String
+  templateId String
+  // Payload validé côté serveur contre FormTemplate.schemaEvenement.
+  // Ex. vaccination : {maladie:"MAL_PPR", espece:"ESP_CAPRIN", vaccin:"VAC_PPRVAC",
+  //                    effectifVaccine: 1250, localite:"Baloum"}
+  payload    Json
+  clientId   String   @unique
+  syncedAt   DateTime @default(now())
+  saisiParId String?
+
+  rapport  RapportArrondissement @relation(fields: [rapportId], references: [id])
+  template FormTemplate          @relation(fields: [templateId], references: [id])
+  saisiPar User?                 @relation("SaisiParEvenement", fields: [saisiParId], references: [id])
+
+  corrections Correction[]
+
+  @@index([templateId])
+}
+
+// ============================================================================
+// 7. CORRECTIONS TRACÉES (§13.2 : valeur DA / valeur service / valeur validée)
+// ============================================================================
+
+model Correction {
+  id                 String   @id @default(cuid())
+  // Une seule des trois FK est renseignée selon la famille de saisie
+  saisieMatriceId    String?
+  saisieNominativeId String?
+  saisieEvenementId  String?
+  valeurAvant        String // sérialisée (nombre, texte ou JSON)
+  valeurApres        String
+  motif              String // motif OBLIGATOIRE (§4.4)
+  auteurId           String
+  createdAt          DateTime @default(now())
+
+  saisieMatrice    SaisieMatrice?    @relation(fields: [saisieMatriceId], references: [id])
+  saisieNominative SaisieNominative? @relation(fields: [saisieNominativeId], references: [id])
+  saisieEvenement  SaisieEvenement?  @relation(fields: [saisieEvenementId], references: [id])
+  auteur           User              @relation(fields: [auteurId], references: [id])
+
+  @@index([auteurId, createdAt])
+}
+
+// ============================================================================
+// 8. ANALYSES ET SYNTHÈSES (§8 — humain + brouillon IA distincts et conservés)
+// ============================================================================
+
+model SyntheseSection {
+  id             String   @id @default(cuid())
+  periodeId      String
+  sectionId      String
+  blocCode       String? // rattachement fin : un commentaire par bloc/tableau si besoin
+  brouillonIA    String?  @db.Text // texte proposé par l'IA — jamais écrasé
+  promptIA       String?  @db.Text // traçabilité : chiffres cités dans le prompt (§8.2)
+  contenuFinal   String?  @db.Text // texte édité et validé par le chef de section
+  auteurId       String?
+  valideDD       Boolean  @default(false)
+  updatedAt      DateTime @updatedAt
+
+  periode PeriodeReporting @relation(fields: [periodeId], references: [id])
+  section Section          @relation(fields: [sectionId], references: [id])
+  auteur  User?            @relation("AuteurSynthese", fields: [auteurId], references: [id])
+
+  @@unique([periodeId, sectionId, blocCode])
+}
+
+// ============================================================================
+// 9. MAPPING COLLECTE → RAPPORT (découverte clé : 30 tableaux de collecte
+// alimentent 72 tableaux du rapport annuel — correspondance non triviale)
+// Chaque balise docxtemplater du template officiel est déclarée ici.
+// ============================================================================
+
+enum TypeAggregation {
+  SOMME // somme des arrondissements / des mois de la période
+  MOYENNE
+  DERNIERE_VALEUR // pour les stocks (effectif cheptel = photo fin de période)
+  COMPTAGE
+}
+
+model MappingRapport {
+  id              String          @id @default(cuid())
+  docTag          String          @unique // balise dans le template : "T14_BOVIN_DSC", "T14_BOVIN_TOTAL"
+  documentCible   String // "RAPPORT_MENSUEL_DD" | "RAPPORT_ANNUEL_DD" | "EXPORT_DREPIA" | "RAPPORT_DA"
+  templateId      String? // tableau de collecte source
+  fieldCodes      String[] // codes FormField sources (souvent 1, parfois n)
+  arrondissementCode String? // null = agrégat départemental
+  aggregation     TypeAggregation @default(SOMME)
+  calculeEcartN1  Boolean         @default(false)
+
+  template FormTemplate? @relation(fields: [templateId], references: [id])
+
+  @@index([documentCible])
+}
+
+// ============================================================================
+// 10. EXPORTS, NOTIFICATIONS, SIG, AUDIT
+// ============================================================================
+
+enum TypeExport {
+  RAPPORT_DA_DOCX
+  RAPPORT_DD_DOCX
+  RAPPORT_EXACT_DOCX // reproduction structurelle littérale du canevas officiel, sans les enrichissements du rapport DD
+  RAPPORT_DD_PDF
+  PPT_TRIMESTRIEL
+  EXPORT_DREPIA_XLSX // export normalisé vers la Délégation Régionale
+  EXPORT_DREPIA_DOCX // format canevas régional (phase ultérieure)
+  EXPORT_SIG_GEOJSON
+}
+
+model ExportDocument {
+  id           String     @id @default(cuid())
+  type         TypeExport
+  periodeId    String
+  auteurId     String
+  version      Int
+  cheminFichier String
+  hashSha256   String?
+  createdAt    DateTime   @default(now())
+
+  periode PeriodeReporting @relation(fields: [periodeId], references: [id])
+  auteur  User             @relation(fields: [auteurId], references: [id])
+
+  @@index([periodeId, type])
+}
+
+enum CanalNotification {
+  SMS
+  WHATSAPP
+  IN_APP
+  EMAIL
+}
+
+enum StatutNotification {
+  EN_ATTENTE
+  ENVOYE
+  ECHEC
+  REESSAI
+}
+
+model Notification {
+  id             String             @id @default(cuid())
+  destinataireId String
+  canal          CanalNotification
+  message        String
+  declencheur    String // "RAPPEL_J-1", "RETARD_DA", "DONNEES_DISPONIBLES", "REJET"...
+  statut         StatutNotification @default(EN_ATTENTE)
+  tentatives     Int                @default(0)
+  erreur         String?
+  createdAt      DateTime           @default(now())
+  sentAt         DateTime?
+
+  destinataire User @relation(fields: [destinataireId], references: [id])
+
+  @@index([statut, createdAt])
+}
+
+model PointSIG {
+  id               String   @id @default(cuid())
+  typeCode         String // FK logique ReferentielItem(TYPE_POINT_SIG) : POINT_EAU, FOYER, VACCINATION, CONFLIT, INFRASTRUCTURE...
+  libelle          String
+  arrondissementId String
+  geom             Unsupported("geometry(Point, 4326)")
+  // Champs qualité obligatoires (§10.3)
+  source           String
+  dateCollecte     DateTime
+  agentCollecteur  String
+  precision        Float?
+  observation      String?
+  valide           Boolean  @default(false) // carte brouillon vs support officiel
+  periodeRef       String? // rattachement à une période si événementiel
+
+  arrondissement Arrondissement @relation(fields: [arrondissementId], references: [id])
+
+  @@index([typeCode, arrondissementId])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String // LOGIN, SYNC, SOUMISSION, CORRECTION, VALIDATION, REJET, EXPORT, DEVERROUILLAGE, ADMIN_REFERENTIEL...
+  entite    String? // nom du modèle concerné
+  entiteId  String?
+  details   Json?
+  ip        String?
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([action, createdAt])
+  @@index([userId, createdAt])
+}

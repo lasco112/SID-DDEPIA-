@@ -1,0 +1,50 @@
+# Dépendances
+node_modules/
+
+# Next.js
+.next/
+out/
+build/
+
+# Variables d'environnement — ne jamais commiter de secrets réels
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.production
+
+# Fichiers générés par l'application (sauvegardes DB, exports .docx/.xlsx)
+storage/
+
+# Prisma
+prisma/*.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+logs/
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# Tests / couverture
+coverage/
+
+# Système d'exploitation / éditeurs
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Vercel (si jamais utilisé en parallèle)
+.vercel
+
+# Anciennes archives de sauvegarde (première itération, dépassées par le code actuel)
+*.zip
+
+# Scripts de débogage locaux jetables
+test_login_api.js

@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "TypeExport" ADD VALUE 'RAPPORT_EXACT_DOCX';
