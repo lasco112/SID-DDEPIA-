@@ -13,7 +13,12 @@ export default async function SaisieTemplatePage({ params }: { params: { templat
 
   return (
     <AppShell allowedRoles={["DA", "AGENT_SAISIE"]}>
-      <SaisieTemplateClient templateCode={params.templateCode} username={username} destinataire={destinataire} />
+      <SaisieTemplateClient
+        templateCode={params.templateCode}
+        username={username}
+        destinataire={destinataire}
+        peutSoumettre={role === "DA"}
+      />
     </AppShell>
   );
 }

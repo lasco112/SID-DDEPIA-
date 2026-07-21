@@ -159,6 +159,15 @@ async function nominatifLoopRows(periodeId: string, templateCode: string, fieldC
     .map(([, r]) => r);
 }
 
+/** Résout un code de référentiel en libellé ; si le code est une entrée "Autre" (suffixe _AUTRE) et que la
+ *  saisie a précisé un texte libre (clé `${c.key}__PRECISION`), l'ajoute entre parenthèses au libellé. */
+function libelleRefAvecPrecision(refLibelle: Map<string, string>, refCategorie: string, code: string, p: Record<string, unknown>, cleChamp: string): string {
+  const libelle = refLibelle.get(`${refCategorie}:${code}`) ?? String(code);
+  if (!code.endsWith("_AUTRE")) return libelle;
+  const precision = p[`${cleChamp}__PRECISION`];
+  return precision ? `${libelle} (${String(precision)})` : libelle;
+}
+
 /** Une ligne par événement déclaré (canevas EVENEMENT) — DD : tous arrondissements + colonne ARR ; DA : un seul arrondissement. */
 async function evenementLoopRows(
   periodeId: string,
@@ -185,7 +194,7 @@ async function evenementLoopRows(
     for (const c of cols) {
       const raw = p[c.key];
       if (raw == null || raw === "") row[c.key] = "—";
-      else if (c.ref) row[c.key] = refLibelle.get(`${c.ref}:${raw}`) ?? String(raw);
+      else if (c.ref) row[c.key] = libelleRefAvecPrecision(refLibelle, c.ref, String(raw), p, c.key);
       else if (typeof raw === "number") row[c.key] = fmt(raw);
       else row[c.key] = String(raw);
     }
@@ -230,7 +239,7 @@ async function evenementLoopRowsGroupes(
     for (const c of cols) {
       const raw = p[c.key];
       if (raw == null || raw === "") item[c.key] = "—";
-      else if (c.ref) item[c.key] = refLibelle.get(`${c.ref}:${raw}`) ?? String(raw);
+      else if (c.ref) item[c.key] = libelleRefAvecPrecision(refLibelle, c.ref, String(raw), p, c.key);
       else if (typeof raw === "number") item[c.key] = fmt(raw);
       else item[c.key] = String(raw);
     }

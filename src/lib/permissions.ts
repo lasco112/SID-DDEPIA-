@@ -53,6 +53,22 @@ export function assertRole(user: SessionUser, allowed: Role[]) {
 
 export const ROLES_CHEF: Role[] = ["CHEF_BAC", "CHEF_SSV", "CHEF_PSA", "CHEF_SPAIH"];
 
+/** Accès en lecture (vue croisée) à des tableaux d'une autre section, accordé au cas par cas sur
+ *  demande explicite du DD — le chef garde le même usage (consultation par DA/arrondissement,
+ *  espèce, période, totaux) que pour les tableaux de sa propre section, sans transfert de propriété.
+ *  Ex. : le chef des services vétérinaires (CHEF_SSV) suit aussi T21 "Abattages contrôlés",
+ *  qui reste rattaché à la section PSA (productions et statistiques animales). */
+export const ACCES_TABLEAU_SUPPLEMENTAIRE: Partial<Record<Role, string[]>> = {
+  CHEF_SSV: ["T21"],
+};
+
+/** Un chef peut consulter un tableau s'il appartient à sa section, ou s'il figure dans
+ *  ACCES_TABLEAU_SUPPLEMENTAIRE pour son rôle. */
+export function peutConsulterTableauSection(user: SessionUser, template: { code: string; sectionId: string }): boolean {
+  if (user.sectionId === template.sectionId) return true;
+  return (ACCES_TABLEAU_SUPPLEMENTAIRE[user.role] ?? []).includes(template.code);
+}
+
 export function assertProprietaireArrondissement(user: SessionUser, arrondissementId: string) {
   if (user.role !== "DA" || user.arrondissementId !== arrondissementId) {
     throw new ForbiddenError("Cet arrondissement n'est pas le vôtre.");

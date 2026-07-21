@@ -5,16 +5,18 @@
  */
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireUser, permissionErrorResponse } from "@/lib/permissions";
-
-const ROLES_CHEF = ["CHEF_BAC", "CHEF_SSV", "CHEF_PSA", "CHEF_SPAIH"];
+import { requireUser, permissionErrorResponse, ROLES_CHEF, ACCES_TABLEAU_SUPPLEMENTAIRE } from "@/lib/permissions";
 
 export async function GET() {
   try {
     const user = await requireUser();
     const scopeSection = ROLES_CHEF.includes(user.role) && user.sectionId ? user.sectionId : undefined;
+    const codesSupplementaires = ACCES_TABLEAU_SUPPLEMENTAIRE[user.role] ?? [];
     const templates = await db.formTemplate.findMany({
-      where: { actif: true, ...(scopeSection ? { sectionId: scopeSection } : {}) },
+      where: {
+        actif: true,
+        ...(scopeSection ? { OR: [{ sectionId: scopeSection }, { code: { in: codesSupplementaires } }] } : {}),
+      },
       orderBy: { ordre: "asc" },
       include: { section: true, _count: { select: { fields: true } } },
     });

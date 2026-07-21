@@ -152,16 +152,30 @@ export default function FormEvenement({
                 {template.schemaEvenement.map((c) => (
                   <td key={c.key} className="border-b border-gray-100 px-3 py-2">
                     {c.type === "ref" ? (
-                      <select
-                        className="w-40 rounded border border-gray-300 px-2 py-1"
-                        value={evt.payload[c.key] ?? ""}
-                        onChange={(e) => majEvenement(evt.clientId, c.key, e.target.value)}
-                      >
-                        <option value="">—</option>
-                        {(referentiels[c.ref ?? ""] ?? []).map((r) => (
-                          <option key={r.code} value={r.code}>{r.libelle}</option>
-                        ))}
-                      </select>
+                      <div className="flex flex-col gap-1">
+                        <select
+                          className="w-40 rounded border border-gray-300 px-2 py-1"
+                          value={evt.payload[c.key] ?? ""}
+                          onChange={(e) => {
+                            majEvenement(evt.clientId, c.key, e.target.value);
+                            if (!e.target.value.endsWith("_AUTRE")) majEvenement(evt.clientId, `${c.key}__PRECISION`, "");
+                          }}
+                        >
+                          <option value="">—</option>
+                          {(referentiels[c.ref ?? ""] ?? []).map((r) => (
+                            <option key={r.code} value={r.code}>{r.libelle}</option>
+                          ))}
+                        </select>
+                        {evt.payload[c.key]?.endsWith("_AUTRE") && (
+                          <input
+                            type="text"
+                            placeholder="Veuillez préciser"
+                            className="w-40 rounded border border-gray-300 px-2 py-1 text-xs"
+                            value={evt.payload[`${c.key}__PRECISION`] ?? ""}
+                            onChange={(e) => majEvenement(evt.clientId, `${c.key}__PRECISION`, e.target.value)}
+                          />
+                        )}
+                      </div>
                     ) : (
                       <input
                         type={c.type === "entier" || c.type === "decimal" ? "number" : "text"}

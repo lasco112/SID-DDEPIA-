@@ -11,10 +11,12 @@ export default function SaisieTemplateClient({
   templateCode,
   username,
   destinataire,
+  peutSoumettre = false,
 }: {
   templateCode: string;
   username: string;
   destinataire: string;
+  peutSoumettre?: boolean;
 }) {
   const [periodeId, setPeriodeId] = useState<string | null>(null);
   const [detail, setDetail] = useState<any>(null);
@@ -55,7 +57,11 @@ export default function SaisieTemplateClient({
             {detail.template.titre}
           </h1>
 
-          <div className="my-4">{periodeId && <SyncButton periodeId={periodeId} username={username} destinataire={destinataire} />}</div>
+          <div className="my-4">
+            {periodeId && (
+              <SyncButton periodeId={periodeId} username={username} destinataire={destinataire} peutSoumettre={peutSoumettre} />
+            )}
+          </div>
 
           <div className="mt-4">
             {periodeId && detail.template.type === "MATRICE" && (

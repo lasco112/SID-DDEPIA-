@@ -185,8 +185,12 @@ export async function collecterDonneesThematiques(filtre: FiltreThematique): Pro
         for (const c of schema) {
           const raw = p[c.key];
           if (raw == null || raw === "") ligne.push("—");
-          else if (c.ref) ligne.push(refLibelle.get(`${c.ref}:${raw}`) ?? String(raw));
-          else ligne.push(fmtValeur(raw));
+          else if (c.ref) {
+            const code = String(raw);
+            const libelle = refLibelle.get(`${c.ref}:${code}`) ?? code;
+            const precision = code.endsWith("_AUTRE") ? p[`${c.key}__PRECISION`] : null;
+            ligne.push(precision ? `${libelle} (${String(precision)})` : libelle);
+          } else ligne.push(fmtValeur(raw));
         }
         lignes.push(ligne);
       }

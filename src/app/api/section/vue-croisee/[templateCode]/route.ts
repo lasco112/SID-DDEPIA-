@@ -6,7 +6,7 @@
  */
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireUser, ROLES_CHEF, permissionErrorResponse, ForbiddenError } from "@/lib/permissions";
+import { requireUser, ROLES_CHEF, permissionErrorResponse, ForbiddenError, peutConsulterTableauSection } from "@/lib/permissions";
 
 const SEUIL_VARIATION = 0.3;
 
@@ -23,8 +23,8 @@ export async function GET(req: Request, { params }: { params: { templateCode: st
     });
     if (!template) return NextResponse.json({ message: "Tableau introuvable" }, { status: 404 });
 
-    const estChefDeCetteSection = ROLES_CHEF.includes(user.role) && user.sectionId === template.sectionId;
-    if (!estChefDeCetteSection && user.role !== "DD") {
+    const estChefAutorise = ROLES_CHEF.includes(user.role) && peutConsulterTableauSection(user, template);
+    if (!estChefAutorise && user.role !== "DD") {
       throw new ForbiddenError("Cette section n'est pas la vôtre.");
     }
 

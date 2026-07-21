@@ -30,7 +30,6 @@ export default function RapportStatusPanel({
   const [statut, setStatut] = useState<string | null>(null);
   const [motifRejet, setMotifRejet] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [soumission, setSoumission] = useState(false);
   const [generation, setGeneration] = useState(false);
 
   const charger = useCallback(async () => {
@@ -50,27 +49,6 @@ export default function RapportStatusPanel({
   useEffect(() => {
     charger();
   }, [charger]);
-
-  async function soumettre() {
-    if (!periodeId) return;
-    setSoumission(true);
-    setMessage(null);
-    try {
-      const res = await fetch("/api/rapports/submit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ periodeId }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message ?? "Échec de la soumission.");
-      setStatut("SOUMIS");
-      setMessage("Rapport soumis avec succès.");
-    } catch (e) {
-      setMessage(e instanceof Error ? e.message : "Erreur lors de la soumission.");
-    } finally {
-      setSoumission(false);
-    }
-  }
 
   async function genererDocx() {
     if (!periodeId) return;
@@ -109,20 +87,19 @@ export default function RapportStatusPanel({
           <span className="font-semibold">{statut ? LIBELLES[statut] ?? statut : "…"}</span>
           {motifRejet && <p className="mt-1 text-sm text-red-700">Motif du rejet : {motifRejet}</p>}
         </div>
-        {periodeId && <SyncButton periodeId={periodeId} username={username} destinataire={destinataire} onSynced={charger} />}
+        {periodeId && (
+          <SyncButton
+            periodeId={periodeId}
+            username={username}
+            destinataire={destinataire}
+            peutSoumettre={peutSoumettre}
+            onSynced={charger}
+          />
+        )}
       </div>
 
       {peutSoumettre && (
         <div className="mt-3 flex flex-wrap gap-2">
-          {(statut === "EN_SAISIE" || statut === "REJETE") && (
-            <button
-              onClick={soumettre}
-              disabled={soumission}
-              className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-hover disabled:cursor-not-allowed disabled:bg-gray-300"
-            >
-              {soumission ? "Soumission…" : "Soumettre mon rapport mensuel"}
-            </button>
-          )}
           {(statut === "SOUMIS" || statut === "CLOTURE") && (
             <button
               onClick={genererDocx}
