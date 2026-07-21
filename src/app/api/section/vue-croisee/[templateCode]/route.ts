@@ -5,7 +5,6 @@
  * Signale les variations fortes vs mois précédent (seuil ±30 %, CDC §M4).
  */
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
 import { requireUser, ROLES_CHEF, permissionErrorResponse, ForbiddenError, peutConsulterTableauSection } from "@/lib/permissions";
 
 const SEUIL_VARIATION = 0.3;
@@ -13,6 +12,7 @@ const SEUIL_VARIATION = 0.3;
 export async function GET(req: Request, { params }: { params: { templateCode: string } }) {
   try {
     const user = await requireUser();
+    const db = user.db;
     const { searchParams } = new URL(req.url);
     const periodeId = searchParams.get("periodeId");
     if (!periodeId) return NextResponse.json({ message: "periodeId requis" }, { status: 400 });

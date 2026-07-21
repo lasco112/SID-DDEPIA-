@@ -46,14 +46,20 @@ const PROTECTED_PREFIXES: Array<{ prefix: string; roles: string[] }> = [
 const CHEMINS_SURS_DEMO = [
   "/dashboard",
   "/da/saisie",
+  "/dd/supervision",
+  "/section/controle",
+  "/section/analyse",
   "/api/auth",
   "/api/periodes/active",
   "/api/form-templates",
-  "/api/rapports/mon-rapport",
-  "/api/rapports/mes-saisies",
-  "/api/rapports/submit",
+  "/api/rapports", // couvre aussi /rejeter, /mon-rapport, /mes-saisies, /submit
+  "/api/reports/generate",
   "/api/sync",
   "/api/notifications",
+  "/api/section/vue-croisee",
+  "/api/validations",
+  "/api/corrections",
+  "/api/syntheses",
 ];
 
 export async function middleware(req: NextRequest) {

@@ -4,12 +4,12 @@
  * repasse en EN_SAISIE dès sa prochaine synchronisation).
  */
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
 import { requireUser, assertRole, ROLES_CHEF, permissionErrorResponse } from "@/lib/permissions";
 
 export async function POST(req: Request) {
   try {
     const user = await requireUser();
+    const db = user.db;
     assertRole(user, ROLES_CHEF);
 
     const { rapportId, motif } = (await req.json()) as { rapportId: string; motif: string };

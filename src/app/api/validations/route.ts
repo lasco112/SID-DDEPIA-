@@ -4,12 +4,12 @@
  * VALIDE/REJETE). Doit intervenir avant le 29 18h (alerte cron sinon).
  */
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
 import { requireUser, assertProprietaireSection, permissionErrorResponse } from "@/lib/permissions";
 
 export async function POST(req: Request) {
   try {
     const user = await requireUser();
+    const db = user.db;
     const { periodeId, statut } = (await req.json()) as {
       periodeId: string;
       statut: "VALIDE" | "REJETE" | "EN_CONTROLE";

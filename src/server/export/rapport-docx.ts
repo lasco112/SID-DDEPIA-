@@ -16,13 +16,19 @@
  *     mais inoffensives) ; rapport DA : {code}, {code}_PREC (son arrondissement).
  *   - NOMINATIF_LOOP / EVENEMENT_LOOP : tableau JSON nommé {templateCode},
  *     une entrée par établissement/événement, avec ARR ajouté côté DD.
+ *
+ * Toutes les fonctions ci-dessous reçoivent le client Prisma en premier
+ * paramètre (db, production ou demoDb) plutôt que d'importer `db` directement
+ * — c'est ce qui permet à la génération de rapport de fonctionner aussi bien
+ * en environnement de démonstration (correction n°10) qu'en production, sans
+ * jamais risquer de mélanger les deux.
  */
 
 import PizZip from "pizzip";
 import Docxtemplater from "docxtemplater";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { db } from "@/lib/db";
+import type { PrismaClient } from "@prisma/client";
 import { CANEVAS_LAYOUTS } from "../../../prisma/seed-lib/canevasLayout";
 
 const ARR_CODES = ["DSC", "FOK", "FGT", "NKN", "PKM", "STC"] as const;
@@ -42,7 +48,7 @@ function fmt(v: number | null): string {
   return new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 3 }).format(v);
 }
 
-async function resolvePeriodeMois(annee: number, mois: number) {
+async function resolvePeriodeMois(db: PrismaClient, annee: number, mois: number) {
   let a = annee;
   let m = mois;
   if (m === 0) {
@@ -52,7 +58,7 @@ async function resolvePeriodeMois(annee: number, mois: number) {
   return db.periodeReporting.findFirst({ where: { type: "MENSUEL", annee: a, mois: m } });
 }
 
-async function sommeMatrice(periodeId: string, fieldCode: string, arrCode: string | null): Promise<number | null> {
+async function sommeMatrice(db: PrismaClient, periodeId: string, fieldCode: string, arrCode: string | null): Promise<number | null> {
   const saisies = await db.saisieMatrice.findMany({
     where: {
       fieldCode,
@@ -66,7 +72,7 @@ async function sommeMatrice(periodeId: string, fieldCode: string, arrCode: strin
 }
 
 /** Champ MATRICE de type TEXTE (ex. T21_LIEUX) : une valeur par arrondissement, jamais sommée. */
-async function dernierTexteMatrice(periodeId: string, fieldCode: string, arrCode: string | null): Promise<string | null> {
+async function dernierTexteMatrice(db: PrismaClient, periodeId: string, fieldCode: string, arrCode: string | null): Promise<string | null> {
   const saisie = await db.saisieMatrice.findFirst({
     where: {
       fieldCode,
@@ -78,7 +84,7 @@ async function dernierTexteMatrice(periodeId: string, fieldCode: string, arrCode
   return saisie?.valeurTexte ?? null;
 }
 
-async function sommeNominatif(periodeId: string, fieldCode: string, arrCode: string | null): Promise<number | null> {
+async function sommeNominatif(db: PrismaClient, periodeId: string, fieldCode: string, arrCode: string | null): Promise<number | null> {
   const saisies = await db.saisieNominative.findMany({
     where: {
       fieldCode,
@@ -92,7 +98,7 @@ async function sommeNominatif(periodeId: string, fieldCode: string, arrCode: str
 }
 
 /** Somme d'une clé numérique du payload JSON à travers les événements déclarés (ligne "Total" du canevas). */
-async function sommeEvenementNumerique(periodeId: string, templateCode: string, cle: string, arrCode: string | null): Promise<number | null> {
+async function sommeEvenementNumerique(db: PrismaClient, periodeId: string, templateCode: string, cle: string, arrCode: string | null): Promise<number | null> {
   const template = await db.formTemplate.findUnique({ where: { code: templateCode } });
   if (!template) return null;
   const saisies = await db.saisieEvenement.findMany({
@@ -107,6 +113,7 @@ async function sommeEvenementNumerique(periodeId: string, templateCode: string, 
 
 /** Lignes "Total Mois Courant"/"Total Mois Précédent" des tableaux NOMINATIF/EVENEMENT (canevas). */
 async function ajouterTotauxListes(
+  db: PrismaClient,
   payload: Record<string, unknown>,
   templates: { code: string; type: string }[],
   periodeId: string,
@@ -117,20 +124,20 @@ async function ajouterTotauxListes(
     const layout = CANEVAS_LAYOUTS[t.code];
     if (t.type === "NOMINATIF" && layout?.kind === "NOMINATIF_LOOP") {
       for (const c of layout.cols.filter((c) => !c.texte)) {
-        payload[`${c.code}_TOTAL`] = fmt(await sommeNominatif(periodeId, c.code, arrCode));
-        payload[`${c.code}_TOTAL_PREC`] = moisPrecedentId ? fmt(await sommeNominatif(moisPrecedentId, c.code, arrCode)) : "—";
+        payload[`${c.code}_TOTAL`] = fmt(await sommeNominatif(db, periodeId, c.code, arrCode));
+        payload[`${c.code}_TOTAL_PREC`] = moisPrecedentId ? fmt(await sommeNominatif(db, moisPrecedentId, c.code, arrCode)) : "—";
       }
     } else if (t.type === "EVENEMENT" && layout?.kind === "EVENEMENT_LOOP") {
       for (const c of layout.cols.filter((c) => c.numeric)) {
-        payload[`${t.code}_${c.key}_TOTAL`] = fmt(await sommeEvenementNumerique(periodeId, t.code, c.key, arrCode));
-        payload[`${t.code}_${c.key}_TOTAL_PREC`] = moisPrecedentId ? fmt(await sommeEvenementNumerique(moisPrecedentId, t.code, c.key, arrCode)) : "—";
+        payload[`${t.code}_${c.key}_TOTAL`] = fmt(await sommeEvenementNumerique(db, periodeId, t.code, c.key, arrCode));
+        payload[`${t.code}_${c.key}_TOTAL_PREC`] = moisPrecedentId ? fmt(await sommeEvenementNumerique(db, moisPrecedentId, t.code, c.key, arrCode)) : "—";
       }
     }
   }
 }
 
 /** Une ligne par établissement (canevas NOMINATIF) — DD : tous arrondissements + colonne ARR ; DA : un seul arrondissement. */
-async function nominatifLoopRows(periodeId: string, templateCode: string, fieldCodes: string[], arrCode: string | null) {
+async function nominatifLoopRows(db: PrismaClient, periodeId: string, templateCode: string, fieldCodes: string[], arrCode: string | null) {
   const template = await db.formTemplate.findUnique({ where: { code: templateCode } });
   if (!template) return [];
   const saisies = await db.saisieNominative.findMany({
@@ -172,6 +179,7 @@ function libelleRefAvecPrecision(refLibelle: Map<string, string>, refCategorie: 
 
 /** Une ligne par événement déclaré (canevas EVENEMENT) — DD : tous arrondissements + colonne ARR ; DA : un seul arrondissement. */
 async function evenementLoopRows(
+  db: PrismaClient,
   periodeId: string,
   templateCode: string,
   cols: { key: string; label: string; ref?: string }[],
@@ -211,6 +219,7 @@ async function evenementLoopRows(
  *  de section vétérinaire, qui doit vérifier minutieusement chaque arrondissement contre le terrain ;
  *  voir renderEvenementLoopGroupe dans buildReportTemplates.ts pour le rendu correspondant. */
 async function evenementLoopRowsGroupes(
+  db: PrismaClient,
   periodeId: string,
   templateCode: string,
   cols: { key: string; label: string; ref?: string; numeric?: boolean }[]
@@ -254,7 +263,7 @@ async function evenementLoopRowsGroupes(
   for (const g of groupes) {
     const entree: Record<string, unknown> = { ARR_NOM: g.nom, items: g.items };
     for (const c of numericCols) {
-      entree[`${c.key}_SOUSTOTAL`] = fmt(await sommeEvenementNumerique(periodeId, templateCode, c.key, g.code));
+      entree[`${c.key}_SOUSTOTAL`] = fmt(await sommeEvenementNumerique(db, periodeId, templateCode, c.key, g.code));
     }
     resultat.push(entree);
   }
@@ -267,7 +276,7 @@ export interface CompletudeDD {
   sectionsNonValidees: string[];
 }
 
-export async function verifierCompletudeDD(periodeId: string): Promise<CompletudeDD> {
+export async function verifierCompletudeDD(db: PrismaClient, periodeId: string): Promise<CompletudeDD> {
   const [periode, arrondissements, rapports, sections, validations] = await Promise.all([
     db.periodeReporting.findUniqueOrThrow({ where: { id: periodeId } }),
     db.arrondissement.findMany({ orderBy: { ordre: "asc" } }),
@@ -293,7 +302,7 @@ export async function verifierCompletudeDD(periodeId: string): Promise<Completud
   return { complet: daManquants.length === 0 && sectionsNonValidees.length === 0, daManquants, sectionsNonValidees };
 }
 
-async function construirePayloadCommun(periodeId: string, mois: number, annee: number) {
+async function construirePayloadCommun(db: PrismaClient, periodeId: string, mois: number, annee: number) {
   const payload: Record<string, unknown> = {
     MOIS_LIBELLE: MOIS_FR[mois - 1],
     ANNEE: String(annee),
@@ -305,7 +314,7 @@ async function construirePayloadCommun(periodeId: string, mois: number, annee: n
     include: { fields: { where: { actif: true } } },
   });
 
-  const moisPrecedent = await resolvePeriodeMois(annee, mois - 1);
+  const moisPrecedent = await resolvePeriodeMois(db, annee, mois - 1);
 
   return { payload, templates, moisPrecedent };
 }
@@ -385,9 +394,9 @@ function ajouterTotauxColonnes(
  *  arrondissement + sous-total, lisibilité demandée par le chef SSV) ; false pour la fiche "exact
  *  canevas" (rapport_mensuel_exact.docx), qui reproduit la liste à plat du canevas papier littéral,
  *  sans regroupement — voir buildDocExact dans buildReportTemplates.ts. */
-export async function genererPayloadDD(periodeId: string, agregerEvenementsParArrondissement = true) {
+export async function genererPayloadDD(db: PrismaClient, periodeId: string, agregerEvenementsParArrondissement = true) {
   const periode = await db.periodeReporting.findUniqueOrThrow({ where: { id: periodeId } });
-  const { payload, templates, moisPrecedent } = await construirePayloadCommun(periodeId, periode.mois!, periode.annee);
+  const { payload, templates, moisPrecedent } = await construirePayloadCommun(db, periodeId, periode.mois!, periode.annee);
 
   const rawTotal = new Map<string, number | null>();
   const rawTotalPrec = new Map<string, number | null>();
@@ -398,14 +407,14 @@ export async function genererPayloadDD(periodeId: string, agregerEvenementsParAr
       for (const f of t.fields) {
         if (f.typeValeur === "TEXTE") {
           for (const arr of ARR_CODES) {
-            payload[`${f.code}_${arr}`] = (await dernierTexteMatrice(periodeId, f.code, arr)) ?? "—";
+            payload[`${f.code}_${arr}`] = (await dernierTexteMatrice(db, periodeId, f.code, arr)) ?? "—";
           }
           continue;
         }
         let total = 0;
         let auMoinsUne = false;
         for (const arr of ARR_CODES) {
-          const v = await sommeMatrice(periodeId, f.code, arr);
+          const v = await sommeMatrice(db, periodeId, f.code, arr);
           payload[`${f.code}_${arr}`] = fmt(v);
           if (v != null) {
             total += v;
@@ -414,21 +423,21 @@ export async function genererPayloadDD(periodeId: string, agregerEvenementsParAr
         }
         rawTotal.set(f.code, auMoinsUne ? total : null);
         payload[`${f.code}_TOTAL`] = auMoinsUne ? fmt(total) : "—";
-        const totalPrec = moisPrecedent ? await sommeMatrice(moisPrecedent.id, f.code, null) : null;
+        const totalPrec = moisPrecedent ? await sommeMatrice(db, moisPrecedent.id, f.code, null) : null;
         rawTotalPrec.set(f.code, totalPrec);
         payload[`${f.code}_TOTAL_PREC`] = fmt(totalPrec);
       }
     } else if (t.type === "NOMINATIF" && layout?.kind === "NOMINATIF_LOOP") {
-      payload[t.code] = await nominatifLoopRows(periodeId, t.code, layout.cols.map((c) => c.code), null);
+      payload[t.code] = await nominatifLoopRows(db, periodeId, t.code, layout.cols.map((c) => c.code), null);
     } else if (t.type === "EVENEMENT" && layout?.kind === "EVENEMENT_LOOP") {
       payload[t.code] = agregerEvenementsParArrondissement
-        ? await evenementLoopRowsGroupes(periodeId, t.code, layout.cols)
-        : await evenementLoopRows(periodeId, t.code, layout.cols, null);
+        ? await evenementLoopRowsGroupes(db, periodeId, t.code, layout.cols)
+        : await evenementLoopRows(db, periodeId, t.code, layout.cols, null);
     }
   }
 
   ajouterTotauxColonnes(payload, templates, rawTotal, rawTotalPrec);
-  await ajouterTotauxListes(payload, templates, periodeId, moisPrecedent?.id, null);
+  await ajouterTotauxListes(db, payload, templates, periodeId, moisPrecedent?.id, null);
 
   const syntheses = await db.syntheseSection.findMany({ where: { periodeId, blocCode: null }, include: { section: true } });
   for (const code of ["BAC", "PSA", "SSV", "SPAIH"]) {
@@ -440,9 +449,9 @@ export async function genererPayloadDD(periodeId: string, agregerEvenementsParAr
 }
 
 /** Rapport DA : fiche de collecte d'un seul arrondissement, identique à la mise en page papier. */
-export async function genererPayloadDA(periodeId: string, arrondissementCode: string, arrondissementNom: string) {
+export async function genererPayloadDA(db: PrismaClient, periodeId: string, arrondissementCode: string, arrondissementNom: string) {
   const periode = await db.periodeReporting.findUniqueOrThrow({ where: { id: periodeId } });
-  const { payload, templates, moisPrecedent } = await construirePayloadCommun(periodeId, periode.mois!, periode.annee);
+  const { payload, templates, moisPrecedent } = await construirePayloadCommun(db, periodeId, periode.mois!, periode.annee);
   payload.ARRONDISSEMENT_NOM = arrondissementNom;
   payload.ARRONDISSEMENT_NOM_CANEVAS = ARR_NOMS_CANEVAS[arrondissementCode] ?? arrondissementNom;
 
@@ -454,26 +463,26 @@ export async function genererPayloadDA(periodeId: string, arrondissementCode: st
     if (t.type === "MATRICE") {
       for (const f of t.fields) {
         if (f.typeValeur === "TEXTE") {
-          payload[f.code] = (await dernierTexteMatrice(periodeId, f.code, arrondissementCode)) ?? "—";
-          payload[`${f.code}_PREC`] = moisPrecedent ? (await dernierTexteMatrice(moisPrecedent.id, f.code, arrondissementCode)) ?? "—" : "—";
+          payload[f.code] = (await dernierTexteMatrice(db, periodeId, f.code, arrondissementCode)) ?? "—";
+          payload[`${f.code}_PREC`] = moisPrecedent ? (await dernierTexteMatrice(db, moisPrecedent.id, f.code, arrondissementCode)) ?? "—" : "—";
           continue;
         }
-        const v = await sommeMatrice(periodeId, f.code, arrondissementCode);
+        const v = await sommeMatrice(db, periodeId, f.code, arrondissementCode);
         rawTotal.set(f.code, v);
         payload[f.code] = fmt(v);
-        const vp = moisPrecedent ? await sommeMatrice(moisPrecedent.id, f.code, arrondissementCode) : null;
+        const vp = moisPrecedent ? await sommeMatrice(db, moisPrecedent.id, f.code, arrondissementCode) : null;
         rawTotalPrec.set(f.code, vp);
         payload[`${f.code}_PREC`] = fmt(vp);
       }
     } else if (t.type === "NOMINATIF" && layout?.kind === "NOMINATIF_LOOP") {
-      payload[t.code] = await nominatifLoopRows(periodeId, t.code, layout.cols.map((c) => c.code), arrondissementCode);
+      payload[t.code] = await nominatifLoopRows(db, periodeId, t.code, layout.cols.map((c) => c.code), arrondissementCode);
     } else if (t.type === "EVENEMENT" && layout?.kind === "EVENEMENT_LOOP") {
-      payload[t.code] = await evenementLoopRows(periodeId, t.code, layout.cols, arrondissementCode);
+      payload[t.code] = await evenementLoopRows(db, periodeId, t.code, layout.cols, arrondissementCode);
     }
   }
 
   ajouterTotauxColonnes(payload, templates, rawTotal, rawTotalPrec);
-  await ajouterTotauxListes(payload, templates, periodeId, moisPrecedent?.id, arrondissementCode);
+  await ajouterTotauxListes(db, payload, templates, periodeId, moisPrecedent?.id, arrondissementCode);
 
   return payload;
 }

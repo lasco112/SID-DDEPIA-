@@ -3,12 +3,12 @@
  * la période (chefs de section et DD, pour rejet motivé / supervision).
  */
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
 import { requireUser, ROLES_CHEF, ForbiddenError, permissionErrorResponse } from "@/lib/permissions";
 
 export async function GET(req: Request) {
   try {
     const user = await requireUser();
+    const db = user.db;
     if (!ROLES_CHEF.includes(user.role) && user.role !== "DD") {
       throw new ForbiddenError("Réservé aux chefs de section et au DD.");
     }

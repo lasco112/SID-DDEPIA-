@@ -4,12 +4,12 @@
  * le DD doit revalider après une modification.
  */
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
 import { requireUser, assertProprietaireSection, permissionErrorResponse } from "@/lib/permissions";
 
 export async function GET(req: Request) {
   try {
     const user = await requireUser();
+    const db = user.db;
     const { searchParams } = new URL(req.url);
     const periodeId = searchParams.get("periodeId");
     if (!periodeId || !user.sectionId) {
@@ -28,6 +28,7 @@ export async function GET(req: Request) {
 export async function PUT(req: Request) {
   try {
     const user = await requireUser();
+    const db = user.db;
     const { periodeId, contenuFinal } = (await req.json()) as { periodeId: string; contenuFinal: string };
     if (!user.sectionId) {
       return NextResponse.json({ message: "Compte sans section assignée" }, { status: 400 });

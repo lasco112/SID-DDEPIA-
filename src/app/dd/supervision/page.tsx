@@ -2,7 +2,7 @@ import React from 'react';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { redirect } from 'next/navigation';
-import { db } from '@/lib/db';
+import { dbForSession } from '@/lib/permissions';
 import AppShell from '@/components/AppShell';
 import DeverrouillerButton from '@/components/DeverrouillerButton';
 import SyntheseValidationRow from '@/components/SyntheseValidationRow';
@@ -20,6 +20,7 @@ export default async function DDSupervisionPage() {
   if (!session || (session.user as any).role !== 'DD') {
     redirect('/');
   }
+  const db = dbForSession(session);
 
   const periode = await db.periodeReporting.findFirst({
     where: { type: 'MENSUEL' },

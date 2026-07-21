@@ -8,7 +8,6 @@
  * Archivage versionné + hash SHA-256 + audit (CDC §9.1/§13).
  */
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
 import { requireUser, assertRole, permissionErrorResponse } from "@/lib/permissions";
 import { verifierCompletudeDD, genererPayloadDD, genererPayloadDA, rendreDocx } from "@/server/export/rapport-docx";
 import crypto from "node:crypto";
@@ -18,6 +17,7 @@ import path from "node:path";
 export async function POST(req: Request) {
   try {
     const user = await requireUser();
+    const db = user.db;
     const { periodeId, type } = (await req.json()) as { periodeId: string; type: "DD" | "DA" | "EXACT" };
 
     const periode = await db.periodeReporting.findUnique({ where: { id: periodeId } });
@@ -31,14 +31,15 @@ export async function POST(req: Request) {
 
     if (type === "DD" || type === "EXACT") {
       assertRole(user, ["DD"]);
-      const completude = await verifierCompletudeDD(periodeId);
+      const completude = await verifierCompletudeDD(db, periodeId);
       if (!completude.complet) {
         return NextResponse.json(
           { message: "Génération impossible : workflow incomplet.", ...completude },
           { status: 409 }
         );
       }
-      const payload = await genererPayloadDD(periodeId, type !== "EXACT");
+      const payload = await genererPayloadDD(db, periodeId, type !== "EXACT");
+      payload.MENTION_DEMO = user.isDemo ? "DOCUMENT DE DÉMONSTRATION — SANS VALEUR ADMINISTRATIVE" : "";
       if (type === "DD") {
         buf = await rendreDocx("rapport_mensuel_DD.docx", payload);
         fileNameBase = `Rapport_Mensuel_DDEPIA-Menoua_${periode.annee}-${String(periode.mois).padStart(2, "0")}`;
@@ -60,7 +61,8 @@ export async function POST(req: Request) {
       if (!rapport || (rapport.statut !== "SOUMIS" && rapport.statut !== "CLOTURE")) {
         return NextResponse.json({ message: "Votre rapport doit être soumis avant de générer le document." }, { status: 409 });
       }
-      const payload = await genererPayloadDA(periodeId, rapport.arrondissement.code, rapport.arrondissement.nom);
+      const payload = await genererPayloadDA(db, periodeId, rapport.arrondissement.code, rapport.arrondissement.nom);
+      payload.MENTION_DEMO = user.isDemo ? "DOCUMENT DE DÉMONSTRATION — SANS VALEUR ADMINISTRATIVE" : "";
       buf = await rendreDocx("rapport_mensuel_DA.docx", payload);
       fileNameBase = `Rapport_Mensuel_${rapport.arrondissement.nom}_${periode.annee}-${String(periode.mois).padStart(2, "0")}`;
       exportType = "RAPPORT_DA_DOCX";

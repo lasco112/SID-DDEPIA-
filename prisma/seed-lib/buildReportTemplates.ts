@@ -34,6 +34,7 @@ import {
   BorderStyle,
   VerticalMergeType,
   ShadingType,
+  Header,
 } from "docx";
 import { PrismaClient } from "@prisma/client";
 import fs from "node:fs/promises";
@@ -76,6 +77,21 @@ function row(cells: string[], opts: { bold?: boolean } = {}): TableRow {
 
 function table(rows: TableRow[]): Table {
   return new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows });
+}
+
+/** En-tête de PAGE (répété automatiquement sur chaque page par Word) portant la balise
+ *  {MENTION_DEMO} — vide en production, "DOCUMENT DE DÉMONSTRATION — SANS VALEUR
+ *  ADMINISTRATIVE" en environnement démo (correction n°10, §10.2). Résolu par
+ *  rapport-docx.ts / api/reports/generate selon user.isDemo, jamais codé en dur ici. */
+function mentionDemoHeader(): Header {
+  return new Header({
+    children: [
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        children: [new TextRun({ text: "{MENTION_DEMO}", bold: true, color: "B8842F" })],
+      }),
+    ],
+  });
 }
 
 function headerBlock(): Table {
@@ -668,7 +684,7 @@ function buildDoc(mode: "DD" | "DA", templates: Awaited<ReturnType<typeof charge
     })
   );
 
-  return new Document({ sections: [{ children }] });
+  return new Document({ sections: [{ headers: { default: mentionDemoHeader() }, children }] });
 }
 
 /**
@@ -733,7 +749,7 @@ function buildDocExact(templates: Awaited<ReturnType<typeof chargerTemplates>>):
   );
   children.push(new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: "(é)" })] }));
 
-  return new Document({ sections: [{ children }] });
+  return new Document({ sections: [{ headers: { default: mentionDemoHeader() }, children }] });
 }
 
 async function main() {

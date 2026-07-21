@@ -5,7 +5,6 @@
  */
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
-import { db } from "@/lib/db";
 import { requireUser, assertProprietaireSection, permissionErrorResponse } from "@/lib/permissions";
 
 interface Body {
@@ -23,6 +22,7 @@ interface Body {
 export async function POST(req: Request) {
   try {
     const user = await requireUser();
+    const db = user.db;
     const body = (await req.json()) as Body;
     if (!body.motif || !body.motif.trim()) {
       return NextResponse.json({ message: "Le motif de correction est obligatoire." }, { status: 400 });

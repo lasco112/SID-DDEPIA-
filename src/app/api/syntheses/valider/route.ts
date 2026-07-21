@@ -3,12 +3,12 @@
  * synthèse d'une section (CDC §6, tableau de bord DD).
  */
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
 import { requireUser, assertRole, permissionErrorResponse } from "@/lib/permissions";
 
 export async function POST(req: Request) {
   try {
     const user = await requireUser();
+    const db = user.db;
     assertRole(user, ["DD"]);
 
     const { syntheseId, valide } = (await req.json()) as { syntheseId: string; valide: boolean };
