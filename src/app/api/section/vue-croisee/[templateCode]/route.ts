@@ -102,7 +102,18 @@ export async function GET(req: Request, { params }: { params: { templateCode: st
       include: { rapport: { include: { arrondissement: true } } },
       orderBy: { syncedAt: "desc" },
     });
-    return NextResponse.json({ template, arrondissements, evenements });
+
+    // Résolution des codes de référentiel (maladie, espèce, vaccin...) en libellés lisibles —
+    // le chef de section ne doit jamais avoir à déchiffrer des codes bruts (CDC lisibilité §M4).
+    const schema = (template.schemaEvenement as Array<{ key: string; label: string; type: string; ref?: string }> | null) ?? [];
+    const refCategories = Array.from(new Set(schema.filter((c) => c.ref).map((c) => c.ref!)));
+    const refItems = refCategories.length
+      ? await db.referentielItem.findMany({ where: { categorie: { in: refCategories as any } } })
+      : [];
+    const refLibelle: Record<string, string> = {};
+    for (const r of refItems) refLibelle[`${r.categorie}:${r.code}`] = r.libelle;
+
+    return NextResponse.json({ template, arrondissements, evenements, refLibelle });
   } catch (e) {
     const { status, message } = permissionErrorResponse(e);
     return NextResponse.json({ message }, { status });
