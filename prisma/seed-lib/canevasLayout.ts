@@ -106,6 +106,7 @@ export const CANEVAS_LAYOUTS: Record<string, TableLayout> = {
       { code: "T13_OEUFS_COUVER_CHAIR", label: "Œufs à couver produits (chair)" },
       { code: "T13_POUSSINS_PONTE", label: "Poussins d'un jour produits (ponte)" },
       { code: "T13_POUSSINS_CHAIR", label: "Poussins d'un jour produits (chair)" },
+      { code: "T13_OBSERVATIONS", label: "Observations", texte: true },
     ],
   },
 
@@ -115,6 +116,7 @@ export const CANEVAS_LAYOUTS: Record<string, TableLayout> = {
       { code: "T14_PONDEUSES_DEBUT", label: "Effectif de pondeuses présentes au début du mois" },
       { code: "T14_POULES_REFORMEES", label: "Effectif de poules réformées au cours du mois" },
       { code: "T14_OEUFS_PRODUITS", label: "Nombre d'œufs produits au cours du mois" },
+      { code: "T14_OBSERVATIONS", label: "Observations", texte: true },
     ],
   },
 
@@ -123,6 +125,7 @@ export const CANEVAS_LAYOUTS: Record<string, TableLayout> = {
     cols: [
       { code: "T15_POULETS_DEBUT", label: "Nombre de poulets présents au début du mois" },
       { code: "T15_POULETS_SORTIS", label: "Nombre de poulets sortis au cours du mois" },
+      { code: "T15_OBSERVATIONS", label: "Observations", texte: true },
     ],
   },
 
@@ -185,6 +188,7 @@ export const CANEVAS_LAYOUTS: Record<string, TableLayout> = {
       { code: "T23_PROV_PORC", label: "Porc" },
       { code: "T23_PROV_BOVIN", label: "Bovins" },
       { code: "T23_PROV_POISSON", label: "Poisson" },
+      { code: "T23_OBSERVATIONS", label: "Observations", texte: true },
     ],
   },
 

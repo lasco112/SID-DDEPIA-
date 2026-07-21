@@ -118,7 +118,7 @@ export async function POST(req: Request) {
       } else if (s.famille === "NOMINATIF" && s.fieldCode && s.etablissementId) {
         await db.saisieNominative.upsert({
           where: { clientId: s.clientId },
-          update: { valeur, nonRenseigne: s.nonRenseigne, syncedAt: new Date(), saisiParId: user.id },
+          update: { valeur, valeurTexte, nonRenseigne: s.nonRenseigne, syncedAt: new Date(), saisiParId: user.id },
           create: {
             clientId: s.clientId,
             rapportId: rapport.id,
@@ -126,6 +126,7 @@ export async function POST(req: Request) {
             etablissementId: s.etablissementId,
             fieldCode: s.fieldCode,
             valeur,
+            valeurTexte,
             nonRenseigne: s.nonRenseigne,
             saisiParId: user.id,
           },

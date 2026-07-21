@@ -368,8 +368,8 @@ function renderNominatifLoop(templateCode: string, cols: ColDef[], withArr: bool
   const dataPlaceholders = [...(withArr ? ["{ARR}"] : []), "{NOM}", "{LOCALITE}", ...cols.map((c) => `{${c.code}}`)];
   const rows = [row(headerLabels, { bold: true }), loopRow(templateCode, dataPlaceholders, true, true)];
   const leadingBlanks = Array((withArr ? 1 : 0) + 1).fill(""); // Nom + Localité (+ Arrondissement) moins la cellule de libellé
-  rows.push(row(["TOTAL MOIS COURANT", ...leadingBlanks, ...cols.map((c) => `{${c.code}_TOTAL}`)], { bold: true }));
-  rows.push(row(["TOTAL MOIS PRÉCÉDENT", ...leadingBlanks, ...cols.map((c) => `{${c.code}_TOTAL_PREC}`)]));
+  rows.push(row(["TOTAL MOIS COURANT", ...leadingBlanks, ...cols.map((c) => (c.texte ? "" : `{${c.code}_TOTAL}`))], { bold: true }));
+  rows.push(row(["TOTAL MOIS PRÉCÉDENT", ...leadingBlanks, ...cols.map((c) => (c.texte ? "" : `{${c.code}_TOTAL_PREC}`))]));
   return table(rows);
 }
 

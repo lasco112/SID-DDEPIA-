@@ -188,5 +188,28 @@ export function parseDictionnaire(
     }
   }
 
+  ajouterChampsObservations(tableaux);
   return tableaux;
+}
+
+/** Ajoute un champ "Observations" (texte libre, non sommé) aux tableaux NOMINATIF listant des
+ *  acteurs individuels (production avicole chair/ponte, poussins, provenderies) — demande
+ *  explicite du DD (correction n°5), absente du classeur dictionnaire officiel : on l'ajoute ici
+ *  plutôt que dans le xlsx pour ne jamais perdre cet ajout lors d'un remplacement du classeur. */
+function ajouterChampsObservations(tableaux: TableauDico[]) {
+  const TABLES_ACTEURS = new Set(["T13", "T14", "T15", "T23"]);
+  for (const t of tableaux) {
+    if (!TABLES_ACTEURS.has(t.templateCode) || t.famille !== "NOMINATIF") continue;
+    t.champs.push({
+      numero: t.numero,
+      code: `${t.templateCode}_OBSERVATIONS`,
+      libelle: "Observations",
+      unite: "",
+      typeValeur: "TEXTE",
+      famille: t.famille,
+      sectionCode: t.sectionCode,
+      agregation: "STOCK",
+      ordre: t.champs.length + 1,
+    });
+  }
 }

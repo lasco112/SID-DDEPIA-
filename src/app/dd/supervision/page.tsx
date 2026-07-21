@@ -37,6 +37,15 @@ export default async function DDSupervisionPage() {
 
   const arrondissements = await db.arrondissement.findMany({ orderBy: { ordre: 'asc' } });
 
+  const daManquants = arrondissements
+    .filter((a) => !rapports.some((r) => r.arrondissementId === a.id && (r.statut === 'SOUMIS' || r.statut === 'CLOTURE')))
+    .map((a) => a.nom);
+  const sectionsNonValidees = sections
+    .filter((s) => s.code !== 'BAC')
+    .filter((s) => validations.find((v) => v.sectionId === s.id)?.statut !== 'VALIDE')
+    .map((s) => s.nom);
+  const generationBloquee = daManquants.length > 0 || sectionsNonValidees.length > 0;
+
   return (
     <AppShell allowedRoles={['DD']}>
       <div className="max-w-6xl">
@@ -53,6 +62,23 @@ export default async function DDSupervisionPage() {
                 <GenererRapportDDButton periodeId={periode.id} type="EXACT" />
               </div>
             </div>
+
+            {generationBloquee && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                <p className="font-semibold">Le rapport départemental ne pourra pas encore être généré.</p>
+                {daManquants.length > 0 && (
+                  <p className="mt-1">
+                    Arrondissements n'ayant pas encore soumis leur rapport : <strong>{daManquants.join(', ')}</strong>.
+                  </p>
+                )}
+                {sectionsNonValidees.length > 0 && (
+                  <p className="mt-1">
+                    Sections n'ayant pas encore validé leurs données (elles doivent cliquer sur « Valider ma section pour
+                    cette période » dans leur page « Contrôle sectoriel ») : <strong>{sectionsNonValidees.join(', ')}</strong>.
+                  </p>
+                )}
+              </div>
+            )}
 
             <section>
               <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">État de soumission des arrondissements</h2>

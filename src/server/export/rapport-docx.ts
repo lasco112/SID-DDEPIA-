@@ -116,7 +116,7 @@ async function ajouterTotauxListes(
   for (const t of templates) {
     const layout = CANEVAS_LAYOUTS[t.code];
     if (t.type === "NOMINATIF" && layout?.kind === "NOMINATIF_LOOP") {
-      for (const c of layout.cols) {
+      for (const c of layout.cols.filter((c) => !c.texte)) {
         payload[`${c.code}_TOTAL`] = fmt(await sommeNominatif(periodeId, c.code, arrCode));
         payload[`${c.code}_TOTAL_PREC`] = moisPrecedentId ? fmt(await sommeNominatif(moisPrecedentId, c.code, arrCode)) : "N/D";
       }
@@ -147,7 +147,9 @@ async function nominatifLoopRows(periodeId: string, templateCode: string, fieldC
       byEtab.set(s.etablissementId, r);
       ordreEtab.set(s.etablissementId, { ordre: s.rapport.arrondissement.ordre, nom: s.etablissement.nom });
     }
-    r[s.fieldCode] = s.nonRenseigne || s.valeur == null ? "N/D" : fmt(Number(s.valeur));
+    if (s.nonRenseigne) r[s.fieldCode] = "N/D";
+    else if (s.valeurTexte != null) r[s.fieldCode] = s.valeurTexte || "N/D"; // champ TEXTE (ex. Observations) : jamais dans `valeur`
+    else r[s.fieldCode] = s.valeur == null ? "N/D" : fmt(Number(s.valeur));
   }
   for (const r of Array.from(byEtab.values())) for (const fc of fieldCodes) if (!(fc in r)) r[fc] = "N/D";
   return Array.from(byEtab.entries())
@@ -266,11 +268,12 @@ export interface CompletudeDD {
 }
 
 export async function verifierCompletudeDD(periodeId: string): Promise<CompletudeDD> {
-  const [periode, arrondissements, rapports, validations] = await Promise.all([
+  const [periode, arrondissements, rapports, sections, validations] = await Promise.all([
     db.periodeReporting.findUniqueOrThrow({ where: { id: periodeId } }),
     db.arrondissement.findMany({ orderBy: { ordre: "asc" } }),
     db.rapportArrondissement.findMany({ where: { periodeId }, include: { arrondissement: true } }),
-    db.validationSection.findMany({ where: { periodeId }, include: { section: true } }),
+    db.section.findMany({ orderBy: { ordre: "asc" } }),
+    db.validationSection.findMany({ where: { periodeId } }),
   ]);
   const daManquants = arrondissements
     .filter((a) => !rapports.some((r) => r.arrondissementId === a.id && (r.statut === "SOUMIS" || r.statut === "CLOTURE")))
@@ -279,10 +282,14 @@ export async function verifierCompletudeDD(periodeId: string): Promise<Completud
   // n'est pas bloquante pour le rapport MENSUEL (demande explicite du DD). Elle
   // redeviendra obligatoire pour les périodes trimestrielle/semestrielle/annuelle
   // (phase ultérieure, non encore implémentée).
-  const sectionsNonValidees = validations
-    .filter((v) => v.statut !== "VALIDE")
-    .filter((v) => !(periode.type === "MENSUEL" && v.section.code === "BAC"))
-    .map((v) => v.section.code);
+  // On part de la liste COMPLÈTE des sections (pas seulement celles qui ont déjà une ligne
+  // ValidationSection) : une section jamais touchée par son chef n'a pas encore de ligne
+  // en base (elle n'est créée qu'à la 1ère validation, ou par le cron de rappel de fin de
+  // mois) et doit compter comme non validée, pas être ignorée silencieusement.
+  const sectionsNonValidees = sections
+    .filter((s) => !(periode.type === "MENSUEL" && s.code === "BAC"))
+    .filter((s) => validations.find((v) => v.sectionId === s.id)?.statut !== "VALIDE")
+    .map((s) => s.nom);
   return { complet: daManquants.length === 0 && sectionsNonValidees.length === 0, daManquants, sectionsNonValidees };
 }
 
@@ -476,6 +483,17 @@ export async function rendreDocx(templateFile: string, payload: Record<string, u
   const templateBuf = await fs.readFile(templatePath);
   const zip = new PizZip(templateBuf);
   const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true, nullGetter: () => "N/D" });
-  doc.render(payload);
+  try {
+    doc.render(payload);
+  } catch (e: any) {
+    // Docxtemplater lève une erreur "Multi error" peu parlante à ce niveau ; le détail utile
+    // (quelle balise, quel tableau) est dans e.properties.errors — on le journalise côté
+    // serveur et on renvoie un message clair à l'utilisateur plutôt qu'un plantage muet.
+    const detail = Array.isArray(e?.properties?.errors)
+      ? e.properties.errors.map((err: any) => err.properties?.explanation ?? err.message).join(" ; ")
+      : e?.message;
+    console.error(`rendreDocx(${templateFile}) a échoué :`, detail ?? e);
+    throw new Error(`Échec de la mise en page du document (${templateFile}) : ${detail ?? "erreur inconnue"}.`);
+  }
   return doc.getZip().generate({ type: "nodebuffer" }) as Buffer;
 }

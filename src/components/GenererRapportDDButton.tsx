@@ -24,9 +24,15 @@ export default function GenererRapportDDButton({ periodeId, type = "DD", label }
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         const details = [
-          ...(data.daManquants?.length ? [`Arrondissements non soumis : ${data.daManquants.join(", ")}`] : []),
-          ...(data.sectionsNonValidees?.length ? [`Sections non validées : ${data.sectionsNonValidees.join(", ")}`] : []),
-        ].join(" — ");
+          ...(data.daManquants?.length
+            ? [`Arrondissements n'ayant pas encore soumis leur rapport : ${data.daManquants.join(", ")}.`]
+            : []),
+          ...(data.sectionsNonValidees?.length
+            ? [
+                `Sections n'ayant pas encore validé leurs données (menu « Contrôle sectoriel » du chef concerné, bouton « Valider ma section pour cette période ») : ${data.sectionsNonValidees.join(", ")}.`,
+              ]
+            : []),
+        ].join(" ");
         throw new Error([data.message, details].filter(Boolean).join(" "));
       }
       const blob = await res.blob();

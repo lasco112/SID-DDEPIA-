@@ -3,7 +3,9 @@
 /**
  * FormNominatif.tsx — rendu générique des tableaux NOMINATIF (CDC §M2).
  * Une ligne par établissement actif du registre (arrondissement du DA),
- * une colonne par FormField.
+ * une colonne par FormField. Les champs `typeValeur === "TEXTE"` (ex.
+ * Observations) utilisent un champ texte libre et ne passent jamais par
+ * `Number()` — même principe que FormMatrice.tsx pour T21_LIEUX.
  */
 
 import { useEffect, useState, useCallback } from "react";
@@ -13,6 +15,7 @@ interface FormFieldDto {
   code: string;
   libelle: string;
   uniteCode: string | null;
+  typeValeur: string;
   ordre: number;
 }
 interface EtablissementDto {
@@ -51,7 +54,15 @@ export default function FormNominatif({
       const initial: Record<Cle, Cellule> = {};
       const auteursInitial: Record<Cle, string> = {};
 
-      let serveur: Array<{ etablissementId: string; fieldCode: string; valeur: string | null; nonRenseigne: boolean; clientId: string; saisiPar: { nom: string; username: string } | null }> = [];
+      let serveur: Array<{
+        etablissementId: string;
+        fieldCode: string;
+        valeur: string | null;
+        valeurTexte: string | null;
+        nonRenseigne: boolean;
+        clientId: string;
+        saisiPar: { nom: string; username: string } | null;
+      }> = [];
       try {
         const res = await fetch(`/api/rapports/mes-saisies?periodeId=${periodeId}&templateCode=${template.code}`);
         if (res.ok) serveur = (await res.json()).nominatif ?? [];
@@ -64,10 +75,15 @@ export default function FormNominatif({
 
       for (const etab of etablissements) {
         for (const f of template.fields) {
+          const texte = f.typeValeur === "TEXTE";
           const cle = `${etab.id}:${f.code}`;
           const local = await trouverSaisieNominatif(username, periodeId, template.code, etab.id, f.code);
           if (local) {
-            initial[cle] = { valeur: local.valeur == null ? "" : String(local.valeur), nonRenseigne: local.nonRenseigne, clientId: local.clientId };
+            initial[cle] = {
+              valeur: texte ? local.valeurTexte ?? "" : local.valeur == null ? "" : String(local.valeur),
+              nonRenseigne: local.nonRenseigne,
+              clientId: local.clientId,
+            };
             continue;
           }
           const distant = serveur.find((s) => s.etablissementId === etab.id && s.fieldCode === f.code);
@@ -80,12 +96,17 @@ export default function FormNominatif({
               famille: "NOMINATIF",
               etablissementId: etab.id,
               fieldCode: f.code,
-              valeur: distant.valeur == null ? null : Number(distant.valeur),
+              valeur: texte ? null : distant.valeur == null ? null : Number(distant.valeur),
+              valeurTexte: texte ? distant.valeurTexte ?? null : null,
               nonRenseigne: distant.nonRenseigne,
               statutLocal: "SYNCHRONISE",
               updatedAt: new Date().toISOString(),
             });
-            initial[cle] = { valeur: distant.valeur == null ? "" : String(distant.valeur), nonRenseigne: distant.nonRenseigne, clientId: distant.clientId };
+            initial[cle] = {
+              valeur: texte ? distant.valeurTexte ?? "" : distant.valeur == null ? "" : String(distant.valeur),
+              nonRenseigne: distant.nonRenseigne,
+              clientId: distant.clientId,
+            };
           } else {
             initial[cle] = { valeur: "", nonRenseigne: false, clientId: crypto.randomUUID() };
           }
@@ -104,7 +125,7 @@ export default function FormNominatif({
   }, [template.code, template.fields, periodeId, etablissements, username]);
 
   const sauvegarder = useCallback(
-    async (etablissementId: string, fieldCode: string, patch: Partial<Cellule>) => {
+    async (etablissementId: string, fieldCode: string, texte: boolean, patch: Partial<Cellule>) => {
       const cle = `${etablissementId}:${fieldCode}`;
       setCellules((prev) => {
         const courante = prev[cle] ?? { valeur: "", nonRenseigne: false, clientId: crypto.randomUUID() };
@@ -119,7 +140,8 @@ export default function FormNominatif({
           famille: "NOMINATIF",
           etablissementId,
           fieldCode,
-          valeur: nouvelle.nonRenseigne ? null : numVal,
+          valeur: texte || nouvelle.nonRenseigne ? null : numVal,
+          valeurTexte: texte && !nouvelle.nonRenseigne ? (nouvelle.valeur.trim() === "" ? null : nouvelle.valeur) : null,
           nonRenseigne: nouvelle.nonRenseigne,
           statutLocal: "BROUILLON_LOCAL",
           updatedAt: new Date().toISOString(),
@@ -161,20 +183,21 @@ export default function FormNominatif({
               {template.fields.map((f) => {
                 const cle = `${etab.id}:${f.code}`;
                 const cellule = cellules[cle];
+                const texte = f.typeValeur === "TEXTE";
                 return (
                   <td key={f.code} className="border-b border-gray-100 px-4 py-2">
                     <input
-                      type="number"
-                      className="w-24 rounded border border-gray-300 px-2 py-1 disabled:bg-gray-100"
+                      type={texte ? "text" : "number"}
+                      className={texte ? "w-56 rounded border border-gray-300 px-2 py-1 disabled:bg-gray-100" : "w-24 rounded border border-gray-300 px-2 py-1 disabled:bg-gray-100"}
                       value={cellule?.nonRenseigne ? "" : cellule?.valeur ?? ""}
                       disabled={cellule?.nonRenseigne}
-                      onChange={(e) => sauvegarder(etab.id, f.code, { valeur: e.target.value })}
+                      onChange={(e) => sauvegarder(etab.id, f.code, texte, { valeur: e.target.value })}
                     />
                     <label className="mt-1 flex items-center gap-1 text-xs">
                       <input
                         type="checkbox"
                         checked={cellule?.nonRenseigne ?? false}
-                        onChange={(e) => sauvegarder(etab.id, f.code, { nonRenseigne: e.target.checked, valeur: "" })}
+                        onChange={(e) => sauvegarder(etab.id, f.code, texte, { nonRenseigne: e.target.checked, valeur: "" })}
                       />
                       N/D
                     </label>
