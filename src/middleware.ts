@@ -36,13 +36,43 @@ const PROTECTED_PREFIXES: Array<{ prefix: string; roles: string[] }> = [
   { prefix: "/api/periodes/deverrouiller", roles: ["DD"] },
 ];
 
+// Correction n°10 (mode Démo), Phase 1 : seules ces routes ont été vérifiées comme
+// interrogeant réellement la base de démonstration (voir user.db / dbForSession dans
+// lib/permissions.ts). Tant qu'une route n'est pas dans cette liste, une session démo
+// ne doit JAMAIS l'atteindre — sinon elle verrait les données réelles de production,
+// ce que le cahier des charges interdit explicitement. Étendre cette liste à mesure que
+// d'autres routes sont migrées (Phase 2 : vue croisée, supervision DD, génération de
+// rapports...), jamais avant de l'avoir fait.
+const CHEMINS_SURS_DEMO = [
+  "/dashboard",
+  "/da/saisie",
+  "/api/auth",
+  "/api/periodes/active",
+  "/api/form-templates",
+  "/api/rapports/mon-rapport",
+  "/api/rapports/mes-saisies",
+  "/api/rapports/submit",
+  "/api/sync",
+  "/api/notifications",
+];
+
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
-  const rule = PROTECTED_PREFIXES.find((r) => pathname.startsWith(r.prefix));
-  if (!rule) return NextResponse.next();
-
   const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
   const isApi = pathname.startsWith("/api/");
+
+  if (token?.isDemo && pathname !== "/" && pathname !== "/demo" && !CHEMINS_SURS_DEMO.some((p) => pathname === p || pathname.startsWith(`${p}/`))) {
+    if (isApi) {
+      return NextResponse.json(
+        { message: "Cette fonctionnalité n'est pas encore disponible dans l'environnement de démonstration." },
+        { status: 403 }
+      );
+    }
+    return NextResponse.redirect(new URL("/dashboard", req.url));
+  }
+
+  const rule = PROTECTED_PREFIXES.find((r) => pathname.startsWith(r.prefix));
+  if (!rule) return NextResponse.next();
 
   if (!token) {
     if (isApi) {
@@ -63,5 +93,14 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/da/:path*", "/dd/:path*", "/section/:path*", "/admin/:path*", "/etablissements/:path*", "/technique/:path*", "/api/:path*"],
+  matcher: [
+    "/da/:path*",
+    "/dd/:path*",
+    "/section/:path*",
+    "/admin/:path*",
+    "/etablissements/:path*",
+    "/technique/:path*",
+    "/api/:path*",
+    "/dashboard",
+  ],
 };

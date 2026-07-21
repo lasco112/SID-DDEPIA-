@@ -98,6 +98,12 @@ export default function LoginPage() {
             </div>
           </div>
 
+          <div className="mt-4 text-center">
+            <a href="/demo" className="text-[13.5px] font-semibold text-primary hover:underline">
+              Accéder à la démonstration →
+            </a>
+          </div>
+
           <p className="mt-5 text-center text-xs leading-relaxed text-ink-faint">
             Ministère de l'Élevage, des Pêches et des Industries Animales
             <br />

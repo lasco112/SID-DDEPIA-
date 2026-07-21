@@ -4,6 +4,7 @@ import { Manrope } from 'next/font/google';
 import Providers from '@/components/Providers';
 import ServiceWorkerRegister from '@/components/ServiceWorkerRegister';
 import SplashScreen from '@/components/SplashScreen';
+import DemoBanner from '@/components/DemoBanner';
 
 const manrope = Manrope({ subsets: ['latin'], variable: '--font-manrope' });
 
@@ -28,7 +29,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <body className="font-sans text-[15px] leading-[1.45] text-ink antialiased">
         <ServiceWorkerRegister />
         <SplashScreen />
-        <Providers>{children}</Providers>
+        <Providers>
+          <DemoBanner />
+          {children}
+        </Providers>
       </body>
     </html>
   );

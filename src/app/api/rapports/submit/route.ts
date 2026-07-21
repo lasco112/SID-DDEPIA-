@@ -4,12 +4,12 @@
  * point seules les corrections tracées des chefs de section sont possibles.
  */
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
 import { requireUser, assertRole, permissionErrorResponse } from "@/lib/permissions";
 
 export async function POST(req: Request) {
   try {
     const user = await requireUser();
+    const db = user.db;
     assertRole(user, ["DA"]);
     if (!user.arrondissementId) {
       return NextResponse.json({ message: "Compte DA sans arrondissement assigné" }, { status: 400 });

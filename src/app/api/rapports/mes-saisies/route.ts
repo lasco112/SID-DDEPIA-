@@ -5,12 +5,12 @@
  * reste la source de vérité tant qu'il contient des données).
  */
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
 import { requireUser, assertRole, permissionErrorResponse } from "@/lib/permissions";
 
 export async function GET(req: Request) {
   try {
     const user = await requireUser();
+    const db = user.db;
     assertRole(user, ["DA", "AGENT_SAISIE"]);
     if (!user.arrondissementId) {
       return NextResponse.json({ message: "Compte DA sans arrondissement assigné" }, { status: 400 });

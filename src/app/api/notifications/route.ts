@@ -4,13 +4,12 @@
  * passerelle réelle (phase 3) : seul IN_APP est affiché ici.
  */
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
 import { requireUser, permissionErrorResponse } from "@/lib/permissions";
 
 export async function GET() {
   try {
     const user = await requireUser();
-    const notifications = await db.notification.findMany({
+    const notifications = await user.db.notification.findMany({
       where: { destinataireId: user.id, canal: "IN_APP" },
       orderBy: { createdAt: "desc" },
       take: 20,

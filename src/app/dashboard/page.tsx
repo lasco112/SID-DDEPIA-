@@ -1,7 +1,7 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { db } from "@/lib/db";
+import { dbForSession } from "@/lib/permissions";
 import AppShell from "@/components/AppShell";
 import NotificationsPanel from "@/components/NotificationsPanel";
 
@@ -42,6 +42,7 @@ function StatCard({ label, value, sub, valueColor }: { label: string; value: str
 export default async function DashboardPage() {
   const session = await getServerSession(authOptions);
   if (!session) redirect("/");
+  const db = dbForSession(session);
 
   const role = (session.user as any).role as string;
   const username = (session.user as any).username as string;

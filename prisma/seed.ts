@@ -17,6 +17,7 @@ import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { parseDictionnaire, EVENEMENT_SCHEMAS } from "./seed-lib/parseDictionnaire";
 import { NOMINATIF_ETABLISSEMENT_TYPE } from "./seed-lib/nominatifEtablissementTypes";
+import { ARRONDISSEMENTS, SECTIONS, GROUPES_REFERENTIELS } from "./seed-lib/referentielsDeBase";
 
 const prisma = new PrismaClient();
 
@@ -32,109 +33,17 @@ function slugUnite(raw: string): { code: string; libelle: string } {
 }
 
 async function seedTerritoireEtSections() {
-  const arrondissements = [
-    { code: "DSC", nom: "Dschang", ordre: 1 },
-    { code: "FOK", nom: "Fokoué", ordre: 2 },
-    { code: "FGT", nom: "Fongo-Tongo", ordre: 3 },
-    { code: "NKN", nom: "Nkong-Ni", ordre: 4 },
-    { code: "PKM", nom: "Penka-Michel", ordre: 5 },
-    { code: "STC", nom: "Santchou", ordre: 6 },
-  ];
-  for (const a of arrondissements) {
+  for (const a of ARRONDISSEMENTS) {
     await prisma.arrondissement.upsert({ where: { code: a.code }, update: {}, create: a });
   }
-
-  const sections = [
-    { code: "BAC", nom: "Bureau des Affaires Communes", ordre: 1 },
-    { code: "PSA", nom: "Productions et Statistiques Animales", ordre: 2 },
-    { code: "SSV", nom: "Services Vétérinaires", ordre: 3 },
-    { code: "SPAIH", nom: "Pêches, Aquaculture et Industries Halieutiques", ordre: 4 },
-  ];
-  for (const s of sections) {
+  for (const s of SECTIONS) {
     await prisma.section.upsert({ where: { code: s.code }, update: {}, create: s });
   }
-
-  return { arrondissements, sections };
+  return { arrondissements: ARRONDISSEMENTS, sections: SECTIONS };
 }
 
 async function seedReferentiels() {
-  const especes = [
-    ["ESP_BOVIN", "Bovins"], ["ESP_OVIN", "Ovins"], ["ESP_CAPRIN", "Caprins"],
-    ["ESP_PORCIN", "Porcins"], ["ESP_CAMELIN", "Camelins"], ["ESP_ASIN", "Asins"],
-    ["ESP_EQUIN", "Equins"], ["ESP_CANIN", "Canins"], ["ESP_LAPIN", "Lapins"],
-    ["ESP_AULACODE", "Aulacodes"], ["ESP_FELIN", "Félins"], ["ESP_COBAYE", "Cobayes"],
-    ["ESP_PRIMATE", "Primates"],
-  ] as const;
-
-  const maladies = [
-    ["MAL_PPR", "Peste des petits ruminants"],
-    ["MAL_FIEVRE_APHTEUSE", "Fièvre aphteuse"],
-    ["MAL_PESTE_PORCINE_AFRICAINE", "Peste porcine africaine"],
-    ["MAL_NEWCASTLE", "Maladie de Newcastle"],
-    ["MAL_CHARBON_BACTERIDIEN", "Charbon bactéridien"],
-    ["MAL_PASTEURELLOSE", "Pasteurellose"],
-    ["MAL_RAGE", "Rage"],
-    ["MAL_TRYPANOSOMOSE", "Trypanosomose"],
-    ["MAL_DERMATOSE_NODULAIRE", "Dermatose nodulaire contagieuse"],
-    ["MAL_CLAVELEE", "Clavelée"],
-    ["MAL_COLIBACILLOSE_AVIAIRE", "Colibacillose aviaire"],
-    ["MAL_COCCIDIOSE", "Coccidiose"],
-    ["MAL_GUMBORO", "Maladie de Gumboro"],
-    ["MAL_AUTRE", "Autre maladie"],
-  ] as const;
-
-  const vaccins = [
-    ["VAC_PPR", "Vaccin PPR"],
-    ["VAC_NEWCASTLE", "Vaccin Newcastle"],
-    ["VAC_CHARBON_BACTERIDIEN", "Vaccin charbon bactéridien"],
-    ["VAC_PASTEURELLOSE", "Vaccin pasteurellose"],
-    ["VAC_RAGE", "Vaccin antirabique"],
-    ["VAC_GUMBORO", "Vaccin Gumboro"],
-    ["VAC_CLAVELEE", "Vaccin clavelée"],
-  ] as const;
-
-  const actesVeterinaires = [
-    ["ACTE_CONSULTATION", "Consultation"],
-    ["ACTE_DEPARASITAGE", "Déparasitage"],
-    ["ACTE_CASTRATION", "Castration"],
-    ["ACTE_VACCINATION_PRIVEE", "Vaccination (privé)"],
-    ["ACTE_CHIRURGIE", "Chirurgie"],
-    ["ACTE_VELAGE_ASSISTE", "Vêlage assisté"],
-    ["ACTE_AUTRE", "Autre acte"],
-  ] as const;
-
-  const motifsSaisie = [
-    ["MOTIF_TUBERCULOSE", "Tuberculose"],
-    ["MOTIF_CYSTICERCOSE", "Cysticercose"],
-    ["MOTIF_DISTOMATOSE", "Distomatose"],
-    ["MOTIF_PUTREFACTION", "Putréfaction"],
-    ["MOTIF_ABCES_GENERALISE", "Abcès généralisé"],
-    ["MOTIF_CACHEXIE", "Cachexie"],
-    ["MOTIF_AUTRE", "Autre motif"],
-  ] as const;
-
-  const typesEtablissement = [
-    ["ETAB_COUVOIR", "Couvoir"],
-    ["ETAB_FERME_PONTE", "Ferme de ponte"],
-    ["ETAB_FERME_CHAIR", "Ferme de poulets de chair"],
-    ["ETAB_PROVENDERIE", "Provenderie"],
-    ["ETAB_ABATTOIR", "Abattoir"],
-    ["ETAB_AIRE_ABATTAGE", "Aire d'abattage aménagée"],
-    ["ETAB_MARCHE", "Marché à bétail"],
-    ["ETAB_ETANG", "Étang piscicole"],
-    ["ETAB_CLINIQUE_PRIVEE", "Clinique vétérinaire privée"],
-  ] as const;
-
-  const groupes: Array<{ categorie: string; items: readonly (readonly [string, string])[] }> = [
-    { categorie: "ESPECE", items: especes },
-    { categorie: "MALADIE", items: maladies },
-    { categorie: "VACCIN", items: vaccins },
-    { categorie: "ACTE_VETERINAIRE", items: actesVeterinaires },
-    { categorie: "MOTIF_SAISIE", items: motifsSaisie },
-    { categorie: "TYPE_ETABLISSEMENT", items: typesEtablissement },
-  ];
-
-  for (const g of groupes) {
+  for (const g of GROUPES_REFERENTIELS) {
     for (let i = 0; i < g.items.length; i++) {
       const [code, libelle] = g.items[i];
       await prisma.referentielItem.upsert({

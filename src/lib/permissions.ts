@@ -11,7 +11,8 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
-import type { Role } from "@prisma/client";
+import { demoDb } from "@/lib/demoDb";
+import type { PrismaClient, Role } from "@prisma/client";
 
 export interface SessionUser {
   id: string;
@@ -19,6 +20,13 @@ export interface SessionUser {
   username: string;
   arrondissementId: string | null;
   sectionId: string | null;
+  /** Session de démonstration (correction n°10) : jamais vrai pour un compte réel. */
+  isDemo: boolean;
+  /** Client Prisma à utiliser pour CETTE session — demoDb si isDemo, sinon la production.
+   *  Les routes non encore migrées vers le mode démo continuent d'importer `db` directement
+   *  (comportement inchangé) ; seules celles qui utilisent explicitement `user.db` deviennent
+   *  démo-conscientes. Ne jamais faire l'inverse (ne jamais utiliser `db` pour une session démo). */
+  db: PrismaClient;
 }
 
 export class ForbiddenError extends Error {
@@ -33,7 +41,11 @@ export async function requireUser(): Promise<SessionUser> {
   const session = await getServerSession(authOptions);
   if (!session?.user) throw new UnauthorizedError("Non authentifié");
 
-  const user = await db.user.findUnique({ where: { id: (session.user as any).id } });
+  const isDemo = Boolean((session.user as any).isDemo);
+  if (isDemo && !demoDb) throw new UnauthorizedError("Environnement de démonstration indisponible.");
+  const client = isDemo ? (demoDb as PrismaClient) : db;
+
+  const user = await client.user.findUnique({ where: { id: (session.user as any).id } });
   if (!user || !user.actif) throw new UnauthorizedError("Compte introuvable ou désactivé");
 
   return {
@@ -42,7 +54,18 @@ export async function requireUser(): Promise<SessionUser> {
     username: user.username,
     arrondissementId: user.arrondissementId,
     sectionId: user.sectionId,
+    isDemo,
+    db: client,
   };
+}
+
+/** Pour les pages serveur qui appellent encore `getServerSession(authOptions)` directement
+ *  (plutôt que `requireUser()`) : renvoie le client Prisma correspondant à la session (démo ou
+ *  production), sans lancer d'erreur — la page gère elle-même la redirection si non connecté. */
+export function dbForSession(session: { user?: unknown } | null): PrismaClient {
+  const isDemo = Boolean((session?.user as any)?.isDemo);
+  if (isDemo && !demoDb) throw new Error("Environnement de démonstration indisponible.");
+  return isDemo ? (demoDb as PrismaClient) : db;
 }
 
 export function assertRole(user: SessionUser, allowed: Role[]) {

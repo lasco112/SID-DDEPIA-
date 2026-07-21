@@ -11,7 +11,6 @@
  */
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
-import { db } from "@/lib/db";
 import { requireUser, assertRole, permissionErrorResponse } from "@/lib/permissions";
 
 interface SaisieOfflineIn {
@@ -30,6 +29,7 @@ interface SaisieOfflineIn {
 export async function POST(req: Request) {
   try {
     const user = await requireUser();
+    const db = user.db;
     assertRole(user, ["DA", "AGENT_SAISIE"]);
 
     const body = (await req.json()) as { periodeId: string; saisies: SaisieOfflineIn[] };
@@ -118,7 +118,7 @@ export async function POST(req: Request) {
       } else if (s.famille === "NOMINATIF" && s.fieldCode && s.etablissementId) {
         await db.saisieNominative.upsert({
           where: { clientId: s.clientId },
-          update: { valeur, valeurTexte, nonRenseigne: s.nonRenseigne, syncedAt: new Date(), saisiParId: user.id },
+          update: { valeur, valeurTexte, nonRenseigne: s.nonRenseigne, motifNonRenseigne: s.motifNonRenseigne ?? null, syncedAt: new Date(), saisiParId: user.id },
           create: {
             clientId: s.clientId,
             rapportId: rapport.id,
@@ -128,6 +128,7 @@ export async function POST(req: Request) {
             valeur,
             valeurTexte,
             nonRenseigne: s.nonRenseigne,
+            motifNonRenseigne: s.motifNonRenseigne ?? null,
             saisiParId: user.id,
           },
         });

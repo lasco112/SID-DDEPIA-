@@ -4,7 +4,6 @@
  * n'est codé en dur côté client.
  */
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
 import { requireUser, permissionErrorResponse, ROLES_CHEF, ACCES_TABLEAU_SUPPLEMENTAIRE } from "@/lib/permissions";
 
 export async function GET() {
@@ -12,7 +11,7 @@ export async function GET() {
     const user = await requireUser();
     const scopeSection = ROLES_CHEF.includes(user.role) && user.sectionId ? user.sectionId : undefined;
     const codesSupplementaires = ACCES_TABLEAU_SUPPLEMENTAIRE[user.role] ?? [];
-    const templates = await db.formTemplate.findMany({
+    const templates = await user.db.formTemplate.findMany({
       where: {
         actif: true,
         ...(scopeSection ? { OR: [{ sectionId: scopeSection }, { code: { in: codesSupplementaires } }] } : {}),

@@ -4,13 +4,12 @@
  * de contrôle et de supervision pour connaître le periodeId à manipuler.
  */
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
 import { requireUser, permissionErrorResponse } from "@/lib/permissions";
 
 export async function GET() {
   try {
-    await requireUser();
-    const periode = await db.periodeReporting.findFirst({
+    const user = await requireUser();
+    const periode = await user.db.periodeReporting.findFirst({
       where: { type: "MENSUEL", statut: { not: "ARCHIVEE" } },
       orderBy: [{ annee: "desc" }, { mois: "desc" }],
     });

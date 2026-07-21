@@ -8,13 +8,13 @@
  *                référencées (maladie, espèce, vaccin...).
  */
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
 import { requireUser, permissionErrorResponse } from "@/lib/permissions";
 import { NOMINATIF_ETABLISSEMENT_TYPE } from "@/lib/nominatifTypes";
 
 export async function GET(_req: Request, { params }: { params: { code: string } }) {
   try {
     const user = await requireUser();
+    const db = user.db;
 
     const template = await db.formTemplate.findUnique({
       where: { code: params.code },
