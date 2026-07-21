@@ -48,7 +48,7 @@ const LIBELLES_DOMAINE: Record<string, string> = {
 export const DOMAINES = Object.entries(LIBELLES_DOMAINE).map(([code, libelle]) => ({ code, libelle }));
 
 function fmtValeur(v: unknown): string | number {
-  if (v == null) return "N/D";
+  if (v == null) return "—";
   if (typeof v === "object" && "toNumber" in (v as any)) return Number(v); // Prisma Decimal
   if (typeof v === "number") return v;
   return String(v);
@@ -108,12 +108,12 @@ export async function collecterDonneesThematiques(filtre: FiltreThematique): Pro
       for (const s of saisies) {
         const ligne = parLigne.get(cle(s.rapport.arrondissementId, s.rapport.periodeId));
         if (!ligne) continue;
-        ligne.valeurs[s.fieldCode] = s.nonRenseigne ? "N/D" : s.valeurTexte != null ? s.valeurTexte : fmtValeur(s.valeur);
+        ligne.valeurs[s.fieldCode] = s.nonRenseigne ? "—" : s.valeurTexte != null ? s.valeurTexte : fmtValeur(s.valeur);
       }
 
       const lignes = Array.from(parLigne.values())
         .filter((l) => Object.keys(l.valeurs).length > 0)
-        .map((l) => [l.arr, l.periode, ...champsRetenus.map((f) => l.valeurs[f.code] ?? "N/D")]);
+        .map((l) => [l.arr, l.periode, ...champsRetenus.map((f) => l.valeurs[f.code] ?? "—")]);
       if (lignes.length === 0) continue;
 
       resultats.push({
@@ -146,7 +146,7 @@ export async function collecterDonneesThematiques(filtre: FiltreThematique): Pro
           l = { arr: s.rapport.arrondissement.nom, periode: periodeLabel(s.rapport.periodeId), nom: s.etablissement.nom, localite: s.etablissement.localite, valeurs: {} };
           parLigne.set(k, l);
         }
-        l.valeurs[s.fieldCode] = s.nonRenseigne ? "N/D" : s.valeurTexte != null ? s.valeurTexte : fmtValeur(s.valeur);
+        l.valeurs[s.fieldCode] = s.nonRenseigne ? "—" : s.valeurTexte != null ? s.valeurTexte : fmtValeur(s.valeur);
       }
 
       resultats.push({
@@ -154,7 +154,7 @@ export async function collecterDonneesThematiques(filtre: FiltreThematique): Pro
         numero: t.numero,
         titre: t.titre,
         colonnes: ["Arrondissement", "Période", "Établissement", "Localité", ...champsRetenus.map((f) => f.libelle)],
-        lignes: Array.from(parLigne.values()).map((l) => [l.arr, l.periode, l.nom, l.localite, ...champsRetenus.map((f) => l.valeurs[f.code] ?? "N/D")]),
+        lignes: Array.from(parLigne.values()).map((l) => [l.arr, l.periode, l.nom, l.localite, ...champsRetenus.map((f) => l.valeurs[f.code] ?? "—")]),
       });
     } else if (t.type === "EVENEMENT") {
       const schema = (t.schemaEvenement as { key: string; label: string; ref?: string }[] | null) ?? [];

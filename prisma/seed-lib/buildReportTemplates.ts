@@ -214,12 +214,23 @@ function renderArrRows(cols: ColDef[], groups?: { label: string; span: number }[
   return table(rows);
 }
 
+/** Fusionne verticalement la colonne Arrondissement sur ses sous-groupes (correction n°10, demande
+ *  explicite du DD) : une seule cellule couvrant les N lignes de catégorie plutôt que des cellules
+ *  vides répétées — évite la répétition visuelle sans rien changer au contenu des données. */
 function renderArrRowsGrouped(subRows: { label: string; cols: ColDef[] }[]): Table {
   const colLabels = subRows[0].cols.map((c) => c.label);
-  const rows = [row(["ARRONDISSEMENTS", "Catégorie", ...colLabels], { bold: true })];
+  const rows: TableRow[] = [row(["ARRONDISSEMENTS", "Catégorie", ...colLabels], { bold: true })];
   for (const arr of ARR_CODES) {
     subRows.forEach((sr, i) => {
-      rows.push(row([i === 0 ? ARR_NOMS[arr] : "", sr.label, ...sr.cols.map((c) => `{${c.code}_${arr}}`)]));
+      rows.push(
+        new TableRow({
+          children: [
+            cellMerged(i === 0 ? ARR_NOMS[arr] : "", { bold: true, verticalMerge: i === 0 ? "restart" : "continue" }),
+            cell(sr.label),
+            ...sr.cols.map((c) => cell(`{${c.code}_${arr}}`)),
+          ],
+        })
+      );
     });
   }
   subRows.forEach((sr) => rows.push(row(["Total Mois Courant", sr.label, ...sr.cols.map((c) => `{${c.code}_TOTAL}`)], { bold: true })));
@@ -454,8 +465,18 @@ function renderArrRowsDA(cols: ColDef[], groups?: { label: string; span: number 
 
 function renderArrRowsGroupedDA(subRows: { label: string; cols: ColDef[] }[]): Table {
   const colLabels = subRows[0].cols.map((c) => c.label);
-  const rows = [row(["ARRONDISSEMENT", "Catégorie", ...colLabels], { bold: true })];
-  subRows.forEach((sr, i) => rows.push(row([i === 0 ? "{ARRONDISSEMENT_NOM_CANEVAS}" : "", sr.label, ...sr.cols.map((c) => `{${c.code}}`)])));
+  const rows: TableRow[] = [row(["ARRONDISSEMENT", "Catégorie", ...colLabels], { bold: true })];
+  subRows.forEach((sr, i) =>
+    rows.push(
+      new TableRow({
+        children: [
+          cellMerged(i === 0 ? "{ARRONDISSEMENT_NOM_CANEVAS}" : "", { bold: true, verticalMerge: i === 0 ? "restart" : "continue" }),
+          cell(sr.label),
+          ...sr.cols.map((c) => cell(`{${c.code}}`)),
+        ],
+      })
+    )
+  );
   subRows.forEach((sr) => rows.push(row(["Mois Précédent", sr.label, ...sr.cols.map((c) => `{${c.code}_PREC}`)])));
   return table(rows);
 }

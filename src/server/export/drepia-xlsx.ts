@@ -37,7 +37,7 @@ export async function genererExportDrepia(periodeId: string): Promise<Buffer> {
     ["Source", "Système d'Information Décisionnel DDEPIA-Menoua"],
     [],
     ["Convention", "Les codes de la colonne A sont stables d'un mois à l'autre."],
-    ["", "Une cellule 'N/D' signifie donnée non renseignée (≠ zéro)."],
+    ["", "Une cellule « — » signifie donnée non renseignée (≠ zéro)."],
   ]);
   meta.getCell("A1").font = { bold: true, size: 14 };
 
@@ -73,21 +73,21 @@ export async function genererExportDrepia(periodeId: string): Promise<Buffer> {
         for (const arr of ARR_CODES) {
           const v = await sommeField(periodeId, field.code, arr);
           if (v == null) {
-            row.push("N/D");
+            row.push("—");
           } else {
             row.push(v);
             totalCourant += v;
             auMoinsUneValeur = true;
           }
         }
-        row.push(auMoinsUneValeur ? totalCourant : "N/D");
+        row.push(auMoinsUneValeur ? totalCourant : "—");
 
         if (periodeN1) {
           const vN1 = await sommeField(periodeN1.id, field.code, null);
-          row.push(vN1 ?? "N/D");
-          row.push(vN1 != null && auMoinsUneValeur ? totalCourant - vN1 : "N/D");
+          row.push(vN1 ?? "—");
+          row.push(vN1 != null && auMoinsUneValeur ? totalCourant - vN1 : "—");
         } else {
-          row.push("N/D", "N/D");
+          row.push("—", "—");
         }
 
         ws.addRow(row);

@@ -38,7 +38,7 @@ const ARR_NOMS_CANEVAS: Record<string, string> = {
 };
 
 function fmt(v: number | null): string {
-  if (v == null) return "N/D";
+  if (v == null) return "—";
   return new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 3 }).format(v);
 }
 
@@ -118,12 +118,12 @@ async function ajouterTotauxListes(
     if (t.type === "NOMINATIF" && layout?.kind === "NOMINATIF_LOOP") {
       for (const c of layout.cols.filter((c) => !c.texte)) {
         payload[`${c.code}_TOTAL`] = fmt(await sommeNominatif(periodeId, c.code, arrCode));
-        payload[`${c.code}_TOTAL_PREC`] = moisPrecedentId ? fmt(await sommeNominatif(moisPrecedentId, c.code, arrCode)) : "N/D";
+        payload[`${c.code}_TOTAL_PREC`] = moisPrecedentId ? fmt(await sommeNominatif(moisPrecedentId, c.code, arrCode)) : "—";
       }
     } else if (t.type === "EVENEMENT" && layout?.kind === "EVENEMENT_LOOP") {
       for (const c of layout.cols.filter((c) => c.numeric)) {
         payload[`${t.code}_${c.key}_TOTAL`] = fmt(await sommeEvenementNumerique(periodeId, t.code, c.key, arrCode));
-        payload[`${t.code}_${c.key}_TOTAL_PREC`] = moisPrecedentId ? fmt(await sommeEvenementNumerique(moisPrecedentId, t.code, c.key, arrCode)) : "N/D";
+        payload[`${t.code}_${c.key}_TOTAL_PREC`] = moisPrecedentId ? fmt(await sommeEvenementNumerique(moisPrecedentId, t.code, c.key, arrCode)) : "—";
       }
     }
   }
@@ -147,11 +147,11 @@ async function nominatifLoopRows(periodeId: string, templateCode: string, fieldC
       byEtab.set(s.etablissementId, r);
       ordreEtab.set(s.etablissementId, { ordre: s.rapport.arrondissement.ordre, nom: s.etablissement.nom });
     }
-    if (s.nonRenseigne) r[s.fieldCode] = "N/D";
-    else if (s.valeurTexte != null) r[s.fieldCode] = s.valeurTexte || "N/D"; // champ TEXTE (ex. Observations) : jamais dans `valeur`
-    else r[s.fieldCode] = s.valeur == null ? "N/D" : fmt(Number(s.valeur));
+    if (s.nonRenseigne) r[s.fieldCode] = "—";
+    else if (s.valeurTexte != null) r[s.fieldCode] = s.valeurTexte || "—"; // champ TEXTE (ex. Observations) : jamais dans `valeur`
+    else r[s.fieldCode] = s.valeur == null ? "—" : fmt(Number(s.valeur));
   }
-  for (const r of Array.from(byEtab.values())) for (const fc of fieldCodes) if (!(fc in r)) r[fc] = "N/D";
+  for (const r of Array.from(byEtab.values())) for (const fc of fieldCodes) if (!(fc in r)) r[fc] = "—";
   return Array.from(byEtab.entries())
     .sort(([idA], [idB]) => {
       const a = ordreEtab.get(idA)!;
@@ -398,7 +398,7 @@ export async function genererPayloadDD(periodeId: string, agregerEvenementsParAr
       for (const f of t.fields) {
         if (f.typeValeur === "TEXTE") {
           for (const arr of ARR_CODES) {
-            payload[`${f.code}_${arr}`] = (await dernierTexteMatrice(periodeId, f.code, arr)) ?? "N/D";
+            payload[`${f.code}_${arr}`] = (await dernierTexteMatrice(periodeId, f.code, arr)) ?? "—";
           }
           continue;
         }
@@ -413,7 +413,7 @@ export async function genererPayloadDD(periodeId: string, agregerEvenementsParAr
           }
         }
         rawTotal.set(f.code, auMoinsUne ? total : null);
-        payload[`${f.code}_TOTAL`] = auMoinsUne ? fmt(total) : "N/D";
+        payload[`${f.code}_TOTAL`] = auMoinsUne ? fmt(total) : "—";
         const totalPrec = moisPrecedent ? await sommeMatrice(moisPrecedent.id, f.code, null) : null;
         rawTotalPrec.set(f.code, totalPrec);
         payload[`${f.code}_TOTAL_PREC`] = fmt(totalPrec);
@@ -454,8 +454,8 @@ export async function genererPayloadDA(periodeId: string, arrondissementCode: st
     if (t.type === "MATRICE") {
       for (const f of t.fields) {
         if (f.typeValeur === "TEXTE") {
-          payload[f.code] = (await dernierTexteMatrice(periodeId, f.code, arrondissementCode)) ?? "N/D";
-          payload[`${f.code}_PREC`] = moisPrecedent ? (await dernierTexteMatrice(moisPrecedent.id, f.code, arrondissementCode)) ?? "N/D" : "N/D";
+          payload[f.code] = (await dernierTexteMatrice(periodeId, f.code, arrondissementCode)) ?? "—";
+          payload[`${f.code}_PREC`] = moisPrecedent ? (await dernierTexteMatrice(moisPrecedent.id, f.code, arrondissementCode)) ?? "—" : "—";
           continue;
         }
         const v = await sommeMatrice(periodeId, f.code, arrondissementCode);
@@ -482,7 +482,7 @@ export async function rendreDocx(templateFile: string, payload: Record<string, u
   const templatePath = path.join(process.cwd(), "templates", templateFile);
   const templateBuf = await fs.readFile(templatePath);
   const zip = new PizZip(templateBuf);
-  const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true, nullGetter: () => "N/D" });
+  const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true, nullGetter: () => "—" });
   try {
     doc.render(payload);
   } catch (e: any) {
