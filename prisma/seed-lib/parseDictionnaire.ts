@@ -82,10 +82,19 @@ export const EVENEMENT_SCHEMAS: Record<string, ChampEvenement[]> = {
     { key: "localites", label: "Localités", type: "texte" },
   ],
   T33_EVT_ACTIVITE_PRIVEE: [
-    { key: "activite", label: "Activité", type: "ref", ref: "ACTE_VETERINAIRE" },
+    // Étendu (correction n°8, demande explicite du DD) : chaque intervention d'une clinique
+    // ou d'un partenaire privé doit rester une ligne distincte et identifiable, jamais réduite
+    // à un total — voir renderEvenementLoopGroupe / evenementLoopRowsGroupes.
+    { key: "structure", label: "Clinique ou partenaire", type: "texte" },
+    { key: "localite", label: "Localité", type: "texte" },
+    { key: "date", label: "Date de l'activité", type: "texte" },
+    { key: "activite", label: "Activité ou intervention réalisée", type: "ref", ref: "ACTE_VETERINAIRE" },
     { key: "espece", label: "Espèce", type: "ref", ref: "ESPECE" },
     { key: "maladie", label: "Maladie", type: "ref", ref: "MALADIE" },
-    { key: "effectif", label: "Effectif", type: "entier" },
+    { key: "effectif", label: "Nombre de cas ou d'animaux pris en charge", type: "entier" },
+    { key: "morts", label: "Morts", type: "entier" },
+    { key: "mesuresActions", label: "Mesures ou actions réalisées", type: "texte" },
+    { key: "observations", label: "Observations", type: "texte" },
   ],
   T35_EVT_SAISIE_ABATTOIR: [
     { key: "affection", label: "Affection / motif", type: "ref", ref: "MOTIF_SAISIE" },

@@ -262,10 +262,16 @@ export const CANEVAS_LAYOUTS: Record<string, TableLayout> = {
   T33: {
     kind: "EVENEMENT_LOOP",
     cols: [
-      { key: "activite", label: "Activité", ref: "ACTE_VETERINAIRE" },
+      { key: "structure", label: "Clinique ou partenaire" },
+      { key: "localite", label: "Localité" },
+      { key: "date", label: "Date de l'activité" },
+      { key: "activite", label: "Activité ou intervention réalisée", ref: "ACTE_VETERINAIRE" },
       { key: "espece", label: "Espèce", ref: "ESPECE" },
       { key: "maladie", label: "Maladie", ref: "MALADIE" },
-      { key: "effectif", label: "Effectif", numeric: true },
+      { key: "effectif", label: "Nombre de cas ou d'animaux pris en charge", numeric: true },
+      { key: "morts", label: "Morts", numeric: true },
+      { key: "mesuresActions", label: "Mesures ou actions réalisées" },
+      { key: "observations", label: "Observations" },
     ],
   },
 
