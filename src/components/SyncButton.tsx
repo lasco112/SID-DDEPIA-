@@ -137,7 +137,7 @@ export default function SyncButton({
       <button
         onClick={handleSync}
         disabled={state === "syncing" || pending === 0}
-        className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-gray-300"
+        className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-hover disabled:cursor-not-allowed disabled:bg-gray-300"
       >
         {state === "syncing" ? "Envoi…" : `Envoyer au ${destinataire} (${pending})`}
       </button>

@@ -91,14 +91,14 @@ export default function ReferentielsEnAttenteClient() {
                   <button
                     onClick={() => decider(item.id, "VALIDE")}
                     disabled={enCours === item.id}
-                    className="rounded-lg bg-green-700 px-3 py-1.5 text-sm font-semibold text-white hover:bg-green-800 disabled:opacity-50"
+                    className="rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-white hover:bg-primary-hover disabled:opacity-50"
                   >
                     Valider
                   </button>
                   <button
                     onClick={() => decider(item.id, "REJETE")}
                     disabled={enCours === item.id}
-                    className="rounded-lg bg-red-700 px-3 py-1.5 text-sm font-semibold text-white hover:bg-red-800 disabled:opacity-50"
+                    className="rounded-lg bg-danger px-3 py-1.5 text-sm font-semibold text-white hover:bg-danger-hover disabled:opacity-50"
                   >
                     Rejeter
                   </button>

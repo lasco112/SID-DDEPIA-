@@ -2,9 +2,42 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  /* Charte graphique officielle SID DDEPIA — voir tailwind.config.js pour les
+     classes utilitaires équivalentes ; ces variables servent aux endroits
+     (dégradés, ombres) où une classe Tailwind seule ne suffit pas. */
+  --color-primary: #397781;
+  --color-primary-hover: #2f6871;
+  --color-primary-light: #e9f5f4;
+  --color-mint: #b8e8d5;
+  --color-aqua: #a8dfe5;
+  --color-sky: #bbd8f3;
+  --color-lavender: #d4d5f5;
+  --color-text: #2f4147;
+  --color-text-secondary: #667a80;
+  --color-text-disabled: #aab8bc;
+  --color-background: #f8fafb;
+  --color-surface: #ffffff;
+  --color-border: #dce7e9;
+  --color-success: #5daf91;
+  --color-info: #609cc7;
+  --color-warning: #d9a84e;
+  --color-danger: #d96c72;
+  --color-offline: #74868b;
+  --radius-small: 8px;
+  --radius-input: 10px;
+  --radius-button: 12px;
+  --radius-card: 16px;
+  --shadow-card: 0 6px 20px rgba(47, 65, 71, 0.06);
+  --shadow-focus: 0 0 0 3px rgba(92, 163, 171, 0.15);
+  --gradient-brand: linear-gradient(135deg, #b8e8d5 0%, #a8dfe5 50%, #bbd8f3 100%);
+  --gradient-brand-soft: linear-gradient(135deg, #e9f7f1 0%, #edf7f8 50%, #eef2fb 100%);
+}
+
 body {
   margin: 0;
   padding: 0;
+  background-color: var(--color-background);
 }
 
 .sid-scroll::-webkit-scrollbar {
@@ -15,4 +48,165 @@ body {
   background: #c3ccd6;
   border-radius: 6px;
   border: 2px solid #f4f6f9;
+}
+
+/* ---------------------------------------------------------------------------
+ * Écran d'ouverture — « Les données prennent vie » (charte graphique §14).
+ * Trois fiches pastel convergent vers la base centrale, puis le nom et la
+ * signature apparaissent. Durée totale ~2,4 s, désactivée si l'utilisateur
+ * a demandé de réduire les animations.
+ * ------------------------------------------------------------------------- */
+.splash-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--gradient-brand);
+  animation: splashFadeOut 0.35s ease-in forwards;
+  animation-delay: 2.05s;
+}
+
+.splash-stage {
+  position: relative;
+  width: 220px;
+  height: 160px;
+}
+
+.splash-fiche {
+  position: absolute;
+  width: 64px;
+  height: 84px;
+  border-radius: var(--radius-input);
+  background: #fff;
+  box-shadow: 0 8px 20px rgba(47, 65, 71, 0.12);
+  opacity: 0;
+}
+.splash-fiche::before {
+  content: "";
+  position: absolute;
+  top: 14px;
+  left: 12px;
+  width: 12px;
+  height: 12px;
+  border-radius: 4px;
+}
+.splash-fiche::after {
+  content: "";
+  position: absolute;
+  top: 34px;
+  left: 12px;
+  width: 40px;
+  height: 6px;
+  border-radius: 3px;
+  background: currentColor;
+  opacity: 0.35;
+  box-shadow: 0 12px 0 currentColor;
+}
+
+.splash-fiche-mint { color: var(--color-mint); top: 0; left: 0; animation: ficheInLeft 1.3s cubic-bezier(0.22, 1, 0.36, 1) 0.4s forwards; }
+.splash-fiche-mint::before { background: var(--color-mint); }
+.splash-fiche-sky { color: var(--color-sky); top: 0; right: 0; animation: ficheInRight 1.3s cubic-bezier(0.22, 1, 0.36, 1) 0.55s forwards; }
+.splash-fiche-sky::before { background: var(--color-sky); }
+.splash-fiche-aqua { color: var(--color-aqua); top: -20px; left: 78px; animation: ficheInTop 1.15s cubic-bezier(0.22, 1, 0.36, 1) 0.7s forwards; }
+.splash-fiche-aqua::before { background: var(--color-aqua); }
+
+@keyframes ficheInLeft {
+  0% { opacity: 0; transform: translate(-40px, 10px) scale(0.85); }
+  45% { opacity: 1; transform: translate(6px, 30px) scale(1); }
+  100% { opacity: 0; transform: translate(78px, 78px) scale(0.4); }
+}
+@keyframes ficheInRight {
+  0% { opacity: 0; transform: translate(40px, 10px) scale(0.85); }
+  45% { opacity: 1; transform: translate(-6px, 30px) scale(1); }
+  100% { opacity: 0; transform: translate(-78px, 78px) scale(0.4); }
+}
+@keyframes ficheInTop {
+  0% { opacity: 0; transform: translate(0, -30px) scale(0.85); }
+  50% { opacity: 1; transform: translate(0, 8px) scale(1); }
+  100% { opacity: 0; transform: translate(0, 68px) scale(0.4); }
+}
+
+.splash-db {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 96px;
+  height: 60px;
+  border-radius: var(--radius-card);
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(47, 65, 71, 0.14);
+  opacity: 0;
+  animation: dbAppear 0.4s ease-out 1.15s forwards, dbPulse 0.6s ease-out 1.55s;
+}
+.splash-db::before,
+.splash-db::after {
+  content: "";
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  height: 1px;
+  background: var(--color-border);
+}
+.splash-db::before { top: 20px; }
+.splash-db::after { top: 40px; }
+
+@keyframes dbAppear {
+  from { opacity: 0; transform: translateX(-50%) translateY(6px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+@keyframes dbPulse {
+  0% { box-shadow: 0 8px 24px rgba(47, 65, 71, 0.14), 0 0 0 0 rgba(93, 175, 145, 0.45); }
+  60% { box-shadow: 0 8px 24px rgba(47, 65, 71, 0.14), 0 0 0 14px rgba(93, 175, 145, 0); }
+  100% { box-shadow: 0 8px 24px rgba(47, 65, 71, 0.14), 0 0 0 0 rgba(93, 175, 145, 0); }
+}
+
+.splash-titre {
+  margin-top: 28px;
+  text-align: center;
+  opacity: 0;
+  animation: textFadeUp 0.5s ease-out 1.75s forwards;
+}
+.splash-tagline {
+  margin-top: 6px;
+  text-align: center;
+  opacity: 0;
+  animation: textFadeUp 0.5s ease-out 1.95s forwards;
+}
+@keyframes textFadeUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes splashFadeOut {
+  to { opacity: 0; visibility: hidden; }
+}
+
+.splash-mini {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-background);
+  animation: splashFadeOut 0.3s ease-in forwards;
+  animation-delay: 0.5s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .splash-overlay,
+  .splash-mini {
+    animation-duration: 0.01s !important;
+    animation-delay: 0s !important;
+  }
+  .splash-fiche,
+  .splash-db,
+  .splash-titre,
+  .splash-tagline {
+    animation: none !important;
+    opacity: 1 !important;
+  }
 }

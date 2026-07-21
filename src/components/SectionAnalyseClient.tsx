@@ -70,7 +70,7 @@ export default function SectionAnalyseClient() {
       <button
         onClick={enregistrer}
         disabled={enregistrement}
-        className="mt-3 rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:bg-gray-300"
+        className="mt-3 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-hover disabled:bg-gray-300"
       >
         {enregistrement ? "Enregistrement…" : "Enregistrer la synthèse"}
       </button>

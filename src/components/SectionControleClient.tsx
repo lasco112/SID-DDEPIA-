@@ -117,7 +117,7 @@ export default function SectionControleClient() {
           <p className="mt-1 text-sm text-ink-muted">Vue croisée des 6 arrondissements. Cliquez une valeur pour la corriger (motif obligatoire, trace conservée).</p>
         </div>
         <div className="text-right">
-          <button onClick={validerSection} className="rounded-lg bg-green-700 px-4 py-2 text-sm font-semibold text-white hover:bg-green-800">
+          <button onClick={validerSection} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-hover">
             Valider ma section pour cette période
           </button>
           {validationMessage && <p className="mt-1 text-xs text-gray-600">{validationMessage}</p>}
@@ -151,7 +151,7 @@ export default function SectionControleClient() {
                       <button
                         onClick={() => rejeterRapport(r.id)}
                         disabled={!rejetMotif[r.id]?.trim()}
-                        className="rounded bg-red-700 px-2 py-1 text-xs text-white disabled:bg-gray-300"
+                        className="rounded bg-danger px-2 py-1 text-xs text-white disabled:bg-gray-300"
                       >
                         Rejeter
                       </button>
@@ -170,7 +170,7 @@ export default function SectionControleClient() {
             key={t.code}
             onClick={() => chargerVue(t.code)}
             className={`rounded-full border px-3 py-1 text-sm ${
-              selection === t.code ? "border-blue-700 bg-blue-700 text-white" : "border-gray-300 text-gray-700 hover:bg-gray-50"
+              selection === t.code ? "border-blue-700 bg-primary text-white" : "border-gray-300 text-gray-700 hover:bg-gray-50"
             }`}
           >
             {t.numero} {t.titre}
@@ -304,7 +304,7 @@ export default function SectionControleClient() {
             onChange={(e) => setMotif(e.target.value)}
           />
           <div className="mt-3 flex gap-2">
-            <button onClick={enregistrerCorrection} disabled={!motif.trim()} className="rounded bg-blue-700 px-3 py-1.5 text-sm text-white disabled:bg-gray-300">
+            <button onClick={enregistrerCorrection} disabled={!motif.trim()} className="rounded bg-primary px-3 py-1.5 text-sm text-white disabled:bg-gray-300">
               Enregistrer
             </button>
             <button onClick={() => setCorrection(null)} className="rounded border border-gray-300 px-3 py-1.5 text-sm">

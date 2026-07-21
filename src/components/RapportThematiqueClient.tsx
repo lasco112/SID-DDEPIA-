@@ -154,21 +154,21 @@ export default function RapportThematiqueClient() {
         <button
           onClick={() => generer("xlsx")}
           disabled={enCours !== null}
-          className="rounded-lg bg-green-700 px-4 py-2 text-sm font-semibold text-white hover:bg-green-800 disabled:cursor-not-allowed disabled:bg-gray-300"
+          className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-hover disabled:cursor-not-allowed disabled:bg-gray-300"
         >
           {enCours === "xlsx" ? "Génération…" : "Générer en Excel (.xlsx)"}
         </button>
         <button
           onClick={() => generer("docx")}
           disabled={enCours !== null}
-          className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-gray-300"
+          className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-hover disabled:cursor-not-allowed disabled:bg-gray-300"
         >
           {enCours === "docx" ? "Génération…" : "Générer en Word (.docx)"}
         </button>
         <button
           onClick={() => generer("pdf")}
           disabled={enCours !== null}
-          className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800 disabled:cursor-not-allowed disabled:bg-gray-300"
+          className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-hover disabled:cursor-not-allowed disabled:bg-gray-300"
         >
           {enCours === "pdf" ? "Génération…" : "Générer en PDF"}
         </button>

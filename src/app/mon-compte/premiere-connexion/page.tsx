@@ -131,7 +131,7 @@ export default function PremiereConnexionPage() {
           <button
             type="submit"
             disabled={enCours}
-            className="w-full rounded-[7px] bg-primary py-3 text-[15.5px] font-semibold text-white hover:bg-primary-darker disabled:cursor-not-allowed disabled:opacity-60"
+            className="w-full rounded-[7px] bg-primary py-3 text-[15.5px] font-semibold text-white hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-60"
           >
             {enCours ? "Enregistrement…" : "Valider et accéder à l'application"}
           </button>

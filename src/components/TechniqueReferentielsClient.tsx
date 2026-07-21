@@ -135,7 +135,7 @@ export default function TechniqueReferentielsClient() {
         <button
           type="submit"
           disabled={ajout}
-          className="mt-3 rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-gray-300"
+          className="mt-3 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-hover disabled:cursor-not-allowed disabled:bg-gray-300"
         >
           {ajout ? "Ajout…" : "Ajouter"}
         </button>

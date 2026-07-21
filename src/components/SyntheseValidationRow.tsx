@@ -44,7 +44,7 @@ export default function SyntheseValidationRow({
       </td>
       <td className="border-b px-3 py-2">
         {!valideDD && contenuFinal && (
-          <button onClick={() => valider(true)} disabled={enCours} className="rounded bg-green-700 px-2 py-1 text-xs text-white disabled:bg-gray-300">
+          <button onClick={() => valider(true)} disabled={enCours} className="rounded bg-primary px-2 py-1 text-xs text-white disabled:bg-gray-300">
             Valider
           </button>
         )}

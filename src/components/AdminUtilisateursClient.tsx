@@ -130,7 +130,7 @@ export default function AdminUtilisateursClient() {
         </div>
         <button
           onClick={() => setFormulaireOuvert((v) => !v)}
-          className="shrink-0 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-darker"
+          className="shrink-0 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-hover"
         >
           + Nouveau compte
         </button>
@@ -214,7 +214,7 @@ export default function AdminUtilisateursClient() {
           </div>
           {erreur && <p className="mt-3 text-sm text-statut-rejeteText">{erreur}</p>}
           <div className="mt-4 flex gap-2">
-            <button type="submit" disabled={creation} className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-darker disabled:opacity-60">
+            <button type="submit" disabled={creation} className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-hover disabled:opacity-60">
               {creation ? "Création…" : "Créer le compte"}
             </button>
             <button type="button" onClick={() => setFormulaireOuvert(false)} className="rounded-md border border-[#c3ccd6] px-4 py-2 text-sm font-semibold text-ink-muted">

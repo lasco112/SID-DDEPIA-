@@ -118,7 +118,7 @@ export default function RapportStatusPanel({
             <button
               onClick={soumettre}
               disabled={soumission}
-              className="rounded-lg bg-green-700 px-4 py-2 text-sm font-semibold text-white hover:bg-green-800 disabled:cursor-not-allowed disabled:bg-gray-300"
+              className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-hover disabled:cursor-not-allowed disabled:bg-gray-300"
             >
               {soumission ? "Soumission…" : "Soumettre mon rapport mensuel"}
             </button>
@@ -127,7 +127,7 @@ export default function RapportStatusPanel({
             <button
               onClick={genererDocx}
               disabled={generation}
-              className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-gray-300"
+              className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-hover disabled:cursor-not-allowed disabled:bg-gray-300"
             >
               {generation ? "Génération…" : "Générer mon rapport d'arrondissement (.docx)"}
             </button>

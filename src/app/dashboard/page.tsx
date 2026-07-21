@@ -31,7 +31,7 @@ function StatCard({ label, value, sub, valueColor }: { label: string; value: str
   return (
     <div className="rounded-[10px] border border-line bg-white p-[18px_20px]">
       <div className="text-[12.5px] font-semibold uppercase tracking-wide text-ink-faint">{label}</div>
-      <div className="mt-1.5 text-[30px] font-bold" style={{ color: valueColor ?? "#173a56" }}>
+      <div className="mt-1.5 text-[30px] font-bold" style={{ color: valueColor ?? "#2F4147" }}>
         {value}
       </div>
       {sub && <div className="mt-2.5 text-[12.5px] text-ink-muted">{sub}</div>}
