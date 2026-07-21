@@ -16,7 +16,16 @@ const LIBELLES: Record<string, string> = {
   CLOTURE: "Clôturé",
 };
 
-export default function RapportStatusPanel({ username, peutSoumettre = true }: { username: string; peutSoumettre?: boolean }) {
+export default function RapportStatusPanel({
+  username,
+  destinataire,
+  peutSoumettre = true,
+}: {
+  username: string;
+  /** Libellé du destinataire hiérarchique direct pour le bouton d'envoi, ex. "Délégué Départemental". */
+  destinataire: string;
+  peutSoumettre?: boolean;
+}) {
   const [periodeId, setPeriodeId] = useState<string | null>(null);
   const [statut, setStatut] = useState<string | null>(null);
   const [motifRejet, setMotifRejet] = useState<string | null>(null);
@@ -100,7 +109,7 @@ export default function RapportStatusPanel({ username, peutSoumettre = true }: {
           <span className="font-semibold">{statut ? LIBELLES[statut] ?? statut : "…"}</span>
           {motifRejet && <p className="mt-1 text-sm text-red-700">Motif du rejet : {motifRejet}</p>}
         </div>
-        {periodeId && <SyncButton periodeId={periodeId} username={username} onSynced={charger} />}
+        {periodeId && <SyncButton periodeId={periodeId} username={username} destinataire={destinataire} onSynced={charger} />}
       </div>
 
       {peutSoumettre && (

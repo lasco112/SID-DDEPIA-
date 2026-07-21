@@ -58,7 +58,7 @@ export default function BackupLocalButton({ username }: { username: string }) {
         return;
       }
       await offlineDB.saisies.bulkPut(aRestaurer);
-      setMessage(`${aRestaurer.length} saisie(s) restaurée(s). Pensez à synchroniser.`);
+      setMessage(`${aRestaurer.length} saisie(s) restaurée(s). Pensez à les envoyer.`);
     } catch (e) {
       setMessage(e instanceof Error ? e.message : "Échec de la restauration.");
     } finally {

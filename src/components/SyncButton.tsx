@@ -14,7 +14,18 @@ type SyncState = "idle" | "offline" | "syncing" | "done" | "error";
 
 const BATCH_SIZE = 200;
 
-export default function SyncButton({ periodeId, username, onSynced }: { periodeId: string; username: string; onSynced?: () => void }) {
+export default function SyncButton({
+  periodeId,
+  username,
+  destinataire,
+  onSynced,
+}: {
+  periodeId: string;
+  username: string;
+  /** Libellé du destinataire hiérarchique direct, ex. "Délégué Départemental" — affiché "Envoyer au {destinataire}". */
+  destinataire: string;
+  onSynced?: () => void;
+}) {
   const [online, setOnline] = useState(true);
   const [pending, setPending] = useState(0);
   const [state, setState] = useState<SyncState>("idle");
@@ -52,7 +63,7 @@ export default function SyncButton({ periodeId, username, onSynced }: { periodeI
       return;
     }
     setState("syncing");
-    setMessage("Synchronisation en cours…");
+    setMessage(`Envoi au ${destinataire} en cours…`);
 
     try {
       const queue = await offlineDB.saisies
@@ -61,7 +72,7 @@ export default function SyncButton({ periodeId, username, onSynced }: { periodeI
         .toArray();
       if (queue.length === 0) {
         setState("done");
-        setMessage("Aucune donnée à synchroniser.");
+        setMessage("Aucune donnée à envoyer.");
         return;
       }
 
@@ -94,16 +105,16 @@ export default function SyncButton({ periodeId, username, onSynced }: { periodeI
       }
 
       setState("done");
-      setMessage(`${confirmed} donnée(s) synchronisée(s) avec le serveur.`);
+      setMessage(`${confirmed} donnée(s) envoyée(s) au ${destinataire}.`);
       onSynced?.();
     } catch (e) {
       setState("error");
-      setMessage(e instanceof Error ? e.message : "Échec de synchronisation. Vos données restent sauvegardées sur cet appareil.");
+      setMessage(e instanceof Error ? e.message : "Échec de l'envoi. Vos données restent sauvegardées sur cet appareil.");
     } finally {
       await refreshPending();
       setTimeout(() => setState("idle"), 5000);
     }
-  }, [periodeId, username, refreshPending, onSynced]);
+  }, [periodeId, username, destinataire, refreshPending, onSynced]);
 
   useEffect(() => {
     if (online && pending > 0 && state === "idle") {
@@ -128,7 +139,7 @@ export default function SyncButton({ periodeId, username, onSynced }: { periodeI
         disabled={state === "syncing" || pending === 0}
         className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-gray-300"
       >
-        {state === "syncing" ? "Synchronisation…" : `Synchroniser (${pending})`}
+        {state === "syncing" ? "Envoi…" : `Envoyer au ${destinataire} (${pending})`}
       </button>
 
       {message && (

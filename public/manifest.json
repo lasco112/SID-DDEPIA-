@@ -1,0 +1,16 @@
+{
+  "name": "SID DDEPIA-Menoua",
+  "short_name": "DDEPIA",
+  "description": "Système d'Information Décisionnel de la Délégation Départementale de l'Élevage, des Pêches et des Industries Animales de la Menoua",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#eef1f5",
+  "theme_color": "#1e6091",
+  "orientation": "any",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

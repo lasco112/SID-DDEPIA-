@@ -7,7 +7,15 @@ import FormNominatif from "@/components/FormNominatif";
 import FormEvenement from "@/components/FormEvenement";
 import SyncButton from "@/components/SyncButton";
 
-export default function SaisieTemplateClient({ templateCode, username }: { templateCode: string; username: string }) {
+export default function SaisieTemplateClient({
+  templateCode,
+  username,
+  destinataire,
+}: {
+  templateCode: string;
+  username: string;
+  destinataire: string;
+}) {
   const [periodeId, setPeriodeId] = useState<string | null>(null);
   const [detail, setDetail] = useState<any>(null);
   const [erreur, setErreur] = useState<string | null>(null);
@@ -47,7 +55,7 @@ export default function SaisieTemplateClient({ templateCode, username }: { templ
             {detail.template.titre}
           </h1>
 
-          <div className="my-4">{periodeId && <SyncButton periodeId={periodeId} username={username} />}</div>
+          <div className="my-4">{periodeId && <SyncButton periodeId={periodeId} username={username} destinataire={destinataire} />}</div>
 
           <div className="mt-4">
             {periodeId && detail.template.type === "MATRICE" && (

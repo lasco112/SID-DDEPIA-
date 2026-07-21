@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Hors ligne — SID DDEPIA-Menoua</title>
+  <style>
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #eef1f5;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, Arial, sans-serif;
+      color: #1f2a37;
+      padding: 24px;
+      box-sizing: border-box;
+    }
+    .carte {
+      max-width: 420px;
+      background: #fff;
+      border-radius: 12px;
+      padding: 32px 28px;
+      text-align: center;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+    .badge {
+      width: 56px;
+      height: 56px;
+      border-radius: 12px;
+      background: #1e6091;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 13px;
+      margin: 0 auto 16px;
+    }
+    h1 {
+      font-size: 18px;
+      margin: 0 0 8px;
+    }
+    p {
+      font-size: 14px;
+      color: #5b6673;
+      line-height: 1.5;
+    }
+    button {
+      margin-top: 16px;
+      background: #1e6091;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 20px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="carte">
+    <div class="badge">DD</div>
+    <h1>Page non disponible hors ligne</h1>
+    <p>
+      Vous êtes hors connexion et cette page n'a pas encore été chargée sur cet appareil.
+      Si vous étiez déjà en train de saisir des données, vos saisies restent sauvegardées
+      localement — retournez à une page déjà visitée ou reconnectez-vous pour continuer.
+    </p>
+    <button onclick="location.reload()">Réessayer</button>
+  </div>
+</body>
+</html>

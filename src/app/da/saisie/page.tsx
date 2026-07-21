@@ -11,6 +11,7 @@ export default async function DASaisieIndexPage() {
   const role = (session?.user as any)?.role;
   if (!session || (role !== "DA" && role !== "AGENT_SAISIE")) redirect("/");
   const username = (session.user as any).username as string;
+  const destinataire = role === "AGENT_SAISIE" ? "Délégué d'Arrondissement" : "Délégué Départemental";
 
   const templates = await db.formTemplate.findMany({
     where: { actif: true },
@@ -30,12 +31,12 @@ export default async function DASaisieIndexPage() {
       <div className="max-w-4xl">
         <h1 className="text-2xl font-bold text-primary-dark">Saisie des données du mois</h1>
         <p className="mt-1 text-gray-600">
-          Les 28 tableaux du canevas. Vos saisies sont sauvegardées localement et peuvent être synchronisées à tout moment.
+          Les 28 tableaux du canevas. Vos saisies sont sauvegardées localement et peuvent être envoyées à tout moment.
           {role === "AGENT_SAISIE" && " Le Délégué d'Arrondissement reste seul habilité à soumettre le rapport final."}
         </p>
 
         <div className="mt-6">
-          <RapportStatusPanel username={username} peutSoumettre={role === "DA"} />
+          <RapportStatusPanel username={username} destinataire={destinataire} peutSoumettre={role === "DA"} />
         </div>
 
         <div className="mt-6 space-y-6">

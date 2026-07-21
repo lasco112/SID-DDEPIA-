@@ -9,10 +9,11 @@ export default async function SaisieTemplatePage({ params }: { params: { templat
   const role = (session?.user as any)?.role;
   if (!session || (role !== "DA" && role !== "AGENT_SAISIE")) redirect("/");
   const username = (session.user as any).username as string;
+  const destinataire = role === "AGENT_SAISIE" ? "Délégué d'Arrondissement" : "Délégué Départemental";
 
   return (
     <AppShell allowedRoles={["DA", "AGENT_SAISIE"]}>
-      <SaisieTemplateClient templateCode={params.templateCode} username={username} />
+      <SaisieTemplateClient templateCode={params.templateCode} username={username} destinataire={destinataire} />
     </AppShell>
   );
 }
