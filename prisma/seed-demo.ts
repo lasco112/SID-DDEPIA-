@@ -449,25 +449,47 @@ async function seedValidationsEtSyntheses(periodeId: string) {
   console.log("Validations de sections : PSA et SPAIH validées, SSV en contrôle, BAC en attente.");
 }
 
-async function main() {
-  console.log(`Seed DÉMONSTRATION — base : ${DEMO_URL!.replace(/:[^:@]+@/, ":***@")}`);
-  await seedTerritoireEtSections();
-  await seedReferentiels();
-  await seedFormulaires();
+/**
+ * Réinitialisation des DONNÉES de démonstration (§10.9) — appelée par la route
+ * API /api/demo/reinitialiser (bouton "Réinitialiser la démonstration").
+ *
+ * Ne touche PAS à la structure (arrondissements, sections, référentiels, les 28
+ * tableaux et leurs champs) : celle-ci est posée une fois pour toutes par le
+ * seed complet ci-dessous et ne change jamais pendant une démonstration. Cette
+ * séparation n'est pas cosmétique : seedFormulaires() lit le dictionnaire .xlsx
+ * via XLSX.readFile, ce qui ne fonctionne pas depuis une route Next.js (le
+ * fichier n'est pas accessible au bundle serveur). Restaurer uniquement les
+ * données transactionnelles est donc à la fois plus sûr et beaucoup plus rapide.
+ */
+export async function reinitialiserDonneesDemo(): Promise<void> {
   const etablissements = await seedEtablissements();
   await seedComptesDemo();
   const periode = await seedPeriode();
   const rapports = await seedRapports(periode.id);
   await seedSaisies(rapports, etablissements);
   await seedValidationsEtSyntheses(periode.id);
+}
+
+/** Seed complet (CLI uniquement) : structure + données. */
+export async function seedDemoComplet(): Promise<void> {
+  console.log(`Seed DÉMONSTRATION — base : ${DEMO_URL!.replace(/:[^:@]+@/, ":***@")}`);
+  await seedTerritoireEtSections();
+  await seedReferentiels();
+  await seedFormulaires();
+  await reinitialiserDonneesDemo();
   console.log("Seed de démonstration terminé.");
 }
 
-main()
-  .catch((e) => {
-    console.error(e);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+// Exécution directe (`npx tsx prisma/seed-demo.ts` / `npm run seed:demo`) uniquement —
+// ce bloc ne s'exécute jamais quand le fichier est importé par l'application.
+const cheminAppelant = process.argv[1]?.replace(/\\/g, "/") ?? "";
+if (cheminAppelant.endsWith("seed-demo.ts") || cheminAppelant.endsWith("seed-demo.js")) {
+  seedDemoComplet()
+    .catch((e) => {
+      console.error(e);
+      process.exitCode = 1;
+    })
+    .finally(async () => {
+      await prisma.$disconnect();
+    });
+}

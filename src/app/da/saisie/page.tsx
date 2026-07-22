@@ -1,17 +1,18 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { dbForSession } from "@/lib/permissions";
+import { contexteSession } from "@/lib/permissions";
 import Link from "next/link";
 import AppShell from "@/components/AppShell";
 import RapportStatusPanel from "@/components/RapportStatusPanel";
 
 export default async function DASaisieIndexPage() {
   const session = await getServerSession(authOptions);
-  const role = (session?.user as any)?.role;
-  if (!session || (role !== "DA" && role !== "AGENT_SAISIE")) redirect("/");
-  const db = dbForSession(session);
-  const username = (session.user as any).username as string;
+  const moi = await contexteSession(session);
+  const role = moi?.role;
+  if (!moi || (role !== "DA" && role !== "AGENT_SAISIE")) redirect("/");
+  const db = moi.db;
+  const username = moi.username;
   const destinataire = role === "AGENT_SAISIE" ? "Délégué d'Arrondissement" : "Délégué Départemental";
 
   const templates = await db.formTemplate.findMany({

@@ -29,7 +29,7 @@ interface TemplateDto {
   fields: FormFieldDto[];
 }
 
-type Cellule = { valeur: string; nonRenseigne: boolean; clientId: string };
+type Cellule = { valeur: string; nonRenseigne: boolean; motifNonRenseigne: string; clientId: string };
 type Cle = string; // `${etablissementId}:${fieldCode}`
 
 export default function FormNominatif({
@@ -60,6 +60,7 @@ export default function FormNominatif({
         valeur: string | null;
         valeurTexte: string | null;
         nonRenseigne: boolean;
+        motifNonRenseigne: string | null;
         clientId: string;
         saisiPar: { nom: string; username: string } | null;
       }> = [];
@@ -82,6 +83,7 @@ export default function FormNominatif({
             initial[cle] = {
               valeur: texte ? local.valeurTexte ?? "" : local.valeur == null ? "" : String(local.valeur),
               nonRenseigne: local.nonRenseigne,
+              motifNonRenseigne: local.motifNonRenseigne ?? "",
               clientId: local.clientId,
             };
             continue;
@@ -99,16 +101,18 @@ export default function FormNominatif({
               valeur: texte ? null : distant.valeur == null ? null : Number(distant.valeur),
               valeurTexte: texte ? distant.valeurTexte ?? null : null,
               nonRenseigne: distant.nonRenseigne,
+              motifNonRenseigne: distant.motifNonRenseigne,
               statutLocal: "SYNCHRONISE",
               updatedAt: new Date().toISOString(),
             });
             initial[cle] = {
               valeur: texte ? distant.valeurTexte ?? "" : distant.valeur == null ? "" : String(distant.valeur),
               nonRenseigne: distant.nonRenseigne,
+              motifNonRenseigne: distant.motifNonRenseigne ?? "",
               clientId: distant.clientId,
             };
           } else {
-            initial[cle] = { valeur: "", nonRenseigne: false, clientId: crypto.randomUUID() };
+            initial[cle] = { valeur: "", nonRenseigne: false, motifNonRenseigne: "", clientId: crypto.randomUUID() };
           }
         }
       }
@@ -128,7 +132,7 @@ export default function FormNominatif({
     async (etablissementId: string, fieldCode: string, texte: boolean, patch: Partial<Cellule>) => {
       const cle = `${etablissementId}:${fieldCode}`;
       setCellules((prev) => {
-        const courante = prev[cle] ?? { valeur: "", nonRenseigne: false, clientId: crypto.randomUUID() };
+        const courante = prev[cle] ?? { valeur: "", nonRenseigne: false, motifNonRenseigne: "", clientId: crypto.randomUUID() };
         const nouvelle = { ...courante, ...patch };
         const numVal = nouvelle.valeur.trim() === "" ? null : Number(nouvelle.valeur);
 
@@ -143,6 +147,7 @@ export default function FormNominatif({
           valeur: texte || nouvelle.nonRenseigne ? null : numVal,
           valeurTexte: texte && !nouvelle.nonRenseigne ? (nouvelle.valeur.trim() === "" ? null : nouvelle.valeur) : null,
           nonRenseigne: nouvelle.nonRenseigne,
+          motifNonRenseigne: nouvelle.nonRenseigne ? nouvelle.motifNonRenseigne || null : null,
           statutLocal: "BROUILLON_LOCAL",
           updatedAt: new Date().toISOString(),
         });
@@ -201,6 +206,15 @@ export default function FormNominatif({
                       />
                       N/D
                     </label>
+                    {cellule?.nonRenseigne && (
+                      <input
+                        type="text"
+                        placeholder="Motif obligatoire"
+                        className="mt-1 w-full rounded border border-gray-300 px-2 py-1 text-xs"
+                        value={cellule.motifNonRenseigne}
+                        onChange={(e) => sauvegarder(etab.id, f.code, texte, { motifNonRenseigne: e.target.value })}
+                      />
+                    )}
                     {auteurs[cle] && <div className="mt-0.5 text-[11px] text-gray-400">{auteurs[cle]}</div>}
                   </td>
                 );

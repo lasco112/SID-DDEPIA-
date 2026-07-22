@@ -36,17 +36,79 @@ export class UnauthorizedError extends Error {
   status = 401;
 }
 
-/** Session + utilisateur en base (source de vérité — jamais le seul JWT). */
-export async function requireUser(): Promise<SessionUser> {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) throw new UnauthorizedError("Non authentifié");
+// ---------------------------------------------------------------------------
+// Mode démonstration GLOBAL (correction n°10, ajout final du DD)
+// ---------------------------------------------------------------------------
+// Quand le Super Administrateur l'active, TOUS les comptes réels basculent sur
+// les données fictives en conservant leur rôle et leur périmètre — sans qu'aucun
+// mot de passe ni aucune donnée de production ne bouge. La bascule se fait ici,
+// au seul endroit qui décide quelle base une requête interroge.
 
-  const isDemo = Boolean((session.user as any).isDemo);
-  if (isDemo && !demoDb) throw new UnauthorizedError("Environnement de démonstration indisponible.");
-  const client = isDemo ? (demoDb as PrismaClient) : db;
+export const CLE_MODE_DEMO_GLOBAL = "MODE_DEMO_GLOBAL";
 
-  const user = await client.user.findUnique({ where: { id: (session.user as any).id } });
+// requireUser() est appelé à chaque requête : on évite une lecture SQL
+// systématique avec un cache très court (la bascule prend effet en ≤ 10 s, et
+// immédiatement pour l'administrateur qui l'actionne via invaliderCacheModeDemo).
+let cacheModeDemo: { actif: boolean; expire: number } | null = null;
+
+export function invaliderCacheModeDemo() {
+  cacheModeDemo = null;
+}
+
+export async function modeDemoGlobalActif(): Promise<boolean> {
+  if (!demoDb) return false; // pas d'environnement démo configuré ici
+  if (cacheModeDemo && cacheModeDemo.expire > Date.now()) return cacheModeDemo.actif;
+  let actif = false;
+  try {
+    const config = await db.configSysteme.findUnique({ where: { cle: CLE_MODE_DEMO_GLOBAL } });
+    actif = config?.valeur === "actif";
+  } catch {
+    actif = false; // table absente ou base indisponible : on reste en production
+  }
+  cacheModeDemo = { actif, expire: Date.now() + 10_000 };
+  return actif;
+}
+
+type IdentiteUtilisateur = { id: string; role: Role; username: string; arrondissementId: string | null; sectionId: string | null };
+
+/** Retrouve, dans la base démo, le compte équivalent à un compte réel : même rôle et même
+ *  périmètre (code d'arrondissement / code de section, stables entre les deux bases). */
+async function jumeauDemo(reel: IdentiteUtilisateur): Promise<IdentiteUtilisateur | null> {
+  if (!demoDb) return null;
+  const [arr, sec] = await Promise.all([
+    reel.arrondissementId ? db.arrondissement.findUnique({ where: { id: reel.arrondissementId }, select: { code: true } }) : null,
+    reel.sectionId ? db.section.findUnique({ where: { id: reel.sectionId }, select: { code: true } }) : null,
+  ]);
+  return demoDb.user.findFirst({
+    where: {
+      role: reel.role,
+      actif: true,
+      ...(arr ? { arrondissement: { code: arr.code } } : {}),
+      ...(sec ? { section: { code: sec.code } } : {}),
+    },
+    select: { id: true, role: true, username: true, arrondissementId: true, sectionId: true },
+  });
+}
+
+/** Contexte effectif d'une session : quelle base interroger, sous quelle identité.
+ *  Trois cas : session démo dédiée (/demo), compte réel pendant une démonstration
+ *  globale (remappé sur son jumeau fictif), ou production normale. */
+async function resoudreContexte(sessionUser: any): Promise<SessionUser> {
+  const sessionEstDemo = Boolean(sessionUser?.isDemo);
+  if (sessionEstDemo && !demoDb) throw new UnauthorizedError("Environnement de démonstration indisponible.");
+
+  const client = sessionEstDemo ? (demoDb as PrismaClient) : db;
+  const user = await client.user.findUnique({ where: { id: sessionUser?.id } });
   if (!user || !user.actif) throw new UnauthorizedError("Compte introuvable ou désactivé");
+
+  // L'ADMIN_TECH n'est jamais remappé : c'est lui qui pilote la démonstration et
+  // il doit garder l'accès réel à son espace technique pour pouvoir l'arrêter.
+  if (!sessionEstDemo && user.role !== "ADMIN_TECH" && (await modeDemoGlobalActif())) {
+    const jumeau = await jumeauDemo(user);
+    if (jumeau) {
+      return { ...jumeau, isDemo: true, db: demoDb as PrismaClient };
+    }
+  }
 
   return {
     id: user.id,
@@ -54,18 +116,27 @@ export async function requireUser(): Promise<SessionUser> {
     username: user.username,
     arrondissementId: user.arrondissementId,
     sectionId: user.sectionId,
-    isDemo,
+    isDemo: sessionEstDemo,
     db: client,
   };
 }
 
-/** Pour les pages serveur qui appellent encore `getServerSession(authOptions)` directement
- *  (plutôt que `requireUser()`) : renvoie le client Prisma correspondant à la session (démo ou
- *  production), sans lancer d'erreur — la page gère elle-même la redirection si non connecté. */
-export function dbForSession(session: { user?: unknown } | null): PrismaClient {
-  const isDemo = Boolean((session?.user as any)?.isDemo);
-  if (isDemo && !demoDb) throw new Error("Environnement de démonstration indisponible.");
-  return isDemo ? (demoDb as PrismaClient) : db;
+/** Session + utilisateur en base (source de vérité — jamais le seul JWT). */
+export async function requireUser(): Promise<SessionUser> {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) throw new UnauthorizedError("Non authentifié");
+  return resoudreContexte(session.user);
+}
+
+/** Équivalent de requireUser() pour les pages serveur qui gèrent elles-mêmes la
+ *  redirection : renvoie null au lieu de lever si la session est absente/invalide. */
+export async function contexteSession(session: { user?: unknown } | null): Promise<SessionUser | null> {
+  if (!session?.user) return null;
+  try {
+    return await resoudreContexte(session.user);
+  } catch {
+    return null;
+  }
 }
 
 export function assertRole(user: SessionUser, allowed: Role[]) {

@@ -60,6 +60,8 @@ const CHEMINS_SURS_DEMO = [
   "/api/validations",
   "/api/corrections",
   "/api/syntheses",
+  "/api/demo/reinitialiser",
+  "/api/demo/etat", // lecture seule : indique si le mode démo global est actif (bandeau)
 ];
 
 export async function middleware(req: NextRequest) {

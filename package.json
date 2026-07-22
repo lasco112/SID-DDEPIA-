@@ -9,6 +9,7 @@
     "start": "next start",
     "lint": "next lint",
     "seed": "tsx prisma/seed.ts",
+    "seed:demo": "tsx prisma/seed-demo.ts",
     "cron": "tsx src/server/cron/alerts.ts",
     "postinstall": "prisma generate"
   },

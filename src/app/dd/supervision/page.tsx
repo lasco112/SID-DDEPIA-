@@ -2,7 +2,7 @@ import React from 'react';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { redirect } from 'next/navigation';
-import { dbForSession } from '@/lib/permissions';
+import { contexteSession } from '@/lib/permissions';
 import AppShell from '@/components/AppShell';
 import DeverrouillerButton from '@/components/DeverrouillerButton';
 import SyntheseValidationRow from '@/components/SyntheseValidationRow';
@@ -17,10 +17,11 @@ const STATUT_STYLE: Record<string, string> = {
 
 export default async function DDSupervisionPage() {
   const session = await getServerSession(authOptions);
-  if (!session || (session.user as any).role !== 'DD') {
+  const moi = await contexteSession(session);
+  if (!moi || moi.role !== 'DD') {
     redirect('/');
   }
-  const db = dbForSession(session);
+  const db = moi.db;
 
   const periode = await db.periodeReporting.findFirst({
     where: { type: 'MENSUEL' },

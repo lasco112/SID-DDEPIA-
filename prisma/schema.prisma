@@ -65,6 +65,7 @@ model User {
   saisiesEvenementEnTantQueAuteur SaisieEvenement[]  @relation("SaisiParEvenement")
   referentielsProposes            ReferentielItem[]  @relation("ReferentielProposePar")
   referentielsValides             ReferentielItem[]  @relation("ReferentielValideParDD")
+  configsModifiees                ConfigSysteme[]
 
   @@index([role, actif])
 }
@@ -360,6 +361,7 @@ model SaisieNominative {
   valeur          Decimal? @db.Decimal(14, 3)
   valeurTexte     String?
   nonRenseigne    Boolean @default(false)
+  motifNonRenseigne String?
   clientId        String  @unique
   syncedAt        DateTime @default(now())
   saisiParId      String?
@@ -568,4 +570,16 @@ model AuditLog {
 
   @@index([action, createdAt])
   @@index([userId, createdAt])
+}
+
+/// Paramètres système clé/valeur — table volontairement minimale, réservée aux
+/// réglages globaux pilotés par le Super Administrateur (correction n°10).
+/// Clé actuelle : "MODE_DEMO_GLOBAL" ("actif" | "inactif").
+model ConfigSysteme {
+  cle         String   @id
+  valeur      String
+  modifieParId String?
+  updatedAt   DateTime @updatedAt
+
+  modifiePar User? @relation(fields: [modifieParId], references: [id])
 }

@@ -1,7 +1,7 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { dbForSession } from "@/lib/permissions";
+import { contexteSession } from "@/lib/permissions";
 import AppShell from "@/components/AppShell";
 import NotificationsPanel from "@/components/NotificationsPanel";
 
@@ -41,11 +41,12 @@ function StatCard({ label, value, sub, valueColor }: { label: string; value: str
 
 export default async function DashboardPage() {
   const session = await getServerSession(authOptions);
-  if (!session) redirect("/");
-  const db = dbForSession(session);
+  const moi = await contexteSession(session);
+  if (!moi) redirect("/");
+  const db = moi.db;
 
-  const role = (session.user as any).role as string;
-  const username = (session.user as any).username as string;
+  const role = moi.role as string;
+  const username = moi.username;
 
   const periode = await db.periodeReporting.findFirst({
     where: { type: "MENSUEL" },
@@ -79,19 +80,17 @@ export default async function DashboardPage() {
   }
 
   if (role === "DA" && periode) {
-    const user = await db.user.findUnique({ where: { username } });
-    const rapport = user?.arrondissementId
+    const rapport = moi.arrondissementId
       ? await db.rapportArrondissement.findUnique({
-          where: { periodeId_arrondissementId: { periodeId: periode.id, arrondissementId: user.arrondissementId } },
+          where: { periodeId_arrondissementId: { periodeId: periode.id, arrondissementId: moi.arrondissementId } },
         })
       : null;
     cards.unshift({ label: "Statut de mon rapport", value: rapport?.statut ?? "EN_SAISIE" });
   }
 
   if (role.startsWith("CHEF_") && periode) {
-    const user = await db.user.findUnique({ where: { username } });
-    const validation = user?.sectionId
-      ? await db.validationSection.findUnique({ where: { periodeId_sectionId: { periodeId: periode.id, sectionId: user.sectionId } } })
+    const validation = moi.sectionId
+      ? await db.validationSection.findUnique({ where: { periodeId_sectionId: { periodeId: periode.id, sectionId: moi.sectionId } } })
       : null;
     cards.unshift({ label: "Statut de ma section", value: validation?.statut ?? "EN_ATTENTE" });
   }
