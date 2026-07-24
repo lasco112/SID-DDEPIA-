@@ -28,15 +28,33 @@ import { parseDictionnaire, EVENEMENT_SCHEMAS, type ChampEvenement } from "./see
 import { NOMINATIF_ETABLISSEMENT_TYPE } from "./seed-lib/nominatifEtablissementTypes";
 import { ARRONDISSEMENTS, SECTIONS, GROUPES_REFERENTIELS } from "./seed-lib/referentielsDeBase";
 
+// Ces vérifications ne doivent JAMAIS s'exécuter au simple IMPORT de ce
+// fichier : Next.js importe (donc évalue) chaque route API au build pour en
+// analyser les types ("Collecting page data"), y compris /api/demo/reinitialiser
+// — sur un environnement sans mode démo configuré (DEMO_DATABASE_URL absente,
+// cas normal en production), un throw ici ferait échouer le build entier alors
+// que rien n'a encore été appelé. Le client est donc construit paresseusement,
+// au premier accès réel (voir Proxy ci-dessous) — c'est-à-dire uniquement
+// quand reinitialiserDonneesDemo()/seedDemoComplet() sont vraiment invoquées.
 const DEMO_URL = process.env.DEMO_DATABASE_URL;
-if (!DEMO_URL) {
-  throw new Error("DEMO_DATABASE_URL manquant — le seed de démonstration ne doit jamais retomber sur DATABASE_URL.");
-}
-if (process.env.DATABASE_URL && DEMO_URL === process.env.DATABASE_URL) {
-  throw new Error("DEMO_DATABASE_URL est identique à DATABASE_URL : refus de seeder — ces deux bases doivent rester distinctes.");
+
+function creerClientDemo(): PrismaClient {
+  if (!DEMO_URL) {
+    throw new Error("DEMO_DATABASE_URL manquant — le seed de démonstration ne doit jamais retomber sur DATABASE_URL.");
+  }
+  if (process.env.DATABASE_URL && DEMO_URL === process.env.DATABASE_URL) {
+    throw new Error("DEMO_DATABASE_URL est identique à DATABASE_URL : refus de seeder — ces deux bases doivent rester distinctes.");
+  }
+  return new PrismaClient({ datasources: { db: { url: DEMO_URL } } });
 }
 
-const prisma = new PrismaClient({ datasources: { db: { url: DEMO_URL } } });
+let clientDemo: PrismaClient | null = null;
+const prisma = new Proxy({} as PrismaClient, {
+  get(_target, prop) {
+    if (!clientDemo) clientDemo = creerClientDemo();
+    return (clientDemo as any)[prop];
+  },
+});
 
 const MOT_DE_PASSE_DEMO = "Demo!2026";
 
@@ -472,7 +490,10 @@ export async function reinitialiserDonneesDemo(): Promise<void> {
 
 /** Seed complet (CLI uniquement) : structure + données. */
 export async function seedDemoComplet(): Promise<void> {
-  console.log(`Seed DÉMONSTRATION — base : ${DEMO_URL!.replace(/:[^:@]+@/, ":***@")}`);
+  if (!DEMO_URL) {
+    throw new Error("DEMO_DATABASE_URL manquant — le seed de démonstration ne doit jamais retomber sur DATABASE_URL.");
+  }
+  console.log(`Seed DÉMONSTRATION — base : ${DEMO_URL.replace(/:[^:@]+@/, ":***@")}`);
   await seedTerritoireEtSections();
   await seedReferentiels();
   await seedFormulaires();
@@ -490,6 +511,6 @@ if (cheminAppelant.endsWith("seed-demo.ts") || cheminAppelant.endsWith("seed-dem
       process.exitCode = 1;
     })
     .finally(async () => {
-      await prisma.$disconnect();
+      if (clientDemo) await clientDemo.$disconnect();
     });
 }
