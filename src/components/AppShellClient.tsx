@@ -21,7 +21,7 @@ import PinGate from "@/components/PinGate";
 const LIBELLES_ROLE: Record<string, string> = {
   DD: "Délégué Départemental",
   DA: "Délégué d'Arrondissement",
-  AGENT_SAISIE: "Agent de saisie",
+  AGENT_SAISIE: "Agent de saisie / Chef de Centre Zootechnique",
   CHEF_BAC: "Chef de section — BAC",
   CHEF_SSV: "Chef de section — SSV",
   CHEF_PSA: "Chef de section — PSA",

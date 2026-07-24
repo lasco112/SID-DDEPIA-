@@ -32,7 +32,7 @@ interface Ref {
 const LIBELLES_ROLE: Record<string, string> = {
   DD: "Délégué Départemental",
   DA: "Délégué d'Arrondissement",
-  AGENT_SAISIE: "Agent de saisie",
+  AGENT_SAISIE: "Agent de saisie / Chef de Centre Zootechnique",
   CHEF_BAC: "Chef de section — BAC",
   CHEF_SSV: "Chef de section — SSV",
   CHEF_PSA: "Chef de section — PSA",
@@ -190,7 +190,7 @@ export default function AdminUtilisateursClient() {
               <label className="mb-1 block text-[13px] font-semibold text-[#3d4855]">Rôle</label>
               <select value={role} onChange={(e) => setRole(e.target.value)} className="w-full rounded-md border border-[#c3ccd6] bg-white px-3 py-2 text-sm">
                 <option value="DA">Délégué d'Arrondissement</option>
-                <option value="AGENT_SAISIE">Agent de saisie (subalterne d'un DA)</option>
+                <option value="AGENT_SAISIE">Agent de saisie / Chef de Centre Zootechnique (subalterne d'un DA)</option>
                 <option value="CHEF_BAC">Chef de section — BAC</option>
                 <option value="CHEF_SSV">Chef de section — SSV</option>
                 <option value="CHEF_PSA">Chef de section — PSA</option>
