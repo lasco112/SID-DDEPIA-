@@ -1,11 +1,11 @@
 "use client";
 
 /**
- * SplashScreen.tsx — ouverture « Les données prennent vie » (charte
- * graphique SID DDEPIA §14). Séquence complète (~2,4 s) une seule fois par
- * jour ; les lancements suivants n'affichent qu'un logo bref (~0,8 s).
- * Skip immédiat au clic/toucher — une animation d'ouverture ne doit jamais
- * retenir l'utilisateur.
+ * SplashScreen.tsx — animation d'ouverture (vidéo fournie par le DD),
+ * une seule fois par jour ; les lancements suivants n'affichent qu'un logo
+ * bref (~0,8 s). Skip immédiat au clic/toucher — une animation d'ouverture
+ * ne doit jamais retenir l'utilisateur, et la vidéo se termine d'elle-même
+ * (événement `ended`) sans durée codée en dur.
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -43,7 +43,10 @@ export default function SplashScreen() {
     } catch {
       // tant pis, la séquence complète réapparaîtra au prochain lancement
     }
-    const t = setTimeout(() => setVisible(false), 2400);
+    // Filet de sécurité si la vidéo ne se charge pas (hors ligne la toute
+    // première fois, format non supporté...) : ne jamais bloquer l'accès à
+    // l'application au-delà de quelques secondes.
+    const t = setTimeout(() => setVisible(false), 6000);
     return () => clearTimeout(t);
   }, []);
 
@@ -60,15 +63,24 @@ export default function SplashScreen() {
   }
 
   return (
-    <div className="splash-overlay" onClick={() => setVisible(false)} role="presentation">
-      <div className="splash-stage">
-        <div className="splash-fiche splash-fiche-mint" />
-        <div className="splash-fiche splash-fiche-sky" />
-        <div className="splash-fiche splash-fiche-aqua" />
-        <div className="splash-db" />
+    <div
+      className="fixed inset-0 z-[300] flex items-center justify-center p-6"
+      style={{ background: "var(--gradient-brand)" }}
+      onClick={() => setVisible(false)}
+      role="presentation"
+    >
+      <div className="w-full max-w-md overflow-hidden rounded-card bg-white shadow-card">
+        <video
+          autoPlay
+          muted
+          playsInline
+          onEnded={() => setVisible(false)}
+          onError={() => setVisible(false)}
+          className="block w-full"
+        >
+          <source src="/videos/animation-entree.mp4" type="video/mp4" />
+        </video>
       </div>
-      <div className="splash-titre text-2xl font-bold tracking-wide text-ink">SID DDEPIA</div>
-      <div className="splash-tagline text-sm font-medium text-ink-muted">Collecter. Centraliser. Décider.</div>
     </div>
   );
 }
