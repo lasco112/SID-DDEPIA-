@@ -1,10 +1,11 @@
 "use client";
 
 /**
- * AssignationsClient.tsx — le DA choisit, tableau par tableau, quel agent de
- * saisie en est responsable ce mois-ci. Chaque changement s'enregistre
- * immédiatement (pas de bouton "Enregistrer" global) ; purement indicatif,
- * voir /api/da/assignations.
+ * AssignationsClient.tsx — le DA choisit quel agent de saisie est
+ * responsable de chaque tableau ce mois-ci, tableau par tableau OU en bloc
+ * pour toute une section (ex. toute la "Section 1"). Chaque changement
+ * s'enregistre immédiatement (pas de bouton "Enregistrer" global) ; purement
+ * indicatif, voir /api/da/assignations.
  */
 
 import { useEffect, useState } from "react";
@@ -49,6 +50,21 @@ export default function AssignationsClient() {
     setEnregistrement(null);
   }
 
+  async function changerSection(codes: string[], agentId: string | null) {
+    setTableaux((prev) => prev.map((t) => (codes.includes(t.code) ? { ...t, agentId } : t)));
+    setEnregistrement(codes.join(","));
+    await Promise.all(
+      codes.map((code) =>
+        fetch("/api/da/assignations", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ templateCode: code, agentId }),
+        })
+      )
+    );
+    setEnregistrement(null);
+  }
+
   if (chargement) return <p className="text-sm text-gray-500">Chargement…</p>;
 
   if (agents.length === 0) {
@@ -63,39 +79,71 @@ export default function AssignationsClient() {
     return <p className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">Aucune période n'est ouverte.</p>;
   }
 
+  const groupes = new Map<string, TableauRow[]>();
+  for (const t of tableaux) {
+    const section = t.numero.split(".")[0];
+    if (!groupes.has(section)) groupes.set(section, []);
+    groupes.get(section)!.push(t);
+  }
+
   return (
-    <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
-      <table className="w-full border-collapse text-sm">
-        <thead>
-          <tr className="bg-gray-50 text-left">
-            <th className="border-b border-gray-200 px-4 py-2">Tableau</th>
-            <th className="border-b border-gray-200 px-4 py-2">Attribué à</th>
-          </tr>
-        </thead>
-        <tbody>
-          {tableaux.map((t) => (
-            <tr key={t.code}>
-              <td className="border-b border-gray-100 px-4 py-2">
-                <span className="mr-2 font-mono text-xs text-gray-400">{t.numero}</span>
-                {t.titre}
-              </td>
-              <td className="border-b border-gray-100 px-4 py-2">
+    <div className="space-y-6">
+      {Array.from(groupes.entries()).map(([section, liste]) => {
+        const codes = liste.map((t) => t.code);
+        return (
+          <div key={section} className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 bg-gray-50 px-4 py-2.5">
+              <h2 className="font-semibold text-gray-800">Section {section}</h2>
+              <label className="flex items-center gap-2 text-xs text-gray-600">
+                Attribuer toute la section à :
                 <select
-                  value={t.agentId ?? ""}
-                  onChange={(e) => changer(t.code, e.target.value || null)}
+                  value=""
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === "__aucun__") changerSection(codes, null);
+                    else if (v) changerSection(codes, v);
+                    e.target.value = "";
+                  }}
                   className="rounded border border-gray-300 px-2 py-1 text-sm"
                 >
-                  <option value="">— Non attribué —</option>
+                  <option value="">— Choisir —</option>
+                  <option value="__aucun__">Non attribué (retirer)</option>
                   {agents.map((a) => (
                     <option key={a.id} value={a.id}>{a.nom}</option>
                   ))}
                 </select>
-                {enregistrement === t.code && <span className="ml-2 text-xs text-gray-400">Enregistrement…</span>}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+              </label>
+            </div>
+            <table className="w-full border-collapse text-sm">
+              <tbody>
+                {liste.map((t) => (
+                  <tr key={t.code}>
+                    <td className="border-b border-gray-100 px-4 py-2">
+                      <span className="mr-2 font-mono text-xs text-gray-400">{t.numero}</span>
+                      {t.titre}
+                    </td>
+                    <td className="border-b border-gray-100 px-4 py-2">
+                      <select
+                        value={t.agentId ?? ""}
+                        onChange={(e) => changer(t.code, e.target.value || null)}
+                        className="rounded border border-gray-300 px-2 py-1 text-sm"
+                      >
+                        <option value="">— Non attribué —</option>
+                        {agents.map((a) => (
+                          <option key={a.id} value={a.id}>{a.nom}</option>
+                        ))}
+                      </select>
+                      {(enregistrement === t.code || enregistrement?.split(",").includes(t.code)) && (
+                        <span className="ml-2 text-xs text-gray-400">Enregistrement…</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+      })}
     </div>
   );
 }
