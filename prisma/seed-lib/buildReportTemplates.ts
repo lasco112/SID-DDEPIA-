@@ -31,15 +31,23 @@ import {
   HeadingLevel,
   AlignmentType,
   WidthType,
-  BorderStyle,
   VerticalMergeType,
   ShadingType,
   Header,
+  ImageRun,
 } from "docx";
 import { PrismaClient } from "@prisma/client";
 import fs from "node:fs/promises";
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import { CANEVAS_LAYOUTS, ColDef } from "./canevasLayout";
+
+// En-tête officiel bilingue MINEPIA (fourni par le DD) : utilisé tel quel en
+// image plutôt que recréé en texte, pour rester identique au letterhead
+// papier (logo MINEPIA inclus) — un rendu texte seul avait produit un en-tête
+// erroné (logo absent, mise en page divergente du document officiel).
+const HEADER_IMAGE = readFileSync(path.join(__dirname, "..", "assets", "entete-rapports.png"));
+const HEADER_IMAGE_RATIO = 855 / 3900; // dimensions réelles du PNG fourni
 
 const prisma = new PrismaClient();
 
@@ -94,47 +102,20 @@ function mentionDemoHeader(): Header {
   });
 }
 
-function headerBlock(): Table {
-  const fr = [
-    "RÉPUBLIQUE DU CAMEROUN",
-    "Paix – Travail – Patrie",
-    "RÉGION DE L'OUEST",
-    "DÉPARTEMENT DE LA MENOUA",
-    "DÉLÉGATION DÉPARTEMENTALE DE L'ÉLEVAGE,",
-    "DES PÊCHES ET DES INDUSTRIES ANIMALES",
-  ];
-  const en = [
-    "REPUBLIC OF CAMEROON",
-    "Peace – Work – Fatherland",
-    "WEST REGION",
-    "MENOUA DIVISION",
-    "DIVISIONAL DELEGATION OF LIVESTOCK,",
-    "FISHERIES AND ANIMAL INDUSTRIES",
-  ];
-  const rows = fr.map(
-    (line, i) =>
-      new TableRow({
-        children: [
-          new TableCell({
-            borders: NO_BORDERS,
-            children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: line, bold: i === 0, size: i === 0 ? 22 : 18 })] })],
-          }),
-          new TableCell({
-            borders: NO_BORDERS,
-            children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: en[i], bold: i === 0, size: i === 0 ? 22 : 18 })] })],
-          }),
-        ],
-      })
-  );
-  return new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows });
+/** En-tête officiel MINEPIA — image fournie par le DD, centrée sur la page. */
+function headerBlock(): Paragraph {
+  const width = 620;
+  return new Paragraph({
+    alignment: AlignmentType.CENTER,
+    children: [
+      new ImageRun({
+        type: "png",
+        data: HEADER_IMAGE,
+        transformation: { width, height: Math.round(width * HEADER_IMAGE_RATIO) },
+      }),
+    ],
+  });
 }
-
-const NO_BORDERS = {
-  top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
-  bottom: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
-  left: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
-  right: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
-};
 
 function sectionTitle(numero: string): string | null {
   const n = numero.split(".")[0];
