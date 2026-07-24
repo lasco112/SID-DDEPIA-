@@ -27,6 +27,7 @@ interface TemplateDto {
   code: string;
   titre: string;
   fields: FormFieldDto[];
+  etablissementTypeCode?: string | null;
 }
 
 type Cellule = { valeur: string; nonRenseigne: boolean; motifNonRenseigne: string; clientId: string };
@@ -46,6 +47,55 @@ export default function FormNominatif({
   const [cellules, setCellules] = useState<Record<Cle, Cellule>>({});
   const [auteurs, setAuteurs] = useState<Record<Cle, string>>({});
   const [loading, setLoading] = useState(true);
+  const [ajoutes, setAjoutes] = useState<EtablissementDto[]>([]);
+  const [formulaireOuvert, setFormulaireOuvert] = useState(false);
+  const [nomNouveau, setNomNouveau] = useState("");
+  const [localiteNouveau, setLocaliteNouveau] = useState("");
+  const [ajoutEnCours, setAjoutEnCours] = useState(false);
+  const [erreurAjout, setErreurAjout] = useState<string | null>(null);
+
+  const tousEtablissements = [...etablissements, ...ajoutes];
+
+  const ajouterEtablissement = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!nomNouveau.trim() || !localiteNouveau.trim()) return;
+      if (!template.etablissementTypeCode) return;
+      setAjoutEnCours(true);
+      setErreurAjout(null);
+      try {
+        const res = await fetch("/api/etablissements", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            typeCode: template.etablissementTypeCode,
+            nom: nomNouveau.trim(),
+            localite: localiteNouveau.trim(),
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message ?? "Échec de la création.");
+        const nouveau: EtablissementDto = { id: data.etablissement.id, nom: data.etablissement.nom, localite: data.etablissement.localite };
+        await offlineDB.etablissements.put({
+          id: data.etablissement.id,
+          typeCode: data.etablissement.typeCode,
+          nom: data.etablissement.nom,
+          localite: data.etablissement.localite,
+          arrondissementId: data.etablissement.arrondissementId,
+          actif: true,
+        });
+        setAjoutes((prev) => [...prev, nouveau]);
+        setNomNouveau("");
+        setLocaliteNouveau("");
+        setFormulaireOuvert(false);
+      } catch (err) {
+        setErreurAjout(err instanceof Error ? err.message : "Erreur de connexion — réessayez en ligne.");
+      } finally {
+        setAjoutEnCours(false);
+      }
+    },
+    [nomNouveau, localiteNouveau, template.etablissementTypeCode]
+  );
 
   useEffect(() => {
     let annule = false;
@@ -159,16 +209,64 @@ export default function FormNominatif({
   );
 
   if (loading) return <p className="text-sm text-gray-500">Chargement…</p>;
-  if (etablissements.length === 0) {
+
+  const boutonAjout = (
+    <div className="mb-3">
+      {!formulaireOuvert ? (
+        <button
+          onClick={() => setFormulaireOuvert(true)}
+          className="rounded-md border border-primary px-3 py-1.5 text-sm font-medium text-primary hover:bg-primary-light"
+        >
+          + Ajouter un établissement
+        </button>
+      ) : (
+        <form onSubmit={ajouterEtablissement} className="flex flex-wrap items-end gap-2 rounded-lg border border-gray-200 bg-gray-50 p-3">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-700">Nom de l'établissement</label>
+            <input
+              type="text"
+              value={nomNouveau}
+              onChange={(e) => setNomNouveau(e.target.value)}
+              className="w-48 rounded border border-gray-300 px-2 py-1 text-sm"
+              autoFocus
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-700">Localité</label>
+            <input
+              type="text"
+              value={localiteNouveau}
+              onChange={(e) => setLocaliteNouveau(e.target.value)}
+              className="w-40 rounded border border-gray-300 px-2 py-1 text-sm"
+            />
+          </div>
+          <button type="submit" disabled={ajoutEnCours} className="rounded-md bg-primary px-3 py-1.5 text-sm font-semibold text-white hover:bg-primary-hover disabled:opacity-60">
+            {ajoutEnCours ? "Ajout…" : "Ajouter"}
+          </button>
+          <button type="button" onClick={() => setFormulaireOuvert(false)} className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-600">
+            Annuler
+          </button>
+          {erreurAjout && <p className="w-full text-xs text-red-700">{erreurAjout}</p>}
+        </form>
+      )}
+    </div>
+  );
+
+  if (tousEtablissements.length === 0) {
     return (
-      <p className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-        Aucun établissement actif de ce type n'est enregistré pour votre arrondissement. Contactez le DD pour compléter le registre.
-      </p>
+      <>
+        {boutonAjout}
+        <p className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+          Aucun établissement actif de ce type n'est enregistré pour votre arrondissement.
+        </p>
+      </>
     );
   }
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
+    <>
+      {boutonAjout}
+      <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
       <table className="w-full border-collapse text-sm">
         <thead>
           <tr className="bg-gray-50 text-left">
@@ -179,7 +277,7 @@ export default function FormNominatif({
           </tr>
         </thead>
         <tbody>
-          {etablissements.map((etab) => (
+          {tousEtablissements.map((etab) => (
             <tr key={etab.id}>
               <td className="border-b border-gray-100 px-4 py-2 font-medium">
                 {etab.nom}
@@ -223,6 +321,7 @@ export default function FormNominatif({
           ))}
         </tbody>
       </table>
-    </div>
+      </div>
+    </>
   );
 }

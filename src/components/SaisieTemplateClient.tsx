@@ -74,6 +74,7 @@ export default function SaisieTemplateClient({
             type: tableau.type,
             fields: tableau.fields,
             schemaEvenement: tableau.schemaEvenement,
+            etablissementTypeCode: tableau.etablissementTypeCode,
           },
           etablissements,
           referentiels,
