@@ -6,60 +6,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-
-interface NavItem {
-  href: string;
-  label: string;
-}
-
-const NAV_PAR_ROLE: Record<string, NavItem[]> = {
-  DA: [
-    { href: "/dashboard", label: "Tableau de bord" },
-    { href: "/da/saisie", label: "Saisie de données" },
-    { href: "/etablissements", label: "Établissements" },
-    { href: "/da/supervision-agents", label: "Suivi des agents de saisie" },
-    { href: "/da/assignations", label: "Organisation du travail" },
-  ],
-  AGENT_SAISIE: [
-    { href: "/dashboard", label: "Tableau de bord" },
-    { href: "/da/saisie", label: "Saisie de données" },
-  ],
-  DD: [
-    { href: "/dashboard", label: "Tableau de bord" },
-    { href: "/dd/supervision", label: "Supervision" },
-    { href: "/dd/rapports-thematiques", label: "Rapports thématiques" },
-    { href: "/admin/utilisateurs", label: "Comptes utilisateurs" },
-    { href: "/etablissements", label: "Établissements" },
-    { href: "/dd/referentiels", label: "Propositions de référentiel" },
-  ],
-  CHEF_BAC: [
-    { href: "/dashboard", label: "Tableau de bord" },
-    { href: "/section/controle", label: "Vue croisée de contrôle" },
-    { href: "/section/analyse", label: "Synthèse d'analyse" },
-  ],
-  CHEF_SSV: [
-    { href: "/dashboard", label: "Tableau de bord" },
-    { href: "/section/controle", label: "Vue croisée de contrôle" },
-    { href: "/section/analyse", label: "Synthèse d'analyse" },
-  ],
-  CHEF_PSA: [
-    { href: "/dashboard", label: "Tableau de bord" },
-    { href: "/section/controle", label: "Vue croisée de contrôle" },
-    { href: "/section/analyse", label: "Synthèse d'analyse" },
-  ],
-  CHEF_SPAIH: [
-    { href: "/dashboard", label: "Tableau de bord" },
-    { href: "/section/controle", label: "Vue croisée de contrôle" },
-    { href: "/section/analyse", label: "Synthèse d'analyse" },
-  ],
-  ADMIN_TECH: [
-    { href: "/dashboard", label: "Tableau de bord" },
-    { href: "/technique", label: "Santé du système" },
-    { href: "/technique/sauvegarde", label: "Sauvegarde de la base" },
-    { href: "/technique/referentiels", label: "Listes de référence" },
-    { href: "/technique/audit", label: "Journal d'audit" },
-  ],
-};
+import { NAV_PAR_ROLE } from "@/lib/navItems";
 
 export default function Sidebar({
   role,

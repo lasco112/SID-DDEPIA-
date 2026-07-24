@@ -12,6 +12,7 @@
  *    l'utilisateur qui, lui, peut être hors ligne).
  */
 import { offlineDB } from "@/lib/dexie";
+import { NAV_PAR_ROLE } from "@/lib/navItems";
 
 export interface BootstrapPayload {
   meta: {
@@ -77,16 +78,10 @@ export async function metaBootstrap() {
 const CACHE_NAME = "sid-ddepia-v1";
 
 /** Pages non paramétrées par tableau, selon le rôle (miroir de Sidebar.tsx). */
-const ROUTES_PAR_ROLE: Record<string, string[]> = {
-  DA: ["/dashboard", "/da/saisie", "/etablissements", "/da/supervision-agents", "/da/assignations"],
-  AGENT_SAISIE: ["/dashboard", "/da/saisie"],
-  DD: ["/dashboard", "/dd/supervision", "/dd/rapports-thematiques", "/admin/utilisateurs", "/etablissements", "/dd/referentiels"],
-  CHEF_BAC: ["/dashboard", "/section/controle", "/section/analyse"],
-  CHEF_SSV: ["/dashboard", "/section/controle", "/section/analyse"],
-  CHEF_PSA: ["/dashboard", "/section/controle", "/section/analyse"],
-  CHEF_SPAIH: ["/dashboard", "/section/controle", "/section/analyse"],
-  ADMIN_TECH: ["/dashboard", "/technique", "/technique/sauvegarde", "/technique/referentiels", "/technique/audit"],
-};
+/** Dérivé de la même source que le menu (Sidebar.tsx) — jamais désynchronisé. */
+const ROUTES_PAR_ROLE: Record<string, string[]> = Object.fromEntries(
+  Object.entries(NAV_PAR_ROLE).map(([role, items]) => [role, items.map((i) => i.href)])
+);
 
 /**
  * Précharge dans le cache HTTP toutes les pages que ce rôle peut ouvrir,
