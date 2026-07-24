@@ -54,6 +54,7 @@ export default function AdminUtilisateursClient() {
   const [erreur, setErreur] = useState<string | null>(null);
   const [creation, setCreation] = useState(false);
   const [recherche, setRecherche] = useState("");
+  const [reinitialisation, setReinitialisation] = useState<{ id: string; valeur: string } | null>(null);
   const [identifiantsGeneres, setIdentifiantsGeneres] = useState<{ username: string; motDePasseTemporaire: string } | null>(null);
 
   const charger = useCallback(async () => {
@@ -119,12 +120,19 @@ export default function AdminUtilisateursClient() {
     if (res.ok) window.alert("Session révoquée : prendra effet à la prochaine connexion réseau de l'appareil.");
   }
 
-  async function reinitialiserMotDePasse(id: string) {
-    const res = await fetch(`/api/admin/utilisateurs/${id}/reset-password`, { method: "POST" });
+  async function confirmerReinitialisation(id: string, motDePasse: string) {
+    const res = await fetch(`/api/admin/utilisateurs/${id}/reset-password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ motDePasse }),
+    });
     const data = await res.json();
     if (res.ok) {
       const u = users.find((x) => x.id === id);
       setIdentifiantsGeneres({ username: u?.username ?? "", motDePasseTemporaire: data.motDePasseTemporaire });
+      setReinitialisation(null);
+    } else {
+      window.alert(data.message ?? "Échec de la réinitialisation.");
     }
   }
 
@@ -140,6 +148,36 @@ export default function AdminUtilisateursClient() {
 
   return (
     <div className="max-w-5xl">
+      {reinitialisation && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-sm rounded-lg bg-white p-5 shadow-xl">
+            <p className="text-sm font-semibold text-gray-800">Nouveau mot de passe</p>
+            <p className="mt-1 text-xs text-gray-500">
+              Validez ce mot de passe proposé ou remplacez-le par un autre de votre choix.
+            </p>
+            <input
+              type="text"
+              value={reinitialisation.valeur}
+              onChange={(e) => setReinitialisation({ ...reinitialisation, valeur: e.target.value })}
+              autoFocus
+              className="mt-3 w-full rounded-md border border-[#c3ccd6] px-3 py-2 text-sm"
+            />
+            <div className="mt-4 flex justify-end gap-2">
+              <button onClick={() => setReinitialisation(null)} className="rounded-md border border-[#c3ccd6] px-4 py-2 text-sm font-semibold text-ink-muted">
+                Annuler
+              </button>
+              <button
+                onClick={() => confirmerReinitialisation(reinitialisation.id, reinitialisation.valeur)}
+                disabled={!reinitialisation.valeur.trim()}
+                className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-hover disabled:opacity-60"
+              >
+                Valider
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-[23px] font-bold text-primary-dark">Comptes utilisateurs</h1>
@@ -307,7 +345,7 @@ export default function AdminUtilisateursClient() {
                         Désactiver
                       </button>
                     )}
-                    <button onClick={() => reinitialiserMotDePasse(u.id)} className="font-semibold text-ink-muted hover:underline">
+                    <button onClick={() => setReinitialisation({ id: u.id, valeur: "password123" })} className="font-semibold text-ink-muted hover:underline">
                       Réinitialiser le mot de passe
                     </button>
                     {u.actif && !u.enAttente && (

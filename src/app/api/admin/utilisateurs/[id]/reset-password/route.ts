@@ -1,7 +1,9 @@
 /**
- * POST /api/admin/utilisateurs/[id]/reset-password — le DD génère un nouveau
- * mot de passe temporaire (compte perdu/bloqué). Le titulaire devra le
- * changer à sa prochaine connexion.
+ * POST /api/admin/utilisateurs/[id]/reset-password — le DD réinitialise le
+ * mot de passe d'un compte (perdu/bloqué). Le mot de passe temporaire est
+ * proposé par le système (password123, simple à communiquer) mais le DD
+ * peut l'écraser par un autre de son choix avant de valider — jamais
+ * imposé. Le titulaire devra le changer à sa prochaine connexion.
  */
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
@@ -9,12 +11,16 @@ import { db } from "@/lib/db";
 import { requireUser, assertRole, permissionErrorResponse } from "@/lib/permissions";
 import { genererMotDePasseTemporaire } from "@/lib/generateCredentials";
 
-export async function POST(_req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, { params }: { params: { id: string } }) {
   try {
     const admin = await requireUser();
     assertRole(admin, ["DD"]);
 
-    const motDePasseTemporaire = genererMotDePasseTemporaire();
+    const { motDePasse } = (await req.json().catch(() => ({}))) as { motDePasse?: string };
+    const motDePasseTemporaire = motDePasse?.trim() || genererMotDePasseTemporaire();
+    if (motDePasseTemporaire.length < 4) {
+      return NextResponse.json({ message: "Le mot de passe doit contenir au moins 4 caractères." }, { status: 400 });
+    }
     const passwordHash = await bcrypt.hash(motDePasseTemporaire, 10);
     const updated = await db.user.update({
       where: { id: params.id },

@@ -38,8 +38,19 @@ export async function genererIdentifiant(opts: {
 
 const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789"; // sans caractères ambigus (0/O, 1/l/I)
 
-/** Mot de passe temporaire lisible, à relayer une seule fois par le DD. */
-export function genererMotDePasseTemporaire(longueur = 10): string {
+/**
+ * Mot de passe temporaire proposé à la création d'un compte ou à une
+ * réinitialisation. Simple et identique pour tous (demande explicite du DD
+ * pour la phase MVP/pilote) : `mustChangePassword` reste actif, donc la
+ * personne devra de toute façon le changer à sa première connexion — ce
+ * n'est qu'un point de départ facile à communiquer oralement.
+ */
+export function genererMotDePasseTemporaire(): string {
+  return "password123";
+}
+
+/** Génère un mot de passe aléatoire lisible — conservé pour un usage futur si besoin d'un vrai secret (non utilisé par défaut). */
+export function genererMotDePasseAleatoire(longueur = 10): string {
   let out = "";
   for (let i = 0; i < longueur; i++) {
     out += ALPHABET[randomInt(ALPHABET.length)];
