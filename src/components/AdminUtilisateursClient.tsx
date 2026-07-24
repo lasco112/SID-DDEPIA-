@@ -53,6 +53,7 @@ export default function AdminUtilisateursClient() {
   const [telephone, setTelephone] = useState("");
   const [erreur, setErreur] = useState<string | null>(null);
   const [creation, setCreation] = useState(false);
+  const [recherche, setRecherche] = useState("");
   const [identifiantsGeneres, setIdentifiantsGeneres] = useState<{ username: string; motDePasseTemporaire: string } | null>(null);
 
   const charger = useCallback(async () => {
@@ -126,6 +127,16 @@ export default function AdminUtilisateursClient() {
       setIdentifiantsGeneres({ username: u?.username ?? "", motDePasseTemporaire: data.motDePasseTemporaire });
     }
   }
+
+  const terme = recherche.trim().toLowerCase();
+  const usersFiltres = terme
+    ? users.filter((u) => {
+        const rattachement = u.arrondissement ?? u.section ?? "";
+        return [u.nom, u.username, LIBELLES_ROLE[u.role] ?? u.role, rattachement].some((v) =>
+          v.toLowerCase().includes(terme)
+        );
+      })
+    : users;
 
   return (
     <div className="max-w-5xl">
@@ -233,7 +244,17 @@ export default function AdminUtilisateursClient() {
         </form>
       )}
 
-      <div className="mt-6 overflow-x-auto rounded-lg border border-line bg-white">
+      <div className="mt-6">
+        <input
+          type="text"
+          value={recherche}
+          onChange={(e) => setRecherche(e.target.value)}
+          placeholder="Rechercher un nom, un identifiant, un rôle ou un rattachement…"
+          className="w-full max-w-md rounded-md border border-[#c3ccd6] px-3 py-2 text-sm"
+        />
+      </div>
+
+      <div className="mt-3 overflow-x-auto rounded-lg border border-line bg-white">
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr className="bg-[#e8eef5] text-left">
@@ -246,12 +267,14 @@ export default function AdminUtilisateursClient() {
             </tr>
           </thead>
           <tbody>
-            {!chargement && users.length === 0 && (
+            {!chargement && usersFiltres.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-6 text-center text-ink-faint">Aucun compte.</td>
+                <td colSpan={6} className="px-4 py-6 text-center text-ink-faint">
+                  {terme ? "Aucun compte ne correspond à cette recherche." : "Aucun compte."}
+                </td>
               </tr>
             )}
-            {users.map((u) => (
+            {usersFiltres.map((u) => (
               <tr key={u.id}>
                 <td className="border-b border-[#eef1f5] px-4 py-3 font-medium text-[#28323d]">{u.nom}</td>
                 <td className="border-b border-[#eef1f5] px-4 py-3 font-mono text-ink-muted">{u.username}</td>
