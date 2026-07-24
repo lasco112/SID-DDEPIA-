@@ -48,6 +48,11 @@ model User {
   sectionId          String? // obligatoire si role = CHEF_*
   createdAt          DateTime  @default(now())
   lastLoginAt        DateTime?
+  // Révocation d'appareil à distance (hors-ligne, sécurité) : tout jeton de
+  // session émis AVANT cette date est rejeté au prochain contact serveur —
+  // utile si un appareil est perdu/volé. Ne bloque pas une reconnexion
+  // légitime avec le bon mot de passe, seulement les jetons déjà en circulation.
+  sessionRevoqueeLe  DateTime?
 
   arrondissement Arrondissement? @relation(fields: [arrondissementId], references: [id])
   section        Section?        @relation(fields: [sectionId], references: [id])

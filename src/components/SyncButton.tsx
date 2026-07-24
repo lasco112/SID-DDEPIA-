@@ -54,7 +54,7 @@ export default function SyncButton({
   const refreshPending = useCallback(async () => {
     const n = await offlineDB.saisies
       .where("[username+statutLocal]")
-      .anyOf([username, "BROUILLON_LOCAL"], [username, "SYNCHRO_EN_ATTENTE"])
+      .anyOf([username, "BROUILLON_LOCAL"], [username, "SYNCHRO_EN_ATTENTE"], [username, "ERREUR_SYNCHRO"])
       .count();
     setPending(n);
   }, [username]);
@@ -89,7 +89,7 @@ export default function SyncButton({
     try {
       const queue = await offlineDB.saisies
         .where("[username+statutLocal]")
-        .anyOf([username, "BROUILLON_LOCAL"], [username, "SYNCHRO_EN_ATTENTE"])
+        .anyOf([username, "BROUILLON_LOCAL"], [username, "SYNCHRO_EN_ATTENTE"], [username, "ERREUR_SYNCHRO"])
         .toArray();
 
       let confirmed = 0;
@@ -106,10 +106,20 @@ export default function SyncButton({
 
           if (!res.ok) {
             const err = await res.json().catch(() => ({}));
-            if (res.status === 423) {
-              throw new Error(err.message ?? "Période verrouillée. Contactez le Délégué Départemental.");
-            }
-            throw new Error(err.message ?? `Erreur serveur (${res.status})`);
+            const erreurMsg =
+              res.status === 423
+                ? err.message ?? "Période verrouillée. Contactez le Délégué Départemental."
+                : err.message ?? `Erreur serveur (${res.status})`;
+            // Le lot en échec passe visiblement en erreur (jamais un échec
+            // silencieux) : la saisie reste sur l'appareil, rien n'est perdu,
+            // et un nouvel essai la reprendra normalement (statut réévalué à
+            // chaque tentative, jamais bloqué en erreur définitive).
+            await offlineDB.transaction("rw", offlineDB.saisies, async () => {
+              for (const s of batch) {
+                await offlineDB.saisies.update(s.clientId, { statutLocal: "ERREUR_SYNCHRO", erreurSynchro: erreurMsg });
+              }
+            });
+            throw new Error(erreurMsg);
           }
 
           const { confirmedIds } = (await res.json()) as { confirmedIds: string[] };
@@ -157,7 +167,7 @@ export default function SyncButton({
   }, [online]);
 
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex flex-wrap items-center gap-3">
       <span
         className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${
           online ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"
@@ -172,8 +182,14 @@ export default function SyncButton({
         disabled={state === "syncing" || (pending === 0 && !peutSoumettre)}
         className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-hover disabled:cursor-not-allowed disabled:bg-gray-300"
       >
-        {state === "syncing" ? "Envoi…" : pending > 0 ? `Envoyer au ${destinataire} (${pending})` : `Envoyer au ${destinataire}`}
+        {state === "syncing" ? "Synchronisation en cours…" : `Envoyer au ${destinataire}`}
       </button>
+
+      {pending > 0 && state !== "syncing" && (
+        <span className="text-xs font-medium text-amber-700">
+          {pending} saisie{pending > 1 ? "s" : ""} en attente de synchronisation
+        </span>
+      )}
 
       {message && (
         <p className={`text-sm ${state === "error" ? "text-red-700" : "text-gray-600"}`} role="status">

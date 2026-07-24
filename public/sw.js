@@ -19,7 +19,15 @@ const PRECACHE = ["/", OFFLINE_URL, "/manifest.json"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE)));
-  self.skipWaiting();
+  // PAS de self.skipWaiting() ici : un nouveau service worker installé doit
+  // rester en attente ("waiting") tant que l'utilisateur n'a pas cliqué sur
+  // « Actualiser maintenant » (voir ServiceWorkerRegister.tsx) — sinon la
+  // page en cours change de version sous les pieds de l'utilisateur en
+  // pleine saisie, sans jamais le prévenir.
+});
+
+self.addEventListener("message", (event) => {
+  if (event.data?.type === "SKIP_WAITING") self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {

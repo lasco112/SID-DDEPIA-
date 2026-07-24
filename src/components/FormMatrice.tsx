@@ -9,7 +9,7 @@
  */
 
 import { useEffect, useState, useCallback } from "react";
-import { offlineDB, trouverSaisieMatrice } from "@/lib/dexie";
+import { offlineDB, trouverSaisieMatrice, type StatutLocal } from "@/lib/dexie";
 
 interface FormFieldDto {
   id: string;
@@ -35,6 +35,22 @@ type Ligne = {
   motifNonRenseigne: string;
   clientId: string;
   savedAt: number | null;
+  statutLocal?: StatutLocal;
+  erreurSynchro?: string | null;
+};
+
+const LIBELLE_STATUT: Record<StatutLocal, string> = {
+  BROUILLON_LOCAL: "Enregistrée sur l'appareil",
+  SYNCHRO_EN_ATTENTE: "En attente de synchronisation",
+  SYNCHRONISE: "Synchronisée",
+  ERREUR_SYNCHRO: "Erreur de synchronisation",
+};
+
+const STYLE_STATUT: Record<StatutLocal, string> = {
+  BROUILLON_LOCAL: "bg-gray-100 text-gray-600",
+  SYNCHRO_EN_ATTENTE: "bg-amber-100 text-amber-800",
+  SYNCHRONISE: "bg-green-100 text-green-800",
+  ERREUR_SYNCHRO: "bg-red-100 text-red-800",
 };
 
 export default function FormMatrice({ template, periodeId, username }: { template: TemplateDto; periodeId: string; username: string }) {
@@ -74,6 +90,8 @@ export default function FormMatrice({ template, periodeId, username }: { templat
             motifNonRenseigne: local.motifNonRenseigne ?? "",
             clientId: local.clientId,
             savedAt: Date.now(),
+            statutLocal: local.statutLocal,
+            erreurSynchro: local.erreurSynchro,
           };
           continue;
         }
@@ -100,6 +118,7 @@ export default function FormMatrice({ template, periodeId, username }: { templat
             motifNonRenseigne: distant.motifNonRenseigne ?? "",
             clientId,
             savedAt: Date.now(),
+            statutLocal: "SYNCHRONISE",
           };
         } else {
           initial[f.code] = { valeur: "", nonRenseigne: false, motifNonRenseigne: "", clientId: crypto.randomUUID(), savedAt: null };
@@ -116,6 +135,33 @@ export default function FormMatrice({ template, periodeId, username }: { templat
       annule = true;
     };
   }, [template.code, template.fields, periodeId, username]);
+
+  // Le statut (synchronisée / en attente / erreur…) change en dehors de ce
+  // composant, côté SyncButton — on relit régulièrement Dexie (source de
+  // vérité) pour que les badges par ligne restent à jour sans recharger toute
+  // la page ni dupliquer la logique de synchronisation ici.
+  useEffect(() => {
+    const t = setInterval(async () => {
+      const locaux = await offlineDB.saisies
+        .where("[username+periodeId+templateCode]")
+        .equals([username, periodeId, template.code])
+        .and((s) => s.famille === "MATRICE")
+        .toArray();
+      if (locaux.length === 0) return;
+      setLignes((prev) => {
+        const suivant = { ...prev };
+        for (const s of locaux) {
+          if (!s.fieldCode) continue;
+          const courante = suivant[s.fieldCode];
+          if (courante && courante.clientId === s.clientId) {
+            suivant[s.fieldCode] = { ...courante, statutLocal: s.statutLocal, erreurSynchro: s.erreurSynchro };
+          }
+        }
+        return suivant;
+      });
+    }, 3000);
+    return () => clearInterval(t);
+  }, [username, periodeId, template.code]);
 
   const sauvegarder = useCallback(
     async (fieldCode: string, texte: boolean, patch: Partial<Ligne>) => {
@@ -139,7 +185,7 @@ export default function FormMatrice({ template, periodeId, username }: { templat
           updatedAt: new Date().toISOString(),
         });
 
-        return { ...prev, [fieldCode]: { ...nouvelle, savedAt: Date.now() } };
+        return { ...prev, [fieldCode]: { ...nouvelle, savedAt: Date.now(), statutLocal: "BROUILLON_LOCAL", erreurSynchro: null } };
       });
     },
     [periodeId, template.code, username]
@@ -157,6 +203,7 @@ export default function FormMatrice({ template, periodeId, username }: { templat
             <th className="border-b border-gray-200 px-4 py-2">Valeur</th>
             <th className="border-b border-gray-200 px-4 py-2">Non renseigné</th>
             <th className="border-b border-gray-200 px-4 py-2">Saisi par</th>
+            <th className="border-b border-gray-200 px-4 py-2">Statut</th>
           </tr>
         </thead>
         <tbody>
@@ -196,6 +243,16 @@ export default function FormMatrice({ template, periodeId, username }: { templat
                   )}
                 </td>
                 <td className="border-b border-gray-100 px-4 py-2 text-xs text-gray-500">{auteurs[f.code] ?? "—"}</td>
+                <td className="border-b border-gray-100 px-4 py-2">
+                  {ligne?.statutLocal && (
+                    <span
+                      title={ligne.statutLocal === "ERREUR_SYNCHRO" ? ligne.erreurSynchro ?? undefined : undefined}
+                      className={`inline-block rounded-full px-2 py-0.5 text-[11px] font-medium ${STYLE_STATUT[ligne.statutLocal]}`}
+                    >
+                      {LIBELLE_STATUT[ligne.statutLocal]}
+                    </span>
+                  )}
+                </td>
               </tr>
             );
           })}

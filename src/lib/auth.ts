@@ -99,9 +99,31 @@ export const authOptions: NextAuthOptions = {
           token.sectionId = fresh.sectionId;
         }
       }
+      // Révocation d'appareil à distance (hors-ligne, sécurité) : vérifiée à
+      // CHAQUE résolution de session (pages ET API), jamais seulement à la
+      // connexion — sinon un appareil perdu/volé resterait valide jusqu'à
+      // expiration naturelle du jeton (30 jours). Un jeton émis avant la
+      // révocation échoue ici ; l'utilisateur peut toujours se reconnecter
+      // normalement ensuite (seul le jeton déjà émis est invalidé, pas le compte).
+      if (!token.isDemo && token.sub && trigger !== "update") {
+        const fresh = await db.user.findUnique({
+          where: { id: token.sub },
+          select: { actif: true, sessionRevoqueeLe: true },
+        });
+        const emisLe = typeof token.iat === "number" ? token.iat * 1000 : 0;
+        if (!fresh || !fresh.actif || (fresh.sessionRevoqueeLe && emisLe < fresh.sessionRevoqueeLe.getTime())) {
+          token.revoque = true;
+        }
+      }
       return token;
     },
     async session({ session, token }) {
+      if (token.revoque) {
+        // Session invalidée (compte désactivé ou appareil révoqué à distance) :
+        // pas d'utilisateur exposé, tout le code existant qui teste `!session?.user`
+        // (AppShell, requireUser…) redirige/rejette déjà correctement sur ce cas.
+        return { ...session, user: undefined, expires: session.expires };
+      }
       if (token && session.user) {
         (session.user as any).id = token.sub;
         (session.user as any).role = token.role;

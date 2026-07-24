@@ -109,6 +109,15 @@ export default function AdminUtilisateursClient() {
     if (res.ok) await charger();
   }
 
+  async function revoquerSession(id: string) {
+    const confirme = window.confirm(
+      "Invalider immédiatement la session de cette personne (utile si son appareil est perdu ou volé) ? Elle pourra se reconnecter normalement ensuite."
+    );
+    if (!confirme) return;
+    const res = await fetch(`/api/admin/utilisateurs/${id}/revoquer`, { method: "POST" });
+    if (res.ok) window.alert("Session révoquée : prendra effet à la prochaine connexion réseau de l'appareil.");
+  }
+
   async function reinitialiserMotDePasse(id: string) {
     const res = await fetch(`/api/admin/utilisateurs/${id}/reset-password`, { method: "POST" });
     const data = await res.json();
@@ -278,6 +287,11 @@ export default function AdminUtilisateursClient() {
                     <button onClick={() => reinitialiserMotDePasse(u.id)} className="font-semibold text-ink-muted hover:underline">
                       Réinitialiser le mot de passe
                     </button>
+                    {u.actif && !u.enAttente && (
+                      <button onClick={() => revoquerSession(u.id)} className="font-semibold text-statut-rejeteText hover:underline">
+                        Révoquer l'appareil
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>

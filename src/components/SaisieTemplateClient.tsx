@@ -6,6 +6,7 @@ import FormMatrice from "@/components/FormMatrice";
 import FormNominatif from "@/components/FormNominatif";
 import FormEvenement from "@/components/FormEvenement";
 import SyncButton from "@/components/SyncButton";
+import { offlineDB } from "@/lib/dexie";
 
 export default function SaisieTemplateClient({
   templateCode,
@@ -23,18 +24,52 @@ export default function SaisieTemplateClient({
   const [erreur, setErreur] = useState<string | null>(null);
 
   useEffect(() => {
+    // Le tableau et ses données de référence (établissements, référentiels,
+    // période) viennent de Dexie — remplies une fois pour toutes par
+    // /api/bootstrap (voir lib/offlineStore.ts) — et non plus d'un appel
+    // réseau : l'ouverture d'un tableau ne doit jamais dépendre d'internet.
     async function charger() {
       try {
-        const [periodeRes, detailRes] = await Promise.all([
-          fetch("/api/periodes/active"),
-          fetch(`/api/form-templates/${templateCode}`),
-        ]);
-        if (!periodeRes.ok) throw new Error("Aucune période active.");
-        if (!detailRes.ok) throw new Error("Tableau introuvable.");
-        const periodeData = await periodeRes.json();
-        const detailData = await detailRes.json();
-        setPeriodeId(periodeData.periode.id);
-        setDetail(detailData);
+        const meta = await offlineDB.meta.get("bootstrap");
+        const tableau = await offlineDB.tableaux.get(templateCode);
+        if (!meta || !tableau) {
+          throw new Error(
+            "Données de référence indisponibles sur cet appareil. Connectez-vous à internet une première fois pour les télécharger."
+          );
+        }
+        const periode = meta.periodeActiveId ? await offlineDB.periodes.get(meta.periodeActiveId) : null;
+        if (!periode) throw new Error("Aucune période active. Reconnectez-vous à internet pour synchroniser.");
+
+        let etablissements: unknown[] = [];
+        if (tableau.type === "NOMINATIF" && tableau.etablissementTypeCode) {
+          etablissements = await offlineDB.etablissements.where("typeCode").equals(tableau.etablissementTypeCode).toArray();
+        }
+
+        let referentiels: Record<string, unknown[]> = {};
+        if (tableau.type === "EVENEMENT" && Array.isArray(tableau.schemaEvenement)) {
+          const categories = Array.from(
+            new Set(
+              (tableau.schemaEvenement as Array<{ ref?: string }>).map((c) => c.ref).filter((r): r is string => Boolean(r))
+            )
+          );
+          for (const categorie of categories) {
+            referentiels[categorie] = await offlineDB.referentiels.where("categorie").equals(categorie).toArray();
+          }
+        }
+
+        setPeriodeId(periode.id);
+        setDetail({
+          template: {
+            code: tableau.code,
+            numero: tableau.numero,
+            titre: tableau.titre,
+            type: tableau.type,
+            fields: tableau.fields,
+            schemaEvenement: tableau.schemaEvenement,
+          },
+          etablissements,
+          referentiels,
+        });
       } catch (e) {
         setErreur(e instanceof Error ? e.message : "Erreur de chargement.");
       }

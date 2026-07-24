@@ -11,9 +11,12 @@
  */
 
 import { useState } from "react";
-import { Menu, X } from "lucide-react";
+import { Menu, X, Lock } from "lucide-react";
+import Link from "next/link";
 import Sidebar from "@/components/Sidebar";
 import OnlineIndicator from "@/components/OnlineIndicator";
+import BootstrapPreload from "@/components/BootstrapPreload";
+import PinGate from "@/components/PinGate";
 
 const LIBELLES_ROLE: Record<string, string> = {
   DD: "Délégué Départemental",
@@ -40,7 +43,9 @@ export default function AppShellClient({
   const [menuOuvert, setMenuOuvert] = useState(false);
 
   return (
+    <PinGate>
     <div className="flex min-h-screen flex-col">
+      <BootstrapPreload />
       <header className="flex h-[58px] shrink-0 items-center gap-4 bg-primary px-[18px] text-white shadow-[0_1px_0_rgba(0,0,0,.12)]">
         <button
           type="button"
@@ -67,6 +72,13 @@ export default function AppShellClient({
             <div className="text-[13.5px] font-semibold">{username}</div>
             <div className="text-[11.5px] text-white/75">{LIBELLES_ROLE[role] ?? role}</div>
           </div>
+          <Link
+            href="/mon-compte/securite"
+            title="Sécurité de l'appareil"
+            className="flex h-9 w-9 items-center justify-center rounded-md hover:bg-white/10"
+          >
+            <Lock size={17} />
+          </Link>
           <a
             href="/api/auth/signout"
             className="rounded-md border border-white/25 bg-white/10 px-3 py-2 text-[13px] font-semibold text-white hover:bg-white/20"
@@ -92,5 +104,6 @@ export default function AppShellClient({
         <main className="sid-scroll flex-1 min-w-0 overflow-auto bg-appbg p-6 md:p-[26px_30px]">{children}</main>
       </div>
     </div>
+    </PinGate>
   );
 }
