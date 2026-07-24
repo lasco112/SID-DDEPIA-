@@ -5,7 +5,8 @@
  * par un vrai module de gestion (ajout + modification, jamais de suppression
  * définitive — cf. Etablissement.actif).
  *
- * DA : uniquement SON arrondissement (jamais un autre — §A.2).
+ * DA / AGENT_SAISIE : uniquement SON arrondissement (jamais un autre — §A.2) —
+ * l'agent partage le registre de son DA, jamais celui d'un autre arrondissement.
  * DD : n'importe quel arrondissement (doit le préciser explicitement).
  * ADMIN_TECH exclu (aucun droit métier, CDC §A.2).
  */
@@ -18,7 +19,7 @@ const TYPES_VALIDES = ["ETAB_COUVOIR", "ETAB_FERME_PONTE", "ETAB_FERME_CHAIR", "
 export async function GET(req: Request) {
   try {
     const user = await requireUser();
-    assertRole(user, ["DA", "DD"]);
+    assertRole(user, ["DA", "DD", "AGENT_SAISIE"]);
 
     const { searchParams } = new URL(req.url);
     const typeCode = searchParams.get("typeCode");
@@ -28,8 +29,8 @@ export async function GET(req: Request) {
     }
 
     let arrondissementId: string;
-    if (user.role === "DA") {
-      if (!user.arrondissementId) return NextResponse.json({ message: "Compte DA sans arrondissement assigné" }, { status: 400 });
+    if (user.role === "DA" || user.role === "AGENT_SAISIE") {
+      if (!user.arrondissementId) return NextResponse.json({ message: "Compte sans arrondissement assigné" }, { status: 400 });
       arrondissementId = user.arrondissementId;
     } else {
       if (!arrondissementIdParam) return NextResponse.json({ message: "arrondissementId requis" }, { status: 400 });
@@ -50,7 +51,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const user = await requireUser();
-    assertRole(user, ["DA", "DD"]);
+    assertRole(user, ["DA", "DD", "AGENT_SAISIE"]);
 
     const body = (await req.json()) as {
       typeCode: string;
@@ -69,8 +70,8 @@ export async function POST(req: Request) {
     }
 
     let arrondissementId: string;
-    if (user.role === "DA") {
-      if (!user.arrondissementId) return NextResponse.json({ message: "Compte DA sans arrondissement assigné" }, { status: 400 });
+    if (user.role === "DA" || user.role === "AGENT_SAISIE") {
+      if (!user.arrondissementId) return NextResponse.json({ message: "Compte sans arrondissement assigné" }, { status: 400 });
       arrondissementId = user.arrondissementId;
     } else {
       if (!body.arrondissementId) return NextResponse.json({ message: "arrondissementId requis" }, { status: 400 });

@@ -28,7 +28,7 @@ const PROTECTED_PREFIXES: Array<{ prefix: string; roles: string[] }> = [
   { prefix: "/technique", roles: ["ADMIN_TECH"] }, // espace de maintenance technique — strictement séparé du métier (§A.2)
   { prefix: "/api/admin", roles: ["DD"] },
   { prefix: "/api/dd", roles: ["DD"] },
-  { prefix: "/api/etablissements", roles: ["DA", "DD"] },
+  { prefix: "/api/etablissements", roles: ["DA", "DD", "AGENT_SAISIE"] }, // AGENT_SAISIE : creation inline pendant la saisie NOMINATIF uniquement (voir route)
   { prefix: "/api/technique", roles: ["ADMIN_TECH"] },
   { prefix: "/api/sync", roles: ["DA", "AGENT_SAISIE"] },
   { prefix: "/api/rapports/submit", roles: ["DA"] }, // soumission réservée au DA — jamais l'agent, quelle que soit la mise en page ou l'ordre des règles
