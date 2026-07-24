@@ -19,11 +19,18 @@ const PRECACHE = ["/", OFFLINE_URL, "/manifest.json"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE)));
-  // PAS de self.skipWaiting() ici : un nouveau service worker installé doit
-  // rester en attente ("waiting") tant que l'utilisateur n'a pas cliqué sur
-  // « Actualiser maintenant » (voir ServiceWorkerRegister.tsx) — sinon la
-  // page en cours change de version sous les pieds de l'utilisateur en
-  // pleine saisie, sans jamais le prévenir.
+  // PAS de self.skipWaiting() automatique en production : un nouveau service
+  // worker installé reste en attente tant que l'utilisateur n'a pas cliqué sur
+  // « Actualiser maintenant » (voir ServiceWorkerRegister.tsx) — sinon la page
+  // en cours change de version sous les pieds de l'utilisateur en pleine
+  // saisie, sans jamais le prévenir.
+  // En développement local (localhost), on bascule immédiatement : sinon un
+  // ancien worker reste actif indéfiniment et sert du code périmé à chaque
+  // modification tant que personne ne clique la bannière — sans intérêt ici,
+  // aucun utilisateur réel n'est en train de saisir des données.
+  if (self.location.hostname === "localhost" || self.location.hostname === "127.0.0.1") {
+    self.skipWaiting();
+  }
 });
 
 self.addEventListener("message", (event) => {

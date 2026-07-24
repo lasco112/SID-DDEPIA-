@@ -22,6 +22,7 @@ export default function SaisieTemplateClient({
   const [periodeId, setPeriodeId] = useState<string | null>(null);
   const [detail, setDetail] = useState<any>(null);
   const [erreur, setErreur] = useState<string | null>(null);
+  const [suivant, setSuivant] = useState<{ code: string; numero: string; titre: string } | null>(null);
 
   useEffect(() => {
     // Le tableau et ses données de référence (établissements, référentiels,
@@ -56,6 +57,13 @@ export default function SaisieTemplateClient({
             referentiels[categorie] = await offlineDB.referentiels.where("categorie").equals(categorie).toArray();
           }
         }
+
+        // Tableau suivant du canevas (ordre officiel) — permet d'enchaîner
+        // sans repasser par la liste des 28 tableaux.
+        const tousLesTableaux = await offlineDB.tableaux.orderBy("ordre").toArray();
+        const indexCourant = tousLesTableaux.findIndex((t) => t.code === templateCode);
+        const prochain = indexCourant >= 0 ? tousLesTableaux[indexCourant + 1] : undefined;
+        setSuivant(prochain ? { code: prochain.code, numero: prochain.numero, titre: prochain.titre } : null);
 
         setPeriodeId(periode.id);
         setDetail({
@@ -107,6 +115,21 @@ export default function SaisieTemplateClient({
             )}
             {periodeId && detail.template.type === "EVENEMENT" && (
               <FormEvenement template={detail.template} periodeId={periodeId} referentiels={detail.referentiels} username={username} />
+            )}
+          </div>
+
+          <div className="mt-6 flex justify-end">
+            {suivant ? (
+              <Link
+                href={`/da/saisie/${suivant.code}`}
+                className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-hover"
+              >
+                Tableau suivant : {suivant.numero} {suivant.titre} →
+              </Link>
+            ) : (
+              <Link href="/da/saisie" className="text-sm font-semibold text-primary hover:underline">
+                Dernier tableau — retour à la liste
+              </Link>
             )}
           </div>
         </>
