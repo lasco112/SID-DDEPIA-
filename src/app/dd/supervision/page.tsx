@@ -7,6 +7,7 @@ import AppShell from '@/components/AppShell';
 import DeverrouillerButton from '@/components/DeverrouillerButton';
 import SyntheseValidationRow from '@/components/SyntheseValidationRow';
 import GenererRapportDDButton from '@/components/GenererRapportDDButton';
+import PurgerDonneesTestButton from '@/components/PurgerDonneesTestButton';
 
 const STATUT_STYLE: Record<string, string> = {
   SOUMIS: 'bg-green-100 text-green-800',
@@ -191,6 +192,10 @@ export default async function DDSupervisionPage() {
         ) : (
           <div className="mt-6 rounded-lg border border-red-200 bg-red-50 p-6 text-red-800">Aucune période n'est ouverte.</div>
         )}
+
+        <div className="mt-10">
+          <PurgerDonneesTestButton />
+        </div>
       </div>
     </AppShell>
   );
