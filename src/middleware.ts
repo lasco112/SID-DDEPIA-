@@ -84,7 +84,11 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(new URL("/dashboard", req.url));
   }
 
-  const rule = PROTECTED_PREFIXES.find((r) => pathname.startsWith(r.prefix));
+  // Frontière de segment obligatoire (pathname === prefix OU suivi de "/") : un simple
+  // startsWith() ferait croire que "/dashboard" appartient au préfixe "/da" (bug réel
+  // trouvé en vérification finale — provoquait une boucle de redirection infinie pour
+  // tout rôle autre que DA/AGENT_SAISIE tentant d'ouvrir le tableau de bord).
+  const rule = PROTECTED_PREFIXES.find((r) => pathname === r.prefix || pathname.startsWith(`${r.prefix}/`));
   if (!rule) return NextResponse.next();
 
   if (!token) {
