@@ -64,23 +64,24 @@ export default function SplashScreen() {
 
   return (
     <div
-      className="fixed inset-0 z-[300] flex items-center justify-center p-6"
+      className="fixed inset-0 z-[300] overflow-hidden"
       style={{ background: "var(--gradient-brand)" }}
       onClick={() => setVisible(false)}
       role="presentation"
     >
-      <div className="w-full max-w-md overflow-hidden rounded-card bg-white shadow-card">
-        <video
-          autoPlay
-          muted
-          playsInline
-          onEnded={() => setVisible(false)}
-          onError={() => setVisible(false)}
-          className="block w-full"
-        >
-          <source src="/videos/animation-entree.mp4" type="video/mp4" />
-        </video>
-      </div>
+      {/* object-cover : la vidéo remplit TOUT l'écran quel que soit le format de
+          l'appareil (le débord est rogné, jamais de bandes ni de cadre). Le
+          dégradé de marque en dessous ne se voit que le temps du chargement. */}
+      <video
+        autoPlay
+        muted
+        playsInline
+        onEnded={() => setVisible(false)}
+        onError={() => setVisible(false)}
+        className="h-full w-full object-cover"
+      >
+        <source src="/videos/animation-entree.mp4" type="video/mp4" />
+      </video>
     </div>
   );
 }
