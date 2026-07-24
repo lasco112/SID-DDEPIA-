@@ -78,7 +78,7 @@ const CACHE_NAME = "sid-ddepia-v1";
 
 /** Pages non paramétrées par tableau, selon le rôle (miroir de Sidebar.tsx). */
 const ROUTES_PAR_ROLE: Record<string, string[]> = {
-  DA: ["/dashboard", "/da/saisie", "/etablissements", "/da/supervision-agents"],
+  DA: ["/dashboard", "/da/saisie", "/etablissements", "/da/supervision-agents", "/da/assignations"],
   AGENT_SAISIE: ["/dashboard", "/da/saisie"],
   DD: ["/dashboard", "/dd/supervision", "/dd/rapports-thematiques", "/admin/utilisateurs", "/etablissements", "/dd/referentiels"],
   CHEF_BAC: ["/dashboard", "/section/controle", "/section/analyse"],

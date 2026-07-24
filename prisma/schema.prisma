@@ -71,6 +71,8 @@ model User {
   referentielsProposes            ReferentielItem[]  @relation("ReferentielProposePar")
   referentielsValides             ReferentielItem[]  @relation("ReferentielValideParDD")
   configsModifiees                ConfigSysteme[]
+  assignationsRecues              AssignationSaisie[] @relation("AgentAssigne")
+  assignationsFaites              AssignationSaisie[] @relation("AssignateurDA")
 
   @@index([role, actif])
 }
@@ -87,6 +89,7 @@ model Arrondissement {
   rapports       RapportArrondissement[]
   etablissements Etablissement[]
   pointsSIG      PointSIG[]
+  assignations   AssignationSaisie[]
 }
 
 model Section {
@@ -268,9 +271,38 @@ model PeriodeReporting {
   validations ValidationSection[]
   syntheses   SyntheseSection[]
   exports     ExportDocument[]
+  assignations AssignationSaisie[]
 
   @@unique([type, annee, mois, trimestre, semestre])
   @@index([statut, dateLimiteDA])
+}
+
+// ============================================================================
+// ORGANISATION DU TRAVAIL DES AGENTS DE SAISIE (demande du DD, réunion de
+// service) : le DA attribue un tableau du canevas à un agent de saisie
+// précis, à titre INDICATIF — n'importe quel agent de l'arrondissement
+// reste techniquement capable de remplir n'importe quel tableau (choix
+// explicite du DD : pas de blocage, notamment pour rester utilisable hors
+// ligne si l'attribution change pendant qu'un agent est déconnecté). La
+// réattribution ne touche jamais les données déjà saisies : `saisiParId`
+// sur SaisieMatrice/SaisieNominative/SaisieEvenement retient qui a
+// réellement écrit chaque valeur, indépendamment de cette table.
+// ============================================================================
+model AssignationSaisie {
+  id               String   @id @default(cuid())
+  periodeId        String
+  arrondissementId String
+  templateCode     String
+  agentId          String? // null = non attribué explicitement
+  assignePar       String
+  assigneLe        DateTime @default(now())
+
+  periode        PeriodeReporting @relation(fields: [periodeId], references: [id])
+  arrondissement Arrondissement   @relation(fields: [arrondissementId], references: [id])
+  agent          User?            @relation("AgentAssigne", fields: [agentId], references: [id])
+  assignateur    User             @relation("AssignateurDA", fields: [assignePar], references: [id])
+
+  @@unique([periodeId, arrondissementId, templateCode])
 }
 
 enum StatutRapportDA {

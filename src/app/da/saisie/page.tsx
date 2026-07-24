@@ -21,6 +21,18 @@ export default async function DASaisieIndexPage() {
     include: { section: true },
   });
 
+  // Organisation du travail (indicative — voir /da/assignations) : qui est
+  // censé remplir quoi ce mois-ci, sans jamais restreindre l'accès.
+  const periodeActive = await db.periodeReporting.findFirst({ where: { type: "MENSUEL" }, orderBy: [{ annee: "desc" }, { mois: "desc" }] });
+  const assignations =
+    periodeActive && moi.arrondissementId
+      ? await db.assignationSaisie.findMany({
+          where: { periodeId: periodeActive.id, arrondissementId: moi.arrondissementId, agentId: { not: null } },
+          include: { agent: true },
+        })
+      : [];
+  const agentParTableau = new Map(assignations.map((a) => [a.templateCode, a.agent?.nom]));
+
   const groupes = new Map<string, typeof templates>();
   for (const t of templates) {
     const section = t.numero.split(".")[0];
@@ -53,7 +65,14 @@ export default async function DASaisieIndexPage() {
                         <span className="mr-2 font-mono text-xs text-gray-400">{t.numero}</span>
                         {t.titre}
                       </span>
-                      <span className="text-xs uppercase text-gray-400">{t.type}</span>
+                      <span className="flex items-center gap-2">
+                        {agentParTableau.get(t.code) && (
+                          <span className="rounded-full bg-primary-light px-2 py-0.5 text-[11px] font-medium text-primary-dark">
+                            {agentParTableau.get(t.code)}
+                          </span>
+                        )}
+                        <span className="text-xs uppercase text-gray-400">{t.type}</span>
+                      </span>
                     </Link>
                   </li>
                 ))}
