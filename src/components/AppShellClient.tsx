@@ -18,6 +18,7 @@ import OnlineIndicator from "@/components/OnlineIndicator";
 import BootstrapPreload from "@/components/BootstrapPreload";
 import PinGate from "@/components/PinGate";
 import RechercheGlobale from "@/components/RechercheGlobale";
+import AideButton from "@/components/AideButton";
 
 const LIBELLES_ROLE: Record<string, string> = {
   DD: "Délégué Départemental",
@@ -70,6 +71,7 @@ export default function AppShellClient({
         <div className="ml-auto flex items-center gap-4">
           <OnlineIndicator />
           <RechercheGlobale role={role} />
+          <AideButton role={role} />
           <div className="hidden text-right leading-tight sm:block">
             <div className="text-[13.5px] font-semibold">{username}</div>
             <div className="text-[11.5px] text-white/75">{LIBELLES_ROLE[role] ?? role}</div>

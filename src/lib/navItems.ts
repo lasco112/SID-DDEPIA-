@@ -28,6 +28,7 @@ export const NAV_PAR_ROLE: Record<string, NavItem[]> = {
     { href: "/admin/utilisateurs", label: "Comptes utilisateurs" },
     { href: "/etablissements", label: "Établissements" },
     { href: "/dd/referentiels", label: "Propositions de référentiel" },
+    { href: "/technique/aide", label: "Questions des utilisateurs" },
   ],
   CHEF_BAC: [
     { href: "/dashboard", label: "Tableau de bord" },
@@ -55,5 +56,6 @@ export const NAV_PAR_ROLE: Record<string, NavItem[]> = {
     { href: "/technique/sauvegarde", label: "Sauvegarde de la base" },
     { href: "/technique/referentiels", label: "Listes de référence" },
     { href: "/technique/audit", label: "Journal d'audit" },
+    { href: "/technique/aide", label: "Questions des utilisateurs" },
   ],
 };

@@ -73,6 +73,7 @@ model User {
   configsModifiees                ConfigSysteme[]
   assignationsRecues              AssignationSaisie[] @relation("AgentAssigne")
   assignationsFaites              AssignationSaisie[] @relation("AssignateurDA")
+  demandesAide                    DemandeAide[]
 
   @@index([role, actif])
 }
@@ -607,6 +608,26 @@ model AuditLog {
 
   @@index([action, createdAt])
   @@index([userId, createdAt])
+}
+
+// ============================================================================
+// AIDE CONTEXTUELLE (demande utilisateur) : question posée depuis le bouton
+// « Aide », avec le contexte exact (page, tableau) pour que le DD/ADMIN_TECH
+// comprenne le problème sans devoir le redemander. Sert aussi de base à une
+// FAQ vivante (questions réellement posées, au-delà de la FAQ pré-écrite).
+// ============================================================================
+model DemandeAide {
+  id         String   @id @default(cuid())
+  userId     String
+  page       String // ex. "/da/saisie/T13"
+  tableauCode String?
+  message    String
+  traite     Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([traite, createdAt])
 }
 
 /// Paramètres système clé/valeur — table volontairement minimale, réservée aux

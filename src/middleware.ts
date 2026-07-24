@@ -20,6 +20,11 @@ const PROTECTED_PREFIXES: Array<{ prefix: string; roles: string[] }> = [
   { prefix: "/section", roles: CHEF_ROLES },
   { prefix: "/admin", roles: ["DD"] }, // ADMIN_TECH n'a aucun droit métier (CDC §A.2) : pas de gestion des comptes
   { prefix: "/etablissements", roles: ["DA", "DD"] }, // registre des établissements NOMINATIF (§B.5.3) : DA sur son arrondissement, DD sur tous
+  // Règle spécifique AVANT la règle générale "/technique" (Array.find prend la
+  // première correspondance) : la boîte de réception de l'aide est partagée
+  // DD + ADMIN_TECH, alors que le reste de l'espace technique reste réservé
+  // à l'ADMIN_TECH seul (§A.2).
+  { prefix: "/technique/aide", roles: ["DD", "ADMIN_TECH"] },
   { prefix: "/technique", roles: ["ADMIN_TECH"] }, // espace de maintenance technique — strictement séparé du métier (§A.2)
   { prefix: "/api/admin", roles: ["DD"] },
   { prefix: "/api/dd", roles: ["DD"] },
