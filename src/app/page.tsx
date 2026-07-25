@@ -46,9 +46,11 @@ export default function LoginPage() {
       <div className="flex flex-1 items-center justify-center p-5">
         <div className="w-full max-w-[410px]">
           <div className="mb-[22px] text-center">
-            <div className="mx-auto mb-3.5 flex h-16 w-16 items-center justify-center rounded-card bg-primary text-[15px] font-bold tracking-wide text-white shadow-[0_4px_14px_rgba(57,119,129,.28)]">
-              DDEPIA
-            </div>
+            <img
+              src="/icon-512.png"
+              alt="SID DDEPIA"
+              className="mx-auto mb-3.5 h-16 w-16 rounded-card shadow-[0_4px_14px_rgba(57,119,129,.28)]"
+            />
             <div className="text-[13px] font-semibold uppercase tracking-[2px] text-ink-faint">
               République du Cameroun · MINEPIA
             </div>

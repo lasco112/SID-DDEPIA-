@@ -51,135 +51,216 @@ body {
 }
 
 /* ---------------------------------------------------------------------------
- * Écran d'ouverture — « Les données prennent vie » (charte graphique §14).
- * Trois fiches pastel convergent vers la base centrale, puis le nom et la
- * signature apparaissent. Durée totale ~2,4 s, désactivée si l'utilisateur
- * a demandé de réduire les animations.
+ * Écran d'ouverture — animation SVG fournie par le DD (trois fiches de
+ * données convergent vers la base centrale, puis le nom et la signature
+ * apparaissent). Durée totale ~4 s, désactivée si l'utilisateur a demandé de
+ * réduire les animations. Voir SplashScreen.tsx pour le déclenchement JS
+ * (une fois par jour, son synchronisé au premier geste de l'utilisateur).
  * ------------------------------------------------------------------------- */
-.splash-overlay {
+.splash-screen {
   position: fixed;
   inset: 0;
-  z-index: 9999;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  background: var(--gradient-brand);
-  animation: splashFadeOut 0.35s ease-in forwards;
-  animation-delay: 2.05s;
+  z-index: 300;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 20% 18%, rgba(255, 255, 255, 0.56), transparent 34%),
+    radial-gradient(circle at 82% 28%, rgba(212, 213, 245, 0.36), transparent 36%),
+    radial-gradient(circle at 52% 86%, rgba(168, 223, 229, 0.38), transparent 38%),
+    var(--gradient-brand);
+  transition: opacity 850ms cubic-bezier(0.4, 0, 0.2, 1), visibility 850ms;
 }
 
-.splash-stage {
-  position: relative;
-  width: 220px;
-  height: 160px;
-}
-
-.splash-fiche {
-  position: absolute;
-  width: 64px;
-  height: 84px;
-  border-radius: var(--radius-input);
-  background: #fff;
-  box-shadow: 0 8px 20px rgba(47, 65, 71, 0.12);
+.splash-screen.hidden {
   opacity: 0;
-}
-.splash-fiche::before {
-  content: "";
-  position: absolute;
-  top: 14px;
-  left: 12px;
-  width: 12px;
-  height: 12px;
-  border-radius: 4px;
-}
-.splash-fiche::after {
-  content: "";
-  position: absolute;
-  top: 34px;
-  left: 12px;
-  width: 40px;
-  height: 6px;
-  border-radius: 3px;
-  background: currentColor;
-  opacity: 0.35;
-  box-shadow: 0 12px 0 currentColor;
+  visibility: hidden;
+  pointer-events: none;
 }
 
-.splash-fiche-mint { color: var(--color-mint); top: 0; left: 0; animation: ficheInLeft 1.3s cubic-bezier(0.22, 1, 0.36, 1) 0.4s forwards; }
-.splash-fiche-mint::before { background: var(--color-mint); }
-.splash-fiche-sky { color: var(--color-sky); top: 0; right: 0; animation: ficheInRight 1.3s cubic-bezier(0.22, 1, 0.36, 1) 0.55s forwards; }
-.splash-fiche-sky::before { background: var(--color-sky); }
-.splash-fiche-aqua { color: var(--color-aqua); top: -20px; left: 78px; animation: ficheInTop 1.15s cubic-bezier(0.22, 1, 0.36, 1) 0.7s forwards; }
-.splash-fiche-aqua::before { background: var(--color-aqua); }
-
-@keyframes ficheInLeft {
-  0% { opacity: 0; transform: translate(-40px, 10px) scale(0.85); }
-  45% { opacity: 1; transform: translate(6px, 30px) scale(1); }
-  100% { opacity: 0; transform: translate(78px, 78px) scale(0.4); }
-}
-@keyframes ficheInRight {
-  0% { opacity: 0; transform: translate(40px, 10px) scale(0.85); }
-  45% { opacity: 1; transform: translate(-6px, 30px) scale(1); }
-  100% { opacity: 0; transform: translate(-78px, 78px) scale(0.4); }
-}
-@keyframes ficheInTop {
-  0% { opacity: 0; transform: translate(0, -30px) scale(0.85); }
-  50% { opacity: 1; transform: translate(0, 8px) scale(1); }
-  100% { opacity: 0; transform: translate(0, 68px) scale(0.4); }
-}
-
-.splash-db {
+.ambient-layer,
+.grain {
   position: absolute;
-  bottom: 0;
+  inset: 0;
+  pointer-events: none;
+}
+
+.ambient-circle {
+  position: absolute;
   left: 50%;
-  transform: translateX(-50%);
-  width: 96px;
-  height: 60px;
-  border-radius: var(--radius-card);
-  background: #fff;
-  box-shadow: 0 8px 24px rgba(47, 65, 71, 0.14);
+  top: 46%;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.34);
+  transform: translate(-50%, -50%) scale(0.58);
   opacity: 0;
-  animation: dbAppear 0.4s ease-out 1.15s forwards, dbPulse 0.6s ease-out 1.55s;
 }
-.splash-db::before,
-.splash-db::after {
-  content: "";
+
+.circle-one { width: min(68vw, 420px); aspect-ratio: 1; }
+.circle-two { width: min(92vw, 590px); aspect-ratio: 1; }
+.circle-three { width: min(116vw, 760px); aspect-ratio: 1; }
+
+.ambient-blob {
   position: absolute;
-  left: 12px;
-  right: 12px;
-  height: 1px;
-  background: var(--color-border);
-}
-.splash-db::before { top: 20px; }
-.splash-db::after { top: 40px; }
-
-@keyframes dbAppear {
-  from { opacity: 0; transform: translateX(-50%) translateY(6px); }
-  to { opacity: 1; transform: translateX(-50%) translateY(0); }
-}
-@keyframes dbPulse {
-  0% { box-shadow: 0 8px 24px rgba(47, 65, 71, 0.14), 0 0 0 0 rgba(93, 175, 145, 0.45); }
-  60% { box-shadow: 0 8px 24px rgba(47, 65, 71, 0.14), 0 0 0 14px rgba(93, 175, 145, 0); }
-  100% { box-shadow: 0 8px 24px rgba(47, 65, 71, 0.14), 0 0 0 0 rgba(93, 175, 145, 0); }
+  border-radius: 999px;
+  filter: blur(44px);
+  opacity: 0.48;
 }
 
-.splash-titre {
-  margin-top: 28px;
+.blob-one { width: 34vw; height: 34vw; max-width: 290px; max-height: 290px; left: -4%; top: 16%; background: rgba(184, 232, 213, 0.72); }
+.blob-two { width: 38vw; height: 38vw; max-width: 330px; max-height: 330px; right: -8%; top: 30%; background: rgba(212, 213, 245, 0.56); }
+.blob-three { width: 42vw; height: 42vw; max-width: 360px; max-height: 360px; left: 28%; bottom: -18%; background: rgba(168, 223, 229, 0.58); }
+
+.grain {
+  opacity: 0.035;
+  background-image: radial-gradient(rgba(47, 65, 71, 0.7) 0.45px, transparent 0.45px);
+  background-size: 6px 6px;
+  mix-blend-mode: multiply;
+}
+
+.splash-content {
+  position: relative;
+  z-index: 4;
+  width: min(66vw, 360px);
   text-align: center;
+  transform: translateY(-1.5vh);
   opacity: 0;
-  animation: textFadeUp 0.5s ease-out 1.75s forwards;
+  filter: blur(12px);
 }
-.splash-tagline {
-  margin-top: 6px;
-  text-align: center;
+
+.logo-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+  filter: drop-shadow(0 20px 38px rgba(57, 119, 129, 0.13));
+}
+
+.brand-text {
+  margin-top: 18px;
+  color: var(--color-text);
+  font-size: clamp(27px, 7vw, 42px);
+  font-weight: 430;
+  letter-spacing: 0.14em;
+  white-space: nowrap;
   opacity: 0;
-  animation: textFadeUp 0.5s ease-out 1.95s forwards;
+  transform: translateY(11px);
 }
-@keyframes textFadeUp {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+
+.splash-tagline-svg {
+  margin-top: 9px;
+  color: var(--color-primary);
+  font-size: clamp(12px, 3vw, 16px);
+  font-weight: 430;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateY(8px);
 }
+
+.skip-button {
+  position: absolute;
+  right: 18px;
+  bottom: 18px;
+  z-index: 10;
+  padding: 9px 13px;
+  border: 1px solid rgba(57, 119, 129, 0.16);
+  border-radius: 999px;
+  color: var(--color-primary);
+  background: rgba(255, 255, 255, 0.50);
+  cursor: pointer;
+  backdrop-filter: blur(14px);
+}
+
+.icon-surface { opacity: 0; transform-box: fill-box; transform-origin: center; }
+#database-group { opacity: 0; transform-box: fill-box; transform-origin: center bottom; }
+.source-card { opacity: 0; transform-box: fill-box; transform-origin: center; }
+.flow-path { opacity: 0; stroke-dasharray: 1; stroke-dashoffset: 1; }
+.flow-particle { opacity: 0; filter: url(#softGlow); }
+.server-led { fill: rgba(255, 255, 255, 0.34); stroke: rgba(255, 255, 255, 0.72); stroke-width: 0.8; }
+.server-top-glow, .server-aura, .sync-ring { opacity: 0; transform-box: fill-box; transform-origin: center; }
+
+.is-playing .splash-content { animation: contentEntrance 1.25s cubic-bezier(0.22, 0.78, 0.22, 1) 0.08s both; }
+.is-playing .circle-one { animation: circleBreathOne 4s ease-in-out both; }
+.is-playing .circle-two { animation: circleBreathTwo 4s ease-in-out both; }
+.is-playing .circle-three { animation: circleBreathThree 4s ease-in-out both; }
+.is-playing .blob-one { animation: blobFloatOne 4s ease-in-out both; }
+.is-playing .blob-two { animation: blobFloatTwo 4s ease-in-out both; }
+.is-playing .blob-three { animation: blobFloatThree 4s ease-in-out both; }
+.is-playing .icon-surface { animation: surfaceIn 0.85s ease-out 0.20s both; }
+.is-playing #database-group { animation: databaseSequence 4s cubic-bezier(0.22, 0.72, 0.22, 1) both; }
+.is-playing #card-left { animation: cardInLeft 0.62s cubic-bezier(0.22, 0.76, 0.24, 1) 0.62s both, cardFloatLeft 2.8s ease-in-out 1.24s infinite; }
+.is-playing #card-mid { animation: cardInMid 0.62s cubic-bezier(0.22, 0.76, 0.24, 1) 0.78s both, cardFloatMid 3.1s ease-in-out 1.40s infinite; }
+.is-playing #card-right { animation: cardInRight 0.62s cubic-bezier(0.22, 0.76, 0.24, 1) 0.94s both, cardFloatRight 2.65s ease-in-out 1.56s infinite; }
+.is-playing #path-left { animation: drawPath 0.68s ease-in-out 1.22s both; }
+.is-playing #path-mid { animation: drawPath 0.68s ease-in-out 1.52s both; }
+.is-playing #path-right { animation: drawPath 0.68s ease-in-out 1.82s both; }
+.is-playing #particle-left { animation: particleLeft 0.72s ease-in-out 1.22s both; }
+.is-playing #particle-mid { animation: particleMid 0.72s ease-in-out 1.52s both; }
+.is-playing #particle-right { animation: particleRight 0.72s ease-in-out 1.82s both; }
+.is-playing .led-one { animation: ledOn 0.34s ease-out 1.82s both; }
+.is-playing .led-two { animation: ledOn 0.34s ease-out 2.12s both; }
+.is-playing .led-three { animation: ledOn 0.34s ease-out 2.42s both; }
+.is-playing .server-top-glow { animation: serverGlowOne 0.46s ease-out 1.76s both, serverGlowTwo 0.46s ease-out 2.06s both, serverGlowThree 0.46s ease-out 2.36s both; }
+.is-playing .server-aura { animation: auraPulse 0.80s ease-out 2.35s both; }
+.is-playing .sync-ring { animation: syncWave 0.80s ease-out 2.52s both; }
+.is-playing .brand-text { animation: textIn 0.62s ease-out 2.78s both; }
+.is-playing .splash-tagline-svg { animation: textIn 0.56s ease-out 3.14s both; }
+
+@keyframes contentEntrance {
+  0% { opacity: 0; filter: blur(12px); transform: translateY(18px) scale(0.82); }
+  58% { opacity: 1; filter: blur(1px); transform: translateY(-2px) scale(1.015); }
+  80% { filter: blur(0); transform: translateY(1px) scale(0.995); }
+  100% { opacity: 1; filter: blur(0); transform: translateY(0) scale(1); }
+}
+@keyframes surfaceIn { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: scale(1); } }
+@keyframes cardInLeft { from { opacity: 0; transform: translate(-12px, -10px) scale(0.90) rotate(-1.2deg); } to { opacity: 1; transform: translate(0, 0) scale(1) rotate(0deg); } }
+@keyframes cardInMid { from { opacity: 0; transform: translateY(-16px) scale(0.90); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes cardInRight { from { opacity: 0; transform: translate(12px, -10px) scale(0.90) rotate(1.2deg); } to { opacity: 1; transform: translate(0, 0) scale(1) rotate(0deg); } }
+@keyframes cardFloatLeft { 0%, 100% { transform: translateY(0) rotate(-0.25deg); } 50% { transform: translateY(-2.5px) rotate(0.18deg); } }
+@keyframes cardFloatMid { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3.2px); } }
+@keyframes cardFloatRight { 0%, 100% { transform: translateY(0) rotate(0.25deg); } 50% { transform: translateY(-2.5px) rotate(-0.18deg); } }
+@keyframes drawPath { 0% { opacity: 0; stroke-dashoffset: 1; } 18% { opacity: 0.38; } 75% { opacity: 0.42; } 100% { opacity: 0; stroke-dashoffset: 0; } }
+@keyframes particleLeft { 0% { opacity: 0; offset-distance: 0%; transform: scale(0.6); } 18% { opacity: 1; } 85% { opacity: 1; } 100% { opacity: 0; offset-distance: 100%; transform: scale(0.38); } }
+@keyframes particleMid { 0% { opacity: 0; offset-distance: 0%; transform: scale(0.6); } 18% { opacity: 1; } 85% { opacity: 1; } 100% { opacity: 0; offset-distance: 100%; transform: scale(0.38); } }
+@keyframes particleRight { 0% { opacity: 0; offset-distance: 0%; transform: scale(0.6); } 18% { opacity: 1; } 85% { opacity: 1; } 100% { opacity: 0; offset-distance: 100%; transform: scale(0.38); } }
+@keyframes databaseSequence {
+  0%, 18% { opacity: 0; transform: translateY(12px) scale(0.96); }
+  30% { opacity: 1; transform: translateY(0) scale(1); }
+  43% { transform: translateY(0) scaleX(1) scaleY(1); }
+  46% { transform: translateY(2px) scaleX(1.022) scaleY(0.962); }
+  49% { transform: translateY(-1px) scaleX(0.996) scaleY(1.008); }
+  52% { transform: translateY(0) scaleX(1) scaleY(1); }
+  54% { transform: translateY(2px) scaleX(1.022) scaleY(0.962); }
+  57% { transform: translateY(-1px) scaleX(0.996) scaleY(1.008); }
+  60% { transform: translateY(0) scaleX(1) scaleY(1); }
+  62% { transform: translateY(2px) scaleX(1.022) scaleY(0.962); }
+  65% { transform: translateY(-1px) scaleX(0.996) scaleY(1.008); }
+  69%, 100% { opacity: 1; transform: translateY(0) scaleX(1) scaleY(1); }
+}
+@keyframes ledOn {
+  0% { fill: rgba(255, 255, 255, 0.34); filter: none; }
+  55% { fill: #ffffff; filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.96)); }
+  100% { fill: var(--color-mint); filter: drop-shadow(0 0 4px rgba(184, 232, 213, 0.92)); }
+}
+@keyframes serverGlowOne { 0%, 100% { opacity: 0; transform: scale(0.70); } 48% { opacity: 0.78; transform: scale(1.03); } }
+@keyframes serverGlowTwo { 0%, 100% { opacity: 0; transform: scale(0.70); } 48% { opacity: 0.78; transform: scale(1.03); } }
+@keyframes serverGlowThree { 0%, 100% { opacity: 0; transform: scale(0.70); } 48% { opacity: 0.90; transform: scale(1.08); } }
+@keyframes auraPulse { 0% { opacity: 0; transform: scale(0.72); } 42% { opacity: 0.58; transform: scale(1.02); } 100% { opacity: 0; transform: scale(1.48); } }
+@keyframes syncWave { 0% { opacity: 0; transform: scale(0.46); } 24% { opacity: 0.52; } 100% { opacity: 0; transform: scale(2.42); } }
+@keyframes textIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes circleBreathOne { 0% { opacity: 0; transform: translate(-50%, -50%) scale(0.52); } 42% { opacity: 0.44; } 100% { opacity: 0.12; transform: translate(-50%, -50%) scale(1.34); } }
+@keyframes circleBreathTwo { 0% { opacity: 0; transform: translate(-50%, -50%) scale(0.60); } 48% { opacity: 0.26; } 100% { opacity: 0.08; transform: translate(-50%, -50%) scale(1.20); } }
+@keyframes circleBreathThree { 0% { opacity: 0; transform: translate(-50%, -50%) scale(0.68); } 58% { opacity: 0.15; } 100% { opacity: 0.04; transform: translate(-50%, -50%) scale(1.10); } }
+@keyframes blobFloatOne { 0% { transform: translate3d(-8px, 8px, 0) scale(0.92); } 55% { transform: translate3d(14px, -10px, 0) scale(1.05); } 100% { transform: translate3d(5px, 0, 0) scale(1); } }
+@keyframes blobFloatTwo { 0% { transform: translate3d(8px, -5px, 0) scale(0.94); } 58% { transform: translate3d(-12px, 12px, 0) scale(1.04); } 100% { transform: translate3d(-4px, 2px, 0) scale(1); } }
+@keyframes blobFloatThree { 0% { transform: translate3d(0, 12px, 0) scale(0.90); } 52% { transform: translate3d(10px, -10px, 0) scale(1.05); } 100% { transform: translate3d(2px, 0, 0) scale(1); } }
+
+@media (max-width: 420px) {
+  .splash-content { width: min(72vw, 330px); }
+  .brand-text { letter-spacing: 0.10em; }
+  .splash-tagline-svg { letter-spacing: 0; }
+}
+
 @keyframes splashFadeOut {
   to { opacity: 0; visibility: hidden; }
 }
@@ -197,16 +278,28 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .splash-overlay,
   .splash-mini {
     animation-duration: 0.01s !important;
     animation-delay: 0s !important;
   }
-  .splash-fiche,
-  .splash-db,
-  .splash-titre,
-  .splash-tagline {
+  .ambient-circle,
+  .ambient-blob,
+  .flow-path,
+  .flow-particle,
+  .server-top-glow,
+  .server-aura,
+  .sync-ring {
+    display: none;
+  }
+  .splash-content,
+  .icon-surface,
+  #database-group,
+  .source-card,
+  .brand-text,
+  .splash-tagline-svg {
     animation: none !important;
     opacity: 1 !important;
+    transform: none !important;
+    filter: none !important;
   }
 }
