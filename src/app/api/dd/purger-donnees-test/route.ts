@@ -74,6 +74,18 @@ export async function POST(req: Request) {
       db.rapportArrondissement.deleteMany({}),
     ]);
 
+    // Marqueur horodaté lu par /api/bootstrap : sans lui, la purge ne vidait
+    // que le serveur, et chaque téléphone gardait ses brouillons locaux « en
+    // attente de synchronisation » — qui étaient RENVOYÉS au serveur à la
+    // reconnexion, recréant les données qu'on venait de purger. Les appareils
+    // comparent cette date à la leur et vident leur base locale d'eux-mêmes.
+    const purgeLe = new Date().toISOString();
+    await db.configSysteme.upsert({
+      where: { cle: "donnees_purgees_le" },
+      create: { cle: "donnees_purgees_le", valeur: purgeLe, modifieParId: user.id },
+      update: { valeur: purgeLe, modifieParId: user.id },
+    });
+
     await db.auditLog.create({
       data: {
         userId: user.id,

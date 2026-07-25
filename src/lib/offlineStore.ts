@@ -24,6 +24,7 @@ export interface BootstrapPayload {
     sectionId: string | null;
     periodeActiveId: string | null;
     telechargeLe: string;
+    donneesPurgeesLe?: string | null;
   };
   tableaux: Array<Omit<import("@/lib/dexie").TableauOffline, never>>;
   etablissements: Array<import("@/lib/dexie").EtablissementOffline>;
@@ -38,11 +39,28 @@ export async function telechargerBootstrap(): Promise<void> {
 
   await offlineDB.transaction(
     "rw",
-    [offlineDB.meta, offlineDB.tableaux, offlineDB.etablissements, offlineDB.referentiels, offlineDB.periodes],
+    [
+      offlineDB.meta,
+      offlineDB.tableaux,
+      offlineDB.etablissements,
+      offlineDB.referentiels,
+      offlineDB.periodes,
+      offlineDB.saisies,
+    ],
     async () => {
       // Le PIN local (pinHash) n'est jamais renvoyé par le serveur — il ne
       // doit pas être écrasé par un rafraîchissement du reste des données.
       const metaExistant = await offlineDB.meta.get("bootstrap");
+
+      // Le DD a purgé les données depuis le dernier passage de cet appareil :
+      // ses brouillons locaux non synchronisés sont obsolètes. Sans ce
+      // nettoyage ils repartiraient vers le serveur à la prochaine synchro et
+      // recréeraient exactement ce que la purge venait d'effacer.
+      const purgeServeur = data.meta.donneesPurgeesLe ?? null;
+      if (purgeServeur && metaExistant && metaExistant.donneesPurgeesLe !== purgeServeur) {
+        await offlineDB.saisies.clear();
+      }
+
       await offlineDB.meta.put({ cle: "bootstrap", ...data.meta, pinHash: metaExistant?.pinHash });
       await offlineDB.tableaux.clear();
       await offlineDB.tableaux.bulkPut(data.tableaux);
@@ -52,6 +70,15 @@ export async function telechargerBootstrap(): Promise<void> {
       await offlineDB.referentiels.bulkPut(data.referentiels);
       await offlineDB.periodes.clear();
       if (data.periode) await offlineDB.periodes.put(data.periode);
+
+      // Brouillons rattachés à un établissement que le DD a supprimé entre-temps :
+      // ils ne peuvent plus être synchronisés (la clé étrangère n'existe plus) et
+      // resteraient bloqués indéfiniment en « en attente de synchronisation ».
+      const idsValides = new Set(data.etablissements.map((e) => e.id));
+      const orphelines = await offlineDB.saisies
+        .filter((s) => Boolean(s.etablissementId) && !idsValides.has(s.etablissementId as string))
+        .primaryKeys();
+      if (orphelines.length > 0) await offlineDB.saisies.bulkDelete(orphelines);
     }
   );
 }
@@ -75,7 +102,7 @@ export async function metaBootstrap() {
  * la partie "mise en cache de toutes les pages, pas seulement l'accueil" de
  * la spécification hors-ligne.
  */
-const CACHE_NAME = "sid-ddepia-v1";
+const CACHE_NAME = "sid-ddepia-v3";
 
 /** Pages non paramétrées par tableau, selon le rôle (miroir de Sidebar.tsx). */
 /** Dérivé de la même source que le menu (Sidebar.tsx) — jamais désynchronisé. */

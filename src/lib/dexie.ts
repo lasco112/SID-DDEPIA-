@@ -75,6 +75,13 @@ export interface MetaOffline {
   periodeActiveId: string | null;
   /** Date du dernier téléchargement complet — sert à l'expiration de l'accès hors ligne. */
   telechargeLe: string;
+  /**
+   * Date de la dernière purge des données décidée par le DD, telle que reçue
+   * du serveur. Si elle change, les brouillons locaux de cet appareil sont
+   * obsolètes (ils recréeraient les données purgées en se synchronisant) et
+   * sont vidés — voir offlineStore.telechargerBootstrap.
+   */
+  donneesPurgeesLe?: string | null;
   /** Empreinte SHA-256 du code PIN local (appareil partagé) — jamais le PIN en clair. */
   pinHash?: string;
 }

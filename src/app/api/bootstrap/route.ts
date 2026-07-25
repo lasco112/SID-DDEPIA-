@@ -19,7 +19,7 @@ export async function GET() {
     const user = await requireUser();
     const db = user.db;
 
-    const [moi, arrondissement, templates, etablissements, referentiels, periode] = await Promise.all([
+    const [moi, arrondissement, templates, etablissements, referentiels, periode, marqueurPurge] = await Promise.all([
       db.user.findUnique({ where: { id: user.id }, select: { nom: true } }),
       user.arrondissementId ? db.arrondissement.findUnique({ where: { id: user.arrondissementId } }) : null,
       db.formTemplate.findMany({
@@ -36,6 +36,7 @@ export async function GET() {
       }),
       db.referentielItem.findMany({ where: { actif: true }, orderBy: { ordre: "asc" } }),
       db.periodeReporting.findFirst({ where: { type: "MENSUEL" }, orderBy: [{ annee: "desc" }, { mois: "desc" }] }),
+      db.configSysteme.findUnique({ where: { cle: "donnees_purgees_le" } }),
     ]);
 
     const uniteLibelleParCode = new Map(
@@ -62,6 +63,10 @@ export async function GET() {
         sectionId: user.sectionId,
         periodeActiveId: periode?.id ?? null,
         telechargeLe: new Date().toISOString(),
+        // Date de la dernière purge des données décidée par le DD : l'appareil
+        // compare avec la sienne et vide ses brouillons locaux si elle a changé
+        // (voir lib/offlineStore.ts).
+        donneesPurgeesLe: marqueurPurge?.valeur ?? null,
       },
       tableaux: templates.map((t) => ({
         code: t.code,

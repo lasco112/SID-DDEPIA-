@@ -13,7 +13,12 @@
  *    d'abord (immuables, noms de fichiers déjà versionnés par Next.js).
  */
 
-const CACHE_NAME = "sid-ddepia-v1";
+// À INCRÉMENTER à chaque fois qu'un fichier servi "cache d'abord" change
+// (logo, manifeste). Le handler `activate` supprime tous les caches dont le
+// nom diffère : c'est le seul mécanisme qui purge réellement l'ancien contenu
+// sur les appareils déjà installés. Doit rester identique à CACHE_NAME dans
+// src/lib/offlineStore.ts.
+const CACHE_NAME = "sid-ddepia-v3";
 const OFFLINE_URL = "/offline.html";
 const PRECACHE = ["/", OFFLINE_URL, "/manifest.json"];
 
@@ -61,9 +66,9 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  const estStatiqueImmuable =
-    url.pathname.startsWith("/_next/static/") || url.pathname.startsWith("/icon-") || url.pathname === "/manifest.json";
-  if (estStatiqueImmuable) {
+  // Fichiers réellement immuables : Next.js versionne leur nom à chaque build,
+  // une URL donnée ne change donc jamais de contenu — cache d'abord sans risque.
+  if (url.pathname.startsWith("/_next/static/")) {
     event.respondWith(
       caches.match(request).then(
         (cached) =>
@@ -74,6 +79,30 @@ self.addEventListener("fetch", (event) => {
             return response;
           })
       )
+    );
+    return;
+  }
+
+  // Logo et manifeste : noms de fichiers FIXES dont le contenu, lui, change
+  // (nouveau logo). Un simple "cache d'abord" servait l'ancien logo pour
+  // toujours — c'est ce qui laissait l'ancienne icône dans l'onglet et sur
+  // l'écran d'accueil des téléphones. On sert donc le cache immédiatement
+  // (donc toujours disponible hors ligne, sans attente) TOUT EN rafraîchissant
+  // en arrière-plan : la version suivante est à jour, sans aucune action.
+  if (url.pathname.startsWith("/icon-") || url.pathname === "/manifest.json") {
+    event.respondWith(
+      caches.match(request).then((cached) => {
+        const reseau = fetch(request)
+          .then((response) => {
+            if (response.ok) {
+              const clone = response.clone();
+              caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+            }
+            return response;
+          })
+          .catch(() => cached);
+        return cached || reseau;
+      })
     );
   }
 });
