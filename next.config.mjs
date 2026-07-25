@@ -10,6 +10,19 @@ const nextConfig = {
   experimental: {
     serverComponentsExternalPackages: ["pdfkit"],
   },
+
+  // Le navigateur met en cache un fichier statique comme /sw.js jusqu'à 24h
+  // par défaut, ce qui retarderait d'autant la détection de chaque nouvelle
+  // version par les agents de terrain (mise à jour automatique, voir
+  // ServiceWorkerRegister.tsx). On force une revérification à chaque visite.
+  async headers() {
+    return [
+      {
+        source: "/sw.js",
+        headers: [{ key: "Cache-Control", value: "no-cache, must-revalidate" }],
+      },
+    ];
+  },
 };
 
 export default nextConfig;
