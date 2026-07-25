@@ -55,6 +55,26 @@ primaries. Overall feel: soft, pastel, luminous, institutional, calm.
   #397781, smaller, lighter weight. Hold the final composition perfectly still
   until the last frame.
 
+### FULL-BLEED BACKGROUND (critical — defect observed in the previous version)
+
+The background gradient must fill the entire frame edge to edge. Do NOT draw an
+inner card, panel, rounded rectangle, border, frame, vignette or margin around
+the composition. The previous version contained a rounded white card floating on
+a background, which looked like a small video inside a large empty area once
+displayed full-screen in the application. The scene must read as one continuous
+full-frame background with the logo floating directly on it.
+
+### TEXT RENDERING (critical — defect observed in the previous version)
+
+The wordmark must read exactly "SID DDEPIA" — four letters, one single space,
+then six letters (S-I-D space D-D-E-P-I-A). In the previous version the letters
+were malformed and overlapped, rendering as "SIDDDEPIA". Render the text
+cleanly, with correct letter spacing, no ligature, no overlap, no duplicated or
+merged characters. Same requirement for the subtitle "Collecter • Centraliser •
+Décider" (with the accent on Décider). If reliable text rendering is not
+possible, deliver the animation WITHOUT any text and provide a clean version
+where the text can be added afterwards.
+
 ### COMPOSITION AND SAFE ZONE (critical)
 
 The video is displayed full-screen with automatic cropping on phones, tablets
@@ -99,7 +119,9 @@ duration must not exceed the 4 seconds.
 No additional icons, no animals, no map, no GPS pins, no people, no hands, no
 excessive particles, no dark or black background, no neon or saturated colors,
 no camera rotation or shake, no dramatic cinematic effects, no lens flares, no
-metallic or chrome appearance, no spelling errors, no logo deformation or
-recoloring, no duplicated cards, no distorted data block, no heavy shadows, no
-watermark, no extra text beyond "SID DDEPIA" and "Collecter • Centraliser •
+metallic or chrome appearance, no spelling errors, no malformed or overlapping
+letters, no merged or duplicated characters, no logo deformation or recoloring,
+no duplicated cards, no distorted data block, no heavy shadows, no watermark,
+no inner card or panel around the composition, no visible frame, border or
+margin, no extra text beyond "SID DDEPIA" and "Collecter • Centraliser •
 Décider".
