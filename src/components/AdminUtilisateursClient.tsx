@@ -9,6 +9,7 @@
  */
 
 import { useEffect, useState, useCallback } from "react";
+import ReinitialiserTousMotsDePasseButton from "@/components/ReinitialiserTousMotsDePasseButton";
 
 interface UserRow {
   id: string;
@@ -109,6 +110,20 @@ export default function AdminUtilisateursClient() {
       body: JSON.stringify({ actif }),
     });
     if (res.ok) await charger();
+  }
+
+  async function supprimerCompte(id: string, nom: string) {
+    const confirme = window.confirm(
+      `Supprimer définitivement le compte de « ${nom} » ? Cette action est irréversible. Les saisies, rapports et validations déjà transmis sont conservés (seule la mention de l'auteur est retirée) ; les corrections, exports, questions d'aide et attributions liés à ce compte sont supprimés avec lui.`
+    );
+    if (!confirme) return;
+    const res = await fetch(`/api/admin/utilisateurs/${id}`, { method: "DELETE" });
+    const data = await res.json();
+    if (res.ok) {
+      await charger();
+    } else {
+      window.alert(data.message ?? "Échec de la suppression.");
+    }
   }
 
   async function revoquerSession(id: string) {
@@ -353,12 +368,19 @@ export default function AdminUtilisateursClient() {
                         Révoquer l'appareil
                       </button>
                     )}
+                    <button onClick={() => supprimerCompte(u.id, u.nom)} className="font-semibold text-statut-rejeteText hover:underline">
+                      Supprimer
+                    </button>
                   </div>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
+      </div>
+
+      <div className="mt-8">
+        <ReinitialiserTousMotsDePasseButton />
       </div>
     </div>
   );

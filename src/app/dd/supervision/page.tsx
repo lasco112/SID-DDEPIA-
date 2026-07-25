@@ -8,6 +8,7 @@ import DeverrouillerButton from '@/components/DeverrouillerButton';
 import SyntheseValidationRow from '@/components/SyntheseValidationRow';
 import GenererRapportDDButton from '@/components/GenererRapportDDButton';
 import PurgerDonneesTestButton from '@/components/PurgerDonneesTestButton';
+import ReporterEcheanceButton from '@/components/ReporterEcheanceButton';
 
 const STATUT_STYLE: Record<string, string> = {
   SOUMIS: 'bg-green-100 text-green-800',
@@ -65,6 +66,11 @@ export default async function DDSupervisionPage() {
                 <GenererRapportDDButton periodeId={periode.id} type="EXACT" />
               </div>
             </div>
+
+            <ReporterEcheanceButton
+              dateLimiteActuelle={periode.dateLimiteDA.toISOString()}
+              verrouillee={periode.statut === 'VERROUILLEE_DA'}
+            />
 
             {generationBloquee && (
               <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">

@@ -58,6 +58,9 @@ export async function rappelJ1DA() {
 export async function verrouillageEtAlerteRetardDA() {
   const periode = await periodeMensuelleCourante();
   if (!periode || periode.statut !== "OUVERTE") return { verrouille: false, notifies: 0 };
+  // Le DD peut repousser dateLimiteDA (report d'échéance pour tout le monde) : dans ce
+  // cas, le déclencheur du 28 ne verrouille pas tant que la nouvelle date n'est pas passée.
+  if (periode.dateLimiteDA.getTime() > Date.now()) return { verrouille: false, notifies: 0 };
 
   await db.periodeReporting.update({ where: { id: periode.id }, data: { statut: "VERROUILLEE_DA" } });
   await db.auditLog.create({

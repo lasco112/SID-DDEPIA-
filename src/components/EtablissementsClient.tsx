@@ -109,6 +109,23 @@ export default function EtablissementsClient({
     }
   }
 
+  async function supprimer(id: string, nom: string) {
+    setMessage(null);
+    const confirme = window.confirm(
+      `Supprimer définitivement « ${nom} » ? Cette action est irréversible et supprimera aussi toutes les saisies rattachées à cet établissement.`
+    );
+    if (!confirme) return;
+    try {
+      const res = await fetch(`/api/etablissements/${id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message ?? "Échec de la suppression.");
+      setMessage(`« ${nom} » supprimé définitivement.`);
+      await charger();
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : "Erreur.");
+    }
+  }
+
   return (
     <div>
       <div className="mb-4 flex flex-wrap gap-2">
@@ -195,11 +212,18 @@ export default function EtablissementsClient({
                 <th className="border-b border-gray-200 px-3 py-2">Propriétaire</th>
                 <th className="border-b border-gray-200 px-3 py-2">Téléphone</th>
                 <th className="border-b border-gray-200 px-3 py-2">Statut</th>
+                {role === "DD" && <th className="border-b border-gray-200 px-3 py-2 text-right">Suppression</th>}
               </tr>
             </thead>
             <tbody>
               {liste.map((etab) => (
-                <LigneEtablissement key={etab.id} etab={etab} onModifier={(patch) => modifier(etab.id, patch)} />
+                <LigneEtablissement
+                  key={etab.id}
+                  etab={etab}
+                  peutSupprimer={role === "DD"}
+                  onModifier={(patch) => modifier(etab.id, patch)}
+                  onSupprimer={() => supprimer(etab.id, etab.nom)}
+                />
               ))}
             </tbody>
           </table>
@@ -209,7 +233,17 @@ export default function EtablissementsClient({
   );
 }
 
-function LigneEtablissement({ etab, onModifier }: { etab: Etablissement; onModifier: (patch: Partial<Etablissement>) => void }) {
+function LigneEtablissement({
+  etab,
+  peutSupprimer,
+  onModifier,
+  onSupprimer,
+}: {
+  etab: Etablissement;
+  peutSupprimer: boolean;
+  onModifier: (patch: Partial<Etablissement>) => void;
+  onSupprimer: () => void;
+}) {
   const [nom, setNom] = useState(etab.nom);
   const [localite, setLocalite] = useState(etab.localite);
   const [proprietaire, setProprietaire] = useState(etab.proprietaire ?? "");
@@ -239,6 +273,13 @@ function LigneEtablissement({ etab, onModifier }: { etab: Etablissement; onModif
           {etab.actif ? "Actif — désactiver" : "Inactif — réactiver"}
         </button>
       </td>
+      {peutSupprimer && (
+        <td className="border-b border-gray-100 px-3 py-2 text-right">
+          <button onClick={onSupprimer} className="text-xs font-semibold text-statut-rejeteText hover:underline">
+            Supprimer
+          </button>
+        </td>
+      )}
     </tr>
   );
 }

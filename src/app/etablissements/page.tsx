@@ -20,7 +20,8 @@ export default async function EtablissementsPage() {
         <h1 className="text-2xl font-bold text-primary-dark">Registre des établissements</h1>
         <p className="mt-1 text-gray-600">
           Couvoirs, fermes de ponte, fermes de poulets de chair et provenderies utilisés dans les tableaux 1.3, 1.4, 1.5 et 2.3.
-          Ajoutez un nouvel établissement ou corrigez un nom déjà existant — rien n'est jamais supprimé, un établissement fermé peut être désactivé.
+          Ajoutez un nouvel établissement ou corrigez un nom déjà existant — un établissement fermé peut être désactivé sans perdre son historique.
+          {role === "DD" && " Seul le Délégué Départemental peut supprimer définitivement un établissement — la suppression emporte aussi ses saisies rattachées."}
         </p>
         <div className="mt-6">
           <EtablissementsClient role={role as "DA" | "DD"} arrondissements={arrondissements} ownArrondissementId={ownArrondissementId} />
