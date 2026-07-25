@@ -3,12 +3,15 @@
  * établissement du registre (désactivation, jamais de suppression — §A.7
  * règle 1, pour DA et DD).
  *
- * DELETE /api/etablissements/[id] — suppression RÉELLE, réservée au DD
- * (demande explicite du DD, réunion de service : « la suppression des
- * établissements que seul le DD peut faire, même ceux écrit démo dessus »).
- * Bloquée si des saisies nominatives existent encore pour cet établissement
- * (on ne supprime jamais des données historiques par ricochet) — dans ce cas
- * le message invite à désactiver plutôt que supprimer.
+ * DELETE /api/etablissements/[id] — suppression RÉELLE. Ouverte au DD, au DA
+ * et à l'agent de saisie (élargissement demandé par le DD : les agents créent
+ * eux-mêmes leurs établissements pendant la saisie et doivent pouvoir
+ * corriger un doublon ou une erreur sans remonter au DD).
+ *
+ * CLOISONNEMENT : le DA et l'agent ne peuvent supprimer QUE dans leur propre
+ * arrondissement (§A.2) — seul le DD agit sur les six. La suppression emporte
+ * les saisies nominatives rattachées, `SaisieNominative.etablissementId` étant
+ * une clé obligatoire qu'on ne peut pas détacher.
  */
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
@@ -18,12 +21,12 @@ import { requireUser, assertRole, permissionErrorResponse } from "@/lib/permissi
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
   try {
     const user = await requireUser();
-    assertRole(user, ["DA", "DD"]);
+    assertRole(user, ["DA", "DD", "AGENT_SAISIE"]);
 
     const etablissement = await db.etablissement.findUnique({ where: { id: params.id } });
     if (!etablissement) return NextResponse.json({ message: "Établissement introuvable" }, { status: 404 });
 
-    if (user.role === "DA" && etablissement.arrondissementId !== user.arrondissementId) {
+    if (user.role !== "DD" && etablissement.arrondissementId !== user.arrondissementId) {
       return NextResponse.json({ message: "Cet établissement n'est pas dans votre arrondissement." }, { status: 403 });
     }
 
@@ -70,10 +73,17 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
   try {
     const user = await requireUser();
-    assertRole(user, ["DD"]);
+    assertRole(user, ["DD", "DA", "AGENT_SAISIE"]);
 
     const etablissement = await db.etablissement.findUnique({ where: { id: params.id } });
     if (!etablissement) return NextResponse.json({ message: "Établissement introuvable" }, { status: 404 });
+
+    // Cloisonnement par arrondissement : contrôle refait ICI, côté serveur, et
+    // pas seulement dans l'interface — un appel direct à l'API ne doit jamais
+    // permettre à un DA ou à un agent de toucher l'arrondissement d'un autre.
+    if (user.role !== "DD" && etablissement.arrondissementId !== user.arrondissementId) {
+      return NextResponse.json({ message: "Cet établissement n'est pas dans votre arrondissement." }, { status: 403 });
+    }
 
     // `SaisieNominative.etablissementId` est une clé obligatoire (pas de valeur
     // "sans établissement" possible) : une suppression réelle doit donc

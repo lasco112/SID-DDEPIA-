@@ -2,9 +2,14 @@
 
 /**
  * EtablissementsClient.tsx — gestion du registre des établissements NOMINATIF
- * (CDC §B.5.3) : ajout et correction du nom/localité/propriétaire/téléphone,
- * jamais de suppression définitive (désactivation seulement, cf. `actif`).
- * DA : limité à son arrondissement. DD : sélectionne l'arrondissement voulu.
+ * (CDC §B.5.3) : ajout, correction du nom/localité/propriétaire/téléphone,
+ * désactivation (conserve l'historique) et suppression définitive.
+ *
+ * Les trois rôles qui saisissent (DD, DA, agent de saisie) peuvent ajouter et
+ * supprimer — élargissement demandé par le DD, l'agent créant lui-même ses
+ * établissements pendant la saisie doit pouvoir corriger un doublon sans
+ * remonter la hiérarchie. Le DA et l'agent restent cloisonnés sur LEUR
+ * arrondissement (le serveur le revérifie), seul le DD choisit parmi les six.
  */
 
 import { useEffect, useState, useCallback } from "react";
@@ -37,12 +42,15 @@ export default function EtablissementsClient({
   arrondissements,
   ownArrondissementId,
 }: {
-  role: "DA" | "DD";
+  role: "DA" | "DD" | "AGENT_SAISIE";
   arrondissements: Arrondissement[];
   ownArrondissementId: string | null;
 }) {
+  // Seul le DD choisit l'arrondissement : le DA et l'agent de saisie sont
+  // cloisonnés sur le leur (§A.2), le serveur le revérifie de son côté.
+  const estDD = role === "DD";
   const [arrondissementId, setArrondissementId] = useState(
-    role === "DA" ? ownArrondissementId ?? "" : arrondissements[0]?.id ?? ""
+    estDD ? arrondissements[0]?.id ?? "" : ownArrondissementId ?? ""
   );
   const [typeCode, setTypeCode] = useState(TYPES[0].code);
   const [liste, setListe] = useState<Etablissement[]>([]);
@@ -55,7 +63,7 @@ export default function EtablissementsClient({
   const charger = useCallback(async () => {
     if (!arrondissementId) return;
     setLoading(true);
-    const params = new URLSearchParams({ typeCode, ...(role === "DD" ? { arrondissementId } : {}) });
+    const params = new URLSearchParams({ typeCode, ...(estDD ? { arrondissementId } : {}) });
     const res = await fetch(`/api/etablissements?${params}`);
     if (res.ok) {
       const data = await res.json();
@@ -162,7 +170,7 @@ export default function EtablissementsClient({
         ))}
       </div>
 
-      {role === "DD" && (
+      {estDD && (
         <div className="mb-4">
           <label className="mb-1 block text-xs font-semibold text-gray-600">Arrondissement</label>
           <select
@@ -232,7 +240,7 @@ export default function EtablissementsClient({
                 <th className="border-b border-gray-200 px-3 py-2">Propriétaire</th>
                 <th className="border-b border-gray-200 px-3 py-2">Téléphone</th>
                 <th className="border-b border-gray-200 px-3 py-2">Statut</th>
-                {role === "DD" && <th className="border-b border-gray-200 px-3 py-2 text-right">Suppression</th>}
+                <th className="border-b border-gray-200 px-3 py-2 text-right">Suppression</th>
               </tr>
             </thead>
             <tbody>
@@ -240,7 +248,6 @@ export default function EtablissementsClient({
                 <LigneEtablissement
                   key={etab.id}
                   etab={etab}
-                  peutSupprimer={role === "DD"}
                   onModifier={(patch) => modifier(etab.id, patch)}
                   onSupprimer={() => setASupprimer({ id: etab.id, nom: etab.nom })}
                 />
@@ -255,12 +262,10 @@ export default function EtablissementsClient({
 
 function LigneEtablissement({
   etab,
-  peutSupprimer,
   onModifier,
   onSupprimer,
 }: {
   etab: Etablissement;
-  peutSupprimer: boolean;
   onModifier: (patch: Partial<Etablissement>) => void;
   onSupprimer: () => void;
 }) {
@@ -293,13 +298,11 @@ function LigneEtablissement({
           {etab.actif ? "Actif — désactiver" : "Inactif — réactiver"}
         </button>
       </td>
-      {peutSupprimer && (
-        <td className="border-b border-gray-100 px-3 py-2 text-right">
-          <button onClick={onSupprimer} className="text-xs font-semibold text-statut-rejeteText hover:underline">
-            Supprimer
-          </button>
-        </td>
-      )}
+      <td className="border-b border-gray-100 px-3 py-2 text-right">
+        <button onClick={onSupprimer} className="text-xs font-semibold text-statut-rejeteText hover:underline">
+          Supprimer
+        </button>
+      </td>
     </tr>
   );
 }

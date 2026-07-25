@@ -20,6 +20,7 @@ export const NAV_PAR_ROLE: Record<string, NavItem[]> = {
   AGENT_SAISIE: [
     { href: "/dashboard", label: "Tableau de bord" },
     { href: "/da/saisie", label: "Saisie de données" },
+    { href: "/etablissements", label: "Établissements" },
   ],
   DD: [
     { href: "/dashboard", label: "Tableau de bord" },
