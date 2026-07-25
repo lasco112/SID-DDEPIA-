@@ -81,7 +81,19 @@ export async function telechargerBootstrap(): Promise<void> {
       if (orphelines.length > 0) await offlineDB.saisies.bulkDelete(orphelines);
     }
   );
+
+  // Les écrans de saisie lisent Dexie UNE FOIS à leur ouverture, alors que ce
+  // rafraîchissement tourne en arrière-plan : sans ce signal, un établissement
+  // supprimé par le DD restait affiché chez le DA jusqu'à un rechargement
+  // manuel tombant après la fin du téléchargement — donc, en pratique,
+  // indéfiniment.
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(EVENEMENT_BOOTSTRAP_MAJ));
+  }
 }
+
+/** Émis après chaque rafraîchissement réussi des données de référence locales. */
+export const EVENEMENT_BOOTSTRAP_MAJ = "sid-ddepia:donnees-reference-majournees";
 
 /** Y a-t-il déjà des données de référence locales (peu importe leur âge) ? */
 export async function bootstrapPresent(): Promise<boolean> {

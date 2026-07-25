@@ -47,7 +47,7 @@ export default function LoginPage() {
         <div className="w-full max-w-[410px]">
           <div className="mb-[22px] text-center">
             <img
-              src="/icon-512.png"
+              src="/icon-512.png?v=2"
               alt="SID DDEPIA"
               className="mx-auto mb-3.5 h-16 w-16 rounded-card shadow-[0_4px_14px_rgba(57,119,129,.28)]"
             />

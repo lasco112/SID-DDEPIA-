@@ -59,7 +59,7 @@ export default function AppShellClient({
         </button>
 
         <div className="flex shrink-0 items-center gap-[11px]">
-          <img src="/icon-512.png" alt="SID DDEPIA" className="h-[34px] w-[34px] shrink-0 rounded-[7px]" />
+          <img src="/icon-512.png?v=2" alt="SID DDEPIA" className="h-[34px] w-[34px] shrink-0 rounded-[7px]" />
           <div className="hidden leading-tight sm:block">
             <div className="text-[15px] font-bold">SID DDEPIA-Menoua</div>
             <div className="text-[11px] text-white/70">Délégation Départementale · Menoua</div>

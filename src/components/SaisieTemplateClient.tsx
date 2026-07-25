@@ -7,6 +7,7 @@ import FormNominatif from "@/components/FormNominatif";
 import FormEvenement from "@/components/FormEvenement";
 import SyncButton from "@/components/SyncButton";
 import { offlineDB } from "@/lib/dexie";
+import { EVENEMENT_BOOTSTRAP_MAJ } from "@/lib/offlineStore";
 
 export default function SaisieTemplateClient({
   templateCode,
@@ -84,6 +85,13 @@ export default function SaisieTemplateClient({
       }
     }
     charger();
+
+    // Le rafraîchissement des données de référence se termine APRÈS ce premier
+    // chargement (il tourne en tâche de fond, voir BootstrapPreload) : on relit
+    // Dexie à ce moment-là, sinon un établissement supprimé côté DD resterait
+    // affiché ici alors qu'il n'existe plus.
+    window.addEventListener(EVENEMENT_BOOTSTRAP_MAJ, charger);
+    return () => window.removeEventListener(EVENEMENT_BOOTSTRAP_MAJ, charger);
   }, [templateCode]);
 
   return (
