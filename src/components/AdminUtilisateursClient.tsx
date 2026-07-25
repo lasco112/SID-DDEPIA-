@@ -57,6 +57,8 @@ export default function AdminUtilisateursClient() {
   const [recherche, setRecherche] = useState("");
   const [reinitialisation, setReinitialisation] = useState<{ id: string; valeur: string } | null>(null);
   const [identifiantsGeneres, setIdentifiantsGeneres] = useState<{ username: string; motDePasseTemporaire: string } | null>(null);
+  const [aSupprimer, setASupprimer] = useState<{ id: string; nom: string } | null>(null);
+  const [messageSuppression, setMessageSuppression] = useState<string | null>(null);
 
   const charger = useCallback(async () => {
     const res = await fetch("/api/admin/utilisateurs");
@@ -112,17 +114,18 @@ export default function AdminUtilisateursClient() {
     if (res.ok) await charger();
   }
 
-  async function supprimerCompte(id: string, nom: string) {
-    const confirme = window.confirm(
-      `Supprimer définitivement le compte de « ${nom} » ? Cette action est irréversible. Les saisies, rapports et validations déjà transmis sont conservés (seule la mention de l'auteur est retirée) ; les corrections, exports, questions d'aide et attributions liés à ce compte sont supprimés avec lui.`
-    );
-    if (!confirme) return;
+  async function confirmerSuppressionCompte() {
+    if (!aSupprimer) return;
+    const { id, nom } = aSupprimer;
+    setASupprimer(null);
+    setMessageSuppression(null);
     const res = await fetch(`/api/admin/utilisateurs/${id}`, { method: "DELETE" });
     const data = await res.json();
     if (res.ok) {
+      setMessageSuppression(`Compte de « ${nom} » supprimé définitivement.`);
       await charger();
     } else {
-      window.alert(data.message ?? "Échec de la suppression.");
+      setMessageSuppression(data.message ?? "Échec de la suppression.");
     }
   }
 
@@ -163,6 +166,36 @@ export default function AdminUtilisateursClient() {
 
   return (
     <div className="max-w-5xl">
+      {aSupprimer && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-sm rounded-lg bg-white p-5 shadow-xl">
+            <p className="text-sm font-semibold text-gray-800">Supprimer définitivement ce compte ?</p>
+            <p className="mt-2 text-sm text-gray-600">
+              Le compte de « {aSupprimer.nom} » sera supprimé définitivement. Les saisies, rapports et validations
+              déjà transmis sont conservés (seule la mention de l'auteur est retirée) ; les corrections, exports,
+              questions d'aide et attributions liés à ce compte sont supprimés avec lui.
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button onClick={() => setASupprimer(null)} className="rounded-md border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700">
+                Annuler
+              </button>
+              <button onClick={confirmerSuppressionCompte} className="rounded-md bg-statut-rejeteText px-4 py-2 text-sm font-semibold text-white hover:opacity-90">
+                Supprimer définitivement
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {messageSuppression && (
+        <div className="mb-4 rounded-md border border-line bg-white p-3 text-sm text-ink">
+          {messageSuppression}
+          <button onClick={() => setMessageSuppression(null)} className="ml-3 text-xs text-primary hover:underline">
+            Fermer
+          </button>
+        </div>
+      )}
+
       {reinitialisation && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-sm rounded-lg bg-white p-5 shadow-xl">
@@ -368,7 +401,7 @@ export default function AdminUtilisateursClient() {
                         Révoquer l'appareil
                       </button>
                     )}
-                    <button onClick={() => supprimerCompte(u.id, u.nom)} className="font-semibold text-statut-rejeteText hover:underline">
+                    <button onClick={() => setASupprimer({ id: u.id, nom: u.nom })} className="font-semibold text-statut-rejeteText hover:underline">
                       Supprimer
                     </button>
                   </div>

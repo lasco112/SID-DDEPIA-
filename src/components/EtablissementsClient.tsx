@@ -50,6 +50,7 @@ export default function EtablissementsClient({
   const [message, setMessage] = useState<string | null>(null);
   const [nouveau, setNouveau] = useState({ nom: "", localite: "", proprietaire: "", telephone: "" });
   const [ajout, setAjout] = useState(false);
+  const [aSupprimer, setASupprimer] = useState<{ id: string; nom: string } | null>(null);
 
   const charger = useCallback(async () => {
     if (!arrondissementId) return;
@@ -109,12 +110,11 @@ export default function EtablissementsClient({
     }
   }
 
-  async function supprimer(id: string, nom: string) {
+  async function confirmerSuppression() {
+    if (!aSupprimer) return;
+    const { id, nom } = aSupprimer;
     setMessage(null);
-    const confirme = window.confirm(
-      `Supprimer définitivement « ${nom} » ? Cette action est irréversible et supprimera aussi toutes les saisies rattachées à cet établissement.`
-    );
-    if (!confirme) return;
+    setASupprimer(null);
     try {
       const res = await fetch(`/api/etablissements/${id}`, { method: "DELETE" });
       const data = await res.json();
@@ -128,6 +128,26 @@ export default function EtablissementsClient({
 
   return (
     <div>
+      {aSupprimer && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-sm rounded-lg bg-white p-5 shadow-xl">
+            <p className="text-sm font-semibold text-gray-800">Supprimer définitivement ?</p>
+            <p className="mt-2 text-sm text-gray-600">
+              « {aSupprimer.nom} » sera supprimé définitivement, ainsi que toutes les saisies qui lui sont rattachées.
+              Cette action est irréversible.
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button onClick={() => setASupprimer(null)} className="rounded-md border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700">
+                Annuler
+              </button>
+              <button onClick={confirmerSuppression} className="rounded-md bg-statut-rejeteText px-4 py-2 text-sm font-semibold text-white hover:opacity-90">
+                Supprimer définitivement
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="mb-4 flex flex-wrap gap-2">
         {TYPES.map((t) => (
           <button
@@ -222,7 +242,7 @@ export default function EtablissementsClient({
                   etab={etab}
                   peutSupprimer={role === "DD"}
                   onModifier={(patch) => modifier(etab.id, patch)}
-                  onSupprimer={() => supprimer(etab.id, etab.nom)}
+                  onSupprimer={() => setASupprimer({ id: etab.id, nom: etab.nom })}
                 />
               ))}
             </tbody>
