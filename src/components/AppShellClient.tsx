@@ -11,7 +11,7 @@
  */
 
 import { useState } from "react";
-import { Menu, X, Lock } from "lucide-react";
+import { Menu, X, Lock, LogOut } from "lucide-react";
 import Link from "next/link";
 import Sidebar from "@/components/Sidebar";
 import OnlineIndicator from "@/components/OnlineIndicator";
@@ -48,46 +48,51 @@ export default function AppShellClient({
     <PinGate>
     <div className="flex min-h-screen flex-col">
       <BootstrapPreload />
-      <header className="flex h-[58px] shrink-0 items-center gap-4 bg-primary px-[18px] text-white shadow-[0_1px_0_rgba(0,0,0,.12)]">
+      <header className="flex h-[58px] shrink-0 items-center gap-1.5 bg-primary px-2 text-white shadow-[0_1px_0_rgba(0,0,0,.12)] sm:gap-4 sm:px-[18px]">
         <button
           type="button"
           onClick={() => setMenuOuvert((v) => !v)}
           aria-label={menuOuvert ? "Fermer le menu" : "Ouvrir le menu"}
-          className="-ml-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-md hover:bg-white/10 md:hidden"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md hover:bg-white/10 md:hidden"
         >
           {menuOuvert ? <X size={22} /> : <Menu size={22} />}
         </button>
 
-        <div className="flex items-center gap-[11px]">
-          <div className="flex h-[34px] w-[34px] items-center justify-center rounded-[7px] bg-white/15 text-[10px] font-bold tracking-wide">
-            DD
-          </div>
-          <div className="leading-tight">
+        <div className="flex shrink-0 items-center gap-[11px]">
+          <img src="/icon-512.png" alt="SID DDEPIA" className="h-[34px] w-[34px] shrink-0 rounded-[7px]" />
+          <div className="hidden leading-tight sm:block">
             <div className="text-[15px] font-bold">SID DDEPIA-Menoua</div>
-            <div className="hidden text-[11px] text-white/70 sm:block">Délégation Départementale · Menoua</div>
+            <div className="text-[11px] text-white/70">Délégation Départementale · Menoua</div>
           </div>
         </div>
 
-        <div className="ml-auto flex items-center gap-4">
+        {/* Zone droite : chaque élément se réduit sur petit écran (texte masqué,
+            icône seule conservée) pour que RIEN ne soit poussé hors du cadre
+            visible — défaut constaté sur téléphones étroits (Android 14 entre
+            autres) où la rangée complète dépassait la largeur de l'écran et
+            faisait disparaître les derniers boutons à droite. */}
+        <div className="ml-auto flex min-w-0 shrink items-center gap-1 sm:gap-4">
           <OnlineIndicator />
           <RechercheGlobale role={role} />
           <AideButton role={role} />
-          <div className="hidden text-right leading-tight sm:block">
+          <div className="hidden text-right leading-tight lg:block">
             <div className="text-[13.5px] font-semibold">{username}</div>
             <div className="text-[11.5px] text-white/75">{LIBELLES_ROLE[role] ?? role}</div>
           </div>
           <Link
             href="/mon-compte/securite"
             title="Sécurité de l'appareil"
-            className="flex h-9 w-9 items-center justify-center rounded-md hover:bg-white/10"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md hover:bg-white/10"
           >
             <Lock size={17} />
           </Link>
           <a
             href="/api/auth/signout"
-            className="rounded-md border border-white/25 bg-white/10 px-3 py-2 text-[13px] font-semibold text-white hover:bg-white/20"
+            title="Déconnexion"
+            className="flex h-9 shrink-0 items-center gap-1.5 rounded-md border border-white/25 bg-white/10 px-2 text-[13px] font-semibold text-white hover:bg-white/20 sm:px-3"
           >
-            Déconnexion
+            <LogOut size={16} />
+            <span className="hidden sm:inline">Déconnexion</span>
           </a>
         </div>
       </header>

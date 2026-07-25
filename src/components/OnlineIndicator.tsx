@@ -19,14 +19,15 @@ export default function OnlineIndicator() {
 
   return (
     <span
-      className={`inline-flex items-center gap-2 whitespace-nowrap rounded-full border px-3 py-1.5 text-[12.5px] font-semibold ${
+      title={online ? "En ligne" : "Hors ligne"}
+      className={`inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border px-2 py-1.5 text-[12.5px] font-semibold sm:px-3 ${
         online
           ? "border-statut-soumisBorder bg-statut-soumisBg text-statut-soumisText"
           : "border-statut-retardBorder bg-statut-retardBg text-statut-retardText"
       }`}
     >
-      <span className={`h-2 w-2 rounded-full ${online ? "bg-statut-soumisDot" : "bg-statut-retardDot"}`} />
-      {online ? "En ligne" : "Hors ligne"}
+      <span className={`h-2 w-2 shrink-0 rounded-full ${online ? "bg-statut-soumisDot" : "bg-statut-retardDot"}`} />
+      <span className="hidden sm:inline">{online ? "En ligne" : "Hors ligne"}</span>
     </span>
   );
 }
