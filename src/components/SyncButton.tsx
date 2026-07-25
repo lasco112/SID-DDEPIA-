@@ -13,12 +13,19 @@
  * confirmation.
  */
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { offlineDB } from "@/lib/dexie";
 
 type SyncState = "idle" | "offline" | "syncing" | "done" | "error";
 
 const BATCH_SIZE = 200;
+/**
+ * Délai minimal entre deux sauvegardes automatiques ratées, pour ne pas
+ * marteler le serveur quand la cause est durable (période verrouillée,
+ * réseau instable). Une saisie en échec reste sur l'appareil et repart au
+ * prochain essai — rien n'est jamais perdu.
+ */
+const DELAI_NOUVEL_ESSAI_MS = 60_000;
 
 export default function SyncButton({
   periodeId,
@@ -39,6 +46,8 @@ export default function SyncButton({
   const [pending, setPending] = useState(0);
   const [state, setState] = useState<SyncState>("idle");
   const [message, setMessage] = useState("");
+  /** Horodatage du dernier échec, pour espacer les nouvelles tentatives automatiques. */
+  const dernierEchecRef = useRef(0);
 
   useEffect(() => {
     const update = () => setOnline(navigator.onLine);
@@ -77,6 +86,86 @@ export default function SyncButton({
     throw new Error(err.message ?? "Échec de la finalisation du rapport.");
   }, [periodeId]);
 
+  /**
+   * Pousse la file locale vers le serveur. Ne soumet JAMAIS le rapport :
+   * mettre les données à l'abri sur le serveur et déclarer officiellement le
+   * rapport sont deux décisions distinctes.
+   */
+  const envoyerFile = useCallback(async (): Promise<number> => {
+    const queue = await offlineDB.saisies
+      .where("[username+statutLocal]")
+      .anyOf([username, "BROUILLON_LOCAL"], [username, "SYNCHRO_EN_ATTENTE"], [username, "ERREUR_SYNCHRO"])
+      .toArray();
+    if (queue.length === 0) return 0;
+
+    await offlineDB.saisies.bulkPut(queue.map((s) => ({ ...s, statutLocal: "SYNCHRO_EN_ATTENTE" as const })));
+
+    let confirmed = 0;
+    for (let i = 0; i < queue.length; i += BATCH_SIZE) {
+      const batch = queue.slice(i, i + BATCH_SIZE);
+      const res = await fetch("/api/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ periodeId, saisies: batch }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        const erreurMsg =
+          res.status === 423
+            ? err.message ?? "Période verrouillée. Contactez le Délégué Départemental."
+            : err.message ?? `Erreur serveur (${res.status})`;
+        // Le lot en échec passe visiblement en erreur (jamais un échec
+        // silencieux) : la saisie reste sur l'appareil, rien n'est perdu,
+        // et un nouvel essai la reprendra normalement (statut réévalué à
+        // chaque tentative, jamais bloqué en erreur définitive).
+        await offlineDB.transaction("rw", offlineDB.saisies, async () => {
+          for (const s of batch) {
+            await offlineDB.saisies.update(s.clientId, { statutLocal: "ERREUR_SYNCHRO", erreurSynchro: erreurMsg });
+          }
+        });
+        throw new Error(erreurMsg);
+      }
+
+      const { confirmedIds } = (await res.json()) as { confirmedIds: string[] };
+      await offlineDB.transaction("rw", offlineDB.saisies, async () => {
+        for (const id of confirmedIds) {
+          await offlineDB.saisies.update(id, { statutLocal: "SYNCHRONISE" });
+        }
+      });
+      confirmed += confirmedIds.length;
+    }
+    return confirmed;
+  }, [periodeId, username]);
+
+  /**
+   * Filet de sécurité : dès qu'il y a du réseau, les saisies partent vers le
+   * serveur toutes seules, SANS soumettre le rapport. Sans cela, des données
+   * pouvaient rester des jours sur un seul téléphone — perdues avec lui en
+   * cas de panne, de perte ou de vol.
+   */
+  const sauvegardeAutomatique = useCallback(async () => {
+    setState("syncing");
+    setMessage("Sauvegarde de vos saisies sur le serveur…");
+    try {
+      const confirmed = await envoyerFile();
+      setState("done");
+      setMessage(confirmed > 0 ? `${confirmed} saisie(s) mise(s) à l'abri sur le serveur.` : "");
+      onSynced?.();
+    } catch (e) {
+      dernierEchecRef.current = Date.now();
+      setState("error");
+      setMessage(
+        e instanceof Error
+          ? `Sauvegarde automatique impossible (${e.message}). Vos données restent sur cet appareil.`
+          : "Sauvegarde automatique impossible. Vos données restent sur cet appareil."
+      );
+    } finally {
+      await refreshPending();
+      setTimeout(() => setState("idle"), 5000);
+    }
+  }, [envoyerFile, refreshPending, onSynced]);
+
   const handleSync = useCallback(async () => {
     if (!navigator.onLine) {
       setState("offline");
@@ -87,50 +176,7 @@ export default function SyncButton({
     setMessage(`Envoi au ${destinataire} en cours…`);
 
     try {
-      const queue = await offlineDB.saisies
-        .where("[username+statutLocal]")
-        .anyOf([username, "BROUILLON_LOCAL"], [username, "SYNCHRO_EN_ATTENTE"], [username, "ERREUR_SYNCHRO"])
-        .toArray();
-
-      let confirmed = 0;
-      if (queue.length > 0) {
-        await offlineDB.saisies.bulkPut(queue.map((s) => ({ ...s, statutLocal: "SYNCHRO_EN_ATTENTE" as const })));
-
-        for (let i = 0; i < queue.length; i += BATCH_SIZE) {
-          const batch = queue.slice(i, i + BATCH_SIZE);
-          const res = await fetch("/api/sync", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ periodeId, saisies: batch }),
-          });
-
-          if (!res.ok) {
-            const err = await res.json().catch(() => ({}));
-            const erreurMsg =
-              res.status === 423
-                ? err.message ?? "Période verrouillée. Contactez le Délégué Départemental."
-                : err.message ?? `Erreur serveur (${res.status})`;
-            // Le lot en échec passe visiblement en erreur (jamais un échec
-            // silencieux) : la saisie reste sur l'appareil, rien n'est perdu,
-            // et un nouvel essai la reprendra normalement (statut réévalué à
-            // chaque tentative, jamais bloqué en erreur définitive).
-            await offlineDB.transaction("rw", offlineDB.saisies, async () => {
-              for (const s of batch) {
-                await offlineDB.saisies.update(s.clientId, { statutLocal: "ERREUR_SYNCHRO", erreurSynchro: erreurMsg });
-              }
-            });
-            throw new Error(erreurMsg);
-          }
-
-          const { confirmedIds } = (await res.json()) as { confirmedIds: string[] };
-          await offlineDB.transaction("rw", offlineDB.saisies, async () => {
-            for (const id of confirmedIds) {
-              await offlineDB.saisies.update(id, { statutLocal: "SYNCHRONISE" });
-            }
-          });
-          confirmed += confirmedIds.length;
-        }
-      }
+      const confirmed = await envoyerFile();
 
       if (peutSoumettre) {
         const { deja } = await soumettreRapport();
@@ -151,20 +197,26 @@ export default function SyncButton({
       }
       onSynced?.();
     } catch (e) {
+      dernierEchecRef.current = Date.now();
       setState("error");
       setMessage(e instanceof Error ? e.message : "Échec de l'envoi. Vos données restent sauvegardées sur cet appareil.");
     } finally {
       await refreshPending();
       setTimeout(() => setState("idle"), 5000);
     }
-  }, [periodeId, username, destinataire, peutSoumettre, soumettreRapport, refreshPending, onSynced]);
+  }, [destinataire, peutSoumettre, envoyerFile, soumettreRapport, refreshPending, onSynced]);
 
+  // `pending` DOIT figurer dans les dépendances : il vaut encore 0 au premier
+  // rendu (son comptage est asynchrone). L'ancienne version ne dépendait que
+  // de `online`, donc l'effet ne se relançait jamais une fois le comptage
+  // terminé — les saisies restaient indéfiniment sur l'appareil alors même
+  // que la connexion était bonne.
   useEffect(() => {
-    if (online && pending > 0 && state === "idle") {
-      void handleSync();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [online]);
+    if (!online || pending === 0 || state !== "idle") return;
+    if (Date.now() - dernierEchecRef.current < DELAI_NOUVEL_ESSAI_MS) return;
+    const t = setTimeout(() => void sauvegardeAutomatique(), 1200);
+    return () => clearTimeout(t);
+  }, [online, pending, state, sauvegardeAutomatique]);
 
   return (
     <div className="flex flex-wrap items-center gap-3">

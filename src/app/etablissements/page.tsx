@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
 import AppShell from "@/components/AppShell";
 import EtablissementsClient from "@/components/EtablissementsClient";
+import SupprimerEtablissementsDemoButton from "@/components/SupprimerEtablissementsDemoButton";
 
 export default async function EtablissementsPage() {
   const session = await getServerSession(authOptions);
@@ -26,6 +27,7 @@ export default async function EtablissementsPage() {
         <div className="mt-6">
           <EtablissementsClient role={role as "DA" | "DD"} arrondissements={arrondissements} ownArrondissementId={ownArrondissementId} />
         </div>
+        {role === "DD" && <SupprimerEtablissementsDemoButton />}
       </div>
     </AppShell>
   );
