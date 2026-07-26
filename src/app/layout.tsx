@@ -3,6 +3,7 @@ import { ReactNode } from 'react';
 import { Manrope } from 'next/font/google';
 import Providers from '@/components/Providers';
 import ServiceWorkerRegister from '@/components/ServiceWorkerRegister';
+import NavigationHorsLigne from '@/components/NavigationHorsLigne';
 import SplashScreen from '@/components/SplashScreen';
 import DemoBanner from '@/components/DemoBanner';
 
@@ -34,6 +35,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       </head>
       <body className="font-sans text-[15px] leading-[1.45] text-ink antialiased">
         <ServiceWorkerRegister />
+        <NavigationHorsLigne />
         <SplashScreen />
         <Providers>
           <DemoBanner />

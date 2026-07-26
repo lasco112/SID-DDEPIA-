@@ -114,7 +114,7 @@ export async function metaBootstrap() {
  * la partie "mise en cache de toutes les pages, pas seulement l'accueil" de
  * la spécification hors-ligne.
  */
-const CACHE_NAME = "sid-ddepia-v3";
+const CACHE_NAME = "sid-ddepia-v4";
 
 /** Pages non paramétrées par tableau, selon le rôle (miroir de Sidebar.tsx). */
 /** Dérivé de la même source que le menu (Sidebar.tsx) — jamais désynchronisé. */
@@ -129,7 +129,10 @@ const ROUTES_PAR_ROLE: Record<string, string[]> = Object.fromEntries(
  * Best-effort : une page qui échoue à se précharger ne bloque pas les autres,
  * et l'utilisateur pourra toujours l'ouvrir normalement en ligne plus tard.
  */
-export async function precacherPagesRole(role: string): Promise<void> {
+export async function precacherPagesRole(
+  role: string,
+  surProgression?: (faits: number, total: number) => void
+): Promise<void> {
   if (typeof window === "undefined" || !("caches" in window)) return;
 
   const urls = [...(ROUTES_PAR_ROLE[role] ?? ["/dashboard"])];
@@ -139,14 +142,56 @@ export async function precacherPagesRole(role: string): Promise<void> {
   }
 
   const cache = await caches.open(CACHE_NAME);
+  let faits = 0;
+  surProgression?.(0, urls.length);
+
   await Promise.all(
     urls.map(async (url) => {
       try {
         const res = await fetch(url, { credentials: "same-origin" });
-        if (res.ok) await cache.put(url, res.clone());
+        if (res.ok) {
+          await cache.put(url, res.clone());
+          await precacherRessourcesDeLaPage(cache, await res.text());
+        }
       } catch {
         // Une page non préchargée reste simplement indisponible hors ligne
         // tant qu'elle n'a pas été ouverte au moins une fois en ligne.
+      } finally {
+        // Comptabilisée même en cas d'échec : la barre doit toujours arriver
+        // au bout, sinon elle resterait bloquée et inquiéterait l'utilisateur.
+        faits++;
+        surProgression?.(faits, urls.length);
+      }
+    })
+  );
+}
+
+/**
+ * Met aussi en cache les fichiers JavaScript et CSS que la page référence.
+ *
+ * Sans cela, la page HTML était bien retrouvée hors ligne mais restait
+ * INERTE : son écran s'affichait vide car le code qui le remplit
+ * (/_next/static/chunks/app/da/saisie/[templateCode]/page.js par exemple)
+ * n'avait jamais été téléchargé — il ne l'est qu'à la première ouverture
+ * réelle de la page, ce qui ne se produit justement pas pour une page
+ * préchargée d'avance.
+ */
+async function precacherRessourcesDeLaPage(cache: Cache, html: string): Promise<void> {
+  const fichiers = new Set<string>();
+  const motif = /(?:src|href)="(\/_next\/static\/[^"]+)"/g;
+  let trouve: RegExpExecArray | null;
+  while ((trouve = motif.exec(html)) !== null) {
+    fichiers.add(trouve[1].replace(/&amp;/g, "&"));
+  }
+
+  await Promise.all(
+    Array.from(fichiers).map(async (fichier) => {
+      try {
+        if (await cache.match(fichier, { ignoreVary: true })) return; // déjà en cache
+        const res = await fetch(fichier, { credentials: "same-origin" });
+        if (res.ok) await cache.put(fichier, res.clone());
+      } catch {
+        // Best-effort : un fichier manquant n'empêche pas de précharger les autres.
       }
     })
   );

@@ -10,6 +10,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { offlineDB, trouverSaisieNominatif } from "@/lib/dexie";
+import { creerEtablissement } from "@/lib/etablissementsLocal";
 
 interface FormFieldDto {
   code: string;
@@ -64,32 +65,25 @@ export default function FormNominatif({
       setAjoutEnCours(true);
       setErreurAjout(null);
       try {
-        const res = await fetch("/api/etablissements", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            typeCode: template.etablissementTypeCode,
-            nom: nomNouveau.trim(),
-            localite: localiteNouveau.trim(),
-          }),
+        // Enregistrement LOCAL d'abord : l'établissement est utilisable
+        // immédiatement, même sans réseau. L'envoi au serveur est empilé et
+        // rejoué automatiquement dès le retour de la connexion.
+        const meta = await offlineDB.meta.get("bootstrap");
+        if (!meta?.arrondissementId) throw new Error("Arrondissement introuvable sur cet appareil.");
+
+        const cree = await creerEtablissement({
+          typeCode: template.etablissementTypeCode,
+          nom: nomNouveau,
+          localite: localiteNouveau,
+          arrondissementId: meta.arrondissementId,
         });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.message ?? "Échec de la création.");
-        const nouveau: EtablissementDto = { id: data.etablissement.id, nom: data.etablissement.nom, localite: data.etablissement.localite };
-        await offlineDB.etablissements.put({
-          id: data.etablissement.id,
-          typeCode: data.etablissement.typeCode,
-          nom: data.etablissement.nom,
-          localite: data.etablissement.localite,
-          arrondissementId: data.etablissement.arrondissementId,
-          actif: true,
-        });
-        setAjoutes((prev) => [...prev, nouveau]);
+
+        setAjoutes((prev) => [...prev, { id: cree.id, nom: cree.nom, localite: cree.localite }]);
         setNomNouveau("");
         setLocaliteNouveau("");
         setFormulaireOuvert(false);
       } catch (err) {
-        setErreurAjout(err instanceof Error ? err.message : "Erreur de connexion — réessayez en ligne.");
+        setErreurAjout(err instanceof Error ? err.message : "Échec de l'enregistrement local.");
       } finally {
         setAjoutEnCours(false);
       }

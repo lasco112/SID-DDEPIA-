@@ -15,6 +15,8 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { offlineDB } from "@/lib/dexie";
+import { envoyerSaisiesEnAttente } from "@/lib/synchronisation";
+import { synchroniserEtablissements } from "@/lib/etablissementsLocal";
 
 type SyncState = "idle" | "offline" | "syncing" | "done" | "error";
 
@@ -92,50 +94,12 @@ export default function SyncButton({
    * rapport sont deux décisions distinctes.
    */
   const envoyerFile = useCallback(async (): Promise<number> => {
-    const queue = await offlineDB.saisies
-      .where("[username+statutLocal]")
-      .anyOf([username, "BROUILLON_LOCAL"], [username, "SYNCHRO_EN_ATTENTE"], [username, "ERREUR_SYNCHRO"])
-      .toArray();
-    if (queue.length === 0) return 0;
-
-    await offlineDB.saisies.bulkPut(queue.map((s) => ({ ...s, statutLocal: "SYNCHRO_EN_ATTENTE" as const })));
-
-    let confirmed = 0;
-    for (let i = 0; i < queue.length; i += BATCH_SIZE) {
-      const batch = queue.slice(i, i + BATCH_SIZE);
-      const res = await fetch("/api/sync", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ periodeId, saisies: batch }),
-      });
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        const erreurMsg =
-          res.status === 423
-            ? err.message ?? "Période verrouillée. Contactez le Délégué Départemental."
-            : err.message ?? `Erreur serveur (${res.status})`;
-        // Le lot en échec passe visiblement en erreur (jamais un échec
-        // silencieux) : la saisie reste sur l'appareil, rien n'est perdu,
-        // et un nouvel essai la reprendra normalement (statut réévalué à
-        // chaque tentative, jamais bloqué en erreur définitive).
-        await offlineDB.transaction("rw", offlineDB.saisies, async () => {
-          for (const s of batch) {
-            await offlineDB.saisies.update(s.clientId, { statutLocal: "ERREUR_SYNCHRO", erreurSynchro: erreurMsg });
-          }
-        });
-        throw new Error(erreurMsg);
-      }
-
-      const { confirmedIds } = (await res.json()) as { confirmedIds: string[] };
-      await offlineDB.transaction("rw", offlineDB.saisies, async () => {
-        for (const id of confirmedIds) {
-          await offlineDB.saisies.update(id, { statutLocal: "SYNCHRONISE" });
-        }
-      });
-      confirmed += confirmedIds.length;
-    }
-    return confirmed;
+    // Implémentation partagée avec l'écran de synchronisation (lib/synchronisation)
+    // pour que les deux ne puissent jamais diverger.
+    const confirmees = await envoyerSaisiesEnAttente(username, periodeId);
+    // Les établissements créés/supprimés hors ligne partent dans le même geste.
+    await synchroniserEtablissements();
+    return confirmees;
   }, [periodeId, username]);
 
   /**

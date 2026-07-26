@@ -16,11 +16,13 @@ export const NAV_PAR_ROLE: Record<string, NavItem[]> = {
     { href: "/etablissements", label: "Établissements" },
     { href: "/da/supervision-agents", label: "Suivi des agents de saisie" },
     { href: "/da/assignations", label: "Organisation du travail" },
+    { href: "/mon-compte/synchronisation", label: "Synchronisation" },
   ],
   AGENT_SAISIE: [
     { href: "/dashboard", label: "Tableau de bord" },
     { href: "/da/saisie", label: "Saisie de données" },
     { href: "/etablissements", label: "Établissements" },
+    { href: "/mon-compte/synchronisation", label: "Synchronisation" },
   ],
   DD: [
     { href: "/dashboard", label: "Tableau de bord" },

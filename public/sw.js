@@ -18,7 +18,7 @@
 // nom diffère : c'est le seul mécanisme qui purge réellement l'ancien contenu
 // sur les appareils déjà installés. Doit rester identique à CACHE_NAME dans
 // src/lib/offlineStore.ts.
-const CACHE_NAME = "sid-ddepia-v3";
+const CACHE_NAME = "sid-ddepia-v4";
 const OFFLINE_URL = "/offline.html";
 const PRECACHE = ["/", OFFLINE_URL, "/manifest.json"];
 
@@ -53,6 +53,14 @@ self.addEventListener("fetch", (event) => {
   if (url.origin !== self.location.origin) return;
   if (url.pathname.startsWith("/api/")) return;
 
+  // ignoreVary est INDISPENSABLE : Next.js renvoie sur chaque page
+  // « Vary: RSC, Next-Router-State-Tree, Next-Router-Prefetch, Accept-Encoding ».
+  // Sans cette option, une page pourtant présente dans le cache n'était pas
+  // retrouvée dès que l'un de ces en-têtes différait d'une requête à l'autre
+  // (l'encodage accepté change couramment) — d'où des pages « indisponibles
+  // hors ligne » alors qu'elles avaient bien été téléchargées.
+  const OPTIONS_CACHE = { ignoreVary: true };
+
   if (request.mode === "navigate") {
     event.respondWith(
       fetch(request)
@@ -61,7 +69,35 @@ self.addEventListener("fetch", (event) => {
           caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
           return response;
         })
-        .catch(async () => (await caches.match(request)) || (await caches.match(OFFLINE_URL)))
+        .catch(
+          async () =>
+            (await caches.match(request, OPTIONS_CACHE)) ||
+            (await caches.match(url.pathname, OPTIONS_CACHE)) ||
+            (await caches.match(OFFLINE_URL, OPTIONS_CACHE))
+        )
+    );
+    return;
+  }
+
+  // Navigation INTERNE à l'application (clic sur un lien) : Next.js ne recharge
+  // pas la page, il demande au serveur un fragment via l'en-tête « RSC ».
+  // Ces requêtes n'étaient pas interceptées ici : hors ligne elles échouaient
+  // et faisaient planter l'écran avec « Application error ». On ne peut pas y
+  // répondre depuis le cache (un fragment RSC n'est pas du HTML), mais on
+  // renvoie une erreur propre 503 que la page sait rattraper en effectuant un
+  // rechargement complet, lequel EST servi depuis le cache (voir
+  // NavigationHorsLigne.tsx et app/error.tsx).
+  const estFragmentRSC = request.headers.get("RSC") === "1" || url.searchParams.has("_rsc");
+  if (estFragmentRSC) {
+    event.respondWith(
+      fetch(request).catch(
+        () =>
+          new Response("", {
+            status: 503,
+            statusText: "Hors ligne",
+            headers: { "X-Hors-Ligne": "1" },
+          })
+      )
     );
     return;
   }
@@ -70,7 +106,7 @@ self.addEventListener("fetch", (event) => {
   // une URL donnée ne change donc jamais de contenu — cache d'abord sans risque.
   if (url.pathname.startsWith("/_next/static/")) {
     event.respondWith(
-      caches.match(request).then(
+      caches.match(request, OPTIONS_CACHE).then(
         (cached) =>
           cached ||
           fetch(request).then((response) => {
@@ -91,7 +127,7 @@ self.addEventListener("fetch", (event) => {
   // en arrière-plan : la version suivante est à jour, sans aucune action.
   if (url.pathname.startsWith("/icon-") || url.pathname === "/manifest.json") {
     event.respondWith(
-      caches.match(request).then((cached) => {
+      caches.match(request, OPTIONS_CACHE).then((cached) => {
         const reseau = fetch(request)
           .then((response) => {
             if (response.ok) {

@@ -13,6 +13,15 @@
  */
 
 import { useEffect, useState, useCallback } from "react";
+import type { EtablissementOffline } from "@/lib/dexie";
+import {
+  listerEtablissements,
+  creerEtablissement,
+  modifierEtablissement,
+  supprimerEtablissement,
+  synchroniserEtablissements,
+  nombreOperationsEnAttente,
+} from "@/lib/etablissementsLocal";
 
 interface Arrondissement {
   id: string;
@@ -20,15 +29,8 @@ interface Arrondissement {
   nom: string;
 }
 
-interface Etablissement {
-  id: string;
-  typeCode: string;
-  nom: string;
-  localite: string;
-  proprietaire: string | null;
-  telephone: string | null;
-  actif: boolean;
-}
+/** Même forme que la table locale : cet écran lit et écrit désormais Dexie. */
+type Etablissement = EtablissementOffline;
 
 const TYPES = [
   { code: "ETAB_COUVOIR", label: "Couvoirs — Tableau 1.3" },
@@ -60,20 +62,31 @@ export default function EtablissementsClient({
   const [ajout, setAjout] = useState(false);
   const [aSupprimer, setASupprimer] = useState<{ id: string; nom: string } | null>(null);
 
+  // Lecture depuis la base LOCALE de l'appareil (remplie par /api/bootstrap),
+  // jamais depuis le réseau : la page reste consultable et modifiable sans
+  // connexion. Une synchronisation est tentée en arrière-plan si le réseau
+  // est là, puis la liste est relue.
   const charger = useCallback(async () => {
     if (!arrondissementId) return;
     setLoading(true);
-    const params = new URLSearchParams({ typeCode, ...(estDD ? { arrondissementId } : {}) });
-    const res = await fetch(`/api/etablissements?${params}`);
-    if (res.ok) {
-      const data = await res.json();
-      setListe(data.etablissements ?? []);
-    }
+    setListe(await listerEtablissements(typeCode, arrondissementId));
     setLoading(false);
-  }, [typeCode, arrondissementId, role]);
+  }, [typeCode, arrondissementId]);
 
   useEffect(() => {
     charger();
+  }, [charger]);
+
+  // Rattrapage : les opérations faites hors ligne repartent dès que le réseau
+  // revient, puis la liste affichée est relue.
+  useEffect(() => {
+    async function rattraper() {
+      const { envoyees } = await synchroniserEtablissements();
+      if (envoyees > 0) await charger();
+    }
+    void rattraper();
+    window.addEventListener("online", rattraper);
+    return () => window.removeEventListener("online", rattraper);
   }, [charger]);
 
   async function ajouter(e: React.FormEvent) {
@@ -85,15 +98,15 @@ export default function EtablissementsClient({
     }
     setAjout(true);
     try {
-      const res = await fetch("/api/etablissements", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ typeCode, arrondissementId, ...nouveau }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message ?? "Échec de la création.");
+      const cree = await creerEtablissement({ typeCode, arrondissementId, ...nouveau });
       setNouveau({ nom: "", localite: "", proprietaire: "", telephone: "" });
-      setMessage(`« ${data.etablissement.nom} » ajouté.`);
+      // On se fie au RÉSULTAT réel, pas à navigator.onLine : celui-ci reste
+      // « en ligne » quand l'appareil est connecté au Wi-Fi sans Internet.
+      setMessage(
+        (await nombreOperationsEnAttente()) > 0
+          ? `« ${cree.nom} » enregistré sur cet appareil — il sera transmis dès que le serveur sera joignable.`
+          : `« ${cree.nom} » ajouté.`
+      );
       await charger();
     } catch (e) {
       setMessage(e instanceof Error ? e.message : "Erreur.");
@@ -105,13 +118,7 @@ export default function EtablissementsClient({
   async function modifier(id: string, patch: Partial<Etablissement>) {
     setMessage(null);
     try {
-      const res = await fetch(`/api/etablissements/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(patch),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message ?? "Échec de la modification.");
+      await modifierEtablissement(id, patch);
       await charger();
     } catch (e) {
       setMessage(e instanceof Error ? e.message : "Erreur.");
@@ -124,10 +131,12 @@ export default function EtablissementsClient({
     setMessage(null);
     setASupprimer(null);
     try {
-      const res = await fetch(`/api/etablissements/${id}`, { method: "DELETE" });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message ?? "Échec de la suppression.");
-      setMessage(`« ${nom} » supprimé définitivement.`);
+      await supprimerEtablissement(id);
+      setMessage(
+        (await nombreOperationsEnAttente()) > 0
+          ? `« ${nom} » retiré de cet appareil — la suppression sera transmise dès que le serveur sera joignable.`
+          : `« ${nom} » supprimé définitivement.`
+      );
       await charger();
     } catch (e) {
       setMessage(e instanceof Error ? e.message : "Erreur.");

@@ -115,6 +115,33 @@ export interface EtablissementOffline {
   localite: string;
   arrondissementId: string;
   actif: boolean;
+  proprietaire?: string | null;
+  telephone?: string | null;
+  /**
+   * Suppression demandée hors ligne (« tombstone ») : l'établissement
+   * disparaît immédiatement des écrans mais reste stocké tant que le serveur
+   * n'a pas confirmé, sinon l'opération serait perdue au rechargement.
+   */
+  deletedAt?: string | null;
+  /** Créé/modifié sur cet appareil et pas encore confirmé par le serveur. */
+  enAttenteSynchro?: boolean;
+}
+
+/**
+ * File d'attente des opérations faites hors ligne sur des données autres que
+ * les saisies (celles-ci ont déjà leur propre file via `saisies.statutLocal`).
+ * Rejouée dans l'ordre dès le retour du réseau — voir lib/etablissementsLocal.
+ */
+export interface OperationEnAttente {
+  id?: number;
+  entite: "etablissement";
+  operation: "CREATION" | "MODIFICATION" | "SUPPRESSION";
+  /** Identifiant de la cible — généré sur l'appareil pour une création. */
+  cibleId: string;
+  payload: Record<string, unknown>;
+  creeLe: string;
+  tentatives: number;
+  derniereErreur?: string | null;
 }
 
 export interface ReferentielOffline {
@@ -143,6 +170,7 @@ export class SIDOfflineDB extends Dexie {
   etablissements!: Table<EtablissementOffline, string>;
   referentiels!: Table<ReferentielOffline, string>;
   periodes!: Table<PeriodeOffline, string>;
+  fileAttente!: Table<OperationEnAttente, number>;
 
   constructor() {
     super("SID_DDEPIA_MENOUA");
@@ -171,6 +199,12 @@ export class SIDOfflineDB extends Dexie {
       etablissements: "id, typeCode, arrondissementId, [typeCode+arrondissementId]",
       referentiels: "id, categorie",
       periodes: "id",
+    });
+    // v5 : file d'attente des opérations hors ligne sur les établissements
+    // (création, modification, suppression). Purement additif — aucune donnée
+    // existante n'est touchée.
+    this.version(5).stores({
+      fileAttente: "++id, entite, operation, creeLe",
     });
   }
 }

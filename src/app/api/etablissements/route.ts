@@ -54,6 +54,13 @@ export async function POST(req: Request) {
     assertRole(user, ["DA", "DD", "AGENT_SAISIE"]);
 
     const body = (await req.json()) as {
+      /**
+       * Identifiant généré sur l'appareil (UUID) quand la création a eu lieu
+       * hors ligne. On l'utilise comme clé primaire pour rendre l'envoi
+       * IDEMPOTENT : si le réseau coupe après l'enregistrement mais avant la
+       * réponse, l'appareil rejouera l'opération sans créer de doublon.
+       */
+      id?: string;
       typeCode: string;
       nom: string;
       localite: string;
@@ -78,16 +85,25 @@ export async function POST(req: Request) {
       arrondissementId = body.arrondissementId;
     }
 
-    const etablissement = await db.etablissement.create({
-      data: {
-        typeCode: body.typeCode,
-        nom: body.nom.trim(),
-        localite: body.localite.trim(),
-        proprietaire: body.proprietaire?.trim() || null,
-        telephone: body.telephone?.trim() || null,
-        arrondissementId,
-      },
-    });
+    const donnees = {
+      typeCode: body.typeCode,
+      nom: body.nom.trim(),
+      localite: body.localite.trim(),
+      proprietaire: body.proprietaire?.trim() || null,
+      telephone: body.telephone?.trim() || null,
+      arrondissementId,
+    };
+
+    // upsert plutôt que create quand l'appareil fournit son identifiant :
+    // un même envoi rejoué après une coupure réseau met simplement à jour la
+    // ligne déjà créée, au lieu d'ajouter un doublon.
+    const etablissement = body.id
+      ? await db.etablissement.upsert({
+          where: { id: body.id },
+          create: { id: body.id, ...donnees },
+          update: donnees,
+        })
+      : await db.etablissement.create({ data: donnees });
 
     await db.auditLog.create({
       data: { userId: user.id, action: "CREATION_ETABLISSEMENT", entite: "Etablissement", entiteId: etablissement.id, details: { nom: etablissement.nom, typeCode: etablissement.typeCode } },
