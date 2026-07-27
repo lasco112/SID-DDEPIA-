@@ -24,6 +24,29 @@ interface SaisieOfflineIn {
   payload?: Record<string, unknown>;
   nonRenseigne: boolean;
   motifNonRenseigne?: string | null;
+  /** Date de modification sur l'appareil (ISO) — arbitre les conflits entre appareils. */
+  updatedAt?: string;
+}
+
+/**
+ * Date de modification retenue pour l'arbitrage.
+ *
+ * Plafonnée à l'heure du serveur : une horloge d'appareil mal réglée (réglée
+ * dans le futur) donnerait sinon à cet appareil un droit de dernier mot
+ * permanent sur tous les autres. Une date absente ou illisible est ramenée à
+ * l'heure du serveur, ce qui revient au comportement antérieur pour cette
+ * ligne — jamais un rejet silencieux.
+ */
+function dateModification(brut: string | undefined, maintenant: Date): Date {
+  if (!brut) return maintenant;
+  const d = new Date(brut);
+  if (Number.isNaN(d.getTime())) return maintenant;
+  return d > maintenant ? maintenant : d;
+}
+
+/** Vrai si l'erreur est le refus de doublon sur la clé naturelle (ligne créée entre-temps). */
+function estConflitDeDoublon(e: unknown): boolean {
+  return e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002";
 }
 
 export async function POST(req: Request) {
@@ -90,6 +113,10 @@ export async function POST(req: Request) {
     const confirmedIds: string[] = [];
     /** Lignes refusées par la base : tracées à l'audit, jamais fatales pour le lot. */
     const lignesEnEchec: Array<{ clientId: string; templateCode: string; fieldCode: string | null; erreur: string }> = [];
+    /** Saisies volontairement non appliquées : le serveur détenait une version plus récente. */
+    let ignorees = 0;
+    /** Heure de référence unique pour tout le lot (cohérence des comparaisons). */
+    const maintenant = new Date();
 
     for (const s of body.saisies) {
       if (s.nonRenseigne && !s.motifNonRenseigne) {
@@ -106,6 +133,20 @@ export async function POST(req: Request) {
       // 200 autres, qui repartaient en erreur à chaque tentative — la file ne
       // se vidait plus jamais et grossissait à chaque saisie (cas constaté sur
       // le terrain : 66 saisies bloquées).
+      const modifieLe = dateModification(s.updatedAt, maintenant);
+      // Une ligne du serveur SANS date de modification date d'avant cette
+      // fonctionnalité : traitée comme la plus ancienne, donc remplaçable.
+      const plusRecenteQueSurLeServeur = { OR: [{ modifieLe: null }, { modifieLe: { lte: modifieLe } }] };
+      const champsCommuns = {
+        valeur,
+        valeurTexte,
+        nonRenseigne: s.nonRenseigne,
+        motifNonRenseigne: s.motifNonRenseigne ?? null,
+        modifieLe,
+        syncedAt: maintenant,
+        saisiParId: user.id,
+      };
+
       try {
         if (s.famille === "MATRICE" && s.fieldCode) {
           // Recherche par (rapport, champ) et NON par clientId : c'est là
@@ -114,61 +155,85 @@ export async function POST(req: Request) {
           // appareil, depuis un autre compte (le DA après son agent) ou après
           // recréation de la base locale, l'upsert ne trouvait rien, tentait
           // une création et violait @@unique([rapportId, fieldCode]).
-          await db.saisieMatrice.upsert({
-            where: { rapportId_fieldCode: { rapportId: rapport.id, fieldCode: s.fieldCode } },
-            update: { valeur, valeurTexte, nonRenseigne: s.nonRenseigne, motifNonRenseigne: s.motifNonRenseigne ?? null, syncedAt: new Date(), saisiParId: user.id },
-            create: {
-              clientId: s.clientId,
-              rapportId: rapport.id,
-              fieldCode: s.fieldCode,
-              valeur,
-              valeurTexte,
-              nonRenseigne: s.nonRenseigne,
-              motifNonRenseigne: s.motifNonRenseigne ?? null,
-              saisiParId: user.id,
-            },
+          //
+          // La mise à jour ne s'applique QUE si la version reçue est plus
+          // récente que celle du serveur : une saisie ancienne remontée
+          // tardivement (appareil longtemps hors ligne) n'écrase plus une
+          // correction faite entre-temps.
+          const misAJour = await db.saisieMatrice.updateMany({
+            where: { rapportId: rapport.id, fieldCode: s.fieldCode, ...plusRecenteQueSurLeServeur },
+            data: champsCommuns,
           });
+          if (misAJour.count === 0) {
+            // Soit la cellule n'existe pas encore, soit le serveur détient
+            // déjà une version plus récente — que l'on conserve alors.
+            try {
+              await db.saisieMatrice.create({
+                data: { clientId: s.clientId, rapportId: rapport.id, fieldCode: s.fieldCode, ...champsCommuns },
+              });
+            } catch (e) {
+              if (!estConflitDeDoublon(e)) throw e;
+              ignorees++; // version du serveur plus récente : conservée
+            }
+          }
           confirmedIds.push(s.clientId);
         } else if (s.famille === "NOMINATIF" && s.fieldCode && s.etablissementId) {
-          await db.saisieNominative.upsert({
+          const misAJour = await db.saisieNominative.updateMany({
             where: {
-              rapportId_etablissementId_fieldCode: {
-                rapportId: rapport.id,
-                etablissementId: s.etablissementId,
-                fieldCode: s.fieldCode,
-              },
-            },
-            update: { valeur, valeurTexte, nonRenseigne: s.nonRenseigne, motifNonRenseigne: s.motifNonRenseigne ?? null, syncedAt: new Date(), saisiParId: user.id },
-            create: {
-              clientId: s.clientId,
               rapportId: rapport.id,
-              templateId,
               etablissementId: s.etablissementId,
               fieldCode: s.fieldCode,
-              valeur,
-              valeurTexte,
-              nonRenseigne: s.nonRenseigne,
-              motifNonRenseigne: s.motifNonRenseigne ?? null,
-              saisiParId: user.id,
+              ...plusRecenteQueSurLeServeur,
             },
+            data: champsCommuns,
           });
+          if (misAJour.count === 0) {
+            try {
+              await db.saisieNominative.create({
+                data: {
+                  clientId: s.clientId,
+                  rapportId: rapport.id,
+                  templateId,
+                  etablissementId: s.etablissementId,
+                  fieldCode: s.fieldCode,
+                  ...champsCommuns,
+                },
+              });
+            } catch (e) {
+              if (!estConflitDeDoublon(e)) throw e;
+              ignorees++;
+            }
+          }
           confirmedIds.push(s.clientId);
         } else if (s.famille === "EVENEMENT" && s.payload) {
           // Un événement (vaccination, foyer...) n'a pas de clé naturelle :
           // deux lignes identiques sont deux faits distincts. Le clientId
-          // reste donc la bonne clé d'idempotence ici.
+          // reste donc la bonne clé d'idempotence ici. L'arbitrage par date
+          // s'applique quand même, pour le cas où la même ligne serait
+          // corrigée depuis deux appareils.
           const payload = s.payload as Prisma.InputJsonValue;
-          await db.saisieEvenement.upsert({
-            where: { clientId: s.clientId },
-            update: { payload, syncedAt: new Date(), saisiParId: user.id },
-            create: {
-              clientId: s.clientId,
-              rapportId: rapport.id,
-              templateId,
-              payload,
-              saisiParId: user.id,
-            },
+          const misAJour = await db.saisieEvenement.updateMany({
+            where: { clientId: s.clientId, ...plusRecenteQueSurLeServeur },
+            data: { payload, modifieLe, syncedAt: maintenant, saisiParId: user.id },
           });
+          if (misAJour.count === 0) {
+            try {
+              await db.saisieEvenement.create({
+                data: {
+                  clientId: s.clientId,
+                  rapportId: rapport.id,
+                  templateId,
+                  payload,
+                  modifieLe,
+                  syncedAt: maintenant,
+                  saisiParId: user.id,
+                },
+              });
+            } catch (e) {
+              if (!estConflitDeDoublon(e)) throw e;
+              ignorees++;
+            }
+          }
           confirmedIds.push(s.clientId);
         }
       } catch (erreurLigne) {
@@ -193,12 +258,13 @@ export async function POST(req: Request) {
         entiteId: rapport.id,
         details: {
           count: confirmedIds.length,
+          ...(ignorees > 0 ? { ignoreesCarPlusAnciennes: ignorees } : {}),
           ...(lignesEnEchec.length > 0 ? { enEchec: lignesEnEchec.length, detail: lignesEnEchec.slice(0, 20) } : {}),
         },
       },
     });
 
-    return NextResponse.json({ confirmedIds, enEchec: lignesEnEchec.length });
+    return NextResponse.json({ confirmedIds, enEchec: lignesEnEchec.length, ignorees });
   } catch (e) {
     const { status, message } = permissionErrorResponse(e);
     return NextResponse.json({ message }, { status });

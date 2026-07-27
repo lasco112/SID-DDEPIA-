@@ -377,6 +377,13 @@ model SaisieMatrice {
   // Identifiant client généré offline (idempotence de la synchronisation)
   clientId    String  @unique
   syncedAt    DateTime @default(now())
+  /// Date de la dernière modification SUR L'APPAREIL — à ne pas confondre avec
+  /// syncedAt, qui est la date d'ARRIVÉE au serveur. C'est elle qui arbitre les
+  /// conflits : entre deux appareils ayant touché la même cellule, la
+  /// modification la plus RÉCENTE gagne, et non la dernière synchronisée. Un
+  /// agent longtemps hors ligne ne peut donc plus écraser, en se reconnectant,
+  /// une correction faite entre-temps par son DA.
+  modifieLe   DateTime?
   // Traçabilité (DA délègue parfois la saisie à un AGENT_SAISIE) : dernier auteur réel de la valeur.
   saisiParId  String?
 
@@ -402,6 +409,8 @@ model SaisieNominative {
   motifNonRenseigne String?
   clientId        String  @unique
   syncedAt        DateTime @default(now())
+  /// Voir SaisieMatrice.modifieLe — arbitrage des conflits par date de modification.
+  modifieLe       DateTime?
   saisiParId      String?
 
   rapport       RapportArrondissement @relation(fields: [rapportId], references: [id])
@@ -426,6 +435,8 @@ model SaisieEvenement {
   payload    Json
   clientId   String   @unique
   syncedAt   DateTime @default(now())
+  /// Voir SaisieMatrice.modifieLe — arbitrage des conflits par date de modification.
+  modifieLe  DateTime?
   saisiParId String?
 
   rapport  RapportArrondissement @relation(fields: [rapportId], references: [id])
