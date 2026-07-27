@@ -5,12 +5,26 @@
  * seed de démonstration (seed-demo.ts) pour qu'elles ne divergent jamais.
  */
 
+// Ordre significatif : `ordre` en base vaut la position dans ce tableau, et le
+// seed n'écrase jamais un item existant. Les ajouts se font donc EN FIN DE
+// LISTE, sinon les items déjà en base seraient renumérotés.
+//
+// « Volaille » et « Autre espèce » servent aux tableaux sanitaires 3.2
+// (vaccinations) et 3.3 (activités cliniques), où l'on soigne et vaccine des
+// volailles — le canevas comporte d'ailleurs déjà les maladies aviaires
+// (Newcastle, Gumboro, colibacillose). Elles n'ajoutent AUCUNE colonne au
+// tableau 1.1 : ses colonnes sont figées dans canevasLayout.ts, et les
+// volailles y sont recensées à part, au tableau 1.2.
+//
+// Tout code suffixé `_AUTRE` fait apparaître automatiquement un champ
+// « Veuillez préciser » à la saisie (FormEvenement), dont le texte est repris
+// entre parenthèses dans le rapport Word (rapport-docx.libelleRefAvecPrecision).
 export const ESPECES = [
   ["ESP_BOVIN", "Bovins"], ["ESP_OVIN", "Ovins"], ["ESP_CAPRIN", "Caprins"],
   ["ESP_PORCIN", "Porcins"], ["ESP_CAMELIN", "Camelins"], ["ESP_ASIN", "Asins"],
   ["ESP_EQUIN", "Equins"], ["ESP_CANIN", "Canins"], ["ESP_LAPIN", "Lapins"],
   ["ESP_AULACODE", "Aulacodes"], ["ESP_FELIN", "Félins"], ["ESP_COBAYE", "Cobayes"],
-  ["ESP_PRIMATE", "Primates"],
+  ["ESP_PRIMATE", "Primates"], ["ESP_VOLAILLE", "Volaille"], ["ESP_AUTRE", "Autre espèce"],
 ] as const;
 
 export const MALADIES = [
