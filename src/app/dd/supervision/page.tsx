@@ -9,6 +9,7 @@ import SyntheseValidationRow from '@/components/SyntheseValidationRow';
 import GenererRapportDDButton from '@/components/GenererRapportDDButton';
 import PurgerDonneesTestButton from '@/components/PurgerDonneesTestButton';
 import ReporterEcheanceButton from '@/components/ReporterEcheanceButton';
+import { tauxRemplissageParArrondissement } from '@/server/supervision/tauxRemplissage';
 
 const STATUT_STYLE: Record<string, string> = {
   SOUMIS: 'bg-green-100 text-green-800',
@@ -40,6 +41,7 @@ export default async function DDSupervisionPage() {
     : [[], [], [], []];
 
   const arrondissements = await db.arrondissement.findMany({ orderBy: { ordre: 'asc' } });
+  const remplissage = periode ? await tauxRemplissageParArrondissement(db, periode.id) : new Map();
 
   const daManquants = arrondissements
     .filter((a) => !rapports.some((r) => r.arrondissementId === a.id && (r.statut === 'SOUMIS' || r.statut === 'CLOTURE')))
@@ -97,6 +99,7 @@ export default async function DDSupervisionPage() {
                     <tr className="bg-gray-50 text-left">
                       <th className="border-b border-gray-200 px-4 py-2">Arrondissement</th>
                       <th className="border-b border-gray-200 px-4 py-2">Statut</th>
+                      <th className="border-b border-gray-200 px-4 py-2">Remplissage du canevas</th>
                       <th className="border-b border-gray-200 px-4 py-2">Soumission</th>
                       <th className="border-b border-gray-200 px-4 py-2">Action</th>
                     </tr>
@@ -111,6 +114,9 @@ export default async function DDSupervisionPage() {
                             <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${STATUT_STYLE[r?.statut ?? ''] ?? 'bg-gray-100 text-gray-600'}`}>
                               {r?.statut ?? 'AUCUNE SAISIE'}
                             </span>
+                          </td>
+                          <td className="border-b border-gray-100 px-4 py-2">
+                            <RemplissageCellule info={remplissage.get(arr.id)} />
                           </td>
                           <td className="border-b border-gray-100 px-4 py-2 text-gray-600">
                             {r?.dateSoumission ? new Date(r.dateSoumission).toLocaleString('fr-FR') : '—'}
@@ -204,5 +210,43 @@ export default async function DDSupervisionPage() {
         </div>
       </div>
     </AppShell>
+  );
+}
+
+/**
+ * Part du canevas réellement renseignée par un arrondissement. Le code couleur
+ * sert à repérer d'un coup d'œil un rapport bâclé, y compris lorsqu'il est
+ * marqué « SOUMIS » : la soumission n'a jamais rien garanti sur le contenu.
+ */
+function RemplissageCellule({
+  info,
+}: {
+  info?: { taux: number; renseigne: number; attendu: number; lignesEvenement: number };
+}) {
+  if (!info) return <span className="text-gray-400">—</span>;
+
+  const couleur =
+    info.taux >= 80
+      ? { barre: 'bg-statut-soumisDot', texte: 'text-statut-soumisText' }
+      : info.taux >= 50
+        ? { barre: 'bg-statut-retardDot', texte: 'text-statut-retardText' }
+        : { barre: 'bg-statut-rejeteDot', texte: 'text-statut-rejeteText' };
+
+  return (
+    <div className="min-w-[150px]">
+      <div className="flex items-baseline gap-2">
+        <span className={`text-sm font-bold ${couleur.texte}`}>{info.taux} %</span>
+        <span className="text-xs text-gray-500">
+          {info.renseigne} / {info.attendu} cases
+        </span>
+      </div>
+      <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-gray-200">
+        <div className={`h-full rounded-full ${couleur.barre}`} style={{ width: `${info.taux}%` }} />
+      </div>
+      <p className="mt-1 text-[11px] text-gray-500">
+        {info.lignesEvenement} ligne{info.lignesEvenement > 1 ? 's' : ''} déclarée
+        {info.lignesEvenement > 1 ? 's' : ''} (vaccinations, foyers…)
+      </p>
+    </div>
   );
 }

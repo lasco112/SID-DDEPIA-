@@ -11,7 +11,10 @@ const TAILLE_PAGE = 50;
 export async function GET(req: Request) {
   try {
     const user = await requireUser();
-    assertRole(user, ["ADMIN_TECH"]);
+    // Le DD partage ce journal avec l'ADMIN_TECH (demande du DD : savoir qui
+    // est dans le système et ce qu'il y fait). Lecture seule pour les deux ;
+    // le reste de l'espace technique demeure réservé à l'ADMIN_TECH.
+    assertRole(user, ["ADMIN_TECH", "DD"]);
 
     const { searchParams } = new URL(req.url);
     const page = Math.max(1, Number(searchParams.get("page") ?? "1"));

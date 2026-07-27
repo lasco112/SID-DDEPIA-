@@ -25,10 +25,12 @@ const PROTECTED_PREFIXES: Array<{ prefix: string; roles: string[] }> = [
   // DD + ADMIN_TECH, alors que le reste de l'espace technique reste réservé
   // à l'ADMIN_TECH seul (§A.2).
   { prefix: "/technique/aide", roles: ["DD", "ADMIN_TECH"] },
+  { prefix: "/technique/audit", roles: ["DD", "ADMIN_TECH"] }, // journal d'activité partagé : le DD doit voir qui fait quoi
   { prefix: "/technique", roles: ["ADMIN_TECH"] }, // espace de maintenance technique — strictement séparé du métier (§A.2)
   { prefix: "/api/admin", roles: ["DD"] },
   { prefix: "/api/dd", roles: ["DD"] },
   { prefix: "/api/etablissements", roles: ["DA", "DD", "AGENT_SAISIE"] }, // AGENT_SAISIE : creation inline pendant la saisie NOMINATIF uniquement (voir route)
+  { prefix: "/api/technique/audit", roles: ["DD", "ADMIN_TECH"] }, // AVANT la règle générale : Array.find prend la première correspondance
   { prefix: "/api/technique", roles: ["ADMIN_TECH"] },
   { prefix: "/api/sync", roles: ["DA", "AGENT_SAISIE"] },
   { prefix: "/api/rapports/submit", roles: ["DA"] }, // soumission réservée au DA — jamais l'agent, quelle que soit la mise en page ou l'ordre des règles

@@ -31,6 +31,7 @@ export const NAV_PAR_ROLE: Record<string, NavItem[]> = {
     { href: "/admin/utilisateurs", label: "Comptes utilisateurs" },
     { href: "/etablissements", label: "Établissements" },
     { href: "/dd/referentiels", label: "Propositions de référentiel" },
+    { href: "/technique/audit", label: "Journal d'activité" },
     { href: "/technique/aide", label: "Questions des utilisateurs" },
   ],
   CHEF_BAC: [
