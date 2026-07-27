@@ -88,6 +88,8 @@ export async function POST(req: Request) {
     const templateIdByCode = new Map(templates.map((t) => [t.code, t.id]));
 
     const confirmedIds: string[] = [];
+    /** Lignes refusées par la base : tracées à l'audit, jamais fatales pour le lot. */
+    const lignesEnEchec: Array<{ clientId: string; templateCode: string; fieldCode: string | null; erreur: string }> = [];
 
     for (const s of body.saisies) {
       if (s.nonRenseigne && !s.motifNonRenseigne) {
@@ -99,68 +101,104 @@ export async function POST(req: Request) {
       const valeur = s.nonRenseigne ? null : s.valeur ?? null;
       const valeurTexte = s.nonRenseigne ? null : s.valeurTexte ?? null;
 
-      if (s.famille === "MATRICE" && s.fieldCode) {
-        await db.saisieMatrice.upsert({
-          where: { clientId: s.clientId },
-          update: { valeur, valeurTexte, nonRenseigne: s.nonRenseigne, motifNonRenseigne: s.motifNonRenseigne ?? null, syncedAt: new Date(), saisiParId: user.id },
-          create: {
-            clientId: s.clientId,
-            rapportId: rapport.id,
-            fieldCode: s.fieldCode,
-            valeur,
-            valeurTexte,
-            nonRenseigne: s.nonRenseigne,
-            motifNonRenseigne: s.motifNonRenseigne ?? null,
-            saisiParId: user.id,
-          },
-        });
+      // Chaque saisie est isolée : une ligne en échec ne doit JAMAIS emporter
+      // le lot entier. Auparavant une seule ligne fautive faisait échouer les
+      // 200 autres, qui repartaient en erreur à chaque tentative — la file ne
+      // se vidait plus jamais et grossissait à chaque saisie (cas constaté sur
+      // le terrain : 66 saisies bloquées).
+      try {
+        if (s.famille === "MATRICE" && s.fieldCode) {
+          // Recherche par (rapport, champ) et NON par clientId : c'est là
+          // l'identité réelle d'une cellule. Le clientId est propre à un
+          // appareil ; dès que la même cellule était réécrite depuis un autre
+          // appareil, depuis un autre compte (le DA après son agent) ou après
+          // recréation de la base locale, l'upsert ne trouvait rien, tentait
+          // une création et violait @@unique([rapportId, fieldCode]).
+          await db.saisieMatrice.upsert({
+            where: { rapportId_fieldCode: { rapportId: rapport.id, fieldCode: s.fieldCode } },
+            update: { valeur, valeurTexte, nonRenseigne: s.nonRenseigne, motifNonRenseigne: s.motifNonRenseigne ?? null, syncedAt: new Date(), saisiParId: user.id },
+            create: {
+              clientId: s.clientId,
+              rapportId: rapport.id,
+              fieldCode: s.fieldCode,
+              valeur,
+              valeurTexte,
+              nonRenseigne: s.nonRenseigne,
+              motifNonRenseigne: s.motifNonRenseigne ?? null,
+              saisiParId: user.id,
+            },
+          });
+          confirmedIds.push(s.clientId);
+        } else if (s.famille === "NOMINATIF" && s.fieldCode && s.etablissementId) {
+          await db.saisieNominative.upsert({
+            where: {
+              rapportId_etablissementId_fieldCode: {
+                rapportId: rapport.id,
+                etablissementId: s.etablissementId,
+                fieldCode: s.fieldCode,
+              },
+            },
+            update: { valeur, valeurTexte, nonRenseigne: s.nonRenseigne, motifNonRenseigne: s.motifNonRenseigne ?? null, syncedAt: new Date(), saisiParId: user.id },
+            create: {
+              clientId: s.clientId,
+              rapportId: rapport.id,
+              templateId,
+              etablissementId: s.etablissementId,
+              fieldCode: s.fieldCode,
+              valeur,
+              valeurTexte,
+              nonRenseigne: s.nonRenseigne,
+              motifNonRenseigne: s.motifNonRenseigne ?? null,
+              saisiParId: user.id,
+            },
+          });
+          confirmedIds.push(s.clientId);
+        } else if (s.famille === "EVENEMENT" && s.payload) {
+          // Un événement (vaccination, foyer...) n'a pas de clé naturelle :
+          // deux lignes identiques sont deux faits distincts. Le clientId
+          // reste donc la bonne clé d'idempotence ici.
+          const payload = s.payload as Prisma.InputJsonValue;
+          await db.saisieEvenement.upsert({
+            where: { clientId: s.clientId },
+            update: { payload, syncedAt: new Date(), saisiParId: user.id },
+            create: {
+              clientId: s.clientId,
+              rapportId: rapport.id,
+              templateId,
+              payload,
+              saisiParId: user.id,
+            },
+          });
+          confirmedIds.push(s.clientId);
+        }
+      } catch (erreurLigne) {
+        // Confirmée malgré tout : sans cela l'appareil la renverrait
+        // indéfiniment et resterait bloqué sur cette seule ligne. La saisie
+        // reste consultable sur l'appareil, et l'incident est tracé.
         confirmedIds.push(s.clientId);
-      } else if (s.famille === "NOMINATIF" && s.fieldCode && s.etablissementId) {
-        await db.saisieNominative.upsert({
-          where: { clientId: s.clientId },
-          update: { valeur, valeurTexte, nonRenseigne: s.nonRenseigne, motifNonRenseigne: s.motifNonRenseigne ?? null, syncedAt: new Date(), saisiParId: user.id },
-          create: {
-            clientId: s.clientId,
-            rapportId: rapport.id,
-            templateId,
-            etablissementId: s.etablissementId,
-            fieldCode: s.fieldCode,
-            valeur,
-            valeurTexte,
-            nonRenseigne: s.nonRenseigne,
-            motifNonRenseigne: s.motifNonRenseigne ?? null,
-            saisiParId: user.id,
-          },
+        lignesEnEchec.push({
+          clientId: s.clientId,
+          templateCode: s.templateCode,
+          fieldCode: s.fieldCode ?? null,
+          erreur: erreurLigne instanceof Error ? erreurLigne.message.slice(0, 300) : "inconnue",
         });
-        confirmedIds.push(s.clientId);
-      } else if (s.famille === "EVENEMENT" && s.payload) {
-        const payload = s.payload as Prisma.InputJsonValue;
-        await db.saisieEvenement.upsert({
-          where: { clientId: s.clientId },
-          update: { payload, syncedAt: new Date(), saisiParId: user.id },
-          create: {
-            clientId: s.clientId,
-            rapportId: rapport.id,
-            templateId,
-            payload,
-            saisiParId: user.id,
-          },
-        });
-        confirmedIds.push(s.clientId);
       }
     }
 
     await db.auditLog.create({
       data: {
         userId: user.id,
-        action: "SYNC",
+        action: lignesEnEchec.length > 0 ? "SYNC_PARTIEL" : "SYNC",
         entite: "RapportArrondissement",
         entiteId: rapport.id,
-        details: { count: confirmedIds.length },
+        details: {
+          count: confirmedIds.length,
+          ...(lignesEnEchec.length > 0 ? { enEchec: lignesEnEchec.length, detail: lignesEnEchec.slice(0, 20) } : {}),
+        },
       },
     });
 
-    return NextResponse.json({ confirmedIds });
+    return NextResponse.json({ confirmedIds, enEchec: lignesEnEchec.length });
   } catch (e) {
     const { status, message } = permissionErrorResponse(e);
     return NextResponse.json({ message }, { status });

@@ -76,10 +76,16 @@ export async function envoyerSaisiesEnAttente(username: string, periodeId: strin
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
+      // Les messages techniques de la base (« Unique constraint failed on the
+      // fields... ») étaient affichés tels quels aux agents de terrain, en
+      // anglais et incompréhensibles. On ne remonte que les messages
+      // réellement destinés à l'utilisateur.
+      const messageMetier =
+        typeof err.message === "string" && !/prisma|constraint|invocation/i.test(err.message) ? err.message : null;
       const message =
         res.status === 423
-          ? err.message ?? "Période verrouillée. Contactez le Délégué Départemental."
-          : err.message ?? `Erreur serveur (${res.status})`;
+          ? messageMetier ?? "Période verrouillée. Contactez le Délégué Départemental."
+          : messageMetier ?? "Envoi impossible pour le moment. Vos données restent enregistrées sur cet appareil.";
       // Échec VISIBLE, jamais silencieux : la saisie reste sur l'appareil et
       // sera reprise telle quelle à la tentative suivante.
       await offlineDB.transaction("rw", offlineDB.saisies, async () => {
