@@ -91,6 +91,10 @@ export default function SynchronisationClient({ username }: { username: string }
           }
         />
         <Ligne
+          libelle="Cases remplies sur cet appareil"
+          valeur={String(etat?.saisiesSurCetAppareil ?? "…")}
+        />
+        <Ligne
           libelle="Saisies en attente"
           valeur={String(etat?.saisiesEnAttente ?? "…")}
           couleur={(etat?.saisiesEnAttente ?? 0) > 0 ? "text-statut-retardText" : undefined}

@@ -20,6 +20,15 @@ export interface EtatSynchronisation {
   operationsEnAttente: number;
   saisiesEnErreur: number;
   derniereSynchro: string | null;
+  /**
+   * Nombre de cases RENSEIGNÉES présentes sur cet appareil, tous statuts
+   * confondus. Sans ce chiffre il était impossible de distinguer deux
+   * situations opposées : un appareil qui a beaucoup de travail non transmis,
+   * et un appareil qui n'en a plus du tout. Le comparer au « Remplissage du
+   * canevas » de la Supervision répond immédiatement à la question « où sont
+   * les données ? ».
+   */
+  saisiesSurCetAppareil: number;
 }
 
 export function memoriserSynchroReussie(): void {
@@ -47,7 +56,22 @@ export async function etatSynchronisation(username: string): Promise<EtatSynchro
     offlineDB.saisies.where("[username+statutLocal]").equals([username, "ERREUR_SYNCHRO"]).count(),
     offlineDB.fileAttente.count(),
   ]);
-  return { saisiesEnAttente, saisiesEnErreur, operationsEnAttente, derniereSynchro: derniereSynchro() };
+
+  // Ne compte que les cases réellement renseignées : une valeur, un texte, ou
+  // un « non renseigné » motivé. Les lignes vides ne sont pas du travail.
+  const saisiesSurCetAppareil = await offlineDB.saisies
+    .where("username")
+    .equals(username)
+    .filter((s) => s.valeur != null || Boolean(s.valeurTexte) || s.nonRenseigne || Boolean(s.payload))
+    .count();
+
+  return {
+    saisiesEnAttente,
+    saisiesEnErreur,
+    operationsEnAttente,
+    saisiesSurCetAppareil,
+    derniereSynchro: derniereSynchro(),
+  };
 }
 
 /**
