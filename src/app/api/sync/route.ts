@@ -44,9 +44,21 @@ function dateModification(brut: string | undefined, maintenant: Date): Date {
   return d > maintenant ? maintenant : d;
 }
 
-/** Vrai si l'erreur est le refus de doublon sur la clé naturelle (ligne créée entre-temps). */
-function estConflitDeDoublon(e: unknown): boolean {
-  return e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002";
+/**
+ * Vrai UNIQUEMENT si le refus porte sur la clé naturelle de la cellule
+ * (rapport + champ [+ établissement]) : cela signifie que la ligne existe déjà
+ * avec une version plus récente, cas légitime que l'on ignore.
+ *
+ * Un refus portant sur `clientId` est tout autre chose — un identifiant
+ * d'appareil réutilisé pour une autre cellule — et doit remonter comme une
+ * vraie erreur : le confondre avec le cas précédent reviendrait à jeter la
+ * saisie sans que personne ne le sache.
+ */
+function estConflitSurLaCelluleExistante(e: unknown): boolean {
+  if (!(e instanceof Prisma.PrismaClientKnownRequestError) || e.code !== "P2002") return false;
+  const cibles = e.meta?.target;
+  const champs = Array.isArray(cibles) ? cibles.map(String) : typeof cibles === "string" ? [cibles] : [];
+  return champs.includes("fieldCode") || champs.includes("rapportId");
 }
 
 export async function POST(req: Request) {
@@ -172,7 +184,7 @@ export async function POST(req: Request) {
                 data: { clientId: s.clientId, rapportId: rapport.id, fieldCode: s.fieldCode, ...champsCommuns },
               });
             } catch (e) {
-              if (!estConflitDeDoublon(e)) throw e;
+              if (!estConflitSurLaCelluleExistante(e)) throw e;
               ignorees++; // version du serveur plus récente : conservée
             }
           }
@@ -200,7 +212,7 @@ export async function POST(req: Request) {
                 },
               });
             } catch (e) {
-              if (!estConflitDeDoublon(e)) throw e;
+              if (!estConflitSurLaCelluleExistante(e)) throw e;
               ignorees++;
             }
           }
@@ -230,17 +242,19 @@ export async function POST(req: Request) {
                 },
               });
             } catch (e) {
-              if (!estConflitDeDoublon(e)) throw e;
+              if (!estConflitSurLaCelluleExistante(e)) throw e;
               ignorees++;
             }
           }
           confirmedIds.push(s.clientId);
         }
       } catch (erreurLigne) {
-        // Confirmée malgré tout : sans cela l'appareil la renverrait
-        // indéfiniment et resterait bloqué sur cette seule ligne. La saisie
-        // reste consultable sur l'appareil, et l'incident est tracé.
-        confirmedIds.push(s.clientId);
+        // JAMAIS confirmée : une ligne refusée par la base n'est PAS
+        // enregistrée, et la faire passer pour envoyée revient à la perdre
+        // silencieusement — l'appareil vidait sa file et annonçait « tout est
+        // enregistré sur le serveur » alors que rien ne l'était (cas constaté
+        // sur le terrain à Fokoué). Elle reste donc en attente sur l'appareil,
+        // visible en erreur, et repartira à la prochaine tentative.
         lignesEnEchec.push({
           clientId: s.clientId,
           templateCode: s.templateCode,
@@ -264,7 +278,14 @@ export async function POST(req: Request) {
       },
     });
 
-    return NextResponse.json({ confirmedIds, enEchec: lignesEnEchec.length, ignorees });
+    return NextResponse.json({
+      confirmedIds,
+      // Renvoyées à l'appareil pour qu'il les CONSERVE en attente, avec le
+      // motif : une saisie non enregistrée ne doit jamais disparaître de la
+      // file en silence.
+      echecs: lignesEnEchec.map((l) => ({ clientId: l.clientId, erreur: l.erreur })),
+      ignorees,
+    });
   } catch (e) {
     const { status, message } = permissionErrorResponse(e);
     return NextResponse.json({ message }, { status });

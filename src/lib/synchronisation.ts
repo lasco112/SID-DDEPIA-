@@ -66,6 +66,7 @@ export async function envoyerSaisiesEnAttente(username: string, periodeId: strin
   await offlineDB.saisies.bulkPut(file.map((s) => ({ ...s, statutLocal: "SYNCHRO_EN_ATTENTE" as const })));
 
   let confirmees = 0;
+  let refusees = 0;
   for (let i = 0; i < file.length; i += TAILLE_LOT) {
     const lot = file.slice(i, i + TAILLE_LOT);
     const res = await fetch("/api/sync", {
@@ -96,15 +97,32 @@ export async function envoyerSaisiesEnAttente(username: string, periodeId: strin
       throw new Error(message);
     }
 
-    const { confirmedIds } = (await res.json()) as { confirmedIds: string[] };
+    const { confirmedIds, echecs = [] } = (await res.json()) as {
+      confirmedIds: string[];
+      echecs?: Array<{ clientId: string; erreur: string }>;
+    };
     await offlineDB.transaction("rw", offlineDB.saisies, async () => {
       for (const id of confirmedIds) {
-        await offlineDB.saisies.update(id, { statutLocal: "SYNCHRONISE" });
+        await offlineDB.saisies.update(id, { statutLocal: "SYNCHRONISE", erreurSynchro: null });
+      }
+      // Refusées par le serveur : CONSERVÉES en attente et signalées. Les faire
+      // passer pour envoyées reviendrait à les perdre sans que personne ne le
+      // remarque — c'est ce qui a vidé la file de Fokoué alors que le serveur
+      // n'avait rien reçu.
+      for (const e of echecs) {
+        await offlineDB.saisies.update(e.clientId, {
+          statutLocal: "ERREUR_SYNCHRO",
+          erreurSynchro: "Refusée par le serveur : " + e.erreur,
+        });
       }
     });
     confirmees += confirmedIds.length;
+    refusees += echecs.length;
   }
 
-  memoriserSynchroReussie();
+  // « Dernier envoi réussi » ne doit être mis à jour que si TOUT est passé,
+  // sans quoi l'écran de synchronisation affiche un succès trompeur.
+  if (refusees === 0) memoriserSynchroReussie();
+  else throw new Error(`${refusees} saisie(s) refusée(s) par le serveur. Elles restent sur cet appareil.`);
   return confirmees;
 }
