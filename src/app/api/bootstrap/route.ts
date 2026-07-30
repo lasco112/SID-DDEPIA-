@@ -39,6 +39,37 @@ export async function GET() {
       db.configSysteme.findUnique({ where: { cle: "donnees_purgees_le" } }),
     ]);
 
+    // LES SAISIES DÉJÀ ENREGISTRÉES SUR LE SERVEUR.
+    // Sans elles, les écrans de saisie n'affichaient que ce qui avait été tapé
+    // sur CET appareil par CE compte : un DA changeant de téléphone, ou dont la
+    // base locale avait été recréée, voyait ses tableaux vides alors que le
+    // rapport généré (qui lit le serveur) les montrait remplis. Les chefs de
+    // section risquaient de rejeter des rapports pourtant complets.
+    const rapport =
+      periode && user.arrondissementId
+        ? await db.rapportArrondissement.findUnique({
+            where: { periodeId_arrondissementId: { periodeId: periode.id, arrondissementId: user.arrondissementId } },
+            select: { id: true },
+          })
+        : null;
+
+    const [saisiesMatrice, saisiesNominatives, saisiesEvenement] = rapport
+      ? await Promise.all([
+          db.saisieMatrice.findMany({
+            where: { rapportId: rapport.id },
+            select: { clientId: true, fieldCode: true, valeur: true, valeurTexte: true, nonRenseigne: true, motifNonRenseigne: true, modifieLe: true, syncedAt: true, field: { select: { template: { select: { code: true } } } } },
+          }),
+          db.saisieNominative.findMany({
+            where: { rapportId: rapport.id },
+            select: { clientId: true, fieldCode: true, etablissementId: true, valeur: true, valeurTexte: true, nonRenseigne: true, motifNonRenseigne: true, modifieLe: true, syncedAt: true, template: { select: { code: true } } },
+          }),
+          db.saisieEvenement.findMany({
+            where: { rapportId: rapport.id },
+            select: { clientId: true, payload: true, modifieLe: true, syncedAt: true, template: { select: { code: true } } },
+          }),
+        ])
+      : [[], [], []];
+
     const uniteLibelleParCode = new Map(
       referentiels.filter((r) => r.categorie === "UNITE").map((u) => [u.code, u.libelle])
     );
@@ -101,6 +132,44 @@ export async function GET() {
         libelle: r.libelle,
         ordre: r.ordre,
       })),
+      // Mises au format exact de SaisieOffline (lib/dexie.ts) pour être
+      // fusionnées telles quelles dans la base locale. `updatedAt` reprend la
+      // date de modification sur l'appareil d'origine quand elle est connue,
+      // sinon la date d'arrivée au serveur : c'est elle qui départage une
+      // saisie locale non encore envoyée d'une version venue du serveur.
+      saisies: [
+        ...saisiesMatrice.map((s) => ({
+          clientId: s.clientId,
+          templateCode: s.field.template.code,
+          famille: "MATRICE" as const,
+          fieldCode: s.fieldCode,
+          valeur: s.valeur === null ? null : Number(s.valeur),
+          valeurTexte: s.valeurTexte,
+          nonRenseigne: s.nonRenseigne,
+          motifNonRenseigne: s.motifNonRenseigne,
+          updatedAt: (s.modifieLe ?? s.syncedAt).toISOString(),
+        })),
+        ...saisiesNominatives.map((s) => ({
+          clientId: s.clientId,
+          templateCode: s.template.code,
+          famille: "NOMINATIF" as const,
+          fieldCode: s.fieldCode,
+          etablissementId: s.etablissementId,
+          valeur: s.valeur === null ? null : Number(s.valeur),
+          valeurTexte: s.valeurTexte,
+          nonRenseigne: s.nonRenseigne,
+          motifNonRenseigne: s.motifNonRenseigne,
+          updatedAt: (s.modifieLe ?? s.syncedAt).toISOString(),
+        })),
+        ...saisiesEvenement.map((s) => ({
+          clientId: s.clientId,
+          templateCode: s.template.code,
+          famille: "EVENEMENT" as const,
+          payload: s.payload,
+          nonRenseigne: false,
+          updatedAt: (s.modifieLe ?? s.syncedAt).toISOString(),
+        })),
+      ],
       periode: periode
         ? {
             id: periode.id,

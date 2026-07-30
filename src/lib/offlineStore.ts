@@ -30,6 +30,73 @@ export interface BootstrapPayload {
   etablissements: Array<import("@/lib/dexie").EtablissementOffline>;
   referentiels: Array<import("@/lib/dexie").ReferentielOffline>;
   periode: import("@/lib/dexie").PeriodeOffline | null;
+  /** Saisies déjà enregistrées sur le serveur pour le rapport en cours. */
+  saisies?: Array<{
+    clientId: string;
+    templateCode: string;
+    famille: "MATRICE" | "NOMINATIF" | "EVENEMENT";
+    fieldCode?: string | null;
+    etablissementId?: string | null;
+    valeur?: number | null;
+    valeurTexte?: string | null;
+    payload?: unknown;
+    nonRenseigne: boolean;
+    motifNonRenseigne?: string | null;
+    updatedAt: string;
+  }>;
+}
+
+/**
+ * Fusionne les saisies venues du serveur dans la base locale.
+ *
+ * Règle : une saisie locale NON ENCORE ENVOYÉE et plus récente n'est jamais
+ * écrasée — sans quoi un agent perdrait, au simple rafraîchissement, le
+ * travail qu'il vient de taper hors ligne. Dans tous les autres cas la version
+ * du serveur fait foi, ce qui permet enfin à un DA de retrouver ses données
+ * sur un nouveau téléphone.
+ */
+async function fusionnerSaisiesDuServeur(
+  username: string,
+  periodeId: string,
+  venantDuServeur: NonNullable<BootstrapPayload["saisies"]>
+): Promise<void> {
+  if (venantDuServeur.length === 0) return;
+
+  const locales = await offlineDB.saisies.where("username").equals(username).toArray();
+  const cle = (s: { famille: string; templateCode: string; fieldCode?: string | null; etablissementId?: string | null; clientId: string }) =>
+    s.famille === "EVENEMENT"
+      ? `E:${s.clientId}`
+      : `${s.famille}:${s.templateCode}:${s.fieldCode ?? ""}:${s.etablissementId ?? ""}`;
+
+  const parCle = new Map(locales.map((l) => [cle(l), l]));
+
+  const aEcrire: import("@/lib/dexie").SaisieOffline[] = [];
+  for (const s of venantDuServeur) {
+    const locale = parCle.get(cle(s));
+    const localeEnAttente = locale && locale.statutLocal !== "SYNCHRONISE";
+    if (localeEnAttente && locale.updatedAt >= s.updatedAt) continue; // travail local plus récent : préservé
+
+    aEcrire.push({
+      // Reprend l'identifiant local existant s'il y en a un, pour ne pas créer
+      // un doublon dans la base locale à côté de la ligne déjà présente.
+      clientId: locale?.clientId ?? s.clientId,
+      username,
+      periodeId,
+      templateCode: s.templateCode,
+      famille: s.famille,
+      fieldCode: s.fieldCode ?? undefined,
+      etablissementId: s.etablissementId ?? undefined,
+      valeur: s.valeur ?? null,
+      valeurTexte: s.valeurTexte ?? null,
+      payload: (s.payload as Record<string, unknown>) ?? undefined,
+      nonRenseigne: s.nonRenseigne,
+      motifNonRenseigne: s.motifNonRenseigne ?? null,
+      statutLocal: "SYNCHRONISE",
+      updatedAt: s.updatedAt,
+    });
+  }
+
+  if (aEcrire.length > 0) await offlineDB.saisies.bulkPut(aEcrire);
 }
 
 export async function telechargerBootstrap(): Promise<void> {
@@ -79,6 +146,12 @@ export async function telechargerBootstrap(): Promise<void> {
         .filter((s) => Boolean(s.etablissementId) && !idsValides.has(s.etablissementId as string))
         .primaryKeys();
       if (orphelines.length > 0) await offlineDB.saisies.bulkDelete(orphelines);
+
+      // Redescend les saisies du serveur : c'est ce qui permet de retrouver son
+      // travail sur un autre appareil, ou après réinstallation.
+      if (data.meta.periodeActiveId) {
+        await fusionnerSaisiesDuServeur(data.meta.username, data.meta.periodeActiveId, data.saisies ?? []);
+      }
     }
   );
 
