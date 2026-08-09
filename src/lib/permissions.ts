@@ -13,6 +13,7 @@ import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { demoDb } from "@/lib/demoDb";
 import type { PrismaClient, Role } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 
 export interface SessionUser {
   id: string;
@@ -179,5 +180,25 @@ export function assertProprietaireSection(user: SessionUser, sectionId: string) 
 export function permissionErrorResponse(e: unknown): { status: number; message: string } {
   if (e instanceof ForbiddenError) return { status: 403, message: e.message };
   if (e instanceof UnauthorizedError) return { status: 401, message: e.message };
+  // Période clôturée (§13) : ce n'est pas un défaut de droits mais un conflit
+  // d'état — le compte a bien le droit d'écrire, c'est le mois qui est figé.
+  if (e instanceof Error && e.name === "PeriodeGeleeError") return { status: 409, message: e.message };
+
+  // Erreurs de base de données courantes. Sans cette traduction, le message
+  // brut de Prisma (« An operation failed because it depends on one or more
+  // records that were required but not found », en anglais) remontait tel quel
+  // à l'écran d'un agent, avec un code 500 laissant croire à une panne — alors
+  // qu'il s'agit d'une liste périmée ou d'un doublon.
+  if (e instanceof Prisma.PrismaClientKnownRequestError) {
+    if (e.code === "P2025") {
+      return { status: 404, message: "L'élément visé n'existe plus. Actualisez la page avant de réessayer." };
+    }
+    if (e.code === "P2002") {
+      return { status: 409, message: "Cet enregistrement existe déjà." };
+    }
+    if (e.code === "P2003") {
+      return { status: 409, message: "Impossible : d'autres données dépendent encore de cet élément." };
+    }
+  }
   return { status: 500, message: e instanceof Error ? e.message : "Erreur serveur" };
 }

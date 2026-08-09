@@ -187,7 +187,7 @@ export async function metaBootstrap() {
  * la partie "mise en cache de toutes les pages, pas seulement l'accueil" de
  * la spécification hors-ligne.
  */
-const CACHE_NAME = "sid-ddepia-v4";
+const CACHE_NAME = "sid-ddepia-v6";
 
 /** Pages non paramétrées par tableau, selon le rôle (miroir de Sidebar.tsx). */
 /** Dérivé de la même source que le menu (Sidebar.tsx) — jamais désynchronisé. */

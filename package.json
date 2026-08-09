@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "prisma migrate deploy && next start",
+    "start": "prisma migrate deploy && node scripts/migrations-demo.mjs && next start",
+    "migrate:demo": "node scripts/migrations-demo.mjs",
     "lint": "next lint",
     "seed": "tsx prisma/seed.ts",
     "seed:demo": "tsx prisma/seed-demo.ts",
@@ -32,6 +33,7 @@
     "react": "^18",
     "react-dom": "^18",
     "tsx": "^4.23.0",
+    "web-push": "^3.6.7",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
@@ -40,6 +42,7 @@
     "@types/node-cron": "^3.0.11",
     "@types/react": "^18",
     "@types/react-dom": "^18",
+    "@types/web-push": "^3.6.4",
     "autoprefixer": "^10.5.2",
     "eslint": "^8",
     "eslint-config-next": "14.2.3",

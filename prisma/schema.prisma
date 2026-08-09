@@ -71,6 +71,9 @@ model User {
   referentielsProposes            ReferentielItem[]  @relation("ReferentielProposePar")
   referentielsValides             ReferentielItem[]  @relation("ReferentielValideParDD")
   configsModifiees                ConfigSysteme[]
+  periodesCloturees               PeriodeReporting[]  @relation("PeriodesCloturees")
+  abonnementsPush                 AbonnementPush[]
+  tableauxTermines                AssignationSaisie[] @relation("AgentTermine")
   assignationsRecues              AssignationSaisie[] @relation("AgentAssigne")
   assignationsFaites              AssignationSaisie[] @relation("AssignateurDA")
   demandesAide                    DemandeAide[]
@@ -91,6 +94,7 @@ model Arrondissement {
   etablissements Etablissement[]
   pointsSIG      PointSIG[]
   assignations   AssignationSaisie[]
+  exports        ExportDocument[]
 }
 
 model Section {
@@ -267,6 +271,19 @@ model PeriodeReporting {
   dateLimiteChef DateTime // le 29 du mois
   dateLimiteDD   DateTime // le 02 du mois suivant
   statut         StatutPeriode @default(OUVERTE)
+  /// Clôture définitive du mois (§13) : les données sont figées, seules la
+  /// consultation et le téléchargement restent possibles. `ARCHIVEE` est le
+  /// statut correspondant.
+  clotureeLe     DateTime?
+  clotureeParId  String?
+  /// Dernière réouverture exceptionnelle après clôture. Le motif est
+  /// OBLIGATOIRE : rouvrir un mois administrativement clos doit toujours
+  /// pouvoir être justifié a posteriori.
+  reouverteLe       DateTime?
+  reouvertePar      String?
+  motifReouverture  String?
+
+  clotureePar User? @relation("PeriodesCloturees", fields: [clotureeParId], references: [id])
 
   rapports    RapportArrondissement[]
   validations ValidationSection[]
@@ -297,10 +314,16 @@ model AssignationSaisie {
   agentId          String? // null = non attribué explicitement
   assignePar       String
   assigneLe        DateTime @default(now())
+  /// L agent de saisie signale qu il a terminé ce tableau : le DA en est
+  /// notifié. L agent ne peut jamais soumettre le rapport — ce signal est sa
+  /// seule façon de dire « c est fini de mon côté ».
+  termineLe        DateTime?
+  termineParId     String?
 
   periode        PeriodeReporting @relation(fields: [periodeId], references: [id])
   arrondissement Arrondissement   @relation(fields: [arrondissementId], references: [id])
   agent          User?            @relation("AgentAssigne", fields: [agentId], references: [id])
+  terminePar     User?            @relation("AgentTermine", fields: [termineParId], references: [id])
   assignateur    User             @relation("AssignateurDA", fields: [assignePar], references: [id])
 
   @@unique([periodeId, arrondissementId, templateCode])
@@ -352,6 +375,13 @@ model ValidationSection {
   statut         StatutValidationSection @default(EN_ATTENTE)
   valideParId    String?
   dateValidation DateTime?
+  /// Validation exercée par le DD au titre de son pouvoir hiérarchique (§9),
+  /// faute de validation du chef de section compétent. Le SID ne doit pas
+  /// rendre le DD dépendant de l'action informatique d'un subordonné — mais
+  /// le document doit dire qui a validé, et à quel titre. Repasse à false si
+  /// le chef valide ensuite lui-même.
+  validationDirecteDD Boolean @default(false)
+  motifValidationDD   String?
 
   periode   PeriodeReporting @relation(fields: [periodeId], references: [id])
   section   Section          @relation(fields: [sectionId], references: [id])
@@ -544,14 +574,28 @@ model ExportDocument {
   periodeId    String
   auteurId     String
   version      Int
+  /// Nom du fichier tel que proposé au téléchargement. Historiquement un chemin
+  /// sur disque — voir `contenu` pour la raison de l'abandon.
   cheminFichier String
+  /// Le document lui-même. Le disque du conteneur Railway est EFFACÉ à chaque
+  /// redéploiement : les rapports écrits sur disque disparaissaient donc, ne
+  /// laissant que leur trace en base. Les conserver ici les rend réellement
+  /// consultables et téléchargeables plus tard, et les inclut dans les
+  /// sauvegardes de la base.
+  contenu      Bytes?
+  /// Arrondissement concerné pour un rapport de DA ; null pour un document
+  /// départemental. Sans cette colonne il était impossible de retrouver « le
+  /// rapport de Santchou » autrement qu'en devinant via l'auteur.
+  arrondissementId String?
   hashSha256   String?
   createdAt    DateTime   @default(now())
 
-  periode PeriodeReporting @relation(fields: [periodeId], references: [id])
-  auteur  User             @relation(fields: [auteurId], references: [id])
+  periode        PeriodeReporting @relation(fields: [periodeId], references: [id])
+  auteur         User             @relation(fields: [auteurId], references: [id])
+  arrondissement Arrondissement?  @relation(fields: [arrondissementId], references: [id])
 
   @@index([periodeId, type])
+  @@index([periodeId, arrondissementId, type])
 }
 
 enum CanalNotification {
@@ -579,10 +623,33 @@ model Notification {
   erreur         String?
   createdAt      DateTime           @default(now())
   sentAt         DateTime?
+  /// Date de lecture par le destinataire. Null = non lue (pastille du bandeau).
+  luLe           DateTime?
+  /// Page à ouvrir quand on clique la notification (ex. /da/saisie/T14).
+  lien           String?
 
   destinataire User @relation(fields: [destinataireId], references: [id])
 
   @@index([statut, createdAt])
+}
+
+/// Autorisation donnée par UN appareil de recevoir les notifications système
+/// (Web Push). Un même compte peut en avoir plusieurs : téléphone + ordinateur.
+/// L endpoint est fourni par le navigateur ; il devient invalide si l utilisateur
+/// retire l autorisation ou désinstalle — on supprime alors l abonnement.
+model AbonnementPush {
+  id         String   @id @default(cuid())
+  userId     String
+  endpoint   String   @unique
+  p256dh     String
+  auth       String
+  appareil   String?
+  createdAt  DateTime @default(now())
+  dernierEnvoi DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model PointSIG {

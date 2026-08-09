@@ -1,4 +1,5 @@
 import { getServerSession } from "next-auth";
+import { resoudrePeriode } from "@/server/periodes/courante";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { contexteSession } from "@/lib/permissions";
@@ -48,10 +49,7 @@ export default async function DashboardPage() {
   const role = moi.role as string;
   const username = moi.username;
 
-  const periode = await db.periodeReporting.findFirst({
-    where: { type: "MENSUEL" },
-    orderBy: [{ annee: "desc" }, { mois: "desc" }],
-  });
+  const periode = await resoudrePeriode(db);
 
   const cards: { label: string; value: string; sub?: string; valueColor?: string }[] = [];
 

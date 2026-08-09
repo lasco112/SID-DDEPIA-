@@ -1,0 +1,1086 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#e9f7f1" />
+  <title>SID DDEPIA — Animation de démarrage</title>
+
+  <style>
+    :root {
+      --mint: #b8e8d5;
+      --aqua: #a8dfe5;
+      --sky: #bbd8f3;
+      --soft-mint: #e9f7f1;
+      --soft-aqua: #edf7f8;
+      --soft-sky: #eef2fb;
+      --primary: #397781;
+      --deep: #2f4147;
+      --lavender: #d4d5f5;
+      --white: #ffffff;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html,
+    body {
+      width: 100%;
+      min-height: 100%;
+      overflow: hidden;
+      background: linear-gradient(135deg, var(--soft-mint), var(--soft-aqua), var(--soft-sky));
+      color: var(--deep);
+      font-family:
+        Inter, ui-rounded, "SF Pro Rounded", "Avenir Next",
+        -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    button,
+    input {
+      font: inherit;
+    }
+
+    .app-shell {
+      position: relative;
+      width: 100vw;
+      height: 100dvh;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 18% 18%, rgba(184, 232, 213, 0.36), transparent 34%),
+        radial-gradient(circle at 82% 24%, rgba(212, 213, 245, 0.34), transparent 34%),
+        radial-gradient(circle at 48% 84%, rgba(168, 223, 229, 0.34), transparent 38%),
+        linear-gradient(135deg, var(--soft-mint), var(--soft-aqua), var(--soft-sky));
+    }
+
+    /* Écran réel placé sous le splash */
+    .login-screen {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      opacity: 1;
+    }
+
+    .login-card {
+      width: min(100%, 510px);
+      padding: 30px;
+      border: 1px solid rgba(57, 119, 129, 0.14);
+      border-radius: 22px;
+      background: rgba(255, 255, 255, 0.92);
+      box-shadow: 0 20px 60px rgba(57, 119, 129, 0.10);
+      backdrop-filter: blur(20px);
+    }
+
+    .login-badge {
+      width: 78px;
+      height: 78px;
+      margin: 0 auto 22px;
+      display: grid;
+      place-items: center;
+      border-radius: 22px;
+      color: white;
+      background: var(--primary);
+      font-weight: 700;
+      box-shadow: 0 10px 24px rgba(57, 119, 129, 0.20);
+    }
+
+    .login-kicker {
+      margin-bottom: 20px;
+      color: rgba(57, 119, 129, 0.50);
+      font-size: 13px;
+      letter-spacing: 0.16em;
+      text-align: center;
+      text-transform: uppercase;
+    }
+
+    .login-card h1 {
+      color: var(--primary);
+      font-size: clamp(24px, 6vw, 32px);
+      font-weight: 650;
+      letter-spacing: -0.02em;
+    }
+
+    .login-card p {
+      margin-top: 7px;
+      color: rgba(47, 65, 71, 0.72);
+      line-height: 1.45;
+    }
+
+    .field {
+      margin-top: 20px;
+    }
+
+    .field label {
+      display: block;
+      margin-bottom: 7px;
+      font-weight: 600;
+    }
+
+    .field input {
+      width: 100%;
+      padding: 14px 15px;
+      border: 1px solid rgba(57, 119, 129, 0.20);
+      border-radius: 13px;
+      background: rgba(255, 255, 255, 0.82);
+      outline: none;
+    }
+
+    .login-button,
+    .replay-button {
+      width: 100%;
+      margin-top: 22px;
+      padding: 14px 16px;
+      border: 0;
+      border-radius: 14px;
+      color: white;
+      background: var(--primary);
+      cursor: pointer;
+    }
+
+    .replay-button {
+      margin-top: 12px;
+      color: var(--primary);
+      background: rgba(57, 119, 129, 0.10);
+    }
+
+    /* Splash plein écran */
+    .splash-screen {
+      position: absolute;
+      inset: 0;
+      z-index: 20;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 20% 18%, rgba(255, 255, 255, 0.56), transparent 34%),
+        radial-gradient(circle at 82% 28%, rgba(212, 213, 245, 0.36), transparent 36%),
+        radial-gradient(circle at 52% 86%, rgba(168, 223, 229, 0.38), transparent 38%),
+        linear-gradient(135deg, var(--mint), var(--aqua) 52%, var(--sky));
+      transition:
+        opacity 850ms cubic-bezier(0.4, 0, 0.2, 1),
+        visibility 850ms;
+    }
+
+    .splash-screen.hidden {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    .ambient-layer,
+    .grain {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    .ambient-circle {
+      position: absolute;
+      left: 50%;
+      top: 46%;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.34);
+      transform: translate(-50%, -50%) scale(0.58);
+      opacity: 0;
+    }
+
+    .circle-one {
+      width: min(68vw, 420px);
+      aspect-ratio: 1;
+    }
+
+    .circle-two {
+      width: min(92vw, 590px);
+      aspect-ratio: 1;
+    }
+
+    .circle-three {
+      width: min(116vw, 760px);
+      aspect-ratio: 1;
+    }
+
+    .ambient-blob {
+      position: absolute;
+      border-radius: 999px;
+      filter: blur(44px);
+      opacity: 0.48;
+    }
+
+    .blob-one {
+      width: 34vw;
+      height: 34vw;
+      max-width: 290px;
+      max-height: 290px;
+      left: -4%;
+      top: 16%;
+      background: rgba(184, 232, 213, 0.72);
+    }
+
+    .blob-two {
+      width: 38vw;
+      height: 38vw;
+      max-width: 330px;
+      max-height: 330px;
+      right: -8%;
+      top: 30%;
+      background: rgba(212, 213, 245, 0.56);
+    }
+
+    .blob-three {
+      width: 42vw;
+      height: 42vw;
+      max-width: 360px;
+      max-height: 360px;
+      left: 28%;
+      bottom: -18%;
+      background: rgba(168, 223, 229, 0.58);
+    }
+
+    .grain {
+      opacity: 0.035;
+      background-image:
+        radial-gradient(rgba(47, 65, 71, 0.7) 0.45px, transparent 0.45px);
+      background-size: 6px 6px;
+      mix-blend-mode: multiply;
+    }
+
+    .splash-content {
+      position: relative;
+      z-index: 4;
+      width: min(66vw, 360px);
+      text-align: center;
+      transform: translateY(-1.5vh);
+      opacity: 0;
+      filter: blur(12px);
+    }
+
+    .logo-svg {
+      display: block;
+      width: 100%;
+      height: auto;
+      overflow: visible;
+      filter: drop-shadow(0 20px 38px rgba(57, 119, 129, 0.13));
+    }
+
+    .brand-text {
+      margin-top: 18px;
+      color: var(--deep);
+      font-size: clamp(27px, 7vw, 42px);
+      font-weight: 430;
+      letter-spacing: 0.14em;
+      white-space: nowrap;
+      opacity: 0;
+      transform: translateY(11px);
+    }
+
+    .tagline {
+      margin-top: 9px;
+      color: var(--primary);
+      font-size: clamp(12px, 3vw, 16px);
+      font-weight: 430;
+      letter-spacing: 0.03em;
+      white-space: nowrap;
+      opacity: 0;
+      transform: translateY(8px);
+    }
+
+    .skip-button {
+      position: absolute;
+      right: 18px;
+      bottom: 18px;
+      z-index: 10;
+      padding: 9px 13px;
+      border: 1px solid rgba(57, 119, 129, 0.16);
+      border-radius: 999px;
+      color: var(--primary);
+      background: rgba(255, 255, 255, 0.50);
+      cursor: pointer;
+      backdrop-filter: blur(14px);
+    }
+
+    /* États SVG */
+    .icon-surface {
+      opacity: 0;
+      transform-box: fill-box;
+      transform-origin: center;
+    }
+
+    #database-group {
+      opacity: 0;
+      transform-box: fill-box;
+      transform-origin: center bottom;
+    }
+
+    .source-card {
+      opacity: 0;
+      transform-box: fill-box;
+      transform-origin: center;
+    }
+
+    .flow-path {
+      opacity: 0;
+      stroke-dasharray: 1;
+      stroke-dashoffset: 1;
+    }
+
+    .flow-particle {
+      opacity: 0;
+      filter: url(#softGlow);
+    }
+
+    .server-led {
+      fill: rgba(255, 255, 255, 0.34);
+      stroke: rgba(255, 255, 255, 0.72);
+      stroke-width: 0.8;
+    }
+
+    .server-top-glow,
+    .server-aura,
+    .sync-ring {
+      opacity: 0;
+      transform-box: fill-box;
+      transform-origin: center;
+    }
+
+    /* Lancement */
+    .is-playing .splash-content {
+      animation: contentEntrance 1.25s cubic-bezier(0.22, 0.78, 0.22, 1) 0.08s both;
+    }
+
+    .is-playing .circle-one {
+      animation: circleBreathOne 4s ease-in-out both;
+    }
+
+    .is-playing .circle-two {
+      animation: circleBreathTwo 4s ease-in-out both;
+    }
+
+    .is-playing .circle-three {
+      animation: circleBreathThree 4s ease-in-out both;
+    }
+
+    .is-playing .blob-one {
+      animation: blobFloatOne 4s ease-in-out both;
+    }
+
+    .is-playing .blob-two {
+      animation: blobFloatTwo 4s ease-in-out both;
+    }
+
+    .is-playing .blob-three {
+      animation: blobFloatThree 4s ease-in-out both;
+    }
+
+    .is-playing .icon-surface {
+      animation: surfaceIn 0.85s ease-out 0.20s both;
+    }
+
+    .is-playing #database-group {
+      animation: databaseSequence 4s cubic-bezier(0.22, 0.72, 0.22, 1) both;
+    }
+
+    .is-playing #card-left {
+      animation:
+        cardInLeft 0.62s cubic-bezier(0.22, 0.76, 0.24, 1) 0.62s both,
+        cardFloatLeft 2.8s ease-in-out 1.24s infinite;
+    }
+
+    .is-playing #card-mid {
+      animation:
+        cardInMid 0.62s cubic-bezier(0.22, 0.76, 0.24, 1) 0.78s both,
+        cardFloatMid 3.1s ease-in-out 1.40s infinite;
+    }
+
+    .is-playing #card-right {
+      animation:
+        cardInRight 0.62s cubic-bezier(0.22, 0.76, 0.24, 1) 0.94s both,
+        cardFloatRight 2.65s ease-in-out 1.56s infinite;
+    }
+
+    .is-playing #path-left {
+      animation: drawPath 0.68s ease-in-out 1.22s both;
+    }
+
+    .is-playing #path-mid {
+      animation: drawPath 0.68s ease-in-out 1.52s both;
+    }
+
+    .is-playing #path-right {
+      animation: drawPath 0.68s ease-in-out 1.82s both;
+    }
+
+    .is-playing #particle-left {
+      animation: particleLeft 0.72s ease-in-out 1.22s both;
+    }
+
+    .is-playing #particle-mid {
+      animation: particleMid 0.72s ease-in-out 1.52s both;
+    }
+
+    .is-playing #particle-right {
+      animation: particleRight 0.72s ease-in-out 1.82s both;
+    }
+
+    .is-playing .led-one {
+      animation: ledOn 0.34s ease-out 1.82s both;
+    }
+
+    .is-playing .led-two {
+      animation: ledOn 0.34s ease-out 2.12s both;
+    }
+
+    .is-playing .led-three {
+      animation: ledOn 0.34s ease-out 2.42s both;
+    }
+
+    .is-playing .server-top-glow {
+      animation:
+        serverGlowOne 0.46s ease-out 1.76s both,
+        serverGlowTwo 0.46s ease-out 2.06s both,
+        serverGlowThree 0.46s ease-out 2.36s both;
+    }
+
+    .is-playing .server-aura {
+      animation: auraPulse 0.80s ease-out 2.35s both;
+    }
+
+    .is-playing .sync-ring {
+      animation: syncWave 0.80s ease-out 2.52s both;
+    }
+
+    .is-playing .brand-text {
+      animation: textIn 0.62s ease-out 2.78s both;
+    }
+
+    .is-playing .tagline {
+      animation: textIn 0.56s ease-out 3.14s both;
+    }
+
+    /* Keyframes */
+    @keyframes contentEntrance {
+      0% {
+        opacity: 0;
+        filter: blur(12px);
+        transform: translateY(18px) scale(0.82);
+      }
+      58% {
+        opacity: 1;
+        filter: blur(1px);
+        transform: translateY(-2px) scale(1.015);
+      }
+      80% {
+        filter: blur(0);
+        transform: translateY(1px) scale(0.995);
+      }
+      100% {
+        opacity: 1;
+        filter: blur(0);
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    @keyframes surfaceIn {
+      from {
+        opacity: 0;
+        transform: scale(0.96);
+      }
+      to {
+        opacity: 1;
+        transform: scale(1);
+      }
+    }
+
+    @keyframes cardInLeft {
+      from {
+        opacity: 0;
+        transform: translate(-12px, -10px) scale(0.90) rotate(-1.2deg);
+      }
+      to {
+        opacity: 1;
+        transform: translate(0, 0) scale(1) rotate(0deg);
+      }
+    }
+
+    @keyframes cardInMid {
+      from {
+        opacity: 0;
+        transform: translateY(-16px) scale(0.90);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    @keyframes cardInRight {
+      from {
+        opacity: 0;
+        transform: translate(12px, -10px) scale(0.90) rotate(1.2deg);
+      }
+      to {
+        opacity: 1;
+        transform: translate(0, 0) scale(1) rotate(0deg);
+      }
+    }
+
+    @keyframes cardFloatLeft {
+      0%, 100% { transform: translateY(0) rotate(-0.25deg); }
+      50% { transform: translateY(-2.5px) rotate(0.18deg); }
+    }
+
+    @keyframes cardFloatMid {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-3.2px); }
+    }
+
+    @keyframes cardFloatRight {
+      0%, 100% { transform: translateY(0) rotate(0.25deg); }
+      50% { transform: translateY(-2.5px) rotate(-0.18deg); }
+    }
+
+    @keyframes drawPath {
+      0% {
+        opacity: 0;
+        stroke-dashoffset: 1;
+      }
+      18% { opacity: 0.38; }
+      75% { opacity: 0.42; }
+      100% {
+        opacity: 0;
+        stroke-dashoffset: 0;
+      }
+    }
+
+    @keyframes particleLeft {
+      0% {
+        opacity: 0;
+        offset-distance: 0%;
+        transform: scale(0.6);
+      }
+      18% { opacity: 1; }
+      85% { opacity: 1; }
+      100% {
+        opacity: 0;
+        offset-distance: 100%;
+        transform: scale(0.38);
+      }
+    }
+
+    @keyframes particleMid {
+      0% {
+        opacity: 0;
+        offset-distance: 0%;
+        transform: scale(0.6);
+      }
+      18% { opacity: 1; }
+      85% { opacity: 1; }
+      100% {
+        opacity: 0;
+        offset-distance: 100%;
+        transform: scale(0.38);
+      }
+    }
+
+    @keyframes particleRight {
+      0% {
+        opacity: 0;
+        offset-distance: 0%;
+        transform: scale(0.6);
+      }
+      18% { opacity: 1; }
+      85% { opacity: 1; }
+      100% {
+        opacity: 0;
+        offset-distance: 100%;
+        transform: scale(0.38);
+      }
+    }
+
+    @keyframes databaseSequence {
+      0%, 18% {
+        opacity: 0;
+        transform: translateY(12px) scale(0.96);
+      }
+      30% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+
+      43% { transform: translateY(0) scaleX(1) scaleY(1); }
+      46% { transform: translateY(2px) scaleX(1.022) scaleY(0.962); }
+      49% { transform: translateY(-1px) scaleX(0.996) scaleY(1.008); }
+      52% { transform: translateY(0) scaleX(1) scaleY(1); }
+
+      51% { transform: translateY(0) scaleX(1) scaleY(1); }
+      54% { transform: translateY(2px) scaleX(1.022) scaleY(0.962); }
+      57% { transform: translateY(-1px) scaleX(0.996) scaleY(1.008); }
+      60% { transform: translateY(0) scaleX(1) scaleY(1); }
+
+      59% { transform: translateY(0) scaleX(1) scaleY(1); }
+      62% { transform: translateY(2px) scaleX(1.022) scaleY(0.962); }
+      65% { transform: translateY(-1px) scaleX(0.996) scaleY(1.008); }
+      69%, 100% {
+        opacity: 1;
+        transform: translateY(0) scaleX(1) scaleY(1);
+      }
+    }
+
+    @keyframes ledOn {
+      0% {
+        fill: rgba(255, 255, 255, 0.34);
+        filter: none;
+      }
+      55% {
+        fill: #ffffff;
+        filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.96));
+      }
+      100% {
+        fill: var(--soft-mint);
+        filter: drop-shadow(0 0 4px rgba(184, 232, 213, 0.92));
+      }
+    }
+
+    @keyframes serverGlowOne {
+      0%, 100% { opacity: 0; transform: scale(0.70); }
+      48% { opacity: 0.78; transform: scale(1.03); }
+    }
+
+    @keyframes serverGlowTwo {
+      0%, 100% { opacity: 0; transform: scale(0.70); }
+      48% { opacity: 0.78; transform: scale(1.03); }
+    }
+
+    @keyframes serverGlowThree {
+      0%, 100% { opacity: 0; transform: scale(0.70); }
+      48% { opacity: 0.90; transform: scale(1.08); }
+    }
+
+    @keyframes auraPulse {
+      0% { opacity: 0; transform: scale(0.72); }
+      42% { opacity: 0.58; transform: scale(1.02); }
+      100% { opacity: 0; transform: scale(1.48); }
+    }
+
+    @keyframes syncWave {
+      0% { opacity: 0; transform: scale(0.46); }
+      24% { opacity: 0.52; }
+      100% { opacity: 0; transform: scale(2.42); }
+    }
+
+    @keyframes textIn {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes circleBreathOne {
+      0% { opacity: 0; transform: translate(-50%, -50%) scale(0.52); }
+      42% { opacity: 0.44; }
+      100% { opacity: 0.12; transform: translate(-50%, -50%) scale(1.34); }
+    }
+
+    @keyframes circleBreathTwo {
+      0% { opacity: 0; transform: translate(-50%, -50%) scale(0.60); }
+      48% { opacity: 0.26; }
+      100% { opacity: 0.08; transform: translate(-50%, -50%) scale(1.20); }
+    }
+
+    @keyframes circleBreathThree {
+      0% { opacity: 0; transform: translate(-50%, -50%) scale(0.68); }
+      58% { opacity: 0.15; }
+      100% { opacity: 0.04; transform: translate(-50%, -50%) scale(1.10); }
+    }
+
+    @keyframes blobFloatOne {
+      0% { transform: translate3d(-8px, 8px, 0) scale(0.92); }
+      55% { transform: translate3d(14px, -10px, 0) scale(1.05); }
+      100% { transform: translate3d(5px, 0, 0) scale(1); }
+    }
+
+    @keyframes blobFloatTwo {
+      0% { transform: translate3d(8px, -5px, 0) scale(0.94); }
+      58% { transform: translate3d(-12px, 12px, 0) scale(1.04); }
+      100% { transform: translate3d(-4px, 2px, 0) scale(1); }
+    }
+
+    @keyframes blobFloatThree {
+      0% { transform: translate3d(0, 12px, 0) scale(0.90); }
+      52% { transform: translate3d(10px, -10px, 0) scale(1.05); }
+      100% { transform: translate3d(2px, 0, 0) scale(1); }
+    }
+
+    @media (max-width: 420px) {
+      .splash-content {
+        width: min(72vw, 330px);
+      }
+
+      .brand-text {
+        letter-spacing: 0.10em;
+      }
+
+      .tagline {
+        letter-spacing: 0;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .ambient-circle,
+      .ambient-blob,
+      .flow-path,
+      .flow-particle,
+      .server-top-glow,
+      .server-aura,
+      .sync-ring {
+        display: none;
+      }
+
+      .splash-content,
+      .icon-surface,
+      #database-group,
+      .source-card,
+      .brand-text,
+      .tagline {
+        animation: none !important;
+        opacity: 1 !important;
+        transform: none !important;
+        filter: none !important;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <main class="app-shell">
+    <section class="login-screen" aria-label="Écran de connexion SID DDEPIA">
+      <div class="login-card">
+        <div class="login-badge">DDEPIA</div>
+        <div class="login-kicker">République du Cameroun · MINEPIA</div>
+
+        <h1>SID DDEPIA-Menoua</h1>
+        <p>Système d’Information Décisionnel — Délégation Départementale de la Menoua</p>
+
+        <div class="field">
+          <label for="username">Identifiant</label>
+          <input id="username" type="text" placeholder="ex : da.dschang" />
+        </div>
+
+        <div class="field">
+          <label for="password">Mot de passe</label>
+          <input id="password" type="password" />
+        </div>
+
+        <button class="login-button" type="button">Se connecter</button>
+        <button class="replay-button" id="replayButton" type="button">Rejouer l’animation avec le son</button>
+      </div>
+    </section>
+
+    <section class="splash-screen is-playing" id="splashScreen" aria-label="Animation de démarrage SID DDEPIA">
+      <div class="ambient-layer" aria-hidden="true">
+        <span class="ambient-circle circle-one"></span>
+        <span class="ambient-circle circle-two"></span>
+        <span class="ambient-circle circle-three"></span>
+        <span class="ambient-blob blob-one"></span>
+        <span class="ambient-blob blob-two"></span>
+        <span class="ambient-blob blob-three"></span>
+      </div>
+
+      <div class="grain" aria-hidden="true"></div>
+
+      <div class="splash-content">
+        <svg class="logo-svg" viewBox="0 0 360 350" role="img" aria-labelledby="logoTitle logoDesc">
+          <title id="logoTitle">SID DDEPIA</title>
+          <desc id="logoDesc">Trois fiches de données transfèrent leurs informations vers un serveur central.</desc>
+
+          <defs>
+            <linearGradient id="surfaceGradient" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#ffffff" stop-opacity="0.96" />
+              <stop offset="100%" stop-color="#ffffff" stop-opacity="0.82" />
+            </linearGradient>
+
+            <linearGradient id="greenCard" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#e9f7f1" />
+              <stop offset="100%" stop-color="#b8e8d5" />
+            </linearGradient>
+
+            <linearGradient id="blueCard" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#edf7f8" />
+              <stop offset="100%" stop-color="#a8dfe5" />
+            </linearGradient>
+
+            <linearGradient id="purpleCard" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#eef2fb" />
+              <stop offset="100%" stop-color="#d4d5f5" />
+            </linearGradient>
+
+            <linearGradient id="dbBody" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#b8e8d5" />
+              <stop offset="52%" stop-color="#a8dfe5" />
+              <stop offset="100%" stop-color="#bbd8f3" />
+            </linearGradient>
+
+            <radialGradient id="topGlow">
+              <stop offset="0%" stop-color="#ffffff" stop-opacity="0.90" />
+              <stop offset="45%" stop-color="#a8dfe5" stop-opacity="0.52" />
+              <stop offset="100%" stop-color="#a8dfe5" stop-opacity="0" />
+            </radialGradient>
+
+            <filter id="softShadow" x="-50%" y="-50%" width="200%" height="200%">
+              <feDropShadow dx="0" dy="10" stdDeviation="12" flood-color="#397781" flood-opacity="0.14" />
+            </filter>
+
+            <filter id="softGlow" x="-100%" y="-100%" width="300%" height="300%">
+              <feGaussianBlur stdDeviation="2.3" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+          </defs>
+
+          <rect
+            class="icon-surface"
+            x="35"
+            y="28"
+            width="290"
+            height="290"
+            rx="74"
+            fill="url(#surfaceGradient)"
+            stroke="#ffffff"
+            stroke-opacity="0.78"
+            filter="url(#softShadow)"
+          />
+
+          <!-- Trajectoires -->
+          <path id="path-left" class="flow-path" pathLength="1"
+                d="M 113 134 C 118 175, 146 192, 166 225"
+                fill="none" stroke="#397781" stroke-opacity="0.30" stroke-width="2.2" stroke-linecap="round" />
+          <path id="path-mid" class="flow-path" pathLength="1"
+                d="M 180 111 C 180 153, 180 184, 180 224"
+                fill="none" stroke="#397781" stroke-opacity="0.30" stroke-width="2.2" stroke-linecap="round" />
+          <path id="path-right" class="flow-path" pathLength="1"
+                d="M 247 134 C 242 175, 214 192, 194 225"
+                fill="none" stroke="#397781" stroke-opacity="0.30" stroke-width="2.2" stroke-linecap="round" />
+
+          <!-- Cartes -->
+          <g id="card-left" class="source-card">
+            <rect x="78" y="78" width="74" height="82" rx="17" fill="url(#greenCard)" stroke="#ffffff" stroke-opacity="0.70" />
+            <rect x="91" y="92" width="18" height="18" rx="5" fill="#66d8b7" />
+            <rect x="91" y="122" width="43" height="7" rx="3.5" fill="#66d8b7" fill-opacity="0.86" />
+            <rect x="91" y="137" width="33" height="7" rx="3.5" fill="#66d8b7" fill-opacity="0.76" />
+          </g>
+
+          <g id="card-mid" class="source-card">
+            <rect x="143" y="51" width="74" height="90" rx="17" fill="url(#blueCard)" stroke="#ffffff" stroke-opacity="0.72" />
+            <rect x="156" y="65" width="18" height="18" rx="5" fill="#4fc1de" />
+            <rect x="156" y="97" width="44" height="7" rx="3.5" fill="#4fc1de" fill-opacity="0.86" />
+            <rect x="156" y="112" width="34" height="7" rx="3.5" fill="#4fc1de" fill-opacity="0.76" />
+          </g>
+
+          <g id="card-right" class="source-card">
+            <rect x="208" y="78" width="74" height="82" rx="17" fill="url(#purpleCard)" stroke="#ffffff" stroke-opacity="0.72" />
+            <rect x="221" y="92" width="18" height="18" rx="5" fill="#7f87ea" />
+            <rect x="221" y="122" width="43" height="7" rx="3.5" fill="#7f87ea" fill-opacity="0.86" />
+            <rect x="221" y="137" width="33" height="7" rx="3.5" fill="#7f87ea" fill-opacity="0.76" />
+          </g>
+
+          <!-- Particules qui suivent les chemins -->
+          <circle id="particle-left" class="flow-particle" r="6.2" fill="#ffffff"
+                  style="offset-path:path('M 113 134 C 118 175, 146 192, 166 225'); offset-rotate:0deg;" />
+          <circle id="particle-mid" class="flow-particle" r="6.2" fill="#ffffff"
+                  style="offset-path:path('M 180 111 C 180 153, 180 184, 180 224'); offset-rotate:0deg;" />
+          <circle id="particle-right" class="flow-particle" r="6.2" fill="#ffffff"
+                  style="offset-path:path('M 247 134 C 242 175, 214 192, 194 225'); offset-rotate:0deg;" />
+
+          <!-- Aura du serveur -->
+          <ellipse class="server-aura" cx="180" cy="236" rx="62" ry="31" fill="url(#topGlow)" />
+          <circle class="sync-ring" cx="180" cy="244" r="34" fill="none" stroke="#397781" stroke-opacity="0.48" stroke-width="1.8" />
+
+          <!-- Serveur -->
+          <g id="database-group">
+            <ellipse cx="180" cy="288" rx="68" ry="16" fill="#397781" opacity="0.08" />
+
+            <path d="M112 246 L112 279 C112 294 248 294 248 279 L248 246 Z" fill="url(#dbBody)" />
+            <ellipse cx="180" cy="246" rx="68" ry="18" fill="#c8edf1" />
+            <ellipse cx="180" cy="245" rx="56" ry="12" fill="#ffffff" opacity="0.22" />
+
+            <path d="M112 224 L112 253 C112 268 248 268 248 253 L248 224 Z" fill="url(#dbBody)" />
+            <ellipse cx="180" cy="224" rx="68" ry="18" fill="#bce7ee" />
+
+            <path d="M112 202 L112 231 C112 246 248 246 248 231 L248 202 Z" fill="url(#dbBody)" />
+            <ellipse cx="180" cy="202" rx="68" ry="18" fill="#c8edf1" />
+
+            <ellipse class="server-top-glow" cx="180" cy="202" rx="76" ry="30" fill="url(#topGlow)" />
+
+            <circle class="server-led led-one" cx="228" cy="222" r="4.3" />
+            <circle class="server-led led-two" cx="228" cy="247" r="4.3" />
+            <circle class="server-led led-three" cx="228" cy="272" r="4.3" />
+          </g>
+        </svg>
+
+        <div class="brand-text">SID DDEPIA</div>
+        <div class="tagline">Collecter • Centraliser • Décider</div>
+      </div>
+
+      <button class="skip-button" id="skipButton" type="button">Passer</button>
+    </section>
+  </main>
+
+  <script>
+    const splashScreen = document.getElementById("splashScreen");
+    const replayButton = document.getElementById("replayButton");
+    const skipButton = document.getElementById("skipButton");
+
+    let audioContext = null;
+    let hideTimer = null;
+
+    function getAudioContext() {
+      if (!audioContext) {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (AudioContextClass) {
+          audioContext = new AudioContextClass();
+        }
+      }
+      return audioContext;
+    }
+
+    function softTone(frequency, startTime, duration, volume = 0.022, type = "sine") {
+      const ctx = getAudioContext();
+      if (!ctx) return;
+
+      const oscillator = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const filter = ctx.createBiquadFilter();
+
+      oscillator.type = type;
+      oscillator.frequency.setValueAtTime(frequency, startTime);
+
+      filter.type = "lowpass";
+      filter.frequency.setValueAtTime(2400, startTime);
+      filter.Q.setValueAtTime(0.7, startTime);
+
+      gain.gain.setValueAtTime(0.0001, startTime);
+      gain.gain.exponentialRampToValueAtTime(volume, startTime + 0.025);
+      gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+
+      oscillator.connect(filter);
+      filter.connect(gain);
+      gain.connect(ctx.destination);
+
+      oscillator.start(startTime);
+      oscillator.stop(startTime + duration + 0.03);
+    }
+
+    function softWhoosh(startTime, duration = 0.30, volume = 0.010) {
+      const ctx = getAudioContext();
+      if (!ctx) return;
+
+      const bufferSize = Math.max(1, Math.floor(ctx.sampleRate * duration));
+      const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+
+      for (let index = 0; index < bufferSize; index += 1) {
+        const envelope = Math.sin(Math.PI * index / bufferSize);
+        data[index] = (Math.random() * 2 - 1) * envelope;
+      }
+
+      const source = ctx.createBufferSource();
+      const gain = ctx.createGain();
+      const filter = ctx.createBiquadFilter();
+
+      source.buffer = buffer;
+
+      filter.type = "bandpass";
+      filter.frequency.setValueAtTime(1350, startTime);
+      filter.frequency.exponentialRampToValueAtTime(520, startTime + duration);
+      filter.Q.setValueAtTime(0.8, startTime);
+
+      gain.gain.setValueAtTime(0.0001, startTime);
+      gain.gain.exponentialRampToValueAtTime(volume, startTime + 0.04);
+      gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+
+      source.connect(filter);
+      filter.connect(gain);
+      gain.connect(ctx.destination);
+
+      source.start(startTime);
+    }
+
+    async function playSoundtrack() {
+      const ctx = getAudioContext();
+      if (!ctx) return;
+
+      if (ctx.state === "suspended") {
+        try {
+          await ctx.resume();
+        } catch (error) {
+          return;
+        }
+      }
+
+      const now = ctx.currentTime + 0.04;
+
+      const transfers = [
+        { start: 1.22, arrive: 1.82, frequency: 520 },
+        { start: 1.52, arrive: 2.12, frequency: 610 },
+        { start: 1.82, arrive: 2.42, frequency: 720 }
+      ];
+
+      transfers.forEach((transfer) => {
+        softWhoosh(now + transfer.start, 0.32, 0.008);
+        softTone(transfer.frequency, now + transfer.arrive, 0.16, 0.020, "triangle");
+        softTone(transfer.frequency * 1.5, now + transfer.arrive + 0.015, 0.11, 0.009, "sine");
+      });
+
+      softTone(523.25, now + 2.68, 0.56, 0.021, "sine");
+      softTone(659.25, now + 2.70, 0.64, 0.015, "sine");
+      softTone(783.99, now + 2.74, 0.52, 0.009, "sine");
+    }
+
+    function resetAnimationClasses() {
+      splashScreen.classList.remove("hidden", "is-playing");
+      void splashScreen.offsetWidth;
+      splashScreen.classList.add("is-playing");
+    }
+
+    function hideSplash() {
+      clearTimeout(hideTimer);
+      splashScreen.classList.add("hidden");
+    }
+
+    function playSplash({ withSound = false } = {}) {
+      clearTimeout(hideTimer);
+      resetAnimationClasses();
+
+      if (withSound) {
+        playSoundtrack();
+      }
+
+      hideTimer = window.setTimeout(hideSplash, 4050);
+    }
+
+    replayButton.addEventListener("click", () => {
+      playSplash({ withSound: true });
+    });
+
+    skipButton.addEventListener("click", hideSplash);
+
+    splashScreen.addEventListener("pointerdown", (event) => {
+      if (event.target === skipButton) return;
+      getAudioContext();
+    }, { once: true });
+
+    window.addEventListener("load", () => {
+      window.setTimeout(() => playSplash({ withSound: false }), 180);
+    });
+  </script>
+</body>
+</html>

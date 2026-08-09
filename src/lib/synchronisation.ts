@@ -81,22 +81,39 @@ export async function etatSynchronisation(username: string): Promise<EtatSynchro
  * optimisme.
  */
 export async function envoyerSaisiesEnAttente(username: string, periodeId: string): Promise<number> {
-  const file = await offlineDB.saisies
+  const toutesLesSaisies = await offlineDB.saisies
     .where("[username+statutLocal]")
     .anyOf([username, "BROUILLON_LOCAL"], [username, "SYNCHRO_EN_ATTENTE"], [username, "ERREUR_SYNCHRO"])
     .toArray();
-  if (file.length === 0) return 0;
+  if (toutesLesSaisies.length === 0) return 0;
 
-  await offlineDB.saisies.bulkPut(file.map((s) => ({ ...s, statutLocal: "SYNCHRO_EN_ATTENTE" as const })));
+  // La file peut contenir des saisies de PLUSIEURS mois — depuis que la
+  // période de travail est sélectionnable, un agent peut remplir juin puis
+  // juillet avant de retrouver du réseau. Envoyer le tout sous un seul
+  // periodeId ferait basculer les données de juin dans le rapport de juillet,
+  // exactement ce que le cahier des charges interdit (§1). On envoie donc un
+  // lot par période, chacun avec SA période.
+  //
+  // `periodeId` reste le repli des saisies antérieures à cette règle, qui
+  // n'en portent pas.
+  const parPeriode = new Map<string, typeof toutesLesSaisies>();
+  for (const s of toutesLesSaisies) {
+    const cle = s.periodeId || periodeId;
+    if (!parPeriode.has(cle)) parPeriode.set(cle, []);
+    parPeriode.get(cle)!.push(s);
+  }
+
+  await offlineDB.saisies.bulkPut(toutesLesSaisies.map((s) => ({ ...s, statutLocal: "SYNCHRO_EN_ATTENTE" as const })));
 
   let confirmees = 0;
   let refusees = 0;
+  for (const [periodeDuLot, file] of Array.from(parPeriode.entries())) {
   for (let i = 0; i < file.length; i += TAILLE_LOT) {
     const lot = file.slice(i, i + TAILLE_LOT);
     const res = await fetch("/api/sync", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ periodeId, saisies: lot }),
+      body: JSON.stringify({ periodeId: periodeDuLot, saisies: lot }),
     });
 
     if (!res.ok) {
@@ -142,6 +159,7 @@ export async function envoyerSaisiesEnAttente(username: string, periodeId: strin
     });
     confirmees += confirmedIds.length;
     refusees += echecs.length;
+  }
   }
 
   // « Dernier envoi réussi » ne doit être mis à jour que si TOUT est passé,

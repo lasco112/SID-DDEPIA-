@@ -4,6 +4,8 @@
  * repasse en EN_SAISIE dès sa prochaine synchronisation).
  */
 import { NextResponse } from "next/server";
+import { notifierEvenement } from "@/server/notifications/evenements";
+import type { PrismaClient } from "@prisma/client";
 import { requireUser, assertRole, ROLES_CHEF, permissionErrorResponse } from "@/lib/permissions";
 
 export async function POST(req: Request) {
@@ -25,6 +27,16 @@ export async function POST(req: Request) {
     await db.auditLog.create({
       data: { userId: user.id, action: "REJET", entite: "RapportArrondissement", entiteId: rapport.id, details: { motif } },
     });
+
+    await notifierEvenement(
+      db as PrismaClient,
+      { arrondissementId: rapport.arrondissementId },
+      {
+        declencheur: "REJET",
+        message: `Votre rapport a été renvoyé pour correction. Motif : ${motif}`,
+        lien: "/da/saisie",
+      }
+    );
 
     return NextResponse.json({ rapport });
   } catch (e) {

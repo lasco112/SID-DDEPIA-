@@ -8,8 +8,10 @@
  * `Number()` — même principe que FormMatrice.tsx pour T21_LIEUX.
  */
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { offlineDB, trouverSaisieNominatif } from "@/lib/dexie";
+import { recalculerDerivesLocaux } from "@/lib/derivationLocale";
+import { regleAlimenteeParLeChamp, numeroTableau } from "@/lib/champsDerives";
 import { creerEtablissement } from "@/lib/etablissementsLocal";
 
 interface FormFieldDto {
@@ -54,6 +56,8 @@ export default function FormNominatif({
   const [localiteNouveau, setLocaliteNouveau] = useState("");
   const [ajoutEnCours, setAjoutEnCours] = useState(false);
   const [erreurAjout, setErreurAjout] = useState<string | null>(null);
+  /** Identifiants locaux stables par cellule (voir sauvegarder). */
+  const idsLocaux = useRef<Record<string, string>>({});
 
   const tousEtablissements = [...etablissements, ...ajoutes];
 
@@ -176,11 +180,23 @@ export default function FormNominatif({
     async (etablissementId: string, fieldCode: string, texte: boolean, patch: Partial<Cellule>) => {
       const cle = `${etablissementId}:${fieldCode}`;
       setCellules((prev) => {
-        const courante = prev[cle] ?? { valeur: "", nonRenseigne: false, motifNonRenseigne: "", clientId: crypto.randomUUID() };
+        // L'identifiant local ne doit JAMAIS être tiré au sort ici : React
+        // peut exécuter cette fonction deux fois pour un même enregistrement,
+        // ce qui créait deux lignes distinctes pour la même cellule dans la
+        // base de l'appareil. Le serveur les fusionnait à la synchronisation,
+        // le défaut restait donc invisible — jusqu'à ce qu'une somme calculée
+        // localement compte la cellule deux fois. On passe par une réserve
+        // stable, hors du cycle de rendu.
+        const courante = prev[cle] ?? {
+          valeur: "",
+          nonRenseigne: false,
+          motifNonRenseigne: "",
+          clientId: (idsLocaux.current[cle] ??= crypto.randomUUID()),
+        };
         const nouvelle = { ...courante, ...patch };
         const numVal = nouvelle.valeur.trim() === "" ? null : Number(nouvelle.valeur);
 
-        offlineDB.saisies.put({
+        const ecriture = offlineDB.saisies.put({
           clientId: nouvelle.clientId,
           username,
           periodeId,
@@ -195,6 +211,15 @@ export default function FormNominatif({
           statutLocal: "BROUILLON_LOCAL",
           updatedAt: new Date().toISOString(),
         });
+
+        // Certaines cases du tableau 1.2 sont la somme de ce tableau (1.4 et
+        // 1.5). On les recalcule immédiatement, sur l'appareil, pour que les
+        // deux tableaux ne puissent jamais se contredire — y compris hors
+        // ligne. Sans effet si ce tableau n'alimente aucune case dérivée.
+        //
+        // Enchaîné sur l'écriture : la somme doit relire une base locale déjà
+        // à jour, sinon elle repartirait sur la valeur précédente.
+        void ecriture.then(() => recalculerDerivesLocaux(username, periodeId, template.code));
 
         return { ...prev, [cle]: nouvelle };
       });
@@ -314,8 +339,45 @@ export default function FormNominatif({
             </tr>
           ))}
         </tbody>
+        {/* Ligne de total, comme au bas du même tableau dans le rapport Word.
+            L'agent voit la somme de ce qu'il vient de saisir et peut la
+            confronter à ce qu'il sait du terrain — c'est un contrôle, pas
+            seulement un affichage. La colonne qui alimente le tableau 1.2 le
+            dit explicitement, pour que le report soit compréhensible. */}
+        <tfoot>
+          <tr className="bg-gray-50">
+            <td className="px-4 py-2 text-xs font-semibold uppercase tracking-wide text-gray-600">Total du mois</td>
+            {template.fields.map((f) => {
+              if (f.typeValeur === "TEXTE") return <td key={f.code} className="px-4 py-2" />;
+              const total = tousEtablissements.reduce((somme, etab) => {
+                const c = cellules[`${etab.id}:${f.code}`];
+                if (!c || c.nonRenseigne || c.valeur.trim() === "") return somme;
+                const n = Number(c.valeur);
+                return Number.isFinite(n) ? somme + n : somme;
+              }, 0);
+              const alimente = regleAlimenteeParLeChamp(template.code, f.code);
+              return (
+                <td key={f.code} className="px-4 py-2">
+                  <span className="font-bold text-primary-dark">{total.toLocaleString("fr-FR")}</span>
+                  {alimente && (
+                    <p className="mt-0.5 text-[11px] font-normal leading-snug text-gray-500">
+                      Reporté automatiquement au tableau {numeroTableau(alimente.templateCible)}, ligne « {libelleCourt(alimente.champCible)} ».
+                    </p>
+                  )}
+                </td>
+              );
+            })}
+          </tr>
+        </tfoot>
       </table>
       </div>
     </>
   );
+}
+
+/** Libellé lisible d'une case cible, sans avoir à charger le tableau 1.2. */
+function libelleCourt(champCible: string): string {
+  if (champCible === "T12_VOL_MOD_PONDEUSE") return "Pondeuse — élevage moderne";
+  if (champCible === "T12_VOL_MOD_POULET_CHAIR") return "Poulet chair — élevage moderne";
+  return champCible;
 }

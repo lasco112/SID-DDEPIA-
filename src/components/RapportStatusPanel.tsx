@@ -31,6 +31,7 @@ export default function RapportStatusPanel({
   const [motifRejet, setMotifRejet] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [generation, setGeneration] = useState(false);
+  const [dernierRapport, setDernierRapport] = useState<{ id: string; version: number; createdAt: string } | null>(null);
 
   const charger = useCallback(async () => {
     const periodeRes = await fetch("/api/periodes/active");
@@ -43,6 +44,18 @@ export default function RapportStatusPanel({
       const data = await res.json();
       setStatut(data.rapport?.statut ?? "EN_SAISIE");
       setMotifRejet(data.rapport?.motifRejet ?? null);
+    }
+
+    // Rapport déjà transmis : on propose de le relire tel quel plutôt que d'en
+    // générer une version de plus à chaque consultation.
+    try {
+      const arch = await fetch(`/api/reports/archives?periodeId=${periode.id}`);
+      if (arch.ok) {
+        const { documents } = await arch.json();
+        setDernierRapport(documents.find((d: { disponible: boolean }) => d.disponible) ?? null);
+      }
+    } catch {
+      // hors ligne : le rapport reste consultable une fois la connexion revenue
     }
   }, []);
 
@@ -72,6 +85,7 @@ export default function RapportStatusPanel({
       a.click();
       URL.revokeObjectURL(url);
       setMessage("Rapport généré et téléchargé.");
+      charger(); // rafraîchit le lien « relire mon rapport transmis » sur la nouvelle version
     } catch (e) {
       setMessage(e instanceof Error ? e.message : "Erreur lors de la génération.");
     } finally {
@@ -108,6 +122,17 @@ export default function RapportStatusPanel({
             >
               {generation ? "Génération…" : "Générer mon rapport d'arrondissement (.docx)"}
             </button>
+          )}
+          {dernierRapport && (
+            <a
+              href={`/api/reports/archives/${dernierRapport.id}?apercu=1`}
+              target="_blank"
+              rel="noopener"
+              className="rounded-lg border border-primary px-4 py-2 text-sm font-semibold text-primary-dark hover:bg-green-50"
+            >
+              Relire mon rapport transmis (v{dernierRapport.version} du{" "}
+              {new Date(dernierRapport.createdAt).toLocaleDateString("fr-FR")})
+            </a>
           )}
         </div>
       )}

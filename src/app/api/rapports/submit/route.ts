@@ -4,6 +4,9 @@
  * point seules les corrections tracées des chefs de section sont possibles.
  */
 import { NextResponse } from "next/server";
+import { notifierEvenement } from "@/server/notifications/evenements";
+import type { PrismaClient } from "@prisma/client";
+import { assertPeriodeModifiable } from "@/server/periodes/gel";
 import { requireUser, assertRole, permissionErrorResponse } from "@/lib/permissions";
 
 export async function POST(req: Request) {
@@ -20,6 +23,7 @@ export async function POST(req: Request) {
     if (!periode) {
       return NextResponse.json({ message: "Période introuvable" }, { status: 404 });
     }
+    await assertPeriodeModifiable(db, periode.id); // §13 : un mois clôturé ne reçoit plus de soumission
 
     const rapport = await db.rapportArrondissement.findUnique({
       where: { periodeId_arrondissementId: { periodeId, arrondissementId: user.arrondissementId } },
@@ -55,6 +59,17 @@ export async function POST(req: Request) {
         entiteId: rapport.id,
       },
     });
+
+    const arr = await db.arrondissement.findUnique({ where: { id: user.arrondissementId } });
+    await notifierEvenement(
+      db as PrismaClient,
+      { roles: ["DD", "CHEF_BAC", "CHEF_SSV", "CHEF_PSA", "CHEF_SPAIH"] },
+      {
+        declencheur: "SOUMISSION_DA",
+        message: `${arr?.nom ?? "Un arrondissement"} a transmis son rapport mensuel.`,
+        lien: "/dd/supervision",
+      }
+    );
 
     return NextResponse.json({ rapport: updated });
   } catch (e) {

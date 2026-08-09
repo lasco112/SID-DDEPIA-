@@ -15,6 +15,8 @@ import { Menu, X, Lock, LogOut } from "lucide-react";
 import Link from "next/link";
 import Sidebar from "@/components/Sidebar";
 import OnlineIndicator from "@/components/OnlineIndicator";
+import SelecteurPeriode, { type PeriodeOption } from "@/components/SelecteurPeriode";
+import ClocheNotifications from "@/components/ClocheNotifications";
 import BootstrapPreload from "@/components/BootstrapPreload";
 import PinGate from "@/components/PinGate";
 import RechercheGlobale from "@/components/RechercheGlobale";
@@ -35,11 +37,15 @@ export default function AppShellClient({
   role,
   username,
   periodeLabel,
+  periodes = [],
+  couranteId = null,
   children,
 }: {
   role: string;
   username: string;
   periodeLabel?: string;
+  periodes?: PeriodeOption[];
+  couranteId?: string | null;
   children: React.ReactNode;
 }) {
   const [menuOuvert, setMenuOuvert] = useState(false);
@@ -72,6 +78,8 @@ export default function AppShellClient({
             autres) où la rangée complète dépassait la largeur de l'écran et
             faisait disparaître les derniers boutons à droite. */}
         <div className="ml-auto flex min-w-0 shrink items-center gap-1 sm:gap-4">
+          <SelecteurPeriode periodes={periodes} couranteId={couranteId} />
+          <ClocheNotifications />
           <OnlineIndicator />
           <RechercheGlobale role={role} />
           <AideButton role={role} />

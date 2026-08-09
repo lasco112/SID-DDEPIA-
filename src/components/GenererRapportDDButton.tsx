@@ -4,11 +4,19 @@ import { useState } from "react";
 
 interface Props {
   periodeId: string;
-  type?: "DD" | "EXACT";
+  type?: "DD" | "EXACT" | "APERCU";
   label?: string;
+  /** L'aperçu n'est pas un document administratif : bouton secondaire. */
+  secondaire?: boolean;
 }
 
-export default function GenererRapportDDButton({ periodeId, type = "DD", label }: Props) {
+const LIBELLE_PAR_DEFAUT: Record<string, string> = {
+  DD: "Générer le rapport définitif (.docx)",
+  EXACT: "Générer la fiche de collecte (.docx)",
+  APERCU: "Générer l'aperçu (brouillon)",
+};
+
+export default function GenererRapportDDButton({ periodeId, type = "DD", label, secondaire = false }: Props) {
   const [enCours, setEnCours] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -55,9 +63,13 @@ export default function GenererRapportDDButton({ periodeId, type = "DD", label }
       <button
         onClick={generer}
         disabled={enCours}
-        className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-hover disabled:cursor-not-allowed disabled:bg-gray-300"
+        className={
+          secondaire
+            ? "rounded-lg border border-primary px-4 py-2 text-sm font-semibold text-primary-dark hover:bg-green-50 disabled:cursor-not-allowed disabled:border-gray-300 disabled:text-gray-400"
+            : "rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-hover disabled:cursor-not-allowed disabled:bg-gray-300"
+        }
       >
-        {enCours ? "Génération…" : label ?? (type === "DD" ? "Générer le rapport départemental (.docx)" : "Générer la fiche de collecte (.docx)")}
+        {enCours ? "Génération…" : label ?? LIBELLE_PAR_DEFAUT[type]}
       </button>
       {message && <p className="mt-2 text-sm text-gray-700">{message}</p>}
     </div>

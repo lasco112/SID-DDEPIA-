@@ -10,7 +10,9 @@
  *    valeur est alors ignorée (jamais convertie en 0 silencieusement).
  */
 import { NextResponse } from "next/server";
-import { Prisma } from "@prisma/client";
+import { assertPeriodeModifiable } from "@/server/periodes/gel";
+import { Prisma, type PrismaClient } from "@prisma/client";
+import { recalculerTousLesDerives } from "@/server/derivation/champsDerives";
 import { requireUser, assertRole, permissionErrorResponse } from "@/lib/permissions";
 
 interface SaisieOfflineIn {
@@ -79,6 +81,10 @@ export async function POST(req: Request) {
     if (!periode) {
       return NextResponse.json({ message: "Période introuvable" }, { status: 404 });
     }
+    // Mois clôturé (§13) : on refuse AVANT d'écrire quoi que ce soit. L'appareil
+    // conserve sa file — rien n'est confirmé, donc rien n'est perdu si le DD
+    // rouvre la période ensuite.
+    await assertPeriodeModifiable(db, periode.id);
 
     let rapport = await db.rapportArrondissement.upsert({
       where: {
@@ -263,6 +269,29 @@ export async function POST(req: Request) {
         });
       }
     }
+
+    // Les cases du tableau 1.2 qui sont la somme de 1.4 / 1.5 sont recalculées
+    // à CHAQUE envoi, sans regarder ce que contient le lot.
+    //
+    // L'appareil les a déjà calculées de son côté, mais avec les seules lignes
+    // qu'il détient : deux appareils alimentant le même arrondissement n'ont
+    // chacun qu'une somme partielle. Seul le serveur voit l'ensemble.
+    //
+    // Et surtout, la file part par lots de 200 : la case calculée et les
+    // lignes qui l'alimentent peuvent voyager dans deux lots distincts. Ne
+    // recalculer que d'après le contenu du lot laisserait alors passer une
+    // somme partielle. Deux requêtes de plus par envoi valent mieux qu'un
+    // effectif faux dans le rapport.
+    //
+    // La retouche est TRACÉE. Le report peut écraser une valeur que le DA
+    // avait tapée à la main avant que la règle n'existe : sans trace, ce
+    // chiffre disparaîtrait sans que personne ne puisse le retrouver ni
+    // comprendre pourquoi le tableau 1.2 a changé. La trace n'est créée que
+    // si la valeur bouge réellement.
+    await recalculerTousLesDerives(db as PrismaClient, rapport.id, {
+      auteurId: user.id,
+      motif: "Report automatique depuis le tableau nominatif (1.4 / 1.5).",
+    });
 
     await db.auditLog.create({
       data: {

@@ -8,8 +8,10 @@
  * texte libre et ne passent jamais par `Number()`.
  */
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { offlineDB, trouverSaisieMatrice, type StatutLocal } from "@/lib/dexie";
+import { regleDuChamp, contientDesChampsDerives, numeroTableau } from "@/lib/champsDerives";
+import { recalculerTousLesDerives } from "@/lib/derivationLocale";
 
 interface FormFieldDto {
   id: string;
@@ -57,6 +59,8 @@ export default function FormMatrice({ template, periodeId, username }: { templat
   const [lignes, setLignes] = useState<Record<string, Ligne>>({});
   const [auteurs, setAuteurs] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
+  /** Identifiants locaux stables par champ — jamais tires au sort dans un updateur d etat. */
+  const idsLocaux = useRef<Record<string, string>>({});
 
   useEffect(() => {
     let annule = false;
@@ -64,6 +68,14 @@ export default function FormMatrice({ template, periodeId, username }: { templat
       setLoading(true);
       const initial: Record<string, Ligne> = {};
       const auteursInitial: Record<string, string> = {};
+
+      // Les cases calculées sont rafraîchies à l'ouverture du tableau : les
+      // données sources ont pu arriver du serveur (saisie faite par un autre
+      // appareil de l'arrondissement) sans passer par le formulaire 1.4/1.5
+      // de cet appareil.
+      if (contientDesChampsDerives(template.code)) {
+        await recalculerTousLesDerives(username, periodeId);
+      }
 
       // 1. Valeurs déjà synchronisées côté serveur (hydrate si Dexie est vide)
       let serveur: Array<{ fieldCode: string; valeur: string | null; valeurTexte: string | null; nonRenseigne: boolean; motifNonRenseigne: string | null; clientId: string; saisiPar: { nom: string; username: string } | null }> = [];
@@ -166,7 +178,7 @@ export default function FormMatrice({ template, periodeId, username }: { templat
   const sauvegarder = useCallback(
     async (fieldCode: string, texte: boolean, patch: Partial<Ligne>) => {
       setLignes((prev) => {
-        const courante = prev[fieldCode] ?? { valeur: "", nonRenseigne: false, motifNonRenseigne: "", clientId: crypto.randomUUID(), savedAt: null };
+        const courante = prev[fieldCode] ?? { valeur: "", nonRenseigne: false, motifNonRenseigne: "", clientId: (idsLocaux.current[fieldCode] ??= crypto.randomUUID()), savedAt: null };
         const nouvelle = { ...courante, ...patch };
 
         const numVal = nouvelle.valeur.trim() === "" ? null : Number(nouvelle.valeur);
@@ -210,36 +222,70 @@ export default function FormMatrice({ template, periodeId, username }: { templat
           {template.fields.map((f) => {
             const ligne = lignes[f.code];
             const texte = f.typeValeur === "TEXTE";
+            // Case calculée à partir d'un autre tableau : elle ne se saisit
+            // pas. La rendre modifiable reviendrait à autoriser une valeur qui
+            // contredit le tableau source dans le rapport final.
+            const derive = regleDuChamp(f.code);
             return (
               <tr key={f.code} className="align-top">
-                <td className="border-b border-gray-100 px-4 py-2 font-medium">{f.libelle}</td>
+                <td className="border-b border-gray-100 px-4 py-2 font-medium">
+                  {f.libelle}
+                  {derive && (
+                    <p className="mt-0.5 max-w-xs text-[11px] font-normal leading-snug text-gray-500">{derive.explication}</p>
+                  )}
+                </td>
                 <td className="border-b border-gray-100 px-4 py-2 text-gray-500">{f.uniteLibelle ?? ""}</td>
                 <td className="border-b border-gray-100 px-4 py-2">
-                  <input
-                    type={texte ? "text" : "number"}
-                    className={texte ? "w-56 rounded border border-gray-300 px-2 py-1 disabled:bg-gray-100" : "w-28 rounded border border-gray-300 px-2 py-1 disabled:bg-gray-100"}
-                    value={ligne?.nonRenseigne ? "" : ligne?.valeur ?? ""}
-                    disabled={ligne?.nonRenseigne}
-                    onChange={(e) => sauvegarder(f.code, texte, { valeur: e.target.value })}
-                  />
+                  {derive ? (
+                    ligne?.valeur === "" || ligne?.valeur == null ? (
+                      // Case encore vide : sans explication, l'agent est dans
+                      // une impasse — il voit un tiret qu'il ne peut pas
+                      // remplir. On lui indique où aller, et on l'y emmène.
+                      <a
+                        href={`/da/saisie/${derive.templateSource}`}
+                        className="inline-flex items-center gap-1 rounded border border-amber-300 bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-900 hover:bg-amber-100"
+                      >
+                        À renseigner au tableau {numeroTableau(derive.templateSource)} →
+                      </a>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 rounded bg-gray-100 px-2 py-1 font-semibold text-gray-700">
+                        {ligne.valeur}
+                        <span title="Valeur calculée, non modifiable ici." className="text-xs">🔒</span>
+                      </span>
+                    )
+                  ) : (
+                    <input
+                      type={texte ? "text" : "number"}
+                      className={texte ? "w-56 rounded border border-gray-300 px-2 py-1 disabled:bg-gray-100" : "w-28 rounded border border-gray-300 px-2 py-1 disabled:bg-gray-100"}
+                      value={ligne?.nonRenseigne ? "" : ligne?.valeur ?? ""}
+                      disabled={ligne?.nonRenseigne}
+                      onChange={(e) => sauvegarder(f.code, texte, { valeur: e.target.value })}
+                    />
+                  )}
                 </td>
                 <td className="border-b border-gray-100 px-4 py-2">
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={ligne?.nonRenseigne ?? false}
-                      onChange={(e) => sauvegarder(f.code, texte, { nonRenseigne: e.target.checked, valeur: "" })}
-                    />
-                    <span>N/D</span>
-                  </label>
-                  {ligne?.nonRenseigne && (
-                    <input
-                      type="text"
-                      placeholder="Motif obligatoire"
-                      className="mt-1 w-full rounded border border-gray-300 px-2 py-1"
-                      value={ligne.motifNonRenseigne}
-                      onChange={(e) => sauvegarder(f.code, texte, { motifNonRenseigne: e.target.value })}
-                    />
+                  {derive ? (
+                    <span className="text-xs text-gray-400">—</span>
+                  ) : (
+                    <>
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={ligne?.nonRenseigne ?? false}
+                          onChange={(e) => sauvegarder(f.code, texte, { nonRenseigne: e.target.checked, valeur: "" })}
+                        />
+                        <span>N/D</span>
+                      </label>
+                      {ligne?.nonRenseigne && (
+                        <input
+                          type="text"
+                          placeholder="Motif obligatoire"
+                          className="mt-1 w-full rounded border border-gray-300 px-2 py-1"
+                          value={ligne.motifNonRenseigne}
+                          onChange={(e) => sauvegarder(f.code, texte, { motifNonRenseigne: e.target.value })}
+                        />
+                      )}
+                    </>
                   )}
                 </td>
                 <td className="border-b border-gray-100 px-4 py-2 text-xs text-gray-500">{auteurs[f.code] ?? "—"}</td>

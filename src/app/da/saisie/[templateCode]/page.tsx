@@ -3,6 +3,7 @@ import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import AppShell from "@/components/AppShell";
 import SaisieTemplateClient from "@/components/SaisieTemplateClient";
+import FinDeSaisieButton from "@/components/FinDeSaisieButton";
 
 export default async function SaisieTemplatePage({ params }: { params: { templateCode: string } }) {
   const session = await getServerSession(authOptions);
@@ -19,6 +20,13 @@ export default async function SaisieTemplatePage({ params }: { params: { templat
         destinataire={destinataire}
         peutSoumettre={role === "DA"}
       />
+      {/* Seul l agent de saisie a besoin de ce signal : le DA, lui, transmet
+          directement le rapport au Delegue Departemental. */}
+      {role === "AGENT_SAISIE" && (
+        <div className="mt-6">
+          <FinDeSaisieButton templateCode={params.templateCode} />
+        </div>
+      )}
     </AppShell>
   );
 }

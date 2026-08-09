@@ -5,7 +5,9 @@
       "name": "sid-menoua-dev",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
-      "port": 3000
+      "port": 3000,
+      "//": "Le port 3000 est imposé : NEXTAUTH_URL vaut http://localhost:3000 et l'authentification casse sur un autre port. Si un serveur tourne déjà, l'ouvrir avec preview_start {url} plutôt que d'en démarrer un second.",
+      "autoPort": false
     }
   ]
 }

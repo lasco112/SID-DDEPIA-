@@ -34,11 +34,13 @@ const PROTECTED_PREFIXES: Array<{ prefix: string; roles: string[] }> = [
   { prefix: "/api/technique", roles: ["ADMIN_TECH"] },
   { prefix: "/api/sync", roles: ["DA", "AGENT_SAISIE"] },
   { prefix: "/api/rapports/submit", roles: ["DA"] }, // soumission réservée au DA — jamais l'agent, quelle que soit la mise en page ou l'ordre des règles
-  { prefix: "/api/corrections", roles: CHEF_ROLES },
+  { prefix: "/api/corrections", roles: [...CHEF_ROLES, "DD"] }, // le DD corrige lui-même avant consolidation (§4) ; la trace est identique
   { prefix: "/api/validations", roles: CHEF_ROLES },
   { prefix: "/api/syntheses", roles: CHEF_ROLES },
   { prefix: "/api/exports/drepia", roles: ["DD"] },
   { prefix: "/api/reports/generate", roles: ["DD", "DA"] },
+  { prefix: "/api/reports/archives", roles: ["DD", "DA", "AGENT_SAISIE"] }, // relecture d'un rapport déjà transmis ; le cloisonnement par arrondissement est refait dans la route
+
   { prefix: "/api/reports/thematique", roles: ["DD"] },
   { prefix: "/api/periodes/deverrouiller", roles: ["DD"] },
 ];

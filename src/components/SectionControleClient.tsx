@@ -13,6 +13,7 @@
  */
 
 import { useEffect, useState, useCallback, useMemo } from "react";
+import { regleDuChamp, numeroTableau } from "@/lib/champsDerives";
 
 interface TemplateSummary {
   code: string;
@@ -55,6 +56,10 @@ export default function SectionControleClient() {
   const [rejetMotif, setRejetMotif] = useState<Record<string, string>>({});
   const [groupesFermes, setGroupesFermes] = useState<Set<string>>(new Set());
   const [arrondissementFiltre, setArrondissementFiltre] = useState<string | null>(null);
+  /** La liste des tableaux se replie dès qu'un tableau est ouvert : sur
+   *  téléphone, elle occupait tout l'écran et le tableau demandé se retrouvait
+   *  hors de vue. Le bouton « Tableaux » la rouvre à tout moment. */
+  const [listeOuverte, setListeOuverte] = useState(true);
 
   useEffect(() => {
     async function init() {
@@ -82,6 +87,14 @@ export default function SectionControleClient() {
     }
     return Array.from(m.entries());
   }, [templates]);
+
+  /** Tableau suivant dans l'ordre du canevas — pour enchaîner le contrôle
+   *  sans repasser par la liste. */
+  const templateSuivant = useMemo(() => {
+    if (!selection) return null;
+    const i = templates.findIndex((t) => t.code === selection);
+    return i >= 0 && i < templates.length - 1 ? templates[i + 1] : null;
+  }, [templates, selection]);
 
   function toggleGroupe(nom: string) {
     setGroupesFermes((prev) => {
@@ -112,6 +125,7 @@ export default function SectionControleClient() {
     setSelection(templateCode);
     setArrondissementFiltre(null);
     setCorrection(null);
+    setListeOuverte(false);
     const res = await fetch(`/api/section/vue-croisee/${templateCode}?periodeId=${periodeId}`);
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
@@ -257,7 +271,32 @@ export default function SectionControleClient() {
         </table>
       </div>
 
-      <div className="mt-6 space-y-3">
+      {/* Barre de navigation du tableau ouvert : le bouton « Tableaux » à
+          gauche rouvre la liste sans quitter la page, et le titre rappelle en
+          permanence ce que l'on est en train de contrôler. */}
+      {selection && vue?.template && (
+        <div className="mt-6 flex flex-wrap items-center gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2">
+          <button
+            onClick={() => setListeOuverte((v) => !v)}
+            className="flex items-center gap-2 rounded-md border border-gray-300 px-3 py-1.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+          >
+            ☰ Tableaux
+          </button>
+          <span className="text-sm font-semibold text-primary-dark">
+            {vue.template.numero} {vue.template.titre}
+          </span>
+          {templateSuivant && (
+            <button
+              onClick={() => chargerVue(templateSuivant.code)}
+              className="ml-auto rounded-md border border-primary px-3 py-1.5 text-sm font-semibold text-primary-dark hover:bg-green-50"
+            >
+              Tableau suivant : {templateSuivant.numero} →
+            </button>
+          )}
+        </div>
+      )}
+
+      <div className={`mt-6 space-y-3 ${listeOuverte ? "" : "hidden"}`}>
         {groupes.map(([nom, liste]) => {
           const ouvert = !groupesFermes.has(nom);
           return (
@@ -308,7 +347,18 @@ export default function SectionControleClient() {
             <tbody>
               {vue.template.fields.map((f: any) => (
                 <tr key={f.code} className={vue.variationForte[f.code] ? "bg-amber-50" : ""}>
-                  <td className="border-b px-3 py-2 font-medium">{f.libelle}</td>
+                  <td className="border-b px-3 py-2 font-medium">
+                    {f.libelle}
+                    {/* Ligne calculée : le chef doit savoir que corriger ici
+                        serait vain — la valeur est reprise du tableau source
+                        au prochain envoi. C'est là-bas qu'il faut corriger. */}
+                    {regleDuChamp(f.code) && (
+                      <p className="mt-0.5 text-[11px] font-normal leading-snug text-gray-500">
+                        Somme du tableau {numeroTableau(regleDuChamp(f.code)!.templateSource)} — à corriger dans ce
+                        tableau, pas ici.
+                      </p>
+                    )}
+                  </td>
                   {vue.arrondissements.map((a: any) => {
                     const cell = vue.cells[f.code]?.[a.code];
                     return (
@@ -334,38 +384,12 @@ export default function SectionControleClient() {
       )}
 
       {vue?.template?.type === "NOMINATIF" && (
-        <div className="mt-6 overflow-x-auto rounded-lg border border-gray-200 bg-white">
-          <table className="w-full border-collapse text-sm">
-            <thead>
-              <tr className="bg-gray-50 text-left">
-                <th className="border-b px-3 py-2">Établissement</th>
-                <th className="border-b px-3 py-2">Arrondissement</th>
-                <th className="border-b px-3 py-2">Champ</th>
-                <th className="border-b px-3 py-2">Valeur</th>
-              </tr>
-            </thead>
-            <tbody>
-              {vue.saisiesNominatives.map((s: any) => {
-                const champ = vue.template.fields.find((f: any) => f.code === s.fieldCode);
-                return (
-                  <tr key={s.id}>
-                    <td className="border-b px-3 py-2">{s.etablissement.nom}</td>
-                    <td className="border-b px-3 py-2">{s.rapport.arrondissement.code}</td>
-                    <td className="border-b px-3 py-2">{champ?.libelle ?? s.fieldCode}</td>
-                    <td className="border-b px-3 py-2">
-                      <button
-                        className="rounded px-2 py-1 hover:bg-blue-50"
-                        onClick={() => ouvrirCorrectionValeur(s.id, String(s.valeur ?? ""))}
-                      >
-                        {s.nonRenseigne ? "N/D" : s.valeurTexte ?? s.valeur ?? "—"}
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        <TableauNominatifCroise
+          vue={vue}
+          arrondissementFiltre={arrondissementFiltre}
+          onFiltrer={setArrondissementFiltre}
+          onCorriger={(id, valeur) => ouvrirCorrectionValeur(id, valeur)}
+        />
       )}
 
       {vue?.template?.type === "EVENEMENT" && (
@@ -504,6 +528,186 @@ export default function SectionControleClient() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * Vue croisée d'un tableau NOMINATIF (1.3, 1.4, 1.5, 2.3…) pour un chef de
+ * section.
+ *
+ * L'affichage précédent listait une ligne par couple (établissement, champ) :
+ * pour le chef PSA contrôlant 1.4 sur six arrondissements, cela donnait des
+ * centaines de lignes sans jamais montrer un total. Or c'est précisément le
+ * total qu'il vient vérifier — celui qui alimente le tableau 1.2 et qui part
+ * dans le rapport.
+ *
+ * On reprend donc la disposition du canevas : une ligne par établissement,
+ * une colonne par champ, un TOTAL en bas — et un sous-total par arrondissement,
+ * qui est l'unité de contrôle du chef de section.
+ */
+function TableauNominatifCroise({
+  vue,
+  arrondissementFiltre,
+  onFiltrer,
+  onCorriger,
+}: {
+  vue: any;
+  arrondissementFiltre: string | null;
+  onFiltrer: (code: string | null) => void;
+  onCorriger: (id: string, valeur: string) => void;
+}) {
+  const champs = (vue.template.fields as Array<{ code: string; libelle: string; typeValeur?: string }>).filter(
+    (f) => f.typeValeur !== "TEXTE"
+  );
+  const champsTexte = (vue.template.fields as Array<{ code: string; libelle: string; typeValeur?: string }>).filter(
+    (f) => f.typeValeur === "TEXTE"
+  );
+  const saisies = (vue.saisiesNominatives ?? []) as any[];
+
+  // Regroupement par établissement, en conservant l'ordre d'arrivée (déjà trié
+  // par arrondissement puis par nom côté serveur).
+  const lignes: Array<{ etabId: string; nom: string; arrCode: string; arrNom: string; cellules: Record<string, any> }> = [];
+  const index = new Map<string, number>();
+  for (const s of saisies) {
+    const cle = s.etablissement.id;
+    if (!index.has(cle)) {
+      index.set(cle, lignes.length);
+      lignes.push({
+        etabId: cle,
+        nom: s.etablissement.nom,
+        arrCode: s.rapport.arrondissement.code,
+        arrNom: s.rapport.arrondissement.nom,
+        cellules: {},
+      });
+    }
+    lignes[index.get(cle)!].cellules[s.fieldCode] = s;
+  }
+
+  const arrondissements = Array.from(new Set(lignes.map((l) => l.arrCode))).sort();
+  const visibles = arrondissementFiltre ? lignes.filter((l) => l.arrCode === arrondissementFiltre) : lignes;
+
+  const totaliser = (sousEnsemble: typeof lignes, code: string) =>
+    sousEnsemble.reduce((somme, l) => {
+      const c = l.cellules[code];
+      if (!c || c.nonRenseigne || c.valeur == null) return somme;
+      const n = Number(c.valeur);
+      return Number.isFinite(n) ? somme + n : somme;
+    }, 0);
+
+  if (lignes.length === 0) {
+    return (
+      <p className="mt-6 rounded-lg border border-gray-200 bg-white p-4 text-sm text-gray-500">
+        Aucune donnée saisie pour ce tableau ce mois-ci.
+      </p>
+    );
+  }
+
+  return (
+    <div className="mt-6">
+      {arrondissements.length > 1 && (
+        <div className="mb-3 flex flex-wrap gap-2">
+          <button
+            onClick={() => onFiltrer(null)}
+            className={`rounded-full px-3 py-1 text-xs font-semibold ${!arrondissementFiltre ? "bg-primary text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
+          >
+            Tous les arrondissements
+          </button>
+          {arrondissements.map((code) => (
+            <button
+              key={code}
+              onClick={() => onFiltrer(code)}
+              className={`rounded-full px-3 py-1 text-xs font-semibold ${arrondissementFiltre === code ? "bg-primary text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
+            >
+              {code}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
+        <table className="w-full border-collapse text-sm">
+          <thead>
+            <tr className="bg-gray-50 text-left">
+              <th className="border-b px-3 py-2">Établissement</th>
+              <th className="border-b px-3 py-2">Arrondissement</th>
+              {champs.map((f) => (
+                <th key={f.code} className="border-b px-3 py-2 text-right">{f.libelle}</th>
+              ))}
+              {champsTexte.map((f) => (
+                <th key={f.code} className="border-b px-3 py-2">{f.libelle}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {visibles.map((l) => (
+              <tr key={l.etabId}>
+                <td className="border-b px-3 py-2 font-medium">{l.nom}</td>
+                <td className="border-b px-3 py-2 text-gray-600">{l.arrNom}</td>
+                {champs.map((f) => {
+                  const c = l.cellules[f.code];
+                  return (
+                    <td key={f.code} className="border-b px-3 py-2 text-right">
+                      {c ? (
+                        <button className="rounded px-2 py-1 hover:bg-blue-50" onClick={() => onCorriger(c.id, String(c.valeur ?? ""))}>
+                          {c.nonRenseigne ? "N/D" : c.valeur ?? "—"}
+                        </button>
+                      ) : (
+                        <span className="text-gray-300">—</span>
+                      )}
+                    </td>
+                  );
+                })}
+                {champsTexte.map((f) => {
+                  const c = l.cellules[f.code];
+                  return (
+                    <td key={f.code} className="border-b px-3 py-2 text-gray-600">
+                      {c?.valeurTexte ?? "—"}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+
+            {/* Sous-totaux par arrondissement : l'unité de contrôle du chef. */}
+            {!arrondissementFiltre &&
+              arrondissements.length > 1 &&
+              arrondissements.map((code) => {
+                const duGroupe = lignes.filter((l) => l.arrCode === code);
+                return (
+                  <tr key={`st-${code}`} className="bg-gray-50/60">
+                    <td className="border-b px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-gray-500" colSpan={2}>
+                      Sous-total {duGroupe[0]?.arrNom ?? code}
+                    </td>
+                    {champs.map((f) => (
+                      <td key={f.code} className="border-b px-3 py-1.5 text-right font-semibold text-gray-700">
+                        {totaliser(duGroupe, f.code).toLocaleString("fr-FR")}
+                      </td>
+                    ))}
+                    {champsTexte.map((f) => (
+                      <td key={f.code} className="border-b px-3 py-1.5" />
+                    ))}
+                  </tr>
+                );
+              })}
+          </tbody>
+          <tfoot>
+            <tr className="bg-gray-100">
+              <td className="px-3 py-2 text-xs font-bold uppercase tracking-wide text-gray-700" colSpan={2}>
+                Total {arrondissementFiltre ? arrondissementFiltre : "département"}
+              </td>
+              {champs.map((f) => (
+                <td key={f.code} className="px-3 py-2 text-right text-base font-bold text-primary-dark">
+                  {totaliser(visibles, f.code).toLocaleString("fr-FR")}
+                </td>
+              ))}
+              {champsTexte.map((f) => (
+                <td key={f.code} className="px-3 py-2" />
+              ))}
+            </tr>
+          </tfoot>
+        </table>
+      </div>
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { getServerSession } from "next-auth";
+import { resoudrePeriode } from "@/server/periodes/courante";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { contexteSession } from "@/lib/permissions";
@@ -23,7 +24,7 @@ export default async function DASaisieIndexPage() {
 
   // Organisation du travail (indicative — voir /da/assignations) : qui est
   // censé remplir quoi ce mois-ci, sans jamais restreindre l'accès.
-  const periodeActive = await db.periodeReporting.findFirst({ where: { type: "MENSUEL" }, orderBy: [{ annee: "desc" }, { mois: "desc" }] });
+  const periodeActive = await resoudrePeriode(db);
   const assignations =
     periodeActive && moi.arrondissementId
       ? await db.assignationSaisie.findMany({

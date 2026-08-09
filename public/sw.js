@@ -18,7 +18,7 @@
 // nom diffère : c'est le seul mécanisme qui purge réellement l'ancien contenu
 // sur les appareils déjà installés. Doit rester identique à CACHE_NAME dans
 // src/lib/offlineStore.ts.
-const CACHE_NAME = "sid-ddepia-v4";
+const CACHE_NAME = "sid-ddepia-v6";
 const OFFLINE_URL = "/offline.html";
 const PRECACHE = ["/", OFFLINE_URL, "/manifest.json"];
 
@@ -141,4 +141,54 @@ self.addEventListener("fetch", (event) => {
       })
     );
   }
+});
+
+// ---------------------------------------------------------------------------
+// NOTIFICATIONS SYSTÈME (Web Push)
+// ---------------------------------------------------------------------------
+// Reçues même application fermée, tant que l'appareil a du réseau et que
+// l'agent a accepté l'autorisation une fois. Sur iPhone, l'application doit
+// avoir été installée sur l'écran d'accueil : c'est une limite d'iOS, pas du
+// SID.
+
+self.addEventListener("push", (event) => {
+  let donnees = { titre: "SID DDEPIA-Menoua", corps: "Vous avez une nouvelle notification.", lien: "/dashboard" };
+  try {
+    if (event.data) donnees = { ...donnees, ...event.data.json() };
+  } catch {
+    // charge utile illisible : on affiche le message générique plutôt que rien
+  }
+
+  event.waitUntil(
+    self.registration.showNotification(donnees.titre, {
+      body: donnees.corps,
+      icon: "/icon-512.png?v=2",
+      badge: "/icon-512.png?v=2",
+      lang: "fr",
+      data: { lien: donnees.lien },
+      // Regroupe les notifications successives au lieu d'empiler dix bandeaux
+      // sur le téléphone d'un agent qui reçoit plusieurs corrections d'affilée.
+      tag: "sid-ddepia",
+      renotify: true,
+    })
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const lien = event.notification.data?.lien || "/dashboard";
+
+  // Si l'application est déjà ouverte quelque part, on y va au lieu d'ouvrir
+  // un second onglet — sur téléphone, deux onglets du SID prêtent à confusion.
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((fenetres) => {
+      for (const f of fenetres) {
+        if ("focus" in f) {
+          f.navigate(lien);
+          return f.focus();
+        }
+      }
+      return self.clients.openWindow(lien);
+    })
+  );
 });

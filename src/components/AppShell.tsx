@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
 import AppShellClient from "@/components/AppShellClient";
+import { resoudrePeriode, listerPeriodes } from "@/server/periodes/courante";
 
 const MOIS_FR = [
   "Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
@@ -28,14 +29,23 @@ export default async function AppShell({
   const username = (session.user as any).username as string;
   if (allowedRoles && !allowedRoles.includes(role)) redirect("/dashboard");
 
-  const periode = await db.periodeReporting.findFirst({
-    where: { type: "MENSUEL" },
-    orderBy: [{ annee: "desc" }, { mois: "desc" }],
-  });
+  // Période de TRAVAIL (celle choisie par l'utilisateur), et non plus « la plus
+  // récente » : c'est elle qui pilote ce que chaque page affiche et enregistre.
+  const [periode, periodes] = await Promise.all([resoudrePeriode(db), listerPeriodes(db)]);
   const periodeLabel = periode ? `${MOIS_FR[(periode.mois ?? 1) - 1]} ${periode.annee}` : undefined;
 
   return (
-    <AppShellClient role={role} username={username} periodeLabel={periodeLabel}>
+    <AppShellClient
+      role={role}
+      username={username}
+      periodeLabel={periodeLabel}
+      periodes={periodes.map((p) => ({
+        id: p.id,
+        libelle: `${MOIS_FR[(p.mois ?? 1) - 1]} ${p.annee}`,
+        cloturee: p.statut === "ARCHIVEE",
+      }))}
+      couranteId={periode?.id ?? null}
+    >
       {children}
     </AppShellClient>
   );

@@ -12,6 +12,7 @@
  * lib/dexie.ts (tables meta/tableaux/etablissements/referentiels/periodes).
  */
 import { NextResponse } from "next/server";
+import { resoudrePeriode } from "@/server/periodes/courante";
 import { requireUser, permissionErrorResponse } from "@/lib/permissions";
 
 export async function GET() {
@@ -35,7 +36,7 @@ export async function GET() {
         orderBy: { nom: "asc" },
       }),
       db.referentielItem.findMany({ where: { actif: true }, orderBy: { ordre: "asc" } }),
-      db.periodeReporting.findFirst({ where: { type: "MENSUEL" }, orderBy: [{ annee: "desc" }, { mois: "desc" }] }),
+      resoudrePeriode(db),
       db.configSysteme.findUnique({ where: { cle: "donnees_purgees_le" } }),
     ]);
 
