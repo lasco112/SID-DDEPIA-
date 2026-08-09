@@ -52,6 +52,8 @@ export interface SaisieOffline {
   payload?: Record<string, unknown>;
 
   nonRenseigne: boolean;
+  /** Valeur reprise du mois précédent, pas encore confirmée (affichée en grisé). */
+  reporte?: boolean;
   motifNonRenseigne?: string | null;
 
   statutLocal: StatutLocal;

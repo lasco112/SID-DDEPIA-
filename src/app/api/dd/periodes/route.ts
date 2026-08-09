@@ -10,6 +10,8 @@
 import { NextResponse } from "next/server";
 import { requireUser, assertRole, permissionErrorResponse } from "@/lib/permissions";
 import { libellePeriode } from "@/server/periodes/courante";
+import { reporterMoisPrecedent } from "@/server/periodes/report";
+import type { PrismaClient } from "@prisma/client";
 
 export async function GET() {
   try {
@@ -83,6 +85,18 @@ export async function POST(req: Request) {
       data: { type: "MENSUEL", annee, mois, dateOuverture, dateLimiteDA, dateLimiteChef, dateLimiteDD, statut: "OUVERTE" },
     });
 
+    // Reprise du mois précédent : l'agent retrouve les chiffres du mois écoulé
+    // déjà inscrits, en grisé, à confirmer ou corriger. Sans effet s'il n'y a
+    // pas de mois précédent (première période du système).
+    const precedente = await db.periodeReporting.findFirst({
+      where: { type: "MENSUEL", OR: [{ annee: { lt: annee } }, { annee, mois: { lt: mois } }] },
+      orderBy: [{ annee: "desc" }, { mois: "desc" }],
+    });
+    let report = { matrice: 0, nominatif: 0, arrondissements: 0 };
+    if (precedente) {
+      report = await reporterMoisPrecedent(db as PrismaClient, precedente.id, periode.id);
+    }
+
     const retroactive = dateLimiteDA < new Date();
     await db.auditLog.create({
       data: {
@@ -90,11 +104,11 @@ export async function POST(req: Request) {
         action: "CREATION_PERIODE",
         entite: "PeriodeReporting",
         entiteId: periode.id,
-        details: { periode: `${annee}-${String(mois).padStart(2, "0")}`, retroactive },
+        details: { periode: `${annee}-${String(mois).padStart(2, "0")}`, retroactive, report },
       },
     });
 
-    return NextResponse.json({ periode, retroactive });
+    return NextResponse.json({ periode, retroactive, report });
   } catch (e) {
     const { status, message } = permissionErrorResponse(e);
     return NextResponse.json({ message }, { status });

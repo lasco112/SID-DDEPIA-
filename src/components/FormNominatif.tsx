@@ -13,6 +13,7 @@ import { offlineDB, trouverSaisieNominatif } from "@/lib/dexie";
 import { recalculerDerivesLocaux } from "@/lib/derivationLocale";
 import { regleAlimenteeParLeChamp, numeroTableau } from "@/lib/champsDerives";
 import { creerEtablissement } from "@/lib/etablissementsLocal";
+import ConfirmerTableauButton from "@/components/ConfirmerTableauButton";
 
 interface FormFieldDto {
   code: string;
@@ -33,7 +34,7 @@ interface TemplateDto {
   etablissementTypeCode?: string | null;
 }
 
-type Cellule = { valeur: string; nonRenseigne: boolean; motifNonRenseigne: string; clientId: string };
+type Cellule = { valeur: string; nonRenseigne: boolean; motifNonRenseigne: string; clientId: string; reporte?: boolean };
 type Cle = string; // `${etablissementId}:${fieldCode}`
 
 export default function FormNominatif({
@@ -133,6 +134,7 @@ export default function FormNominatif({
               nonRenseigne: local.nonRenseigne,
               motifNonRenseigne: local.motifNonRenseigne ?? "",
               clientId: local.clientId,
+              reporte: local.reporte ?? false,
             };
             continue;
           }
@@ -193,7 +195,8 @@ export default function FormNominatif({
           motifNonRenseigne: "",
           clientId: (idsLocaux.current[cle] ??= crypto.randomUUID()),
         };
-        const nouvelle = { ...courante, ...patch };
+        // Dès que l'agent touche la case, ce n'est plus une reprise.
+        const nouvelle = { ...courante, ...patch, reporte: false };
         const numVal = nouvelle.valeur.trim() === "" ? null : Number(nouvelle.valeur);
 
         const ecriture = offlineDB.saisies.put({
@@ -208,6 +211,7 @@ export default function FormNominatif({
           valeurTexte: texte && !nouvelle.nonRenseigne ? (nouvelle.valeur.trim() === "" ? null : nouvelle.valeur) : null,
           nonRenseigne: nouvelle.nonRenseigne,
           motifNonRenseigne: nouvelle.nonRenseigne ? nouvelle.motifNonRenseigne || null : null,
+          reporte: false,
           statutLocal: "BROUILLON_LOCAL",
           updatedAt: new Date().toISOString(),
         });
@@ -310,7 +314,7 @@ export default function FormNominatif({
                   <td key={f.code} className="border-b border-gray-100 px-4 py-2">
                     <input
                       type={texte ? "text" : "number"}
-                      className={texte ? "w-56 rounded border border-gray-300 px-2 py-1 disabled:bg-gray-100" : "w-24 rounded border border-gray-300 px-2 py-1 disabled:bg-gray-100"}
+                      className={`${texte ? "w-56" : "w-24"} rounded border px-2 py-1 disabled:bg-gray-100 ${cellule?.reporte ? "border-amber-300 bg-amber-50 text-gray-400" : "border-gray-300"}`}
                       value={cellule?.nonRenseigne ? "" : cellule?.valeur ?? ""}
                       disabled={cellule?.nonRenseigne}
                       onChange={(e) => sauvegarder(etab.id, f.code, texte, { valeur: e.target.value })}
@@ -371,6 +375,11 @@ export default function FormNominatif({
         </tfoot>
       </table>
       </div>
+      <ConfirmerTableauButton
+        templateCode={template.code}
+        nbReprises={Object.values(cellules).filter((c) => c.reporte).length}
+        onConfirme={() => setCellules((prev) => Object.fromEntries(Object.entries(prev).map(([k, v]) => [k, { ...v, reporte: false }])))}
+      />
     </>
   );
 }

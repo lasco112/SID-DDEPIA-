@@ -404,6 +404,11 @@ model SaisieMatrice {
   valeurTexte String? // champs MATRICE de type TEXTE (ex. T21_LIEUX) — non sommé, une valeur par arrondissement
   nonRenseigne Boolean @default(false)
   motifNonRenseigne String?
+  /// Valeur REPRISE du mois précédent, pas encore confirmée par l'agent.
+  /// Elle s'affiche en grisé et bloque la transmission du rapport tant que
+  /// le tableau n'a pas été confirmé : sans cela, un mois entier de
+  /// production pourrait être validé sans que personne ne l'ait regardé.
+  reporte     Boolean @default(false)
   // Identifiant client généré offline (idempotence de la synchronisation)
   clientId    String  @unique
   syncedAt    DateTime @default(now())
@@ -437,6 +442,11 @@ model SaisieNominative {
   valeurTexte     String?
   nonRenseigne    Boolean @default(false)
   motifNonRenseigne String?
+  /// Valeur REPRISE du mois précédent, pas encore confirmée par l'agent.
+  /// Elle s'affiche en grisé et bloque la transmission du rapport tant que
+  /// le tableau n'a pas été confirmé : sans cela, un mois entier de
+  /// production pourrait être validé sans que personne ne l'ait regardé.
+  reporte     Boolean @default(false)
   clientId        String  @unique
   syncedAt        DateTime @default(now())
   /// Voir SaisieMatrice.modifieLe — arbitrage des conflits par date de modification.

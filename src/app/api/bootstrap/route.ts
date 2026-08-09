@@ -58,11 +58,11 @@ export async function GET() {
       ? await Promise.all([
           db.saisieMatrice.findMany({
             where: { rapportId: rapport.id },
-            select: { clientId: true, fieldCode: true, valeur: true, valeurTexte: true, nonRenseigne: true, motifNonRenseigne: true, modifieLe: true, syncedAt: true, field: { select: { template: { select: { code: true } } } } },
+            select: { clientId: true, fieldCode: true, valeur: true, valeurTexte: true, nonRenseigne: true, motifNonRenseigne: true, reporte: true, modifieLe: true, syncedAt: true, field: { select: { template: { select: { code: true } } } } },
           }),
           db.saisieNominative.findMany({
             where: { rapportId: rapport.id },
-            select: { clientId: true, fieldCode: true, etablissementId: true, valeur: true, valeurTexte: true, nonRenseigne: true, motifNonRenseigne: true, modifieLe: true, syncedAt: true, template: { select: { code: true } } },
+            select: { clientId: true, fieldCode: true, etablissementId: true, valeur: true, valeurTexte: true, nonRenseigne: true, motifNonRenseigne: true, reporte: true, modifieLe: true, syncedAt: true, template: { select: { code: true } } },
           }),
           db.saisieEvenement.findMany({
             where: { rapportId: rapport.id },
@@ -147,6 +147,7 @@ export async function GET() {
           valeur: s.valeur === null ? null : Number(s.valeur),
           valeurTexte: s.valeurTexte,
           nonRenseigne: s.nonRenseigne,
+          reporte: s.reporte,
           motifNonRenseigne: s.motifNonRenseigne,
           updatedAt: (s.modifieLe ?? s.syncedAt).toISOString(),
         })),
@@ -159,6 +160,7 @@ export async function GET() {
           valeur: s.valeur === null ? null : Number(s.valeur),
           valeurTexte: s.valeurTexte,
           nonRenseigne: s.nonRenseigne,
+          reporte: s.reporte,
           motifNonRenseigne: s.motifNonRenseigne,
           updatedAt: (s.modifieLe ?? s.syncedAt).toISOString(),
         })),

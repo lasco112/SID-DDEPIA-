@@ -160,6 +160,9 @@ export async function POST(req: Request) {
         valeurTexte,
         nonRenseigne: s.nonRenseigne,
         motifNonRenseigne: s.motifNonRenseigne ?? null,
+        // Une valeur qui revient de l'appareil a été vue par l'agent : ce n'est
+        // plus une reprise du mois précédent en attente de confirmation.
+        reporte: false,
         modifieLe,
         syncedAt: maintenant,
         saisiParId: user.id,

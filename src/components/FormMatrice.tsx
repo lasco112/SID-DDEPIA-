@@ -12,6 +12,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { offlineDB, trouverSaisieMatrice, type StatutLocal } from "@/lib/dexie";
 import { regleDuChamp, contientDesChampsDerives, numeroTableau } from "@/lib/champsDerives";
 import { recalculerTousLesDerives } from "@/lib/derivationLocale";
+import ConfirmerTableauButton from "@/components/ConfirmerTableauButton";
 
 interface FormFieldDto {
   id: string;
@@ -33,6 +34,8 @@ interface TemplateDto {
 
 type Ligne = {
   valeur: string;
+  /** Valeur reprise du mois précédent, pas encore confirmée. */
+  reporte?: boolean;
   nonRenseigne: boolean;
   motifNonRenseigne: string;
   clientId: string;
@@ -104,6 +107,7 @@ export default function FormMatrice({ template, periodeId, username }: { templat
             savedAt: Date.now(),
             statutLocal: local.statutLocal,
             erreurSynchro: local.erreurSynchro,
+            reporte: local.reporte ?? false,
           };
           continue;
         }
@@ -179,7 +183,8 @@ export default function FormMatrice({ template, periodeId, username }: { templat
     async (fieldCode: string, texte: boolean, patch: Partial<Ligne>) => {
       setLignes((prev) => {
         const courante = prev[fieldCode] ?? { valeur: "", nonRenseigne: false, motifNonRenseigne: "", clientId: (idsLocaux.current[fieldCode] ??= crypto.randomUUID()), savedAt: null };
-        const nouvelle = { ...courante, ...patch };
+        // Dès que l'agent touche la case, ce n'est plus une reprise.
+        const nouvelle = { ...courante, ...patch, reporte: false };
 
         const numVal = nouvelle.valeur.trim() === "" ? null : Number(nouvelle.valeur);
         offlineDB.saisies.put({
@@ -193,6 +198,7 @@ export default function FormMatrice({ template, periodeId, username }: { templat
           valeurTexte: texte && !nouvelle.nonRenseigne ? (nouvelle.valeur.trim() === "" ? null : nouvelle.valeur) : null,
           nonRenseigne: nouvelle.nonRenseigne,
           motifNonRenseigne: nouvelle.nonRenseigne ? nouvelle.motifNonRenseigne || null : null,
+          reporte: false,
           statutLocal: "BROUILLON_LOCAL",
           updatedAt: new Date().toISOString(),
         });
@@ -205,7 +211,10 @@ export default function FormMatrice({ template, periodeId, username }: { templat
 
   if (loading) return <p className="text-sm text-gray-500">Chargement…</p>;
 
+  const nbReprises = Object.values(lignes).filter((l) => l.reporte).length;
+
   return (
+    <>
     <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
       <table className="w-full border-collapse text-sm">
         <thead>
@@ -256,7 +265,7 @@ export default function FormMatrice({ template, periodeId, username }: { templat
                   ) : (
                     <input
                       type={texte ? "text" : "number"}
-                      className={texte ? "w-56 rounded border border-gray-300 px-2 py-1 disabled:bg-gray-100" : "w-28 rounded border border-gray-300 px-2 py-1 disabled:bg-gray-100"}
+                      className={`${texte ? "w-56" : "w-28"} rounded border px-2 py-1 disabled:bg-gray-100 ${ligne?.reporte ? "border-amber-300 bg-amber-50 text-gray-400" : "border-gray-300"}`}
                       value={ligne?.nonRenseigne ? "" : ligne?.valeur ?? ""}
                       disabled={ligne?.nonRenseigne}
                       onChange={(e) => sauvegarder(f.code, texte, { valeur: e.target.value })}
@@ -288,7 +297,9 @@ export default function FormMatrice({ template, periodeId, username }: { templat
                     </>
                   )}
                 </td>
-                <td className="border-b border-gray-100 px-4 py-2 text-xs text-gray-500">{auteurs[f.code] ?? "—"}</td>
+                <td className="border-b border-gray-100 px-4 py-2 text-xs text-gray-500">
+                  {ligne?.reporte ? <span className="text-amber-700">repris du mois précédent</span> : auteurs[f.code] ?? "—"}
+                </td>
                 <td className="border-b border-gray-100 px-4 py-2">
                   {ligne?.statutLocal && (
                     <span
@@ -305,5 +316,11 @@ export default function FormMatrice({ template, periodeId, username }: { templat
         </tbody>
       </table>
     </div>
+    <ConfirmerTableauButton
+      templateCode={template.code}
+      nbReprises={nbReprises}
+      onConfirme={() => setLignes((prev) => Object.fromEntries(Object.entries(prev).map(([k, v]) => [k, { ...v, reporte: false }])))}
+    />
+    </>
   );
 }

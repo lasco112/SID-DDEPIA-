@@ -7,6 +7,7 @@ import { NextResponse } from "next/server";
 import { notifierEvenement } from "@/server/notifications/evenements";
 import type { PrismaClient } from "@prisma/client";
 import { assertPeriodeModifiable } from "@/server/periodes/gel";
+import { tableauxNonConfirmes } from "@/server/periodes/report";
 import { requireUser, assertRole, permissionErrorResponse } from "@/lib/permissions";
 
 export async function POST(req: Request) {
@@ -38,6 +39,21 @@ export async function POST(req: Request) {
       return NextResponse.json(
         { message: "Période verrouillée : demandez un déverrouillage exceptionnel au DD." },
         { status: 423 }
+      );
+    }
+
+    // Valeurs reprises du mois précédent non confirmées : on refuse la
+    // transmission. Laisser passer reviendrait à déclarer la production du
+    // mois précédent comme étant celle du mois en cours.
+    const aConfirmer = await tableauxNonConfirmes(db as PrismaClient, rapport.id);
+    if (aConfirmer.length > 0) {
+      return NextResponse.json(
+        {
+          message:
+            "Des tableaux contiennent encore des valeurs reprises du mois précédent, non confirmées. Ouvrez-les et cliquez sur « Confirmer ce tableau ».",
+          tableaux: aConfirmer,
+        },
+        { status: 409 }
       );
     }
 
