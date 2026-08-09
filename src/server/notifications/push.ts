@@ -15,7 +15,19 @@
  * consultables dans l'application. Le système ne tombe pas pour autant.
  */
 import type { PrismaClient } from "@prisma/client";
-import webpush from "web-push";
+import type webpushType from "web-push";
+
+/**
+ * Chargement DYNAMIQUE de web-push : la bibliothèque tire des modules Node
+ * (http, https-proxy-agent) que l'empaqueteur de Next refuse dans le module
+ * d'instrumentation, lequel importe indirectement ce fichier. L'import
+ * différé garde la dépendance hors du graphe compilé.
+ */
+let webpush: typeof webpushType | null = null;
+async function charger(): Promise<typeof webpushType> {
+  if (!webpush) webpush = (await import("web-push")).default;
+  return webpush;
+}
 
 export interface MessagePush {
   titre: string;
@@ -30,10 +42,10 @@ export function pushDisponible(): boolean {
   return Boolean(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY);
 }
 
-function configurer(): boolean {
+async function configurer(): Promise<boolean> {
   if (configure) return true;
   if (!pushDisponible()) return false;
-  webpush.setVapidDetails(
+  (await charger()).setVapidDetails(
     process.env.VAPID_SUBJECT || "mailto:ddepia.menoua@minepia.cm",
     process.env.VAPID_PUBLIC_KEY!,
     process.env.VAPID_PRIVATE_KEY!
@@ -49,7 +61,7 @@ function configurer(): boolean {
  * sans quoi la table se remplirait d'adresses mortes réessayées à l'infini.
  */
 export async function envoyerPush(db: PrismaClient, userIds: string[], message: MessagePush): Promise<void> {
-  if (userIds.length === 0 || !configurer()) return;
+  if (userIds.length === 0 || !(await configurer())) return;
 
   const abonnements = await db.abonnementPush.findMany({ where: { userId: { in: userIds } } });
   if (abonnements.length === 0) return;
@@ -60,7 +72,7 @@ export async function envoyerPush(db: PrismaClient, userIds: string[], message: 
   await Promise.all(
     abonnements.map(async (a) => {
       try {
-        await webpush.sendNotification(
+        await (await charger()).sendNotification(
           { endpoint: a.endpoint, keys: { p256dh: a.p256dh, auth: a.auth } },
           charge
         );

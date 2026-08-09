@@ -12,6 +12,7 @@ import PurgerDonneesTestButton from '@/components/PurgerDonneesTestButton';
 import ReporterEcheanceButton from '@/components/ReporterEcheanceButton';
 import ValidationsDDPanel from '@/components/ValidationsDDPanel';
 import CloturePeriodePanel from '@/components/CloturePeriodePanel';
+import ControleReportPanel from '@/components/ControleReportPanel';
 import { tauxRemplissageParArrondissement } from '@/server/supervision/tauxRemplissage';
 
 const STATUT_STYLE: Record<string, string> = {
@@ -125,6 +126,8 @@ export default async function DDSupervisionPage() {
               arrondissements={etatArrondissements}
               sections={etatSections}
             />
+
+            <ControleReportPanel />
 
             <CloturePeriodePanel
               periodeId={periode.id}

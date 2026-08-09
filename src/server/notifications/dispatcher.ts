@@ -7,6 +7,7 @@
  * déclencheurs de cron/alerts.ts.
  */
 import { db } from "@/lib/db";
+import { envoyerPush } from "@/server/notifications/push";
 
 export type Canal = "IN_APP" | "SMS" | "WHATSAPP";
 
@@ -20,6 +21,15 @@ export interface NotifierOptions {
 }
 
 export async function notifier(opts: NotifierOptions) {
+  // Les relances calendaires partent aussi sur le téléphone, comme les
+  // notifications d'événement : c'est justement quand l'agent n'ouvre pas
+  // l'application qu'un rappel d'échéance a de la valeur.
+  void envoyerPush(db, [opts.userId], {
+    titre: "SID DDEPIA-Menoua",
+    corps: opts.message,
+    lien: "/dashboard",
+  }).catch(() => {});
+
   const canaux: Canal[] = ["IN_APP", "SMS", "WHATSAPP"];
   for (const canal of canaux) {
     console.log(
