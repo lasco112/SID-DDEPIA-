@@ -48,6 +48,24 @@ export default function GestionPeriodesClient({ couranteId }: { couranteId: stri
   const [enCours, setEnCours] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
+  /** Mois qui suit la période la plus récente : l'action attendue après une
+   *  clôture. Existe déjà ou reste à ouvrir. */
+  const suivant = (() => {
+    if (!periodes || periodes.length === 0) return null;
+    const recente = periodes[0]; // la liste arrive de la plus récente à la plus ancienne
+    const mois = recente.mois === 12 ? 1 : recente.mois + 1;
+    const annee = recente.mois === 12 ? recente.annee + 1 : recente.annee;
+    const deja = periodes.find((p) => p.mois === mois && p.annee === annee);
+    return {
+      mois,
+      annee,
+      libelle: `${MOIS[mois - 1]} ${annee}`,
+      existe: Boolean(deja),
+      id: deja?.id ?? null,
+      estCourante: deja?.id === couranteId,
+    };
+  })();
+
   const charger = useCallback(async () => {
     const res = await fetch("/api/dd/periodes");
     if (res.ok) setPeriodes((await res.json()).periodes);
@@ -57,13 +75,15 @@ export default function GestionPeriodesClient({ couranteId }: { couranteId: stri
     charger();
   }, [charger]);
 
-  async function creer() {
+  const creer = () => creerPeriode(annee, mois);
+
+  async function creerPeriode(a: number, m: number) {
     setEnCours(true);
     setMessage(null);
     const res = await fetch("/api/dd/periodes", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ annee, mois }),
+      body: JSON.stringify({ annee: a, mois: m }),
     });
     const data = await res.json().catch(() => ({}));
     setEnCours(false);
@@ -73,8 +93,8 @@ export default function GestionPeriodesClient({ couranteId }: { couranteId: stri
     }
     setMessage(
       data.retroactive
-        ? `Période ${MOIS[mois - 1]} ${annee} créée. Son échéance étant passée, elle est ouverte pour une saisie rétroactive : sélectionnez-la dans le bandeau pour y travailler.`
-        : `Période ${MOIS[mois - 1]} ${annee} créée et ouverte à la saisie.`
+        ? `Période ${MOIS[m - 1]} ${a} créée. Son échéance étant passée, elle est ouverte pour une saisie rétroactive : sélectionnez-la dans le bandeau pour y travailler.`
+        : `Période ${MOIS[m - 1]} ${a} créée et ouverte à la saisie.`
     );
     charger();
     router.refresh();
@@ -112,8 +132,49 @@ export default function GestionPeriodesClient({ couranteId }: { couranteId: stri
         système : les données saisies y seront rattachées à ce mois-là, quelle que soit la date réelle de saisie.
       </p>
 
+      {/* Action principale : à la fermeture d'un mois, le geste attendu est
+          « ouvrir le suivant ». Le faire chercher dans deux listes déroulantes
+          revenait à cacher la fonction la plus courante derrière la plus rare. */}
+      {suivant && (
+        <section className="mt-6 rounded-lg border-2 border-primary bg-green-50 p-4">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-primary-dark">Mois suivant</h2>
+          {suivant.existe ? (
+            <>
+              <p className="mt-1 text-sm text-gray-700">
+                <strong>{suivant.libelle}</strong> est déjà ouvert. Les DA peuvent y saisir leurs données.
+              </p>
+              {!suivant.estCourante && (
+                <button
+                  onClick={() => travaillerSur(suivant.id!)}
+                  className="mt-3 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-hover"
+                >
+                  Travailler sur {suivant.libelle}
+                </button>
+              )}
+            </>
+          ) : (
+            <>
+              <p className="mt-1 text-sm text-gray-700">
+                Le mois <strong>{suivant.libelle}</strong> n'est pas encore ouvert. Tant qu'il ne l'est pas, les
+                Délégations d'Arrondissement ne peuvent rien saisir pour ce mois.
+              </p>
+              <button
+                onClick={() => creerPeriode(suivant.annee, suivant.mois)}
+                disabled={enCours}
+                className="mt-3 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-hover disabled:bg-gray-300"
+              >
+                {enCours ? "Ouverture…" : `Ouvrir ${suivant.libelle}`}
+              </button>
+            </>
+          )}
+        </section>
+      )}
+
       <section className="mt-6 rounded-lg border border-gray-200 bg-white p-4">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">Créer une période</h2>
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">Créer un autre mois</h2>
+        <p className="mb-2 text-xs text-gray-500">
+          Pour rouvrir un mois passé et reconstituer son rapport, par exemple.
+        </p>
         <div className="mt-3 flex flex-wrap items-end gap-3">
           <label className="text-sm">
             <span className="mb-1 block text-xs font-semibold text-gray-600">Mois</span>

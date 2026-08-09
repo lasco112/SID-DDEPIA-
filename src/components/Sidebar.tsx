@@ -41,6 +41,26 @@ export default function Sidebar({
           </Link>
         );
       })}
+      {/* Reprises du bandeau, masquees au-dela de `sm` ou elles y figurent deja. */}
+      <div className="mt-3 border-t border-appbg pt-3 sm:hidden">
+        <Link
+          href="/mon-compte/securite"
+          onClick={onNavigate}
+          className="mb-0.5 flex items-center gap-2.5 rounded-md py-2.5 pl-4 pr-3 text-[13.5px] font-medium text-ink-muted hover:bg-appbg"
+        >
+          <span className="h-[7px] w-[7px] shrink-0 rounded-full bg-line" />
+          Sécurité de l'appareil
+        </Link>
+        <Link
+          href="/technique/aide"
+          onClick={onNavigate}
+          className="mb-0.5 flex items-center gap-2.5 rounded-md py-2.5 pl-4 pr-3 text-[13.5px] font-medium text-ink-muted hover:bg-appbg"
+        >
+          <span className="h-[7px] w-[7px] shrink-0 rounded-full bg-line" />
+          Aide
+        </Link>
+      </div>
+
       {periodeLabel && (
         <div className="mt-4 border-t border-appbg px-3 pb-1 pt-4">
           <div className="text-[11px] leading-relaxed text-ink-faint">

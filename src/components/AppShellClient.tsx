@@ -81,8 +81,15 @@ export default function AppShellClient({
           <SelecteurPeriode periodes={periodes} couranteId={couranteId} />
           <ClocheNotifications />
           <OnlineIndicator />
-          <RechercheGlobale role={role} />
-          <AideButton role={role} />
+          {/* Recherche, aide et sécurité disparaissent du bandeau sur
+              téléphone : avec le sélecteur de période et la cloche ajoutés
+              depuis, la rangée comptait huit éléments et les derniers
+              sortaient du cadre. Les trois sont repris dans le tiroir de
+              navigation, où ils restent atteignables. */}
+          <div className="hidden items-center gap-1 sm:flex sm:gap-4">
+            <RechercheGlobale role={role} />
+            <AideButton role={role} />
+          </div>
           <div className="hidden text-right leading-tight lg:block">
             <div className="text-[13.5px] font-semibold">{username}</div>
             <div className="text-[11.5px] text-white/75">{LIBELLES_ROLE[role] ?? role}</div>
@@ -90,7 +97,7 @@ export default function AppShellClient({
           <Link
             href="/mon-compte/securite"
             title="Sécurité de l'appareil"
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md hover:bg-white/10"
+            className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-md hover:bg-white/10 sm:flex"
           >
             <Lock size={17} />
           </Link>
