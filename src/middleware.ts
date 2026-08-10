@@ -36,6 +36,14 @@ const PROTECTED_PREFIXES: Array<{ prefix: string; roles: string[] }> = [
   { prefix: "/api/rapports/submit", roles: ["DA"] }, // soumission réservée au DA — jamais l'agent, quelle que soit la mise en page ou l'ordre des règles
   { prefix: "/api/corrections", roles: [...CHEF_ROLES, "DD"] }, // le DD corrige lui-même avant consolidation (§4) ; la trace est identique
   { prefix: "/api/validations", roles: CHEF_ROLES },
+  // Règle spécifique AVANT la règle générale (Array.find prend la première
+  // correspondance) : la VALIDATION d'une synthèse appartient au DD, alors que
+  // sa RÉDACTION appartient au chef de section. Sans cette ligne, le DD était
+  // renvoyé en 403 par la règle "/api/syntheses" ci-dessous — donc aucune
+  // synthèse ne pouvait être validée, et comme rapport-docx.ts n'insère le
+  // texte que si valideDD est vrai, les quatre rubriques ANALYSE_* de TOUS les
+  // rapports mensuels portaient « Synthèse non disponible. ».
+  { prefix: "/api/syntheses/valider", roles: ["DD"] },
   { prefix: "/api/syntheses", roles: CHEF_ROLES },
   { prefix: "/api/exports/drepia", roles: ["DD"] },
   { prefix: "/api/reports/generate", roles: ["DD", "DA"] },
