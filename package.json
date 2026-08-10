@@ -12,7 +12,9 @@
     "seed": "tsx prisma/seed.ts",
     "seed:demo": "tsx prisma/seed-demo.ts",
     "cron": "tsx src/server/cron/alerts.ts",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "test:golden": "node --env-file=.env --import tsx --test tests/golden-mensuel.test.ts",
+    "golden:generer": "node --env-file=.env --import tsx scripts/generer-golden-mensuel.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.12.0",
