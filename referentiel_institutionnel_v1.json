@@ -1,0 +1,467 @@
+{
+  "meta": {
+    "objet": "Référentiel institutionnel de la DDEPIA-MENOUA. Blocs de texte stables réutilisés dans tous les rapports (mensuel, trimestriel, semestriel, annuel). Saisis une seule fois, injectés à la génération, jamais retapés.",
+    "regle_absolue": "Aucune phrase portant une date, une période ou un chiffre d'activité ne peut figurer dans ce référentiel. Ces éléments appartiennent aux données, pas au référentiel.",
+    "version": "1.0",
+    "derniere_revue": "2026-08-10",
+    "cadence_revue_generale": "Revue annuelle obligatoire avant le rapport du premier trimestre"
+  },
+  "blocs": [
+    {
+      "id": "INTRO.structure",
+      "section": "Introduction — partie stable",
+      "niveau_stabilite": "INVARIANT",
+      "cadence_revue": "Sur modification du canevas hiérarchique",
+      "statut": "VALIDE",
+      "texte": [
+        "Le présent rapport récapitule l'essentiel des activités conduites sur l'ensemble des six arrondissements du département de la Menoua. Il est structuré en quatre parties. La première est une présentation générale de la DDEPIA-Menoua dans son organisation administrative, son personnel et ses infrastructures. La deuxième partie fait l'état des productions animales suivant les différentes activités induites par chacune des spéculations. La troisième partie présente la situation des productions et des importations en matière de pêche, d'aquaculture et d'activités connexes. La quatrième partie porte sur le déploiement des interventions en matière de protection sanitaire des cheptels et des consommateurs, pour l'ensemble des produits d'origine animale et halieutique.",
+        "Le contenu de ce rapport, présenté suivant le canevas arrêté par la hiérarchie, fait ressortir la présentation générale de la DDEPIA, les réalisations et les difficultés rencontrées."
+      ]
+    },
+    {
+      "id": "INTRO.variable",
+      "section": "Introduction — partie variable",
+      "niveau_stabilite": "VARIABLE",
+      "cadence_revue": "Chaque période",
+      "statut": "A_SAISIR",
+      "texte": [],
+      "consigne": "Phrase de couverture de la période, puis liste des activités régaliennes ayant marqué la période. Ne jamais recopier la liste de la période précédente sans la revoir."
+    },
+    {
+      "id": "I.a",
+      "section": "Situation et relief",
+      "niveau_stabilite": "INVARIANT",
+      "cadence_revue": "Sur texte réglementaire",
+      "statut": "VALIDE",
+      "texte": [
+        "Le département de la Menoua a été créé vers 1885 par les Allemands. Il a pour chef-lieu Dschang. Ce département est situé dans la région de l'Ouest du Cameroun, plus précisément entre 5°25' et 5°30' de latitude Nord et entre 10° et 10°5' de longitude Est. Il est limité au Nord-Est par les Bamboutos, à l'Est par la Mifi et les Hauts-Plateaux, au Nord-Ouest par le département du Lebialem, à l'Ouest par le Koupé-Manengouba, au Sud et au Sud-Est par le Moungo et le Haut-Nkam.",
+        "Le relief du département de la Menoua est essentiellement accidenté, avec des altitudes variables comprises entre 1 300 et 1 500 mètres."
+      ]
+    },
+    {
+      "id": "I.b",
+      "section": "Pédologie, climat, hydrographie et végétation",
+      "niveau_stabilite": "INVARIANT",
+      "cadence_revue": "Sur texte réglementaire",
+      "statut": "MANQUANT",
+      "texte": [],
+      "consigne": "Rubrique imposée par le canevas régional et absente du rapport actuel. À rédiger une seule fois, puis figée. Ne pas inventer : reprendre les données pédologiques et climatiques officielles du département."
+    },
+    {
+      "id": "I.c",
+      "section": "Données démographiques et économiques",
+      "niveau_stabilite": "REVUE_ANNUELLE",
+      "cadence_revue": "Annuelle",
+      "statut": "A_VERIFIER",
+      "texte": [
+        "Le département de la Menoua compte une population de 372 244 habitants pour une superficie de 1 380 km², soit une densité de 270 habitants au kilomètre carré."
+      ],
+      "consigne": "Chiffre de population à réactualiser annuellement et à sourcer. Compléter par les données économiques du département, absentes du rapport actuel."
+    },
+    {
+      "id": "I-1.a",
+      "section": "Missions",
+      "niveau_stabilite": "INVARIANT",
+      "cadence_revue": "Sur texte réglementaire",
+      "statut": "A_VERIFIER",
+      "base_juridique": "Décret n° 2012/382 du 14 septembre 2012 portant organisation du Ministère de l'Élevage, des Pêches et des Industries Animales",
+      "texte": [
+        "Coordonner et animer les activités de l'ensemble des services installés dans le département ;",
+        "Coordonner et mobiliser les ressources et les acteurs du secteur de l'élevage, des pêches et des industries animales et halieutiques ;",
+        "Gérer les ressources humaines, matérielles et financières ;",
+        "Mettre à jour la carte épidémiologique ;",
+        "Exécuter et suivre les projets d'investissement ;",
+        "Centraliser, consolider et exploiter les informations et les données statistiques en provenance des délégations d'arrondissement ;",
+        "Suivre la mise en œuvre des programmes prioritaires ;",
+        "Suivre la mise en œuvre des activités ayant bénéficié d'une délégation de compétences en matière d'élevage, de pêches et d'industries animales et halieutiques ;",
+        "Suivre la mise en œuvre des activités de vulgarisation ;",
+        "Suivre la mise en œuvre de la réglementation et des normes en matière d'élevage, de pêches et d'industries animales et halieutiques ;",
+        "Suivre la mise en œuvre des mesures visant l'amélioration quantitative et qualitative de la production et des rendements dans les secteurs de l'élevage et des pêches ;",
+        "Suivre la promotion des investissements dans les domaines de l'élevage et de la pêche au niveau départemental, en liaison avec les services déconcentrés compétents ;",
+        "Assurer l'inspection sanitaire vétérinaire ;",
+        "Produire les rapports périodiques d'activités ;",
+        "Entretenir les relations avec les différents acteurs intervenant dans le secteur de l'élevage, des pêches et des industries animales et halieutiques ;",
+        "Suivre et contrôler l'application de la législation et de la réglementation relatives à l'exercice des professions et des activités d'élevage, de pêches et d'industries animales et halieutiques."
+      ],
+      "corrections_apportees": [
+        "Le rapport actuel indique « en provenance des Délégations Départementales » : formulation issue du niveau régional. Corrigée en « délégations d'arrondissement ». À confirmer contre l'article exact du décret applicable au niveau départemental.",
+        "Le rapport actuel indique « au niveau Régional » : corrigé en « au niveau départemental ». Même vérification requise.",
+        "L'article cité doit être vérifié : l'article 12 vise l'organisation régionale ; l'article applicable aux délégations départementales est probablement différent."
+      ]
+    },
+    {
+      "id": "I-1.b",
+      "section": "Vision",
+      "niveau_stabilite": "INVARIANT",
+      "cadence_revue": "Sur changement de stratégie sous-sectorielle",
+      "statut": "VALIDE",
+      "texte": [
+        "La vision de la DDEPIA de la Menoua, qui découle de celle du MINEPIA, est d'accroître quantitativement et qualitativement la production des protéines animales et halieutiques, afin de satisfaire la demande locale, d'approvisionner les industries de transformation et de dégager des excédents pour l'exportation.",
+        "Cette vision s'inscrit dans le défi de l'émergence du Cameroun à l'horizon 2035. Cette émergence doit être soutenue par un secteur rural fort en général, et par un sous-secteur de l'élevage, des pêches et des industries animales de seconde génération en particulier. La stratégie sous-sectorielle a pour objectif global d'accroître les productions animales et halieutiques, afin de contribuer à la croissance économique, à la création d'emplois décents et au renforcement de la sécurité alimentaire."
+      ]
+    },
+    {
+      "id": "I-1.c",
+      "section": "Organisation administrative",
+      "niveau_stabilite": "REVUE_ANNUELLE",
+      "cadence_revue": "Annuelle, et à chaque création ou suppression de structure",
+      "statut": "VALIDE",
+      "texte": [
+        "La DDEPIA de la Menoua couvre six arrondissements : Dschang, Fokoué, Fongo-Tongo, Nkong-Ni, Penka-Michel et Santchou.",
+        "Les services qui lui sont rattachés sont six délégations d'arrondissement, onze centres zootechniques et vétérinaires et deux postes de contrôle sanitaire et vétérinaire.",
+        "Les services locaux ont, la plupart du temps, pour ressort territorial la circonscription administrative dont ils portent le nom. Compte tenu de l'étendue du département et de la nécessité de rendre service à l'ensemble des populations, la couverture territoriale demeure incomplète, d'où le besoin de création de nouvelles structures."
+      ],
+      "tableau_organigramme": [
+        [
+          "Délégation départementale",
+          "DAEPIA",
+          "CZV",
+          "Poste de contrôle"
+        ],
+        [
+          "MENOUA",
+          "Dschang",
+          "CZV Dschang",
+          ""
+        ],
+        [
+          "",
+          "Fokoué",
+          "CZV Fokoué",
+          ""
+        ],
+        [
+          "",
+          "Fongo-Tongo",
+          "CZV Fongo-Tongo",
+          "Poste de contrôle sanitaire et vétérinaire"
+        ],
+        [
+          "",
+          "Nkong-Ni",
+          "CZV Bafou",
+          ""
+        ],
+        [
+          "",
+          "",
+          "CZV Baleveng",
+          ""
+        ],
+        [
+          "",
+          "",
+          "CZV Maya (non créé)",
+          ""
+        ],
+        [
+          "",
+          "Penka-Michel",
+          "CZV Penka-Michel",
+          ""
+        ],
+        [
+          "",
+          "",
+          "CZV Balessing",
+          ""
+        ],
+        [
+          "",
+          "",
+          "CZV Bamendou",
+          ""
+        ],
+        [
+          "",
+          "Santchou",
+          "CZV Santchou",
+          "Poste de contrôle sanitaire et vétérinaire"
+        ],
+        [
+          "",
+          "",
+          "CZV Fondonéra (non construit)",
+          ""
+        ],
+        [
+          "TOTAUX",
+          "06",
+          "11",
+          "02"
+        ]
+      ],
+      "corrections_apportees": [
+        "Le rapport actuel annonce « dix (10) centres zootechniques et vétérinaires » alors que son propre tableau en totalise onze. Corrigé à onze, conformément au tableau et au tableau des crédits."
+      ]
+    },
+    {
+      "id": "ACRONYMES",
+      "section": "Liste des acronymes, sigles et abréviations",
+      "niveau_stabilite": "REVUE_ANNUELLE",
+      "cadence_revue": "Annuelle, par ajout uniquement",
+      "statut": "VALIDE",
+      "source": "Rapport trimestriel T1 2026 de la DDEPIA-Menoua",
+      "tableau": [
+        [
+          "ACEFA",
+          "Programme d'Amélioration de la Compétitivité des Exploitations Familiales Agropastorales"
+        ],
+        [
+          "ADOP",
+          "Assemblée Départementale des Organisations des Producteurs"
+        ],
+        [
+          "AFOP",
+          "Programme d'Appui à la rénovation et au développement de la Formation Professionnelle dans les secteurs de l'agriculture, de l'élevage et de la pêche"
+        ],
+        [
+          "AMO",
+          "Programme d'Appui à la Maîtrise d'Ouvrage des Administrations du Secteur Rural"
+        ],
+        [
+          "C2D",
+          "Contrat Désendettement et Développement"
+        ],
+        [
+          "CACP",
+          "Centre d'Alevinage et de Contrôle de Pêche"
+        ],
+        [
+          "CDSP",
+          "Commission Départementale de Sélection des Projets"
+        ],
+        [
+          "CGO",
+          "Conseiller de Groupement des Organisations"
+        ],
+        [
+          "CGP",
+          "Conseiller de Groupement des Producteurs"
+        ],
+        [
+          "CN",
+          "Coordination Nationale"
+        ],
+        [
+          "CNFZV",
+          "Centre National de Formation Zootechnique et Vétérinaire"
+        ],
+        [
+          "CODAC",
+          "Commission Départementale d'Appui Conseil"
+        ],
+        [
+          "CPY",
+          "Centre Pasteur de Yaoundé"
+        ],
+        [
+          "CR",
+          "Coordination Régionale"
+        ],
+        [
+          "CS",
+          "Conseiller Spécialisé"
+        ],
+        [
+          "CTD",
+          "Collectivités Territoriales Décentralisées"
+        ],
+        [
+          "CTS",
+          "Conseiller Technique Spécialisé"
+        ],
+        [
+          "CZV",
+          "Centre Zootechnique et Vétérinaire"
+        ],
+        [
+          "DAC",
+          "Dispositif d'Appui Conseil"
+        ],
+        [
+          "DAEPIA",
+          "Délégation d'Arrondissement de l'Élevage, des Pêches et des Industries Animales"
+        ],
+        [
+          "DDEPIA",
+          "Délégation Départementale de l'Élevage, des Pêches et des Industries Animales"
+        ],
+        [
+          "DDPIA",
+          "Direction du Développement des Productions et des Industries Animales"
+        ],
+        [
+          "DHLPP",
+          "Distemper, Hepatitis, Leptospirosis, Parvovirose, Parainfluenza"
+        ],
+        [
+          "DPAIH",
+          "Direction de la Pêche, de l'Aquaculture et des Industries Halieutiques"
+        ],
+        [
+          "DREPIA",
+          "Délégation Régionale de l'Élevage, des Pêches et des Industries Animales"
+        ],
+        [
+          "EFA",
+          "Exploitation Familiale Agropastorale"
+        ],
+        [
+          "GADD",
+          "Groupement d'Appui pour le Développement Durable"
+        ],
+        [
+          "GIC",
+          "Groupe d'Initiative Commune"
+        ],
+        [
+          "GP",
+          "Groupement des Producteurs"
+        ],
+        [
+          "IBD",
+          "Infectious Bursal Disease (maladie de Gumboro)"
+        ],
+        [
+          "IPAVIC",
+          "Interprofession Avicole du Cameroun"
+        ],
+        [
+          "ISV",
+          "Inspection Sanitaire Vétérinaire"
+        ],
+        [
+          "JAPAP",
+          "Journées d'Animation et de Promotion des Activités de Pêche"
+        ],
+        [
+          "Kg",
+          "Kilogramme"
+        ],
+        [
+          "L",
+          "Litre"
+        ],
+        [
+          "MINADER",
+          "Ministère de l'Agriculture et du Développement Rural"
+        ],
+        [
+          "MINEPAT",
+          "Ministère de l'Économie, de la Planification et de l'Aménagement du Territoire"
+        ],
+        [
+          "MINEPIA",
+          "Ministère de l'Élevage, des Pêches et des Industries Animales"
+        ],
+        [
+          "MNC",
+          "Maladie de Newcastle"
+        ],
+        [
+          "OIE",
+          "Organisation Mondiale de la Santé Animale (ancienne Organisation Internationale des Épizooties)"
+        ],
+        [
+          "ONG",
+          "Organisation Non Gouvernementale"
+        ],
+        [
+          "OPA",
+          "Organisation des Producteurs Agropastoraux"
+        ],
+        [
+          "PACA",
+          "Projet d'Amélioration de la Compétitivité Agricole"
+        ],
+        [
+          "PNDP",
+          "Programme National de Développement Participatif"
+        ],
+        [
+          "PNVRA",
+          "Programme National de Vulgarisation et de Recherche Agricoles"
+        ],
+        [
+          "PPA",
+          "Peste Porcine Africaine"
+        ],
+        [
+          "PPCB",
+          "Péripneumonie Contagieuse des Bovidés"
+        ],
+        [
+          "PPR",
+          "Peste des Petits Ruminants"
+        ],
+        [
+          "PRODEL",
+          "Projet de Développement de l'Élevage"
+        ],
+        [
+          "PSREP",
+          "Programme de Sécurisation des Recettes de l'Élevage et des Pêches"
+        ],
+        [
+          "RCTE",
+          "Responsable du Conseil Technico-Économique"
+        ],
+        [
+          "SPAIH",
+          "Section des Pêches, de l'Aquaculture et des Industries Halieutiques"
+        ]
+      ],
+      "corrections_apportees": [
+        "Les cellules du rapport actuel regroupaient plusieurs sigles dans une même ligne (CGO/CGP/CN/CNFZV, CPY/CS/CR/CTD/CTS/CZV, etc.) : chaque sigle a été isolé sur sa propre ligne.",
+        "OIE : dénomination actualisée en Organisation Mondiale de la Santé Animale.",
+        "Ordre alphabétique rétabli."
+      ]
+    },
+    {
+      "id": "PROG.053",
+      "section": "Programme 053 — présentation",
+      "niveau_stabilite": "INVARIANT",
+      "cadence_revue": "Sur changement de stratégie sous-sectorielle",
+      "statut": "VALIDE",
+      "source": "Rapport trimestriel T1 2026 de la DDEPIA-Menoua",
+      "texte": [
+        "Le Programme de Développement des Productions et des Industries Animales vise l'amélioration de la productivité et de la compétitivité des filières animales. Il s'agit d'une politique de promotion des filières, fondée sur une meilleure organisation des principaux acteurs à chaque maillon — recherche, production, transformation, commercialisation — dans l'optique d'augmenter et de sécuriser les revenus de tous les intervenants.",
+        "Compte tenu de la place qu'occupent les productions et industries animales dans l'économie nationale, le Gouvernement entend y impulser une croissance durable en développant les activités tout en préservant les ressources naturelles qui y sont liées. Un accent particulier est mis sur l'intensification des productions, l'amélioration de la productivité, la modernisation de l'appareil productif et la compétitivité des filières porteuses de croissance et créatrices d'emplois, notamment la volaille, le porc, les gros et les petits ruminants.",
+        "Objectif : accroître la production des protéines animales pour satisfaire la demande locale, approvisionner les industries de transformation en matières premières d'origine animale, dégager des excédents pour l'exportation et promouvoir l'import-substitution.",
+        "Indicateur : taux d'accroissement de la production.",
+        "Référence de base : en 2013, le niveau de production était de 12,3 kg de viande par habitant et par an, 1,375 kg d'œufs et 9 kg de lait par habitant et par an, pour une demande de 15,3 kg de viande et 14,5 kg de lait par habitant et par an."
+      ],
+      "corrections_apportees": [
+        "La phrase « Pour cette année 2024 le MINEPIA compte accentuer la mise en œuvre de la politique d'import-substitution » a été retirée du référentiel : elle porte une année et relève donc de la partie variable, à réécrire à chaque période."
+      ]
+    },
+    {
+      "id": "PROG.055",
+      "section": "Programme 055 — présentation",
+      "niveau_stabilite": "INVARIANT",
+      "cadence_revue": "Sur changement de stratégie sous-sectorielle",
+      "statut": "MANQUANT",
+      "texte": [],
+      "consigne": "Le canevas impose une rubrique de présentation (objectif, indicateur, référence de base) pour chaque programme. Elle est absente du rapport actuel. À rédiger une seule fois puis figer."
+    },
+    {
+      "id": "PROG.057",
+      "section": "Programme 057 — présentation",
+      "niveau_stabilite": "INVARIANT",
+      "cadence_revue": "Sur changement de stratégie sous-sectorielle",
+      "statut": "MANQUANT",
+      "texte": [],
+      "consigne": "Le canevas impose une rubrique de présentation (objectif, indicateur, référence de base) pour chaque programme. Elle est absente du rapport actuel. À rédiger une seule fois puis figer."
+    },
+    {
+      "id": "PROG.059",
+      "section": "Programme 059 — présentation",
+      "niveau_stabilite": "INVARIANT",
+      "cadence_revue": "Sur changement de stratégie sous-sectorielle",
+      "statut": "MANQUANT",
+      "texte": [],
+      "consigne": "Le canevas impose une rubrique de présentation (objectif, indicateur, référence de base) pour chaque programme. Elle est absente du rapport actuel. À rédiger une seule fois puis figer."
+    }
+  ]
+}
