@@ -10,25 +10,99 @@ Rien de ce qui suit n'est implémenté à ce jour.
 
 ---
 
-## 1. Décision de principe : aucun modèle de langage
+## 1. Décision de principe : le calcul d'abord, la langue ensuite
 
-**Le SID ne recourt à aucun LLM, ni acheté, ni hébergé, ni entraîné.**
+Décision arrêtée le 11 août 2026, après trois positions successives du DD.
+**C'est celle-ci qui fait foi.**
 
-Trois raisons, dans cet ordre :
+### 1.1 Le texte est calculé, jamais rédigé par une machine libre
 
-1. **La hiérarchie ne fait pas confiance aux modèles de langage.** Un texte
-   officiel dont personne ne peut retracer l'origine est un texte
-   indéfendable devant la DREPIA.
-2. **La Délégation n'a pas les ressources** pour un abonnement à un service
-   extérieur, ni pour héberger un modèle.
-3. **Ce n'est pas le bon outil.** Une analyse de rapport administratif énonce
-   des faits de calcul — évolution, contribution, rupture, complétude. Ce sont
-   des règles arithmétiques, pas de la compréhension du langage. Un modèle
-   probabiliste est approximatif là où l'administration exige l'exactitude.
+Le moteur d'analyse (§ 2) produit **toujours** le texte, par règles, sans aucun
+modèle. C'est la branche de base : elle fonctionne hors ligne, sans serveur,
+sans abonnement, et chaque phrase porte son calcul.
 
-Cette décision est **définitive jusqu'à instruction contraire du DD**. La
-possibilité d'une assistance rédactionnelle avait été envisagée le 10 août puis
-écartée le 11 : ne pas la reproposer sans nouvel arbitrage.
+### 1.2 Un modèle de langage peut être ajouté par-dessus — sous conditions
+
+Le DD retient le principe d'un **modèle open source auto-hébergé** en service
+privé, pour corriger le caractère répétitif des phrases types. Motif retenu :
+les rapports trimestriel, semestriel, annuel — et le niveau régional en
+perspective — sont **de plus en plus analytiques**, là où le mensuel est de la
+collecte.
+
+Ce modèle est soumis à **quatre règles non négociables**.
+
+**Règle 1 — Le modèle n'écrit jamais un chiffre.**
+
+Il reçoit des faits étiquetés et doit rédiger en n'employant que les étiquettes.
+Le SID substitue les valeurs après coup.
+
+> Faits : `F1`=Abattages bovins · `F2`=14 436 têtes · `F3`=Fokoué · `F4`=55,3 %
+> · `F5`=Dschang · `F6`=669 têtes
+>
+> Modèle : « Les {F1} du département s'établissent à {F2}. {F3} en concentre à
+> elle seule {F4}, très loin devant {F5} qui n'en réalise que {F6}. »
+>
+> SID : « Les abattages bovins du département s'établissent à 14 436 têtes.
+> Fokoué en concentre à elle seule 55,3 %, très loin devant Dschang qui n'en
+> réalise que 669 têtes. »
+
+**Tout caractère numérique dans la sortie du modèle entraîne le rejet.** Un
+chiffre faux n'est pas rendu improbable : il est rendu structurellement
+impossible. Ce qu'apporte le modèle est la langue — ici « à elle seule »,
+« très loin devant » — et rien d'autre.
+
+**Règle 2 — Sept contrôles automatiques, tous bloquants.**
+
+| Défaillance | Verrou |
+|---|---|
+| Chiffre inventé | tout caractère numérique → rejet |
+| Cause inventée | connecteurs explicatifs interdits (*à cause de, en raison de, grâce à, s'explique par*) |
+| Arrondissement non fourni | seuls les six noms, et seulement ceux présents dans les faits |
+| Sens inversé (« baisse » pour une hausse) | le sens du fait est connu : antonymes interdits |
+| Langue, longueur, sortie vide | contrôle de forme |
+| Serveur absent, lent, en panne | repli sur la phrase type |
+| Tout le reste | relecture et validation par l'émetteur (§ 4) |
+
+Deux tentatives, puis repli. Un texte qui échoue à un seul contrôle n'est
+jamais affiché.
+
+**Règle 3 — Le modèle n'est jamais le seul chemin.**
+
+La phrase type est produite en premier, toujours. Le modèle l'améliore.
+**Débrancher le modèle ne casse rien** — le rapport sort, hors ligne compris.
+
+**Règle 4 — Aucun texte libre saisi par un agent n'entre dans le prompt.**
+
+Les champs libres (`T44.pointDepart`, `T32.localites`, `T33.observations`,
+`T31.mesurePrise`…) sont tapés par des agents. Un texte saisi qui atteindrait
+le modèle pourrait en détourner la rédaction. Seuls entrent des **chiffres
+calculés** et des **libellés de référentiel**. Cette porte pourra être rouverte
+plus tard, encadrée.
+
+### 1.3 Choix du modèle : différé, et tranché sur pièces
+
+Aucun modèle n'est retenu à ce jour. Critères, par ordre d'importance :
+**qualité du français administratif**, respect strict de la consigne, licence
+compatible avec un service public, empreinte mémoire tenable sans carte
+graphique.
+
+Deux constats guident le choix :
+
+- parce que le modèle ne calcule pas, **un petit modèle suffit** — la
+  difficulté a été retirée de son travail ;
+- l'usage est **par lots** (une quarantaine de paragraphes par trimestre, en
+  préparation) et non interactif : la lenteur ne coûte rien, on peut donc
+  privilégier la qualité sur la vitesse.
+
+**Méthode de décision** : lorsque le moteur de calcul tournera, faire produire
+dix tableaux réels par trois modèles candidats et les soumettre **à l'aveugle**
+au DD. Le choix se fait sur le texte, pas sur une fiche technique.
+
+### 1.4 Ce qui reste vrai des positions antérieures
+
+La défiance de la hiérarchie envers les modèles de langage reste le point
+central — et c'est la règle 1 qui y répond : le texte peut être stylé, les
+chiffres restent calculés et traçables jusqu'à la saisie.
 
 Les colonnes `brouillonIA` et `promptIA` de `SyntheseSection`
 (`prisma/schema.prisma:524` et `:525`) sont conservées — leur nom est
@@ -200,11 +274,25 @@ Les étapes E5 à E8 sont inchangées.
 
 ## 8. Ce que ce choix coûte, et ce qu'il ne coûte pas
 
-Aucun abonnement, aucun serveur supplémentaire, aucune carte graphique. Le
-moteur fonctionne **hors ligne** — un DA sans réseau dispose du même texte
-proposé qu'au bureau.
+Le moteur de règles seul ne coûte **aucun abonnement, aucun serveur, aucune
+carte graphique**, et fonctionne **hors ligne** : un DA sans réseau dispose du
+même texte proposé qu'au bureau.
 
-En contrepartie, le texte est **factuel et répétitif** : il énonce ce que les
-chiffres disent, il ne fait ni contexte, ni hypothèse, ni recommandation. C'est
-précisément ce qui reste au rédacteur humain, et c'est ce qui donne sa valeur à
-sa signature.
+En contrepartie, son texte est **factuel et répétitif**. C'est la raison d'être
+de la couche modèle du § 1.2 — et la raison pour laquelle celle-ci reste
+strictement optionnelle : elle ajoute de la langue, elle ne conditionne rien.
+
+Ce que le modèle n'apportera **jamais**, quelle que soit sa taille : le
+contexte, l'hypothèse, la recommandation, la décision. Cela reste au rédacteur
+humain, et c'est ce qui donne sa valeur à sa signature.
+
+### Ordre de construction
+
+La couche modèle se branche **à un seul endroit**, en bout de chaîne, sur une
+base de faits qui doit exister d'abord. Tout ce qui la précède — calculs, base
+de faits, phrases types, validation, « voir le calcul » — est à construire de
+toute façon.
+
+**Conséquence pratique : la décision d'activer ou non le modèle n'a pas à être
+prise maintenant.** Elle se prendra devant les phrases types produites sur de
+vraies données. Si elles suffisent, rien n'aura été dépensé.
