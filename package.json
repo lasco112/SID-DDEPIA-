@@ -13,6 +13,7 @@
     "seed:demo": "tsx prisma/seed-demo.ts",
     "cron": "tsx src/server/cron/alerts.ts",
     "postinstall": "prisma generate",
+    "test:periodes": "node --import tsx --test tests/calendrier.test.ts",
     "test:golden": "node --env-file=.env --import tsx --test tests/golden-mensuel.test.ts",
     "golden:generer": "node --env-file=.env --import tsx scripts/generer-golden-mensuel.ts"
   },
