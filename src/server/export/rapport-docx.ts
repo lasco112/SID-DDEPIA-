@@ -287,16 +287,18 @@ export async function verifierCompletudeDD(db: PrismaClient, periodeId: string):
   const daManquants = arrondissements
     .filter((a) => !rapports.some((r) => r.arrondissementId === a.id && (r.statut === "SOUMIS" || r.statut === "CLOTURE")))
     .map((a) => a.nom);
-  // Le BAC ne contrôle aucun des 28 tableaux (dictionnaire de données) : sa validation
-  // n'est pas bloquante pour le rapport MENSUEL (demande explicite du DD). Elle
-  // redeviendra obligatoire pour les périodes trimestrielle/semestrielle/annuelle
-  // (phase ultérieure, non encore implémentée).
+  // Les QUATRE sections comptent, BAC compris (décision du DD du 11 août 2026).
+  // Le BAC ne porte aucun des 28 tableaux mensuels, mais il porte les treize
+  // premiers tableaux du canevas trimestriel — personnel, infrastructures,
+  // matériel, budget, crédits, recettes — et sa validation engage son chef au
+  // même titre que les trois autres. Le DD conserve « Valider en tant que DD »
+  // si un chef est défaillant.
+  //
   // On part de la liste COMPLÈTE des sections (pas seulement celles qui ont déjà une ligne
   // ValidationSection) : une section jamais touchée par son chef n'a pas encore de ligne
   // en base (elle n'est créée qu'à la 1ère validation, ou par le cron de rappel de fin de
   // mois) et doit compter comme non validée, pas être ignorée silencieusement.
   const sectionsNonValidees = sections
-    .filter((s) => !(periode.type === "MENSUEL" && s.code === "BAC"))
     .filter((s) => validations.find((v) => v.sectionId === s.id)?.statut !== "VALIDE")
     .map((s) => s.nom);
   return { complet: daManquants.length === 0 && sectionsNonValidees.length === 0, daManquants, sectionsNonValidees };

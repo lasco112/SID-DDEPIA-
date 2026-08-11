@@ -74,8 +74,8 @@ export default async function DDSupervisionPage() {
 
   // État des validations (§10) : le DD doit voir précisément ce qui bloque la
   // clôture avant de décider d'attendre ou de valider lui-même.
-  // Le BAC ne contrôle aucun des 28 tableaux : sa validation n'est pas
-  // bloquante pour une période mensuelle — même règle que verifierCompletudeDD.
+  // Les quatre sections comptent, BAC compris — même règle que
+  // verifierCompletudeDD, dont cet écran ne doit jamais diverger.
   const etatArrondissements = arrondissements.map((a) => ({
     nom: a.nom,
     soumis: rapports.some((r) => r.arrondissementId === a.id && (r.statut === 'SOUMIS' || r.statut === 'CLOTURE')),
@@ -87,7 +87,7 @@ export default async function DDSupervisionPage() {
       code: s.code,
       nom: s.nom,
       valide: v?.statut === 'VALIDE',
-      bloquante: s.code !== 'BAC',
+      bloquante: true,
       parLeDD: Boolean(v?.validationDirecteDD),
       validePar: v?.validePar?.nom ?? null,
       dateValidation: v?.dateValidation?.toISOString() ?? null,
