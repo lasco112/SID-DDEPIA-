@@ -15,7 +15,10 @@
     "postinstall": "prisma generate",
     "test:periodes": "node --import tsx --test tests/calendrier.test.ts",
     "test:golden": "node --env-file=.env --import tsx --test tests/golden-mensuel.test.ts",
-    "golden:generer": "node --env-file=.env --import tsx scripts/generer-golden-mensuel.ts"
+    "golden:generer": "node --env-file=.env --import tsx scripts/generer-golden-mensuel.ts",
+    "test:regles": "node --env-file=.env --import tsx --test tests/regles-champs.test.ts",
+    "test:agregation": "node --env-file=.env --import tsx --test tests/agregation-trimestre.test.ts",
+    "trimestre:donnees": "node --env-file=.env --import tsx scripts/donnees-fictives-trimestre.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.12.0",
