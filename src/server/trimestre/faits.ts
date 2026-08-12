@@ -110,7 +110,7 @@ export function faitsDunChamp(
   if (valeur == null) {
     faits.push({
       fieldCode, libelle, type: "COMPLETUDE", importance: 0.5,
-      phrase: `${libelle} : aucune donnée renseignée pour ${libelleOfficiel(ctx.periode)}.`,
+      phrase: `${libelle} — aucune donnée renseignée sur la période.`,
       calcul: `Aucun des six arrondissements n'a renseigné ce champ sur les mois de la période.`,
     });
     return faits;
@@ -128,26 +128,26 @@ export function faitsDunChamp(
     if (Math.abs(variation) >= seuils.rupture) {
       faits.push({
         fieldCode, libelle, type: "RUPTURE", importance: Math.min(1, Math.abs(variation)),
-        phrase: `${libelle} : ${nombre(valeur)}, ${variation > 0 ? "en très forte hausse" : "en très forte baisse"} sur un an (${pourcentage(variation)}). Cette variation mérite un examen.`,
+        phrase: `${libelle} — ${nombre(valeur)} sur la période, ${variation > 0 ? "en très forte hausse" : "en très forte baisse"} par rapport au ${libelleOfficiel(ctx.periodePrecedente).toLowerCase()} (${pourcentage(variation)}). Un écart de cette ampleur appelle une vérification.`,
         calcul,
       });
     } else if (Math.abs(variation) >= seuils.stabilite) {
       faits.push({
         fieldCode, libelle, type: "EVOLUTION", importance: Math.min(0.9, Math.abs(variation) * 2),
-        phrase: `${libelle} : ${nombre(valeur)}, ${variation > 0 ? "en hausse" : "en recul"} de ${pourcentage(Math.abs(variation)).replace("+", "")} sur un an.`,
+        phrase: `${libelle} — ${nombre(valeur)} sur la période, ${variation > 0 ? "en progression" : "en recul"} de ${pourcentage(Math.abs(variation)).replace("+", "")} par rapport au ${libelleOfficiel(ctx.periodePrecedente).toLowerCase()}.`,
         calcul,
       });
     } else {
       faits.push({
         fieldCode, libelle, type: "EVOLUTION", importance: 0.15,
-        phrase: `${libelle} : ${nombre(valeur)}, stable par rapport à ${libelleOfficiel(ctx.periodePrecedente)} (${pourcentage(variation)}).`,
+        phrase: `${libelle} — ${nombre(valeur)} sur la période, soit un niveau comparable à celui du ${libelleOfficiel(ctx.periodePrecedente).toLowerCase()} (${pourcentage(variation)}).`,
         calcul,
       });
     }
   } else if (avant === 0 && valeur > 0) {
     faits.push({
       fieldCode, libelle, type: "RUPTURE", importance: 0.9,
-      phrase: `${libelle} : ${nombre(valeur)}, alors que rien n'avait été enregistré au ${libelleOfficiel(ctx.periodePrecedente)}.`,
+      phrase: `${libelle} — ${nombre(valeur)}, alors que rien n'avait été enregistré au ${libelleOfficiel(ctx.periodePrecedente).toLowerCase()}.`,
       calcul: `${nombre(valeur)} contre 0 — l'évolution en pourcentage n'a pas de sens à partir de zéro.`,
     });
   }
@@ -161,13 +161,13 @@ export function faitsDunChamp(
     if (a < b && b < c) {
       faits.push({
         fieldCode, libelle, type: "TENDANCE", importance: 0.6,
-        phrase: `${libelle} progresse d'un mois sur l'autre tout au long de la période.`,
+        phrase: `La progression se poursuit d'un mois à l'autre sur toute la période.`,
         calcul: `${detailMois}.`,
       });
     } else if (a > b && b > c) {
       faits.push({
         fieldCode, libelle, type: "TENDANCE", importance: 0.7,
-        phrase: `${libelle} recule d'un mois sur l'autre tout au long de la période.`,
+        phrase: `Le recul se poursuit d'un mois à l'autre sur toute la période.`,
         calcul: `${detailMois}.`,
       });
     } else {
@@ -179,7 +179,7 @@ export function faitsDunChamp(
         const i = [a, b, c].indexOf(max);
         faits.push({
           fieldCode, libelle, type: "TENDANCE", importance: 0.65,
-          phrase: `${libelle} : le mois de ${nomMois[i]} représente à lui seul ${pourcentage(max / total).replace("+", "")} de la période.`,
+          phrase: `Le mois de ${nomMois[i]} en concentre à lui seul ${pourcentage(max / total).replace("+", "")}.`,
           calcul: `${detailMois} — total ${nombre(total)}.`,
         });
       }
@@ -199,13 +199,13 @@ export function faitsDunChamp(
     if (part >= seuils.concentration) {
       faits.push({
         fieldCode, libelle, type: "CONCENTRATION", importance: Math.min(1, part),
-        phrase: `${premier.nom} concentre à elle seule ${pourcentage(part).replace("+", "")} du total départemental de « ${libelle} ».`,
+        phrase: `${premier.nom} en représente à elle seule ${pourcentage(part).replace("+", "")} du total départemental.`,
         calcul: `${nombre(premier.valeur)} sur ${nombre(totalArr)}, soit ${pourcentage(part).replace("+", "")}. Suivent ${contributions.slice(1, 3).map((c) => `${c.nom} ${nombre(c.valeur)}`).join(", ")}.`,
       });
     } else {
       faits.push({
         fieldCode, libelle, type: "CONTRIBUTION", importance: 0.25,
-        phrase: `${libelle} : ${premier.nom} en tête avec ${pourcentage(part).replace("+", "")} du total.`,
+        phrase: `${premier.nom} vient en tête, avec ${pourcentage(part).replace("+", "")} du total.`,
         calcul: contributions.map((c) => `${c.nom} ${nombre(c.valeur)} (${pourcentage(c.valeur / totalArr).replace("+", "")})`).join(" · "),
       });
     }
@@ -219,7 +219,7 @@ export function faitsDunChamp(
       if (ecartRelatif <= seuils.decrochage) {
         faits.push({
           fieldCode, libelle, type: "DECROCHAGE", importance: Math.min(1, Math.abs(ecartRelatif)),
-          phrase: `${dernier.nom} se situe nettement en dessous des autres arrondissements pour « ${libelle} » (${pourcentage(ecartRelatif)} par rapport à leur moyenne).`,
+          phrase: `${dernier.nom} reste nettement en retrait, ${pourcentage(Math.abs(ecartRelatif)).replace("+", "")} en dessous de la moyenne des autres arrondissements.`,
           calcul: `${nombre(dernier.valeur)} contre une moyenne de ${nombre(Math.round(moyenneAutres * 1000) / 1000)} pour les ${autres.length} autres.`,
         });
       }
@@ -232,7 +232,7 @@ export function faitsDunChamp(
     const noms = muets.map((v) => ctx.arrondissements.get(v.arrondissementCode!) ?? v.arrondissementCode!);
     faits.push({
       fieldCode, libelle, type: "COMPLETUDE", importance: 0.4 + 0.1 * muets.length,
-      phrase: `${libelle} : ${noms.length === 1 ? `${noms[0]} n'a rien renseigné` : `${noms.length} arrondissements n'ont rien renseigné`} (${noms.join(", ")}).`,
+      phrase: `${libelle} — ${noms.length === 1 ? `${noms[0]} n'a rien renseigné` : `${noms.length} arrondissements n'ont rien renseigné` } (${noms.join(", ")}).`,
       calcul: `${contributions.length} arrondissement(s) sur ${courantParArr.length} ont renseigné ce champ.`,
     });
   }
@@ -300,12 +300,18 @@ const ORDRE_NARRATIF: TypeFait[] = [
  * Les faits gardent leur ordre d'importance à l'intérieur d'un même type.
  */
 export function rediger(faits: Fait[]): string {
+  if (faits.length === 0) return "";
   const rang = (t: TypeFait) => {
     const i = ORDRE_NARRATIF.indexOf(t);
     return i === -1 ? ORDRE_NARRATIF.length : i;
   };
-  return [...faits]
-    .sort((a, b) => rang(a.type) - rang(b.type) || b.importance - a.importance)
-    .map((f) => f.phrase)
-    .join(" ");
+  const ordonnes = [...faits].sort((a, b) => rang(a.type) - rang(b.type) || b.importance - a.importance);
+
+  // Seules les phrases d'ouverture nomment l'indicateur ; les suivantes y
+  // renvoient par « en » ou par le nom de l'arrondissement. Si le paragraphe
+  // ne commence par aucune d'elles, ce renvoi n'aurait pas d'antécédent : on
+  // rétablit le sujet.
+  const PORTE_LE_SUJET: TypeFait[] = ["EVOLUTION", "RUPTURE", "COMPLETUDE"];
+  const texte = ordonnes.map((f) => f.phrase).join(" ");
+  return PORTE_LE_SUJET.includes(ordonnes[0].type) ? texte : `${ordonnes[0].libelle} — ${texte}`;
 }
