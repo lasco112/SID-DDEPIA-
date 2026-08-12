@@ -274,7 +274,38 @@ export function produireFaits(
   return tous.sort((a, b) => b.importance - a.importance);
 }
 
-/** Rédige le paragraphe d'un champ à partir de ses faits, du plus notable au moins. */
+/**
+ * Ordre de LECTURE d'un paragraphe, qui n'est pas l'ordre d'importance.
+ *
+ * Un rédacteur administratif annonce d'abord le chiffre et son évolution, puis
+ * la structure (qui pèse, qui décroche), et termine par les réserves. Trier par
+ * importance mettrait « Fongo-Tongo décroche de 72 % » avant d'avoir dit de
+ * quoi on parle et combien.
+ */
+const ORDRE_NARRATIF: TypeFait[] = [
+  "EVOLUTION",      // le chiffre et son mouvement — la phrase d'ouverture
+  "TENDANCE",       // ce que disent les trois mois entre eux
+  "RUPTURE",        // l'anomalie franche, si elle existe
+  "CONCENTRATION",  // qui pèse dans le total
+  "CONTRIBUTION",
+  "DECROCHAGE",     // qui reste en arrière
+  // Le détecteur COHERENCE (contrôles croisés du canevas, tableau 69 = 16+24+
+  // 29+39+45) n'est pas encore écrit ; sa place dans le récit est ici, juste
+  // avant les réserves.
+  "COMPLETUDE",     // les réserves, toujours en dernier
+];
+
+/**
+ * Rédige le paragraphe d'un champ à partir de ses faits.
+ * Les faits gardent leur ordre d'importance à l'intérieur d'un même type.
+ */
 export function rediger(faits: Fait[]): string {
-  return faits.map((f) => f.phrase).join(" ");
+  const rang = (t: TypeFait) => {
+    const i = ORDRE_NARRATIF.indexOf(t);
+    return i === -1 ? ORDRE_NARRATIF.length : i;
+  };
+  return [...faits]
+    .sort((a, b) => rang(a.type) - rang(b.type) || b.importance - a.importance)
+    .map((f) => f.phrase)
+    .join(" ");
 }
