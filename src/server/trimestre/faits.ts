@@ -110,7 +110,9 @@ export function faitsDunChamp(
   if (valeur == null) {
     faits.push({
       fieldCode, libelle, type: "COMPLETUDE", importance: 0.5,
-      phrase: `${libelle} — aucune donnée renseignée sur la période.`,
+      // Le sujet est rétabli par rediger() : le répéter ici le ferait
+      // apparaître deux fois quand la phrase ouvre le paragraphe.
+      phrase: `aucune donnée renseignée sur la période.`,
       calcul: `Aucun des six arrondissements n'a renseigné ce champ sur les mois de la période.`,
     });
     return faits;
@@ -232,7 +234,10 @@ export function faitsDunChamp(
     const noms = muets.map((v) => ctx.arrondissements.get(v.arrondissementCode!) ?? v.arrondissementCode!);
     faits.push({
       fieldCode, libelle, type: "COMPLETUDE", importance: 0.4 + 0.1 * muets.length,
-      phrase: `${libelle} — ${noms.length === 1 ? `${noms[0]} n'a rien renseigné` : `${noms.length} arrondissements n'ont rien renseigné` } (${noms.join(", ")}).`,
+      phrase:
+        noms.length === 1
+          ? `${noms[0]} n'a rien renseigné pour cet indicateur.`
+          : `${noms.length} arrondissements n'ont rien renseigné : ${noms.join(", ")}.`,
       calcul: `${contributions.length} arrondissement(s) sur ${courantParArr.length} ont renseigné ce champ.`,
     });
   }
@@ -311,7 +316,7 @@ export function rediger(faits: Fait[]): string {
   // renvoient par « en » ou par le nom de l'arrondissement. Si le paragraphe
   // ne commence par aucune d'elles, ce renvoi n'aurait pas d'antécédent : on
   // rétablit le sujet.
-  const PORTE_LE_SUJET: TypeFait[] = ["EVOLUTION", "RUPTURE", "COMPLETUDE"];
+  const PORTE_LE_SUJET: TypeFait[] = ["EVOLUTION", "RUPTURE"];
   const texte = ordonnes.map((f) => f.phrase).join(" ");
   return PORTE_LE_SUJET.includes(ordonnes[0].type) ? texte : `${ordonnes[0].libelle} — ${texte}`;
 }
