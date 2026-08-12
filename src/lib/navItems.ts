@@ -29,6 +29,7 @@ export const NAV_PAR_ROLE: Record<string, NavItem[]> = {
     { href: "/dd/supervision", label: "Supervision" },
     { href: "/dd/donnees", label: "Données par arrondissement" },
     { href: "/dd/periodes", label: "Gestion des périodes" },
+    { href: "/dd/trimestre", label: "Rapport trimestriel" },
     { href: "/dd/rapports-thematiques", label: "Rapports thématiques" },
     { href: "/admin/utilisateurs", label: "Comptes utilisateurs" },
     { href: "/etablissements", label: "Établissements" },
