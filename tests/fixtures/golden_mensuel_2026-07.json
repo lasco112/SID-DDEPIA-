@@ -2,7 +2,7 @@
   "meta": {
     "periode": "2026-07",
     "periodeId": "cmrcmc06h000w63r5emfyc1qd",
-    "figeLe": "2026-08-10T05:53:50.616Z",
+    "figeLe": "2026-08-12T19:34:05.949Z",
     "champsVolatilesExclus": [
       "DATE_GENERATION"
     ],
@@ -1085,440 +1085,317 @@
     ],
     "T42": [
       {
-        "ARR_NOM": "Dschang",
-        "items": [
-          {
-            "espece": "Aulacodes",
-            "paysOrigine": "Guinée Équatoriale",
-            "effectif": "117"
-          },
-          {
-            "espece": "Primates",
-            "paysOrigine": "Gabon",
-            "effectif": "46"
-          },
-          {
-            "espece": "Aulacodes",
-            "paysOrigine": "Guinée Équatoriale",
-            "effectif": "129"
-          }
-        ],
-        "effectif_SOUSTOTAL": "292"
+        "espece": "Aulacodes",
+        "paysOrigine": "Guinée Équatoriale",
+        "effectif": "246"
       },
       {
-        "ARR_NOM": "Fokoué",
-        "items": [
-          {
-            "espece": "Caprins",
-            "paysOrigine": "République Centrafricaine",
-            "effectif": "7"
-          },
-          {
-            "espece": "Bovins",
-            "paysOrigine": "Nigeria",
-            "effectif": "37"
-          },
-          {
-            "espece": "Aulacodes",
-            "paysOrigine": "Tchad",
-            "effectif": "131"
-          },
-          {
-            "espece": "Equins",
-            "paysOrigine": "Guinée Équatoriale",
-            "effectif": "151"
-          }
-        ],
-        "effectif_SOUSTOTAL": "326"
+        "espece": "Primates",
+        "paysOrigine": "Gabon",
+        "effectif": "46"
       },
       {
-        "ARR_NOM": "Fongo-Tongo",
-        "items": [
-          {
-            "espece": "Ovins",
-            "paysOrigine": "Gabon",
-            "effectif": "5"
-          },
-          {
-            "espece": "Félins",
-            "paysOrigine": "Tchad",
-            "effectif": "200"
-          }
-        ],
-        "effectif_SOUSTOTAL": "205"
+        "espece": "Caprins",
+        "paysOrigine": "République Centrafricaine",
+        "effectif": "7"
       },
       {
-        "ARR_NOM": "Nkong-Ni",
-        "items": [
-          {
-            "espece": "Cobayes",
-            "paysOrigine": "Guinée Équatoriale",
-            "effectif": "112"
-          },
-          {
-            "espece": "Lapins",
-            "paysOrigine": "Tchad",
-            "effectif": "60"
-          },
-          {
-            "espece": "Ovins",
-            "paysOrigine": "République Centrafricaine",
-            "effectif": "16"
-          }
-        ],
-        "effectif_SOUSTOTAL": "188"
+        "espece": "Bovins",
+        "paysOrigine": "Nigeria",
+        "effectif": "37"
       },
       {
-        "ARR_NOM": "Penka-Michel",
-        "items": [
-          {
-            "espece": "Primates",
-            "paysOrigine": "Tchad",
-            "effectif": "175"
-          },
-          {
-            "espece": "Ovins",
-            "paysOrigine": "Tchad",
-            "effectif": "114"
-          },
-          {
-            "espece": "Equins",
-            "paysOrigine": "République Centrafricaine",
-            "effectif": "88"
-          }
-        ],
-        "effectif_SOUSTOTAL": "377"
+        "espece": "Aulacodes",
+        "paysOrigine": "Tchad",
+        "effectif": "131"
       },
       {
-        "ARR_NOM": "Santchou",
-        "items": [
-          {
-            "espece": "Cobayes",
-            "paysOrigine": "Guinée Équatoriale",
-            "effectif": "283"
-          },
-          {
-            "espece": "Ovins",
-            "paysOrigine": "Gabon",
-            "effectif": "13"
-          },
-          {
-            "espece": "Caprins",
-            "paysOrigine": "Tchad",
-            "effectif": "288"
-          }
-        ],
-        "effectif_SOUSTOTAL": "584"
+        "espece": "Equins",
+        "paysOrigine": "Guinée Équatoriale",
+        "effectif": "151"
+      },
+      {
+        "espece": "Ovins",
+        "paysOrigine": "Gabon",
+        "effectif": "18"
+      },
+      {
+        "espece": "Félins",
+        "paysOrigine": "Tchad",
+        "effectif": "200"
+      },
+      {
+        "espece": "Cobayes",
+        "paysOrigine": "Guinée Équatoriale",
+        "effectif": "395"
+      },
+      {
+        "espece": "Lapins",
+        "paysOrigine": "Tchad",
+        "effectif": "60"
+      },
+      {
+        "espece": "Ovins",
+        "paysOrigine": "République Centrafricaine",
+        "effectif": "16"
+      },
+      {
+        "espece": "Primates",
+        "paysOrigine": "Tchad",
+        "effectif": "175"
+      },
+      {
+        "espece": "Ovins",
+        "paysOrigine": "Tchad",
+        "effectif": "114"
+      },
+      {
+        "espece": "Equins",
+        "paysOrigine": "République Centrafricaine",
+        "effectif": "88"
+      },
+      {
+        "espece": "Caprins",
+        "paysOrigine": "Tchad",
+        "effectif": "288"
       }
     ],
     "T43": [
       {
-        "ARR_NOM": "Dschang",
-        "items": [
-          {
-            "espece": "Ovins",
-            "paysProvenance": "République Centrafricaine",
-            "paysDestination": "Guinée Équatoriale",
-            "effectif": "226"
-          },
-          {
-            "espece": "Ovins",
-            "paysProvenance": "Nigeria",
-            "paysDestination": "Gabon",
-            "effectif": "181"
-          },
-          {
-            "espece": "Asins",
-            "paysProvenance": "Gabon",
-            "paysDestination": "République Centrafricaine",
-            "effectif": "191"
-          },
-          {
-            "espece": "Porcins",
-            "paysProvenance": "Guinée Équatoriale",
-            "paysDestination": "Nigeria",
-            "effectif": "206"
-          }
-        ],
-        "effectif_SOUSTOTAL": "804"
+        "espece": "Ovins",
+        "paysProvenance": "République Centrafricaine",
+        "paysDestination": "Guinée Équatoriale",
+        "effectif": "226"
       },
       {
-        "ARR_NOM": "Fokoué",
-        "items": [
-          {
-            "espece": "Primates",
-            "paysProvenance": "Tchad",
-            "paysDestination": "Tchad",
-            "effectif": "185"
-          },
-          {
-            "espece": "Asins",
-            "paysProvenance": "Tchad",
-            "paysDestination": "Nigeria",
-            "effectif": "279"
-          },
-          {
-            "espece": "Primates",
-            "paysProvenance": "Guinée Équatoriale",
-            "paysDestination": "République Centrafricaine",
-            "effectif": "249"
-          }
-        ],
-        "effectif_SOUSTOTAL": "713"
+        "espece": "Ovins",
+        "paysProvenance": "Nigeria",
+        "paysDestination": "Gabon",
+        "effectif": "181"
       },
       {
-        "ARR_NOM": "Fongo-Tongo",
-        "items": [
-          {
-            "espece": "Aulacodes",
-            "paysProvenance": "République Centrafricaine",
-            "paysDestination": "Nigeria",
-            "effectif": "138"
-          },
-          {
-            "espece": "Caprins",
-            "paysProvenance": "Nigeria",
-            "paysDestination": "Gabon",
-            "effectif": "106"
-          }
-        ],
-        "effectif_SOUSTOTAL": "244"
+        "espece": "Asins",
+        "paysProvenance": "Gabon",
+        "paysDestination": "République Centrafricaine",
+        "effectif": "191"
       },
       {
-        "ARR_NOM": "Nkong-Ni",
-        "items": [
-          {
-            "espece": "Caprins",
-            "paysProvenance": "Tchad",
-            "paysDestination": "République Centrafricaine",
-            "effectif": "31"
-          },
-          {
-            "espece": "Equins",
-            "paysProvenance": "Guinée Équatoriale",
-            "paysDestination": "République Centrafricaine",
-            "effectif": "136"
-          }
-        ],
-        "effectif_SOUSTOTAL": "167"
+        "espece": "Porcins",
+        "paysProvenance": "Guinée Équatoriale",
+        "paysDestination": "Nigeria",
+        "effectif": "206"
       },
       {
-        "ARR_NOM": "Penka-Michel",
-        "items": [
-          {
-            "espece": "Bovins",
-            "paysProvenance": "Guinée Équatoriale",
-            "paysDestination": "République Centrafricaine",
-            "effectif": "25"
-          },
-          {
-            "espece": "Equins",
-            "paysProvenance": "Gabon",
-            "paysDestination": "République Centrafricaine",
-            "effectif": "167"
-          },
-          {
-            "espece": "Canins",
-            "paysProvenance": "République Centrafricaine",
-            "paysDestination": "Gabon",
-            "effectif": "286"
-          }
-        ],
-        "effectif_SOUSTOTAL": "478"
+        "espece": "Primates",
+        "paysProvenance": "Tchad",
+        "paysDestination": "Tchad",
+        "effectif": "185"
       },
       {
-        "ARR_NOM": "Santchou",
-        "items": [
-          {
-            "espece": "Caprins",
-            "paysProvenance": "Nigeria",
-            "paysDestination": "République Centrafricaine",
-            "effectif": "261"
-          },
-          {
-            "espece": "Asins",
-            "paysProvenance": "Nigeria",
-            "paysDestination": "Tchad",
-            "effectif": "165"
-          },
-          {
-            "espece": "Porcins",
-            "paysProvenance": "Nigeria",
-            "paysDestination": "République Centrafricaine",
-            "effectif": "122"
-          },
-          {
-            "espece": "Asins",
-            "paysProvenance": "Guinée Équatoriale",
-            "paysDestination": "Guinée Équatoriale",
-            "effectif": "145"
-          }
-        ],
-        "effectif_SOUSTOTAL": "693"
+        "espece": "Asins",
+        "paysProvenance": "Tchad",
+        "paysDestination": "Nigeria",
+        "effectif": "279"
+      },
+      {
+        "espece": "Primates",
+        "paysProvenance": "Guinée Équatoriale",
+        "paysDestination": "République Centrafricaine",
+        "effectif": "249"
+      },
+      {
+        "espece": "Aulacodes",
+        "paysProvenance": "République Centrafricaine",
+        "paysDestination": "Nigeria",
+        "effectif": "138"
+      },
+      {
+        "espece": "Caprins",
+        "paysProvenance": "Nigeria",
+        "paysDestination": "Gabon",
+        "effectif": "106"
+      },
+      {
+        "espece": "Caprins",
+        "paysProvenance": "Tchad",
+        "paysDestination": "République Centrafricaine",
+        "effectif": "31"
+      },
+      {
+        "espece": "Equins",
+        "paysProvenance": "Guinée Équatoriale",
+        "paysDestination": "République Centrafricaine",
+        "effectif": "136"
+      },
+      {
+        "espece": "Bovins",
+        "paysProvenance": "Guinée Équatoriale",
+        "paysDestination": "République Centrafricaine",
+        "effectif": "25"
+      },
+      {
+        "espece": "Equins",
+        "paysProvenance": "Gabon",
+        "paysDestination": "République Centrafricaine",
+        "effectif": "167"
+      },
+      {
+        "espece": "Canins",
+        "paysProvenance": "République Centrafricaine",
+        "paysDestination": "Gabon",
+        "effectif": "286"
+      },
+      {
+        "espece": "Caprins",
+        "paysProvenance": "Nigeria",
+        "paysDestination": "République Centrafricaine",
+        "effectif": "261"
+      },
+      {
+        "espece": "Asins",
+        "paysProvenance": "Nigeria",
+        "paysDestination": "Tchad",
+        "effectif": "165"
+      },
+      {
+        "espece": "Porcins",
+        "paysProvenance": "Nigeria",
+        "paysDestination": "République Centrafricaine",
+        "effectif": "122"
+      },
+      {
+        "espece": "Asins",
+        "paysProvenance": "Guinée Équatoriale",
+        "paysDestination": "Guinée Équatoriale",
+        "effectif": "145"
       }
     ],
     "T44": [
       {
-        "ARR_NOM": "Dschang",
-        "items": [
-          {
-            "especeOuProduit": "Porcins",
-            "pointDepart": "Dschang — quartier Nord",
-            "destination": "Dschang — quartier Marché",
-            "modeDeplacement": "Train",
-            "effectif": "55"
-          },
-          {
-            "especeOuProduit": "Bovins",
-            "pointDepart": "Dschang — quartier Centre",
-            "destination": "Dschang — quartier Sud",
-            "modeDeplacement": "Moto",
-            "effectif": "187"
-          }
-        ],
-        "effectif_SOUSTOTAL": "242"
+        "especeOuProduit": "Porcins",
+        "pointDepart": "Dschang — quartier Nord",
+        "destination": "Dschang — quartier Marché",
+        "modeDeplacement": "Train",
+        "effectif": "55"
       },
       {
-        "ARR_NOM": "Fokoué",
-        "items": [
-          {
-            "especeOuProduit": "Volailles",
-            "pointDepart": "Fokoué — quartier Marché",
-            "destination": "Fokoué — quartier Marché",
-            "modeDeplacement": "Train",
-            "effectif": "121"
-          },
-          {
-            "especeOuProduit": "Bovins",
-            "pointDepart": "Fokoué — quartier Nord",
-            "destination": "Fokoué — quartier Centre",
-            "modeDeplacement": "Train",
-            "effectif": "129"
-          },
-          {
-            "especeOuProduit": "Porcins",
-            "pointDepart": "Fokoué — quartier Sud",
-            "destination": "Fokoué — quartier Centre",
-            "modeDeplacement": "Train",
-            "effectif": "139"
-          },
-          {
-            "especeOuProduit": "Volailles",
-            "pointDepart": "Fokoué — quartier Marché",
-            "destination": "Fokoué — quartier Centre",
-            "modeDeplacement": "Train",
-            "effectif": "138"
-          }
-        ],
-        "effectif_SOUSTOTAL": "527"
+        "especeOuProduit": "Bovins",
+        "pointDepart": "Dschang — quartier Centre",
+        "destination": "Dschang — quartier Sud",
+        "modeDeplacement": "Moto",
+        "effectif": "187"
       },
       {
-        "ARR_NOM": "Fongo-Tongo",
-        "items": [
-          {
-            "especeOuProduit": "Caprins",
-            "pointDepart": "Fongo-Tongo — quartier Marché",
-            "destination": "Fongo-Tongo — quartier Marché",
-            "modeDeplacement": "À pied",
-            "effectif": "295"
-          },
-          {
-            "especeOuProduit": "Bovins",
-            "pointDepart": "Fongo-Tongo — quartier Centre",
-            "destination": "Fongo-Tongo — quartier Sud",
-            "modeDeplacement": "À pied",
-            "effectif": "280"
-          },
-          {
-            "especeOuProduit": "Bovins",
-            "pointDepart": "Fongo-Tongo — quartier Nord",
-            "destination": "Fongo-Tongo — quartier Sud",
-            "modeDeplacement": "Camion",
-            "effectif": "196"
-          }
-        ],
-        "effectif_SOUSTOTAL": "771"
+        "especeOuProduit": "Volailles",
+        "pointDepart": "Fokoué — quartier Marché",
+        "destination": "Fokoué — quartier Marché",
+        "modeDeplacement": "Train",
+        "effectif": "121"
       },
       {
-        "ARR_NOM": "Nkong-Ni",
-        "items": [
-          {
-            "especeOuProduit": "Caprins",
-            "pointDepart": "Nkong-Ni — quartier Marché",
-            "destination": "Nkong-Ni — quartier Marché",
-            "modeDeplacement": "Camion",
-            "effectif": "277"
-          },
-          {
-            "especeOuProduit": "Porcins",
-            "pointDepart": "Nkong-Ni — quartier Sud",
-            "destination": "Nkong-Ni — quartier Marché",
-            "modeDeplacement": "Moto",
-            "effectif": "288"
-          }
-        ],
-        "effectif_SOUSTOTAL": "565"
+        "especeOuProduit": "Bovins",
+        "pointDepart": "Fokoué — quartier Nord",
+        "destination": "Fokoué — quartier Centre",
+        "modeDeplacement": "Train",
+        "effectif": "129"
       },
       {
-        "ARR_NOM": "Penka-Michel",
-        "items": [
-          {
-            "especeOuProduit": "Caprins",
-            "pointDepart": "Penka-Michel — quartier Nord",
-            "destination": "Penka-Michel — quartier Centre",
-            "modeDeplacement": "Moto",
-            "effectif": "70"
-          },
-          {
-            "especeOuProduit": "Caprins",
-            "pointDepart": "Penka-Michel — quartier Sud",
-            "destination": "Penka-Michel — quartier Marché",
-            "modeDeplacement": "Moto",
-            "effectif": "157"
-          },
-          {
-            "especeOuProduit": "Porcins",
-            "pointDepart": "Penka-Michel — quartier Centre",
-            "destination": "Penka-Michel — quartier Marché",
-            "modeDeplacement": "Camion",
-            "effectif": "115"
-          }
-        ],
-        "effectif_SOUSTOTAL": "342"
+        "especeOuProduit": "Porcins",
+        "pointDepart": "Fokoué — quartier Sud",
+        "destination": "Fokoué — quartier Centre",
+        "modeDeplacement": "Train",
+        "effectif": "139"
       },
       {
-        "ARR_NOM": "Santchou",
-        "items": [
-          {
-            "especeOuProduit": "Volailles",
-            "pointDepart": "Santchou — quartier Marché",
-            "destination": "Santchou — quartier Centre",
-            "modeDeplacement": "À pied",
-            "effectif": "98"
-          },
-          {
-            "especeOuProduit": "Caprins",
-            "pointDepart": "Santchou — quartier Marché",
-            "destination": "Santchou — quartier Sud",
-            "modeDeplacement": "À pied",
-            "effectif": "215"
-          },
-          {
-            "especeOuProduit": "Volailles",
-            "pointDepart": "Santchou — quartier Sud",
-            "destination": "Santchou — quartier Centre",
-            "modeDeplacement": "À pied",
-            "effectif": "137"
-          },
-          {
-            "especeOuProduit": "Bovins",
-            "pointDepart": "Santchou — quartier Centre",
-            "destination": "Santchou — quartier Sud",
-            "modeDeplacement": "À pied",
-            "effectif": "18"
-          }
-        ],
-        "effectif_SOUSTOTAL": "468"
+        "especeOuProduit": "Volailles",
+        "pointDepart": "Fokoué — quartier Marché",
+        "destination": "Fokoué — quartier Centre",
+        "modeDeplacement": "Train",
+        "effectif": "138"
+      },
+      {
+        "especeOuProduit": "Caprins",
+        "pointDepart": "Fongo-Tongo — quartier Marché",
+        "destination": "Fongo-Tongo — quartier Marché",
+        "modeDeplacement": "À pied",
+        "effectif": "295"
+      },
+      {
+        "especeOuProduit": "Bovins",
+        "pointDepart": "Fongo-Tongo — quartier Centre",
+        "destination": "Fongo-Tongo — quartier Sud",
+        "modeDeplacement": "À pied",
+        "effectif": "280"
+      },
+      {
+        "especeOuProduit": "Bovins",
+        "pointDepart": "Fongo-Tongo — quartier Nord",
+        "destination": "Fongo-Tongo — quartier Sud",
+        "modeDeplacement": "Camion",
+        "effectif": "196"
+      },
+      {
+        "especeOuProduit": "Caprins",
+        "pointDepart": "Nkong-Ni — quartier Marché",
+        "destination": "Nkong-Ni — quartier Marché",
+        "modeDeplacement": "Camion",
+        "effectif": "277"
+      },
+      {
+        "especeOuProduit": "Porcins",
+        "pointDepart": "Nkong-Ni — quartier Sud",
+        "destination": "Nkong-Ni — quartier Marché",
+        "modeDeplacement": "Moto",
+        "effectif": "288"
+      },
+      {
+        "especeOuProduit": "Caprins",
+        "pointDepart": "Penka-Michel — quartier Nord",
+        "destination": "Penka-Michel — quartier Centre",
+        "modeDeplacement": "Moto",
+        "effectif": "70"
+      },
+      {
+        "especeOuProduit": "Caprins",
+        "pointDepart": "Penka-Michel — quartier Sud",
+        "destination": "Penka-Michel — quartier Marché",
+        "modeDeplacement": "Moto",
+        "effectif": "157"
+      },
+      {
+        "especeOuProduit": "Porcins",
+        "pointDepart": "Penka-Michel — quartier Centre",
+        "destination": "Penka-Michel — quartier Marché",
+        "modeDeplacement": "Camion",
+        "effectif": "115"
+      },
+      {
+        "especeOuProduit": "Volailles",
+        "pointDepart": "Santchou — quartier Marché",
+        "destination": "Santchou — quartier Centre",
+        "modeDeplacement": "À pied",
+        "effectif": "98"
+      },
+      {
+        "especeOuProduit": "Caprins",
+        "pointDepart": "Santchou — quartier Marché",
+        "destination": "Santchou — quartier Sud",
+        "modeDeplacement": "À pied",
+        "effectif": "215"
+      },
+      {
+        "especeOuProduit": "Volailles",
+        "pointDepart": "Santchou — quartier Sud",
+        "destination": "Santchou — quartier Centre",
+        "modeDeplacement": "À pied",
+        "effectif": "137"
+      },
+      {
+        "especeOuProduit": "Bovins",
+        "pointDepart": "Santchou — quartier Centre",
+        "destination": "Santchou — quartier Sud",
+        "modeDeplacement": "À pied",
+        "effectif": "18"
       }
     ],
     "T51_BOVIN_TAURILLON_MEV_D1_DSC": "12 935",
@@ -3045,290 +2922,218 @@
     "T26_VIANDE_FUMEE_TOTAL_PREC": "—",
     "T32": [
       {
-        "ARR_NOM": "Dschang",
-        "items": [
-          {
-            "maladie": "Pasteurellose",
-            "espece": "Caprins",
-            "vaccin": "Vaccin Newcastle",
-            "effectifVaccine": "53",
-            "localites": "Dschang — quartier Nord"
-          },
-          {
-            "maladie": "Charbon bactéridien",
-            "espece": "Lapins",
-            "vaccin": "Vaccin Gumboro",
-            "effectifVaccine": "251",
-            "localites": "Dschang — quartier Nord"
-          }
-        ],
-        "effectifVaccine_SOUSTOTAL": "304"
+        "maladie": "Pasteurellose",
+        "espece": "Caprins",
+        "vaccin": "Vaccin Newcastle",
+        "effectifVaccine": "53",
+        "localites": "Dschang — quartier Nord"
       },
       {
-        "ARR_NOM": "Fokoué",
-        "items": [
-          {
-            "maladie": "Autre maladie",
-            "espece": "Primates",
-            "vaccin": "Vaccin Gumboro",
-            "effectifVaccine": "61",
-            "localites": "Fokoué — quartier Sud"
-          },
-          {
-            "maladie": "Maladie de Gumboro",
-            "espece": "Caprins",
-            "vaccin": "Vaccin antirabique",
-            "effectifVaccine": "75",
-            "localites": "Fokoué — quartier Nord"
-          },
-          {
-            "maladie": "Maladie de Newcastle",
-            "espece": "Equins",
-            "vaccin": "Vaccin pasteurellose",
-            "effectifVaccine": "108",
-            "localites": "Fokoué — quartier Centre"
-          },
-          {
-            "maladie": "Maladie de Newcastle",
-            "espece": "Félins",
-            "vaccin": "Vaccin Newcastle",
-            "effectifVaccine": "246",
-            "localites": "Fokoué — quartier Sud"
-          }
-        ],
-        "effectifVaccine_SOUSTOTAL": "490"
+        "maladie": "Charbon bactéridien",
+        "espece": "Lapins",
+        "vaccin": "Vaccin Gumboro",
+        "effectifVaccine": "251",
+        "localites": "Dschang — quartier Nord"
       },
       {
-        "ARR_NOM": "Fongo-Tongo",
-        "items": [
-          {
-            "maladie": "Trypanosomose",
-            "espece": "Canins",
-            "vaccin": "Vaccin antirabique",
-            "effectifVaccine": "64",
-            "localites": "Fongo-Tongo — quartier Marché"
-          },
-          {
-            "maladie": "Peste des petits ruminants",
-            "espece": "Asins",
-            "vaccin": "Vaccin PPR",
-            "effectifVaccine": "14",
-            "localites": "Fongo-Tongo — quartier Marché"
-          }
-        ],
-        "effectifVaccine_SOUSTOTAL": "78"
+        "maladie": "Autre maladie",
+        "espece": "Primates",
+        "vaccin": "Vaccin Gumboro",
+        "effectifVaccine": "61",
+        "localites": "Fokoué — quartier Sud"
       },
       {
-        "ARR_NOM": "Nkong-Ni",
-        "items": [
-          {
-            "maladie": "Fièvre aphteuse",
-            "espece": "Bovins",
-            "vaccin": "Vaccin charbon bactéridien",
-            "effectifVaccine": "269",
-            "localites": "Nkong-Ni — quartier Nord"
-          },
-          {
-            "maladie": "Colibacillose aviaire",
-            "espece": "Aulacodes",
-            "vaccin": "Vaccin Gumboro",
-            "effectifVaccine": "110",
-            "localites": "Nkong-Ni — quartier Sud"
-          },
-          {
-            "maladie": "Coccidiose",
-            "espece": "Porcins",
-            "vaccin": "Vaccin charbon bactéridien",
-            "effectifVaccine": "212",
-            "localites": "Nkong-Ni — quartier Centre"
-          }
-        ],
-        "effectifVaccine_SOUSTOTAL": "591"
+        "maladie": "Maladie de Gumboro",
+        "espece": "Caprins",
+        "vaccin": "Vaccin antirabique",
+        "effectifVaccine": "75",
+        "localites": "Fokoué — quartier Nord"
       },
       {
-        "ARR_NOM": "Penka-Michel",
-        "items": [
-          {
-            "maladie": "Peste des petits ruminants",
-            "espece": "Cobayes",
-            "vaccin": "Vaccin charbon bactéridien",
-            "effectifVaccine": "109",
-            "localites": "Penka-Michel — quartier Centre"
-          },
-          {
-            "maladie": "Rage",
-            "espece": "Asins",
-            "vaccin": "Vaccin Gumboro",
-            "effectifVaccine": "158",
-            "localites": "Penka-Michel — quartier Sud"
-          }
-        ],
-        "effectifVaccine_SOUSTOTAL": "267"
+        "maladie": "Maladie de Newcastle",
+        "espece": "Equins",
+        "vaccin": "Vaccin pasteurellose",
+        "effectifVaccine": "108",
+        "localites": "Fokoué — quartier Centre"
       },
       {
-        "ARR_NOM": "Santchou",
-        "items": [
-          {
-            "maladie": "Peste des petits ruminants",
-            "espece": "Asins",
-            "vaccin": "Vaccin Newcastle",
-            "effectifVaccine": "295",
-            "localites": "Santchou — quartier Nord"
-          },
-          {
-            "maladie": "Charbon bactéridien",
-            "espece": "Camelins",
-            "vaccin": "Vaccin charbon bactéridien",
-            "effectifVaccine": "299",
-            "localites": "Santchou — quartier Nord"
-          },
-          {
-            "maladie": "Peste porcine africaine",
-            "espece": "Camelins",
-            "vaccin": "Vaccin Newcastle",
-            "effectifVaccine": "150",
-            "localites": "Santchou — quartier Nord"
-          }
-        ],
-        "effectifVaccine_SOUSTOTAL": "744"
+        "maladie": "Maladie de Newcastle",
+        "espece": "Félins",
+        "vaccin": "Vaccin Newcastle",
+        "effectifVaccine": "246",
+        "localites": "Fokoué — quartier Sud"
+      },
+      {
+        "maladie": "Trypanosomose",
+        "espece": "Canins",
+        "vaccin": "Vaccin antirabique",
+        "effectifVaccine": "64",
+        "localites": "Fongo-Tongo — quartier Marché"
+      },
+      {
+        "maladie": "Peste des petits ruminants",
+        "espece": "Asins",
+        "vaccin": "Vaccin PPR",
+        "effectifVaccine": "14",
+        "localites": "Fongo-Tongo — quartier Marché"
+      },
+      {
+        "maladie": "Fièvre aphteuse",
+        "espece": "Bovins",
+        "vaccin": "Vaccin charbon bactéridien",
+        "effectifVaccine": "269",
+        "localites": "Nkong-Ni — quartier Nord"
+      },
+      {
+        "maladie": "Colibacillose aviaire",
+        "espece": "Aulacodes",
+        "vaccin": "Vaccin Gumboro",
+        "effectifVaccine": "110",
+        "localites": "Nkong-Ni — quartier Sud"
+      },
+      {
+        "maladie": "Coccidiose",
+        "espece": "Porcins",
+        "vaccin": "Vaccin charbon bactéridien",
+        "effectifVaccine": "212",
+        "localites": "Nkong-Ni — quartier Centre"
+      },
+      {
+        "maladie": "Peste des petits ruminants",
+        "espece": "Cobayes",
+        "vaccin": "Vaccin charbon bactéridien",
+        "effectifVaccine": "109",
+        "localites": "Penka-Michel — quartier Centre"
+      },
+      {
+        "maladie": "Rage",
+        "espece": "Asins",
+        "vaccin": "Vaccin Gumboro",
+        "effectifVaccine": "158",
+        "localites": "Penka-Michel — quartier Sud"
+      },
+      {
+        "maladie": "Peste des petits ruminants",
+        "espece": "Asins",
+        "vaccin": "Vaccin Newcastle",
+        "effectifVaccine": "295",
+        "localites": "Santchou — quartier Nord"
+      },
+      {
+        "maladie": "Charbon bactéridien",
+        "espece": "Camelins",
+        "vaccin": "Vaccin charbon bactéridien",
+        "effectifVaccine": "299",
+        "localites": "Santchou — quartier Nord"
+      },
+      {
+        "maladie": "Peste porcine africaine",
+        "espece": "Camelins",
+        "vaccin": "Vaccin Newcastle",
+        "effectifVaccine": "150",
+        "localites": "Santchou — quartier Nord"
       }
     ],
     "T41": [
       {
-        "ARR_NOM": "Dschang",
-        "items": [
-          {
-            "espece": "Asins",
-            "destination": "Dschang — quartier Centre",
-            "effectif": "36"
-          },
-          {
-            "espece": "Asins",
-            "destination": "Dschang — quartier Marché",
-            "effectif": "202"
-          },
-          {
-            "espece": "Lapins",
-            "destination": "Dschang — quartier Marché",
-            "effectif": "28"
-          }
-        ],
-        "effectif_SOUSTOTAL": "266"
+        "espece": "Asins",
+        "destination": "Dschang — quartier Centre",
+        "effectif": "36"
       },
       {
-        "ARR_NOM": "Fokoué",
-        "items": [
-          {
-            "espece": "Porcins",
-            "destination": "Fokoué — quartier Centre",
-            "effectif": "160"
-          },
-          {
-            "espece": "Asins",
-            "destination": "Fokoué — quartier Sud",
-            "effectif": "294"
-          },
-          {
-            "espece": "Bovins",
-            "destination": "Fokoué — quartier Sud",
-            "effectif": "63"
-          },
-          {
-            "espece": "Lapins",
-            "destination": "Fokoué — quartier Sud",
-            "effectif": "126"
-          }
-        ],
-        "effectif_SOUSTOTAL": "643"
+        "espece": "Asins",
+        "destination": "Dschang — quartier Marché",
+        "effectif": "202"
       },
       {
-        "ARR_NOM": "Fongo-Tongo",
-        "items": [
-          {
-            "espece": "Primates",
-            "destination": "Fongo-Tongo — quartier Centre",
-            "effectif": "52"
-          },
-          {
-            "espece": "Equins",
-            "destination": "Fongo-Tongo — quartier Nord",
-            "effectif": "196"
-          },
-          {
-            "espece": "Félins",
-            "destination": "Fongo-Tongo — quartier Marché",
-            "effectif": "168"
-          }
-        ],
-        "effectif_SOUSTOTAL": "416"
+        "espece": "Lapins",
+        "destination": "Dschang — quartier Marché",
+        "effectif": "28"
       },
       {
-        "ARR_NOM": "Nkong-Ni",
-        "items": [
-          {
-            "espece": "Canins",
-            "destination": "Nkong-Ni — quartier Sud",
-            "effectif": "248"
-          },
-          {
-            "espece": "Primates",
-            "destination": "Nkong-Ni — quartier Centre",
-            "effectif": "35"
-          },
-          {
-            "espece": "Félins",
-            "destination": "Nkong-Ni — quartier Marché",
-            "effectif": "199"
-          },
-          {
-            "espece": "Ovins",
-            "destination": "Nkong-Ni — quartier Centre",
-            "effectif": "292"
-          }
-        ],
-        "effectif_SOUSTOTAL": "774"
+        "espece": "Porcins",
+        "destination": "Fokoué — quartier Centre",
+        "effectif": "160"
       },
       {
-        "ARR_NOM": "Penka-Michel",
-        "items": [
-          {
-            "espece": "Bovins",
-            "destination": "Penka-Michel — quartier Centre",
-            "effectif": "286"
-          },
-          {
-            "espece": "Asins",
-            "destination": "Penka-Michel — quartier Sud",
-            "effectif": "211"
-          }
-        ],
-        "effectif_SOUSTOTAL": "497"
+        "espece": "Asins",
+        "destination": "Fokoué — quartier Sud",
+        "effectif": "294"
       },
       {
-        "ARR_NOM": "Santchou",
-        "items": [
-          {
-            "espece": "Primates",
-            "destination": "Santchou — quartier Nord",
-            "effectif": "154"
-          },
-          {
-            "espece": "Ovins",
-            "destination": "Santchou — quartier Centre",
-            "effectif": "270"
-          },
-          {
-            "espece": "Camelins",
-            "destination": "Santchou — quartier Marché",
-            "effectif": "188"
-          },
-          {
-            "espece": "Equins",
-            "destination": "Santchou — quartier Nord",
-            "effectif": "266"
-          }
-        ],
-        "effectif_SOUSTOTAL": "878"
+        "espece": "Bovins",
+        "destination": "Fokoué — quartier Sud",
+        "effectif": "63"
+      },
+      {
+        "espece": "Lapins",
+        "destination": "Fokoué — quartier Sud",
+        "effectif": "126"
+      },
+      {
+        "espece": "Primates",
+        "destination": "Fongo-Tongo — quartier Centre",
+        "effectif": "52"
+      },
+      {
+        "espece": "Equins",
+        "destination": "Fongo-Tongo — quartier Nord",
+        "effectif": "196"
+      },
+      {
+        "espece": "Félins",
+        "destination": "Fongo-Tongo — quartier Marché",
+        "effectif": "168"
+      },
+      {
+        "espece": "Canins",
+        "destination": "Nkong-Ni — quartier Sud",
+        "effectif": "248"
+      },
+      {
+        "espece": "Primates",
+        "destination": "Nkong-Ni — quartier Centre",
+        "effectif": "35"
+      },
+      {
+        "espece": "Félins",
+        "destination": "Nkong-Ni — quartier Marché",
+        "effectif": "199"
+      },
+      {
+        "espece": "Ovins",
+        "destination": "Nkong-Ni — quartier Centre",
+        "effectif": "292"
+      },
+      {
+        "espece": "Bovins",
+        "destination": "Penka-Michel — quartier Centre",
+        "effectif": "286"
+      },
+      {
+        "espece": "Asins",
+        "destination": "Penka-Michel — quartier Sud",
+        "effectif": "211"
+      },
+      {
+        "espece": "Primates",
+        "destination": "Santchou — quartier Nord",
+        "effectif": "154"
+      },
+      {
+        "espece": "Ovins",
+        "destination": "Santchou — quartier Centre",
+        "effectif": "270"
+      },
+      {
+        "espece": "Camelins",
+        "destination": "Santchou — quartier Marché",
+        "effectif": "188"
+      },
+      {
+        "espece": "Equins",
+        "destination": "Santchou — quartier Nord",
+        "effectif": "266"
       }
     ],
     "T54_PORCIN_VERRAT_VENDU_D1_DSC": "297",

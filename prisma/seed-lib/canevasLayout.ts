@@ -41,6 +41,26 @@ export type TableLayout =
   | { kind: "T16_SPECIAL" }
   | { kind: "T17_SPECIAL" };
 
+/**
+ * Tableaux événementiels dont le RAPPORT DÉPARTEMENTAL présente une synthèse
+ * consolidée, et non le détail arrondissement par arrondissement (décision du
+ * Délégué Départemental, 11 août 2026).
+ *
+ * Les lignes identiques sur toutes leurs colonnes descriptives sont fusionnées
+ * et leurs effectifs additionnés : le rapport départemental dit « 4 200 bovins
+ * vaccinés contre le charbon », il ne répète pas six fois la même vaccination.
+ *
+ * Le détail par arrondissement n'est pas perdu : la FICHE DE COLLECTE
+ * (`agregerEvenementsParArrondissement = false`) conserve la liste complète
+ * avec sa colonne Arrondissement, et c'est elle que le chef de section
+ * vétérinaire utilise pour son contrôle de terrain.
+ *
+ * Cette constante est lue par `buildReportTemplates.ts` (mise en page) ET par
+ * `rapport-docx.ts` (données). Les deux DOIVENT rester d'accord : une colonne
+ * dessinée sans donnée, ou l'inverse, produit un document faux.
+ */
+export const EVENEMENTS_SYNTHESE_DEPARTEMENTALE = new Set(["T32", "T41", "T42", "T43", "T44"]);
+
 export const CANEVAS_LAYOUTS: Record<string, TableLayout> = {
   T11: {
     kind: "ARR_ROWS",

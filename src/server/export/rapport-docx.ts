@@ -29,7 +29,7 @@ import Docxtemplater from "docxtemplater";
 import fs from "node:fs/promises";
 import path from "node:path";
 import type { PrismaClient } from "@prisma/client";
-import { CANEVAS_LAYOUTS } from "../../../prisma/seed-lib/canevasLayout";
+import { CANEVAS_LAYOUTS, EVENEMENTS_SYNTHESE_DEPARTEMENTALE } from "../../../prisma/seed-lib/canevasLayout";
 
 const ARR_CODES = ["DSC", "FOK", "FGT", "NKN", "PKM", "STC"] as const;
 const MOIS_FR = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"];
@@ -212,6 +212,85 @@ async function evenementLoopRows(
   });
   rows.sort((a, b) => a.ordre - b.ordre);
   return rows.map(({ row }) => row);
+}
+
+/**
+ * Rapport DD, tableaux de `EVENEMENTS_SYNTHESE_DEPARTEMENTALE` : SYNTHÈSE
+ * départementale, sans détail par arrondissement (décision du DD, 11/08/2026).
+ *
+ * Règle : deux lignes identiques sur TOUTES leurs colonnes descriptives sont
+ * fusionnées, et leurs colonnes numériques additionnées. Une même vaccination
+ * (même maladie, même espèce, même vaccin) déclarée par les six arrondissements
+ * devient une seule ligne portant le total départemental.
+ *
+ * La colonne `localites` du tableau 3.2 est descriptive mais ne doit PAS servir
+ * de clé de regroupement : chaque arrondissement y écrit ses propres villages,
+ * ce qui empêcherait toute fusion. Les valeurs distinctes y sont concaténées.
+ * Le repérage se fait sur la mise en page (`numeric`), donc sans liste codée en
+ * dur : toute colonne non numérique et non libre est une clé.
+ */
+/**
+ * Séparateur des clés composites de regroupement. Un caractère qui ne peut pas
+ * figurer dans une donnée saisie : avec un espace, les couples
+ * ("Peste A", "Bovin") et ("Peste", "A Bovin") produiraient la même clé et
+ * seraient fusionnés à tort.
+ */
+const SEPARATEUR_CLE = "\u001F";
+
+async function evenementLoopRowsSyntheseDept(
+  db: PrismaClient,
+  periodeId: string,
+  templateCode: string,
+  cols: { key: string; label: string; ref?: string; numeric?: boolean }[]
+): Promise<Record<string, unknown>[]> {
+  const lignes = await evenementLoopRows(db, periodeId, templateCode, cols, null);
+
+  // Clés de regroupement : les colonnes descriptives adossées à un référentiel,
+  // plus les colonnes de texte court. `localites` est laissée hors des clés.
+  const CHAMPS_LIBRES = new Set(["localites", "observations", "mesurePrise", "mesuresActions"]);
+  const clefs = cols.filter((c) => !c.numeric && !CHAMPS_LIBRES.has(c.key)).map((c) => c.key);
+  const numeriques = cols.filter((c) => c.numeric).map((c) => c.key);
+  const libres = cols.filter((c) => !c.numeric && CHAMPS_LIBRES.has(c.key)).map((c) => c.key);
+
+  const groupes = new Map<string, { ordre: number; valeurs: Record<string, string>; sommes: Map<string, number>; libres: Map<string, Set<string>> }>();
+
+  let rang = 0;
+  for (const ligne of lignes) {
+    const cle = clefs.map((k) => String(ligne[k] ?? "")).join(SEPARATEUR_CLE);
+    let g = groupes.get(cle);
+    if (!g) {
+      g = { ordre: rang++, valeurs: {}, sommes: new Map(), libres: new Map() };
+      for (const k of clefs) g.valeurs[k] = String(ligne[k] ?? "—");
+      groupes.set(cle, g);
+    }
+    for (const k of numeriques) {
+      // Les lignes arrivent déjà mises en forme ("7 980") : on retire les
+      // séparateurs de milliers avant d'additionner, sinon parseFloat s'arrête
+      // au premier espace et on perdrait l'essentiel du nombre.
+      const brut = String(ligne[k] ?? "").replace(/[^\d,.-]/g, "").replace(",", ".");
+      const v = Number.parseFloat(brut);
+      if (Number.isFinite(v)) g.sommes.set(k, (g.sommes.get(k) ?? 0) + v);
+    }
+    for (const k of libres) {
+      const t = String(ligne[k] ?? "").trim();
+      if (t && t !== "—") {
+        if (!g.libres.has(k)) g.libres.set(k, new Set());
+        g.libres.get(k)!.add(t);
+      }
+    }
+  }
+
+  return Array.from(groupes.values())
+    .sort((a, b) => a.ordre - b.ordre)
+    .map((g) => {
+      const row: Record<string, string> = { ...g.valeurs };
+      for (const k of numeriques) row[k] = g.sommes.has(k) ? fmt(g.sommes.get(k)!) : "—";
+      for (const k of libres) {
+        const v = g.libres.get(k);
+        row[k] = v && v.size ? Array.from(v).join(", ") : "—";
+      }
+      return row;
+    });
 }
 
 /** Rapport DD uniquement : mêmes événements que evenementLoopRows, mais groupés par arrondissement
@@ -432,9 +511,14 @@ export async function genererPayloadDD(db: PrismaClient, periodeId: string, agre
     } else if (t.type === "NOMINATIF" && layout?.kind === "NOMINATIF_LOOP") {
       payload[t.code] = await nominatifLoopRows(db, periodeId, t.code, layout.cols.map((c) => c.code), null);
     } else if (t.type === "EVENEMENT" && layout?.kind === "EVENEMENT_LOOP") {
-      payload[t.code] = agregerEvenementsParArrondissement
-        ? await evenementLoopRowsGroupes(db, periodeId, t.code, layout.cols)
-        : await evenementLoopRows(db, periodeId, t.code, layout.cols, null);
+      if (!agregerEvenementsParArrondissement) {
+        // Fiche de collecte : la liste complète, avec sa colonne Arrondissement.
+        payload[t.code] = await evenementLoopRows(db, periodeId, t.code, layout.cols, null);
+      } else if (EVENEMENTS_SYNTHESE_DEPARTEMENTALE.has(t.code)) {
+        payload[t.code] = await evenementLoopRowsSyntheseDept(db, periodeId, t.code, layout.cols);
+      } else {
+        payload[t.code] = await evenementLoopRowsGroupes(db, periodeId, t.code, layout.cols);
+      }
     }
   }
 

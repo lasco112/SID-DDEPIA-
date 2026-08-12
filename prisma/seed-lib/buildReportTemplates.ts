@@ -40,7 +40,7 @@ import { PrismaClient } from "@prisma/client";
 import fs from "node:fs/promises";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { CANEVAS_LAYOUTS, ColDef } from "./canevasLayout";
+import { CANEVAS_LAYOUTS, ColDef, EVENEMENTS_SYNTHESE_DEPARTEMENTALE } from "./canevasLayout";
 
 // En-tête officiel bilingue MINEPIA (fourni par le DD) : utilisé tel quel en
 // image plutôt que recréé en texte, pour rester identique au letterhead
@@ -556,7 +556,15 @@ function renderCanevasTable(
     case "NOMINATIF_LOOP":
       return [renderNominatifLoop(t.code, layout.cols, loopWithArr)];
     case "EVENEMENT_LOOP":
-      return [groupePourLisibilite ? renderEvenementLoopGroupe(t.code, layout.cols) : renderEvenementLoop(t.code, layout.cols, loopWithArr)];
+      if (groupePourLisibilite) {
+        // Rapport départemental : soit une synthèse consolidée sans colonne
+        // Arrondissement (décision du DD), soit le détail groupé par
+        // arrondissement pour les tableaux restés au détail.
+        return EVENEMENTS_SYNTHESE_DEPARTEMENTALE.has(t.code)
+          ? [renderEvenementLoop(t.code, layout.cols, false)]
+          : [renderEvenementLoopGroupe(t.code, layout.cols)];
+      }
+      return [renderEvenementLoop(t.code, layout.cols, loopWithArr)];
     case "T16_SPECIAL":
       return [renderT16()];
     case "T17_SPECIAL":
@@ -648,14 +656,14 @@ function buildDoc(mode: "DD" | "DA", templates: Awaited<ReturnType<typeof charge
     children.push(new Paragraph({ text: "" }));
   }
 
-  if (mode === "DD") {
-    children.push(new Paragraph({ heading: HeadingLevel.HEADING_2, children: [new TextRun({ text: "SYNTHÈSES D'ANALYSE DES SECTIONS", bold: true })] }));
-    for (const code of ["BAC", "PSA", "SSV", "SPAIH"]) {
-      children.push(new Paragraph({ children: [new TextRun({ text: code, bold: true })] }));
-      children.push(new Paragraph({ children: [new TextRun({ text: `{ANALYSE_${code}}` })] }));
-      children.push(new Paragraph({ text: "" }));
-    }
-  }
+  // Le bloc « SYNTHÈSES D'ANALYSE DES SECTIONS » a été RETIRÉ du document
+  // (décision du DD, 11 août 2026) : il imprimait quatre fois « Synthèse non
+  // disponible. » dans un rapport transmis à la hiérarchie. Les synthèses des
+  // chefs de section restent consultables par le DD à l'écran, dans la
+  // Supervision départementale. Les valeurs ANALYSE_BAC/PSA/SSV/SPAIH continuent
+  // d'être calculées et transmises au modèle : elles sont simplement sans balise
+  // correspondante, ce que docxtemplater ignore sans erreur, et le bloc peut
+  // être rétabli sans retoucher la génération des données.
 
   children.push(new Paragraph({ text: "" }));
   children.push(
