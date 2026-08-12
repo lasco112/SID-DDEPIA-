@@ -35,8 +35,7 @@ export default function TrimestreClient() {
   const [etat, setEtat] = useState<Etat | null>(null);
   const [choix, setChoix] = useState<{ annee: number; trimestre: number } | null>(null);
   const [chargement, setChargement] = useState(true);
-  const [generation, setGeneration] = useState<"final" | "apercu" | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
+  const [message] = useState<string | null>(null);
   const [calculOuvert, setCalculOuvert] = useState<number | null>(null);
 
   const charger = useCallback(async (c: { annee: number; trimestre: number } | null) => {
@@ -56,32 +55,9 @@ export default function TrimestreClient() {
   useEffect(() => { charger(null); }, [charger]);
   useEffect(() => { if (choix) charger(choix); }, [choix, charger]);
 
-  async function generer(apercu: boolean) {
-    if (!choix) return;
-    setGeneration(apercu ? "apercu" : "final");
-    setMessage(null);
-    const res = await fetch("/api/dd/trimestre", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...choix, apercu }),
-    });
-    if (!res.ok) {
-      const d = await res.json().catch(() => ({}));
-      setMessage(d.message ?? "La génération a échoué.");
-      setGeneration(null);
-      return;
-    }
-    const blob = await res.blob();
-    const nom = res.headers.get("Content-Disposition")?.match(/filename="([^"]+)"/)?.[1] ?? "rapport-trimestriel.docx";
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = nom;
-    a.click();
-    URL.revokeObjectURL(url);
-    setGeneration(null);
-    setMessage(`Document produit : ${nom}`);
-  }
+  // Le téléchargement du .docx est retiré tant que le rendu ne reproduit pas le
+  // canevas officiel — voir RENDU_CONFORME_AU_CANEVAS dans la route. Il sera
+  // rétabli avec le nouveau générateur ; git en conserve la première version.
 
   if (chargement && !etat) {
     return <p className="text-sm text-ink-muted">Chargement…</p>;
@@ -195,29 +171,23 @@ export default function TrimestreClient() {
       {/* ---- Génération ---- */}
       <section className="mt-6">
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">Production du document</h2>
-        <div className="flex flex-wrap gap-3">
-          <button
-            onClick={() => generer(false)}
-            disabled={!complet || generation !== null}
-            className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-hover disabled:bg-gray-300"
-            title={complet ? undefined : "La période doit être complète"}
-          >
-            {generation === "final" ? "Génération…" : "Générer le rapport trimestriel (.docx)"}
-          </button>
-          <button
-            onClick={() => generer(true)}
-            disabled={generation !== null}
-            className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:text-gray-400"
-          >
-            {generation === "apercu" ? "Génération…" : "Générer un brouillon"}
-          </button>
-        </div>
-        {!complet && (
-          <p className="mt-2 text-xs text-amber-900">
-            Le rapport définitif est indisponible tant qu&apos;un mois manque ou qu&apos;un arrondissement n&apos;a
-            pas transmis. Un brouillon reste possible ; il porte la mention sur chaque page.
+
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+          <p className="text-sm font-semibold text-amber-900">
+            La production du document Word est suspendue.
           </p>
-        )}
+          <p className="mt-2 text-sm text-amber-900">
+            Le rendu ne reproduit pas encore le canevas officiel : celui-ci impose six colonnes
+            d&apos;arrondissement nommées, une colonne de total pour la période, une pour la même période de
+            l&apos;année précédente, et des libellés de ligne fixes. Un document non conforme ne doit pas
+            pouvoir être transmis à la Délégation Régionale.
+          </p>
+          <p className="mt-2 text-xs text-amber-900">
+            Les chiffres consolidés et les analyses ci-dessus sont exacts et restent consultables. Seule la
+            mise en page du document reste à reconstruire.
+          </p>
+        </div>
+
         {message && <p className="mt-3 text-sm text-gray-700">{message}</p>}
       </section>
     </div>
