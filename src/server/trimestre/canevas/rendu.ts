@@ -188,6 +188,7 @@ const NIVEAUX = {
   1: HeadingLevel.HEADING_1,
   2: HeadingLevel.HEADING_2,
   3: HeadingLevel.HEADING_3,
+  4: HeadingLevel.HEADING_4,
 } as const;
 
 export interface OptionsRendu {

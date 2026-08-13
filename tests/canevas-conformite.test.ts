@@ -22,6 +22,7 @@ import { readFileSync, existsSync } from "node:fs";
 import PizZip from "pizzip";
 import { SECTION_I } from "../src/server/trimestre/canevas/sectionI";
 import { SECTION_BUDGET } from "../src/server/trimestre/canevas/sectionBudget";
+import { SECTION_II_BOVIN } from "../src/server/trimestre/canevas/sectionBovin";
 import { colonnesDe, lignesDe, inventaireSection } from "../src/server/trimestre/canevas/rendu";
 import { type Bloc, type ContexteCanevas, type SectionCanevas } from "../src/server/trimestre/canevas/types";
 
@@ -43,6 +44,7 @@ const CTX: ContexteCanevas = {
 const SECTIONS: { section: SectionCanevas; premierTableau: number; nbTableaux: number }[] = [
   { section: SECTION_I, premierTableau: 2, nbTableaux: 14 },
   { section: SECTION_BUDGET, premierTableau: 16, nbTableaux: 4 },
+  { section: SECTION_II_BOVIN, premierTableau: 20, nbTableaux: 9 },
 ];
 
 const texteDe = (f: string) =>

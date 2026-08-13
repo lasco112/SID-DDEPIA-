@@ -62,7 +62,9 @@ export interface TableauLibre {
 export type Tableau = TableauArrondissements | TableauLibre;
 
 export type Bloc =
-  | { type: "titre"; niveau: 1 | 2 | 3; texte: string }
+  // Le canevas descend jusqu'au niveau 4 : « a) Les abattages contrôlés »,
+  // « b) Rendement moyen viande / carcasse »…
+  | { type: "titre"; niveau: 1 | 2 | 3 | 4; texte: string }
   /**
    * Zone de texte du canevas. `consigne` est la mention entre crochets du
    * document officiel ; elle indique au rédacteur ce qui est attendu.
