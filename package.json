@@ -20,7 +20,8 @@
     "test:agregation": "node --env-file=.env --import tsx --test tests/agregation-trimestre.test.ts",
     "trimestre:donnees": "node --env-file=.env --import tsx scripts/donnees-fictives-trimestre.ts",
     "test:canevas": "node --import tsx --test tests/canevas-section-i.test.ts",
-    "canevas:section": "node --import tsx scripts/generer-section-canevas.ts"
+    "canevas:section": "node --import tsx scripts/generer-section-canevas.ts",
+    "doc:word": "node --import tsx scripts/md-vers-docx.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.12.0",
