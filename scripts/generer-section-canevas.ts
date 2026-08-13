@@ -41,6 +41,7 @@ async function principal() {
   const ctx: ContexteCanevas = {
     periodeCourt: libelleCourt(p),
     periodeCourtN1: libelleCourt(memePeriodeAnneePrecedente(p)),
+    annee,
     mois: moisDeLaPeriode(p).map((m) => MOIS_MAJ[m.mois - 1]),
     arrondissements: ["Dschang", "Fokoué", "Fongo-Tongo", "Nkong-Ni", "Penka-Michel", "Santchou"],
   };

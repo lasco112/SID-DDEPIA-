@@ -23,6 +23,7 @@ import PizZip from "pizzip";
 import { SECTION_I } from "../src/server/trimestre/canevas/sectionI";
 import { SECTION_BUDGET } from "../src/server/trimestre/canevas/sectionBudget";
 import { SECTION_II_BOVIN } from "../src/server/trimestre/canevas/sectionBovin";
+import { SECTION_II_OVIN, SECTION_II_CAPRIN, SECTION_II_EQUIDES } from "../src/server/trimestre/canevas/sectionElevages";
 import { colonnesDe, lignesDe, inventaireSection } from "../src/server/trimestre/canevas/rendu";
 import { type Bloc, type ContexteCanevas, type SectionCanevas } from "../src/server/trimestre/canevas/types";
 
@@ -32,6 +33,7 @@ const CANEVAS = "docs/canevas/CANEVAS_RAPPORT_TRIMESTRIEL_DDEPIA-MENOUA_v1.docx"
 const CTX: ContexteCanevas = {
   periodeCourt: "T1 2026",
   periodeCourtN1: "T1 2025",
+  annee: 2026,
   mois: ["JANVIER", "FÉVRIER", "MARS"],
   arrondissements: ["Dschang", "Fokoué", "Fongo-Tongo", "Nkong-Ni", "Penka-Michel", "Santchou"],
 };
@@ -45,6 +47,9 @@ const SECTIONS: { section: SectionCanevas; premierTableau: number; nbTableaux: n
   { section: SECTION_I, premierTableau: 2, nbTableaux: 14 },
   { section: SECTION_BUDGET, premierTableau: 16, nbTableaux: 4 },
   { section: SECTION_II_BOVIN, premierTableau: 20, nbTableaux: 9 },
+  { section: SECTION_II_OVIN, premierTableau: 29, nbTableaux: 5 },
+  { section: SECTION_II_CAPRIN, premierTableau: 34, nbTableaux: 5 },
+  { section: SECTION_II_EQUIDES, premierTableau: 39, nbTableaux: 4 },
 ];
 
 const texteDe = (f: string) =>
@@ -187,6 +192,8 @@ test("l'inventaire des sections est cohérent", () => {
   for (const { section, nbTableaux } of SECTIONS) {
     const inv = inventaireSection(section, CTX);
     assert.equal(inv.tableaux, nbTableaux, section.cle);
-    assert.ok(inv.zonesTexte > 0, `${section.cle} : aucune zone de texte`);
+    // Toutes les sections ne portent pas de zone de texte : le canevas n'en
+    // met aucune dans II-4, les élevages d'asins et d'équidés.
+    assert.ok(inv.titres > 0, `${section.cle} : aucun titre`);
   }
 });

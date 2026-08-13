@@ -10,6 +10,8 @@
  * Les libellés dépendant de la période portent des jetons, remplacés au rendu :
  *   {P}    la période      — « T3 2026 »
  *   {P-1}  la même, un an plus tôt — « T3 2025 »
+ *   {A}    l'année millésime — « 2026 »
+ *   {A-1}  l'année précédente — « 2025 »
  *   {M1} {M2} {M3}  les trois mois en majuscules — « JUILLET »…
  */
 
@@ -18,6 +20,8 @@ export interface ContexteCanevas {
   periodeCourt: string;
   /** « T3 2025 » */
   periodeCourtN1: string;
+  /** L'année de la période — 2026. */
+  annee: number;
   /** Les trois mois de la période, en majuscules. */
   mois: string[];
   /** Les six arrondissements, dans l'ordre du canevas. */
@@ -29,6 +33,8 @@ export function resoudre(libelle: string, ctx: ContexteCanevas): string {
   return libelle
     .replace(/\{P-1\}/g, ctx.periodeCourtN1)
     .replace(/\{P\}/g, ctx.periodeCourt)
+    .replace(/\{A-1\}/g, String(ctx.annee - 1))
+    .replace(/\{A\}/g, String(ctx.annee))
     .replace(/\{M1\}/g, ctx.mois[0] ?? "")
     .replace(/\{M2\}/g, ctx.mois[1] ?? "")
     .replace(/\{M3\}/g, ctx.mois[2] ?? "");
