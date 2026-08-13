@@ -103,7 +103,26 @@ export function colonnesDe(bloc: Extract<Bloc, { type: "tableau" }>, ctx: Contex
   if (bloc.kind === "arrondissements") {
     return [bloc.enteteLibelle, ...ctx.arrondissements, `TOTAL ${ctx.periodeCourt}`, `TOTAL ${ctx.periodeCourtN1}`];
   }
-  return bloc.entetes.map((e) => resoudre(e, ctx));
+  // Même jeton que pour les lignes : un tableau « libre » peut lui aussi
+  // porter une colonne par arrondissement — le tableau 13 des recettes en est.
+  return bloc.entetes
+    .flatMap((e) => (e === "{ARRONDISSEMENTS}" ? ctx.arrondissements : [e]))
+    .map((e) => resoudre(e, ctx));
+}
+
+/**
+ * Libellés de ligne effectifs, jetons résolus.
+ *
+ * `{ARRONDISSEMENTS}` se déplie en une ligne par arrondissement. Les nommer
+ * dans la description figerait le canevas sur la Menoua ; le jour où le SID
+ * servira un autre département, la liste viendra de la base sans qu'on touche
+ * au canevas. Le test de conformité passe par cette même fonction : il compare
+ * donc ce qui sera RÉELLEMENT rendu, et non la description brute.
+ */
+export function lignesDe(bloc: Extract<Bloc, { type: "tableau" }>, ctx: ContexteCanevas): string[] {
+  return bloc.lignes
+    .flatMap((l) => (l === "{ARRONDISSEMENTS}" ? ctx.arrondissements : [l]))
+    .map((l) => resoudre(l, ctx));
 }
 
 function rendreTableau(
@@ -112,7 +131,7 @@ function rendreTableau(
   valeur: FournisseurValeur
 ): (Paragraph | Table)[] {
   const colonnes = colonnesDe(bloc, ctx);
-  const lignes = bloc.lignes.map((l) => resoudre(l, ctx));
+  const lignes = lignesDe(bloc, ctx);
 
   const entete = new TableRow({
     tableHeader: true,

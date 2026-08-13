@@ -300,17 +300,9 @@ export const SECTION_I: SectionCanevas = {
       numero: 12,
       titre: "Synthèse des crédits par arrondissement",
       entetes: ["Arrondissement", "Fonctionnement", "Total", "TOTAL {P}", "TOTAL {P-1}"],
-      lignes: [
-        "Dschang",
-        "Fokoué",
-        "Fongo-Tongo",
-        "Nkong-Ni",
-        "Penka-Michel",
-        "Santchou",
-        "TOTAL {P}",
-        "TOTAL {P-1}",
-        "ÉCART",
-      ],
+      // {ARRONDISSEMENTS} plutôt que les six noms : le jour où le SID servira
+      // un autre département, la liste viendra de la base.
+      lignes: ["{ARRONDISSEMENTS}", "TOTAL {P}", "TOTAL {P-1}", "ÉCART"],
     },
 
     { type: "titre", niveau: 2, texte: "I-4-1. État des recettes" },
@@ -325,17 +317,7 @@ export const SECTION_I: SectionCanevas = {
       kind: "libre",
       numero: 13,
       titre: "Synthèse des recettes par régie et par mois",
-      entetes: [
-        "MOIS",
-        "DDEPIA",
-        "Dschang",
-        "Fokoué",
-        "Fongo-Tongo",
-        "Nkong-Ni",
-        "Penka-Michel",
-        "Santchou",
-        "TOTAL",
-      ],
+      entetes: ["MOIS", "DDEPIA", "{ARRONDISSEMENTS}", "TOTAL"],
       lignes: ["{M1}", "{M2}", "{M3}", "TOTAL {P}", "TOTAL {P-1}", "ÉCART"],
     },
 

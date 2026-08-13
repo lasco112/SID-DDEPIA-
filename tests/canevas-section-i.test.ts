@@ -17,7 +17,7 @@ import assert from "node:assert/strict";
 import { readFileSync, existsSync } from "node:fs";
 import PizZip from "pizzip";
 import { SECTION_I } from "../src/server/trimestre/canevas/sectionI";
-import { colonnesDe, inventaireSection } from "../src/server/trimestre/canevas/rendu";
+import { colonnesDe, lignesDe, inventaireSection } from "../src/server/trimestre/canevas/rendu";
 import { resoudre, type Bloc, type ContexteCanevas } from "../src/server/trimestre/canevas/types";
 
 const CANEVAS = "docs/canevas/CANEVAS_RAPPORT_TRIMESTRIEL_DDEPIA-MENOUA_v1.docx";
@@ -113,7 +113,7 @@ test("chaque tableau a EXACTEMENT les libellés de ligne du canevas", () => {
     const officiel = officiels[INDEX_PREMIER_TABLEAU_SECTION_I + k];
     if (!officiel) return;
     const attendues = officiel.lignes;
-    const obtenues = bloc.lignes.map((l) => resoudre(l, CTX));
+    const obtenues = lignesDe(bloc, CTX);
     if (obtenues.length !== attendues.length) {
       ecarts.push(
         `n° ${bloc.numero ?? "—"} « ${bloc.titre} » : ${obtenues.length} lignes au lieu de ${attendues.length}\n` +
@@ -151,7 +151,7 @@ test("les zones de texte analytiques du canevas sont toutes reprises", () => {
 
 test("les jetons de période sont bien substitués", () => {
   const t13 = tableauxDecrits().find((b) => b.numero === 13)!;
-  const lignes = t13.lignes.map((l) => resoudre(l, CTX));
+  const lignes = lignesDe(t13, CTX);
   assert.deepEqual(lignes.slice(0, 3), ["JANVIER", "FÉVRIER", "MARS"]);
   assert.ok(lignes.includes("TOTAL T1 2026"));
   assert.ok(!lignes.some((l) => l.includes("{")), "un jeton n'a pas été remplacé");
