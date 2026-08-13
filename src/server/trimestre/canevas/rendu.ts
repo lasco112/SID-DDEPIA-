@@ -13,7 +13,7 @@
  */
 import {
   Paragraph, TextRun, Table, TableRow, TableCell, HeadingLevel,
-  WidthType, BorderStyle, AlignmentType,
+  WidthType, BorderStyle, AlignmentType, SimpleField, TableOfContents,
 } from "docx";
 import { type Bloc, type ContexteCanevas, type SectionCanevas, resoudre } from "./types";
 
@@ -39,6 +39,52 @@ const BORDURES = {
   insideHorizontal: { style: BorderStyle.SINGLE, size: 1 },
   insideVertical: { style: BorderStyle.SINGLE, size: 1 },
 };
+
+/**
+ * Légende d'un tableau, avec numérotation AUTOMATIQUE.
+ *
+ * Le canevas officiel n'écrit jamais le numéro en dur : il pose un champ Word
+ * `SEQ Tableau \* ARABIC`, présent 72 fois dans le document. C'est ce champ qui
+ * fait que les tableaux se renumérotent seuls quand on en insère un, et surtout
+ * c'est lui que `TOC \a "Tableau"` collecte pour bâtir la liste des tableaux.
+ * Écrire « Tableau n° 7 » en clair produirait un document où la liste des
+ * tableaux resterait vide.
+ *
+ * Le style « Caption » est celui que Word nomme Légende : sans lui, la légende
+ * n'entre pas dans la liste.
+ */
+export function legendeTableau(titre: string, numeroAttendu: number | null): Paragraph {
+  return new Paragraph({
+    style: "Caption",
+    children: [
+      new TextRun({ text: "Tableau n° ", bold: true }),
+      // La valeur affichée avant recalcul par Word : le numéro connu de la
+      // description, pour qu'un lecteur qui n'actualise pas les champs voie
+      // tout de même un nombre cohérent.
+      new SimpleField("SEQ Tableau \\* ARABIC", numeroAttendu == null ? undefined : String(numeroAttendu)),
+      new TextRun({ text: ` : ${titre}`, bold: true }),
+    ],
+  });
+}
+
+/**
+ * Les trois champs automatiques du canevas, dans son ordre :
+ * sommaire, liste des tableaux, liste des graphiques.
+ * Word les remplit à l'ouverture du document (Ctrl+A puis F9).
+ */
+export function champsAutomatiques(): (Paragraph | TableOfContents)[] {
+  return [
+    new Paragraph({ heading: HeadingLevel.HEADING_1, children: [new TextRun({ text: "SOMMAIRE", bold: true })] }),
+    new TableOfContents("Sommaire", { hyperlink: true, headingStyleRange: "1-4" }),
+    new Paragraph({ text: "" }),
+    new Paragraph({ heading: HeadingLevel.HEADING_1, children: [new TextRun({ text: "LISTE DES TABLEAUX", bold: true })] }),
+    new TableOfContents("Liste des tableaux", { hyperlink: true, captionLabel: "Tableau" }),
+    new Paragraph({ text: "" }),
+    new Paragraph({ heading: HeadingLevel.HEADING_1, children: [new TextRun({ text: "LISTE DES GRAPHIQUES", bold: true })] }),
+    new TableOfContents("Liste des graphiques", { hyperlink: true, captionLabel: "Graphique" }),
+    new Paragraph({ text: "" }),
+  ];
+}
 
 function cellule(texte: string, o: { gras?: boolean; fond?: string; droite?: boolean } = {}): TableCell {
   return new TableCell({
@@ -84,12 +130,8 @@ function rendreTableau(
     });
   });
 
-  const titre = bloc.numero == null
-    ? bloc.titre
-    : `Tableau n° ${bloc.numero} : ${bloc.titre}`;
-
   return [
-    new Paragraph({ children: [new TextRun({ text: titre, bold: true, italics: true, size: 20 })] }),
+    legendeTableau(bloc.titre, bloc.numero),
     new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, borders: BORDURES, rows: [entete, ...corps] }),
     new Paragraph({ text: "" }),
   ];

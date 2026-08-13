@@ -13,7 +13,7 @@
 import { Document, Packer, Paragraph, TextRun, AlignmentType, HeadingLevel } from "docx";
 import { writeFileSync, mkdirSync } from "node:fs";
 import { SECTION_I } from "../src/server/trimestre/canevas/sectionI";
-import { rendreSection, inventaireSection } from "../src/server/trimestre/canevas/rendu";
+import { rendreSection, inventaireSection, champsAutomatiques } from "../src/server/trimestre/canevas/rendu";
 import type { ContexteCanevas, SectionCanevas } from "../src/server/trimestre/canevas/types";
 import { trimestrielle, libelleOfficiel, libelleCourt, memePeriodeAnneePrecedente, moisDeLaPeriode } from "../src/server/periodes/calendrier";
 
@@ -74,6 +74,9 @@ async function principal() {
       ],
     }),
     new Paragraph({ text: "" }),
+    // Sommaire, liste des tableaux, liste des graphiques — champs Word, comme
+    // dans le canevas officiel. Ils se remplissent à l'ouverture du document.
+    ...champsAutomatiques(),
     ...rendreSection(section, { ctx }),
   ];
 
