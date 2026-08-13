@@ -149,11 +149,18 @@ function rendreTableau(
     });
   });
 
-  return [
-    legendeTableau(bloc.titre, bloc.numero),
-    new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, borders: BORDURES, rows: [entete, ...corps] }),
-    new Paragraph({ text: "" }),
-  ];
+  const tableau = new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    borders: BORDURES,
+    rows: [entete, ...corps],
+  });
+
+  // Certains tableaux du canevas n'ont PAS de légende — ceux du
+  // budget-programme, par exemple. Leur en inventer une les ferait apparaître
+  // dans la liste des tableaux, où le canevas ne les met pas.
+  return bloc.titre
+    ? [legendeTableau(bloc.titre, bloc.numero), tableau, new Paragraph({ text: "" })]
+    : [tableau, new Paragraph({ text: "" })];
 }
 
 /**

@@ -13,6 +13,7 @@
 import { Document, Packer, Paragraph, TextRun, AlignmentType, HeadingLevel } from "docx";
 import { writeFileSync, mkdirSync } from "node:fs";
 import { SECTION_I } from "../src/server/trimestre/canevas/sectionI";
+import { SECTION_BUDGET } from "../src/server/trimestre/canevas/sectionBudget";
 import { rendreSection, inventaireSection, champsAutomatiques } from "../src/server/trimestre/canevas/rendu";
 import type { ContexteCanevas, SectionCanevas } from "../src/server/trimestre/canevas/types";
 import { trimestrielle, libelleOfficiel, libelleCourt, memePeriodeAnneePrecedente, moisDeLaPeriode } from "../src/server/periodes/calendrier";
@@ -22,7 +23,7 @@ const MOIS_MAJ = [
   "JUILLET", "AOÛT", "SEPTEMBRE", "OCTOBRE", "NOVEMBRE", "DÉCEMBRE",
 ];
 
-const SECTIONS: Record<string, SectionCanevas> = { I: SECTION_I };
+const SECTIONS: Record<string, SectionCanevas> = { I: SECTION_I, BUDGET: SECTION_BUDGET };
 
 async function principal() {
   const cle = (process.argv[2] ?? "I").toUpperCase();
