@@ -25,6 +25,7 @@ import { SECTION_BUDGET } from "../src/server/trimestre/canevas/sectionBudget";
 import { SECTION_II_BOVIN } from "../src/server/trimestre/canevas/sectionBovin";
 import { SECTION_II_OVIN, SECTION_II_CAPRIN, SECTION_II_EQUIDES } from "../src/server/trimestre/canevas/sectionElevages";
 import { SECTION_II_PORCIN, SECTION_II_AVICOLE } from "../src/server/trimestre/canevas/sectionPorcinAvicole";
+import { SECTION_II_AUTRES, SECTION_III_PECHE } from "../src/server/trimestre/canevas/sectionPecheEtDivers";
 import { colonnesDe, lignesDe, inventaireSection } from "../src/server/trimestre/canevas/rendu";
 import { type Bloc, type ContexteCanevas, type SectionCanevas } from "../src/server/trimestre/canevas/types";
 
@@ -53,6 +54,8 @@ const SECTIONS: { section: SectionCanevas; premierTableau: number; nbTableaux: n
   { section: SECTION_II_EQUIDES, premierTableau: 39, nbTableaux: 4 },
   { section: SECTION_II_PORCIN, premierTableau: 43, nbTableaux: 5 },
   { section: SECTION_II_AVICOLE, premierTableau: 48, nbTableaux: 9 },
+  { section: SECTION_II_AUTRES, premierTableau: 57, nbTableaux: 4 },
+  { section: SECTION_III_PECHE, premierTableau: 61, nbTableaux: 9 },
 ];
 
 const texteDe = (f: string) =>
@@ -153,14 +156,17 @@ for (const { section, premierTableau, nbTableaux } of SECTIONS) {
   });
 }
 
-test("aucune colonne « Écart » n'est ajoutée là où le canevas n'en a pas", () => {
-  const fautifs: string[] = [];
+test("un SEUL tableau porte une colonne « Écart », et c'est le n° 62", () => {
+  // Garde-fou contre la faute d'origine : une colonne « Écart » avait été
+  // ajoutée à tous les tableaux, alors que le canevas n'en met qu'à un seul —
+  // la production semestrielle d'alevins.
+  const porteurs: string[] = [];
   for (const { section } of SECTIONS) {
     for (const b of tableauxDe(section)) {
-      if (colonnesDe(b, CTX).some((c) => /^écart$/i.test(c))) fautifs.push(`${section.cle} n° ${b.numero}`);
+      if (colonnesDe(b, CTX).some((c) => /^écart$/i.test(c))) porteurs.push(`${section.cle} n° ${b.numero}`);
     }
   }
-  assert.deepEqual(fautifs, [], "le canevas ne porte de colonne « Écart » dans aucun de ces tableaux");
+  assert.deepEqual(porteurs, ["III n° 62"], "une colonne « Écart » a été ajoutée là où le canevas n'en a pas");
 });
 
 test("les jetons de période sont tous substitués", () => {
