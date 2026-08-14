@@ -60,6 +60,7 @@ model User {
   rapportsSoumis     RapportArrondissement[] @relation("SoumisPar")
   corrections        Correction[]
   syntheses          SyntheseSection[]       @relation("AuteurSynthese")
+  rubriques          RubriqueNarrative[]     @relation("AuteurRubrique")
   exports            ExportDocument[]
   notifications      Notification[]
   auditLogs          AuditLog[]
@@ -95,6 +96,7 @@ model Arrondissement {
   pointsSIG      PointSIG[]
   assignations   AssignationSaisie[]
   exports        ExportDocument[]
+  rubriques      RubriqueNarrative[]
 }
 
 model Section {
@@ -290,6 +292,7 @@ model PeriodeReporting {
   syntheses   SyntheseSection[]
   exports     ExportDocument[]
   assignations AssignationSaisie[]
+  rubriques   RubriqueNarrative[]
 
   @@unique([type, annee, mois, trimestre, semestre])
   @@index([statut, dateLimiteDA])
@@ -516,6 +519,47 @@ model Correction {
 // 8. ANALYSES ET SYNTHÈSES (§8 — humain + brouillon IA distincts et conservés)
 // ============================================================================
 
+/// Les zones de texte analytiques du canevas trimestriel.
+///
+/// Le canevas en compte 41 : introduction, présentation, commentaire de chaque
+/// groupe de tableaux, contraintes, perspectives. Cinq seulement ont un texte
+/// fixe qui ne change pas d'une période à l'autre ; les 36 autres doivent être
+/// écrites à chaque trimestre. Sans cette table, elles sortaient toutes en
+/// consigne grise entre crochets, et le Délégué devait les retaper dans Word
+/// après téléchargement — c'est-à-dire hors du système, sans trace ni reprise.
+///
+/// `SyntheseSection` ne pouvait pas servir : elle est rattachée à une SECTION
+/// (BAC, SSV, PSA, SPAIH) et sert le rapport mensuel. Les zones du canevas
+/// trimestriel appartiennent au rapport, pas à une section.
+model RubriqueNarrative {
+  id               String  @id @default(cuid())
+  periodeId        String
+  /// null = rubrique du rapport départemental ; sinon celle d'un arrondissement.
+  /// Même convention que `ExportDocument.arrondissementId`.
+  arrondissementId String?
+  /// Clé stable de la zone dans le canevas : « I.introduction »,
+  /// « I4.performances »… Voir les descriptions de section.
+  cle              String
+  contenu          String? @db.Text
+  /// Texte proposé par l'assistance rédactionnelle, conservé à part : le texte
+  /// de l'agent humain ne doit JAMAIS être écrasé par la machine (lots 12-13).
+  brouillonIA      String? @db.Text
+  auteurId         String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  periode        PeriodeReporting @relation(fields: [periodeId], references: [id])
+  arrondissement Arrondissement?  @relation(fields: [arrondissementId], references: [id])
+  auteur         User?            @relation("AuteurRubrique", fields: [auteurId], references: [id])
+
+  /// ATTENTION : en PostgreSQL, deux NULL sont distincts. Cet index NE protège
+  /// donc PAS les rubriques départementales (arrondissementId à null) contre le
+  /// doublon. La migration ajoute pour cela deux index uniques PARTIELS, qui
+  /// eux couvrent les deux cas. Voir la migration correspondante.
+  @@unique([periodeId, arrondissementId, cle])
+  @@index([periodeId, arrondissementId])
+}
+
 model SyntheseSection {
   id             String   @id @default(cuid())
   periodeId      String
@@ -641,6 +685,11 @@ model Notification {
   destinataire User @relation(fields: [destinataireId], references: [id])
 
   @@index([statut, createdAt])
+  /// Sert la pastille du bandeau : « mes notifications non lues ». L'index
+  /// existait en base depuis la migration 20260802120000, mais sa déclaration
+  /// avait disparu d'ici — la première migration générée ensuite le supprimait
+  /// donc en production, sans que personne l'ait demandé. Rétabli.
+  @@index([destinataireId, luLe])
 }
 
 /// Autorisation donnée par UN appareil de recevoir les notifications système

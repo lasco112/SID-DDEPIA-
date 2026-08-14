@@ -25,6 +25,7 @@ import { TEXTES_FIXES } from "./canevas/textesFixes";
 import { TEXTES_ARRONDISSEMENTS } from "./canevas/textesArrondissements";
 import type { ContexteCanevas, SectionCanevas } from "./canevas/types";
 import { champsMobilises, bilanLiaisons } from "./liaison";
+import { lireRubriques } from "./rubriques";
 import { preparer, fournisseur } from "./remplissage";
 import { inspecterPeriode, type EtatPeriode } from "./agregation";
 import {
@@ -42,6 +43,50 @@ export const SECTIONS_CANEVAS: SectionCanevas[] = [
   SECTION_II_EQUIDES, SECTION_II_PORCIN, SECTION_II_AVICOLE, SECTION_II_AUTRES,
   SECTION_III_PECHE, SECTION_IV_SANTE,
 ];
+
+/** Une zone de texte analytique du canevas, repérée dans sa section. */
+export interface ZoneTexte {
+  cle: string;
+  consigne: string;
+  sectionCle: string;
+  sectionTitre: string;
+  /** Le dernier titre rencontré avant la zone — situe le rédacteur. */
+  contexte: string;
+  /** Vrai si un texte fixe couvre déjà cette zone (introduction, missions…). */
+  fixe: boolean;
+}
+
+/**
+ * Les 41 zones de texte du canevas, dans l'ordre où le rédacteur les rencontre.
+ *
+ * L'inventaire est déduit de la description du canevas, jamais tenu à jour à la
+ * main : décrire une nouvelle zone dans une section la fait apparaître à
+ * l'écran de rédaction sans autre intervention.
+ */
+export function zonesTexte(options: { arrondissement?: boolean } = {}): ZoneTexte[] {
+  const fixes = options.arrondissement
+    ? new Set(["I.introduction", "I1.organisation"])
+    : new Set(Array.from(TEXTES_FIXES.keys()));
+
+  const zones: ZoneTexte[] = [];
+  for (const section of SECTIONS_CANEVAS) {
+    let contexte = section.titre;
+    for (const bloc of section.blocs) {
+      if (bloc.type === "titre") contexte = bloc.texte;
+      else if (bloc.type === "zoneTexte") {
+        zones.push({
+          cle: bloc.cle,
+          consigne: bloc.consigne,
+          sectionCle: section.cle,
+          sectionTitre: section.titre,
+          contexte,
+          fixe: fixes.has(bloc.cle),
+        });
+      }
+    }
+  }
+  return zones;
+}
 
 /** Les six arrondissements, dans l'ordre du canevas. */
 async function arrondissementsDe(db: PrismaClient): Promise<{ id: string; nom: string }[]> {
@@ -176,10 +221,15 @@ export async function genererRapportCanevas(
   const textes = options.arrondissement ? new Map<string, string>() : new Map(TEXTES_FIXES);
 
   if (options.arrondissement) {
-    const sien = TEXTES_ARRONDISSEMENTS.get(options.arrondissement);
-    if (sien?.introduction) textes.set("I.introduction", sien.introduction);
-    if (sien?.presentation) textes.set("I1.organisation", sien.presentation);
+    const sienTexte = TEXTES_ARRONDISSEMENTS.get(options.arrondissement);
+    if (sienTexte?.introduction) textes.set("I.introduction", sienTexte.introduction);
+    if (sienTexte?.presentation) textes.set("I1.organisation", sienTexte.presentation);
   }
+
+  // Ce que le rédacteur a écrit pour CETTE période l'emporte sur le texte fixe :
+  // le fixe n'est qu'un point de départ, pas une contrainte.
+  (await lireRubriques(db, periode, sien?.id ?? null)).forEach((t, cle) => textes.set(cle, t));
+
   options.textes?.forEach((t, cle) => textes.set(cle, t));
 
   for (const section of SECTIONS_CANEVAS) {

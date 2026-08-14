@@ -30,6 +30,11 @@ const PROTECTED_PREFIXES: Array<{ prefix: string; roles: string[] }> = [
   { prefix: "/api/admin", roles: ["DD"] },
   { prefix: "/api/dd", roles: ["DD"] },
   { prefix: "/api/etablissements", roles: ["DA", "DD", "AGENT_SAISIE"] }, // AGENT_SAISIE : creation inline pendant la saisie NOMINATIF uniquement (voir route)
+  // Rédaction des zones de texte du rapport trimestriel. Le DD écrit celles du
+  // département, le DA les siennes ; le cloisonnement est REFAIT dans la route,
+  // le middleware ne connaissant que le rôle. L'agent de saisie en est exclu :
+  // il ne signe aucun rapport.
+  { prefix: "/api/trimestre/rubriques", roles: ["DD", "DA"] },
   { prefix: "/api/technique/audit", roles: ["DD", "ADMIN_TECH"] }, // AVANT la règle générale : Array.find prend la première correspondance
   { prefix: "/api/technique", roles: ["ADMIN_TECH"] },
   { prefix: "/api/sync", roles: ["DA", "AGENT_SAISIE"] },
