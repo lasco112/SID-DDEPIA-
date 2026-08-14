@@ -65,14 +65,6 @@ test("les titres sont transposés au niveau de l'arrondissement", async () => {
     "Aucun titre ne doit encore parler du département."
   );
 
-  /*
-   * L'examen porte sur les TITRES, et sur eux seuls. Le mot « DDEPIA » demeure
-   * ailleurs dans le document, et c'est voulu : le canevas le porte comme TYPE
-   * DE STRUCTURE (« CZV, DAEPIA, …, DDEPIA ») au tableau 3, et comme RÉGIE au
-   * tableau 13. Ce sont des libellés du canevas officiel, pas des restes de
-   * transposition ; les retirer du rapport d'un DA reviendrait à retoucher le
-   * canevas, ce qui est précisément l'erreur déjà commise une fois.
-   */
   const ctx = {
     periodeCourt: "T3 2026", periodeCourtN1: "T3 2025", annee: 2026,
     mois: ["JUILLET", "AOÛT", "SEPTEMBRE"], arrondissements: ["Dschang"], arrondissement: "Dschang",
@@ -82,6 +74,33 @@ test("les titres sont transposés au niveau de l'arrondissement", async () => {
   );
   const restés = titres.filter((t) => /\bDDEPIA\b|DÉPARTEMENT DE LA MENOUA/.test(t));
   assert.deepEqual(restés, [], "Ces titres parlent encore du département dans un rapport d'arrondissement.");
+});
+
+test("le rapport d'un DA porte les lignes DA, jamais les lignes DD", async () => {
+  const { texte } = await produire("Dschang");
+
+  /*
+   * Un arrondissement ne possède pas de DDEPIA. La ligne « DDEPIA » des
+   * tableaux du personnel et des infrastructures, et la colonne « DDEPIA » du
+   * tableau 13 des recettes, sont la structure du chef : les laisser
+   * reviendrait à faire rendre compte au DA de ce qui ne lui appartient pas.
+   */
+  assert.ok(
+    !/\bDDEPIA\b/.test(texte),
+    "Une ligne ou une colonne DDEPIA subsiste dans le rapport d'un arrondissement."
+  );
+
+  // Et l'inverse, qui est le vrai risque : ne pas emporter sa ligne à lui —
+  // « DAEPIA » ne diffère de « DDEPIA » que d'une lettre.
+  assert.ok(texte.includes("DAEPIA"), "La ligne DAEPIA, qui est la sienne, doit rester.");
+});
+
+test("le rapport départemental garde ses lignes DDEPIA", async () => {
+  const { texte } = await produire();
+  assert.ok(
+    /\bDDEPIA\b/.test(texte),
+    "La DDEPIA est une structure du département : elle a sa ligne dans le rapport du DD."
+  );
 });
 
 test("il ne porte qu'une seule colonne territoriale — la sienne", async () => {

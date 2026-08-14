@@ -15,7 +15,10 @@ import {
   Paragraph, TextRun, Table, TableRow, TableCell, HeadingLevel,
   WidthType, BorderStyle, AlignmentType, SimpleField, TableOfContents,
 } from "docx";
-import { type Bloc, type ContexteCanevas, type SectionCanevas, resoudre, adapterTitre } from "./types";
+import {
+  type Bloc, type ContexteCanevas, type SectionCanevas,
+  resoudre, adapterTitre, sansNiveauDepartemental,
+} from "./types";
 
 /**
  * Fournit la valeur d'une case. Renvoie `null` quand le SID ne porte pas la
@@ -105,9 +108,12 @@ export function colonnesDe(bloc: Extract<Bloc, { type: "tableau" }>, ctx: Contex
   }
   // Même jeton que pour les lignes : un tableau « libre » peut lui aussi
   // porter une colonne par arrondissement — le tableau 13 des recettes en est.
-  return bloc.entetes
-    .flatMap((e) => (e === "{ARRONDISSEMENTS}" ? ctx.arrondissements : [e]))
-    .map((e) => resoudre(e, ctx));
+  // C'est aussi lui qui porte une colonne « DDEPIA », la régie du département :
+  // elle disparaît du rapport d'un arrondissement.
+  return sansNiveauDepartemental(
+    bloc.entetes.flatMap((e) => (e === "{ARRONDISSEMENTS}" ? ctx.arrondissements : [e])),
+    ctx
+  ).map((e) => resoudre(e, ctx));
 }
 
 /**
@@ -120,9 +126,13 @@ export function colonnesDe(bloc: Extract<Bloc, { type: "tableau" }>, ctx: Contex
  * donc ce qui sera RÉELLEMENT rendu, et non la description brute.
  */
 export function lignesDe(bloc: Extract<Bloc, { type: "tableau" }>, ctx: ContexteCanevas): string[] {
-  return bloc.lignes
-    .flatMap((l) => (l === "{ARRONDISSEMENTS}" ? ctx.arrondissements : [l]))
-    .map((l) => resoudre(l, ctx));
+  // La ligne « DDEPIA » — présente aux tableaux du personnel et des
+  // infrastructures — sort du rapport d'un arrondissement : il ne possède pas
+  // cette structure. La ligne « DAEPIA », elle, est la sienne et reste.
+  return sansNiveauDepartemental(
+    bloc.lignes.flatMap((l) => (l === "{ARRONDISSEMENTS}" ? ctx.arrondissements : [l])),
+    ctx
+  ).map((l) => resoudre(l, ctx));
 }
 
 function rendreTableau(

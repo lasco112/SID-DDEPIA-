@@ -52,6 +52,30 @@ export function adapterTitre(texte: string, ctx: ContexteCanevas): string {
     .replace(/CARTE ÉPIDÉMIOLOGIQUE ACTUALISÉE DU DÉPARTEMENT/gi, `CARTE ÉPIDÉMIOLOGIQUE ACTUALISÉE DE L'ARRONDISSEMENT`);
 }
 
+/**
+ * Libellés du canevas qui désignent le NIVEAU DÉPARTEMENTAL lui-même.
+ *
+ * Ils ont leur place dans le rapport du Délégué départemental — la DDEPIA est
+ * une structure, elle a du personnel, elle tient une régie de recettes. Ils
+ * n'en ont aucune dans le rapport d'un DA : un arrondissement ne possède pas de
+ * DDEPIA, et lui faire remplir cette ligne reviendrait à lui faire rendre
+ * compte de la structure de son chef.
+ *
+ * La liste est nominative, jamais un motif : « DAEPIA » ressemble à « DDEPIA »
+ * d'une lettre, et c'est justement la ligne du DA qu'il faut garder.
+ */
+const LIBELLES_DEPARTEMENTAUX = new Set(["DDEPIA"]);
+
+/**
+ * Retire les lignes et colonnes départementales quand on produit le rapport
+ * d'un arrondissement. Sur le rapport départemental, ne retire rien : le
+ * canevas y est reproduit sans retouche.
+ */
+export function sansNiveauDepartemental(libelles: string[], ctx: ContexteCanevas): string[] {
+  if (!ctx.arrondissement) return libelles;
+  return libelles.filter((l) => !LIBELLES_DEPARTEMENTAUX.has(l.trim()));
+}
+
 /** Remplace les jetons de période dans un libellé du canevas. */
 export function resoudre(libelle: string, ctx: ContexteCanevas): string {
   return libelle
