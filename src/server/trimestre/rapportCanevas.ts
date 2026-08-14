@@ -21,6 +21,7 @@ import { SECTION_II_PORCIN, SECTION_II_AVICOLE } from "./canevas/sectionPorcinAv
 import { SECTION_II_AUTRES, SECTION_III_PECHE } from "./canevas/sectionPecheEtDivers";
 import { SECTION_IV_SANTE } from "./canevas/sectionSanteAnimale";
 import { rendreSection, champsAutomatiques } from "./canevas/rendu";
+import { TEXTES_FIXES } from "./canevas/textesFixes";
 import type { ContexteCanevas, SectionCanevas } from "./canevas/types";
 import { champsMobilises, bilanLiaisons } from "./liaison";
 import { preparer, fournisseur } from "./remplissage";
@@ -128,8 +129,15 @@ export async function genererRapportCanevas(
     ...champsAutomatiques()
   );
 
+  // Les textes qui ne changent pas d'une période à l'autre — présentation du
+  // département, missions, vision, organisation — sont repris automatiquement.
+  // Un texte fourni pour la période l'emporte sur le texte fixe : le Délégué
+  // garde le dernier mot sur ce qui sort sous sa signature.
+  const textes = new Map(TEXTES_FIXES);
+  options.textes?.forEach((t, cle) => textes.set(cle, t));
+
   for (const section of SECTIONS_CANEVAS) {
-    enfants.push(...rendreSection(section, { ctx, valeur, textes: options.textes }));
+    enfants.push(...rendreSection(section, { ctx, valeur, textes }));
   }
 
   enfants.push(

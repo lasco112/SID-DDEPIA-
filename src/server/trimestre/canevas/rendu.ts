@@ -174,7 +174,16 @@ function rendreZoneTexte(
 ): Paragraph[] {
   const saisi = textes.get(bloc.cle);
   if (saisi && saisi.trim()) {
-    return [new Paragraph({ children: [new TextRun({ text: saisi.trim(), size: 20 })] }), new Paragraph({ text: "" })];
+    // Un texte de plusieurs paragraphes arrive séparé par des lignes vides.
+    // Le rendre d'un bloc collerait l'introduction en un seul pavé illisible.
+    return [
+      ...saisi
+        .trim()
+        .split(/\n\s*\n/)
+        .filter((p) => p.trim())
+        .map((p) => new Paragraph({ children: [new TextRun({ text: p.trim(), size: 20 })] })),
+      new Paragraph({ text: "" }),
+    ];
   }
   return [
     new Paragraph({
