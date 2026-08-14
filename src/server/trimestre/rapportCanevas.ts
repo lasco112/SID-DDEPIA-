@@ -22,6 +22,7 @@ import { SECTION_II_AUTRES, SECTION_III_PECHE } from "./canevas/sectionPecheEtDi
 import { SECTION_IV_SANTE } from "./canevas/sectionSanteAnimale";
 import { rendreSection, champsAutomatiques } from "./canevas/rendu";
 import { TEXTES_FIXES } from "./canevas/textesFixes";
+import { TEXTES_ARRONDISSEMENTS } from "./canevas/textesArrondissements";
 import type { ContexteCanevas, SectionCanevas } from "./canevas/types";
 import { champsMobilises, bilanLiaisons } from "./liaison";
 import { preparer, fournisseur } from "./remplissage";
@@ -61,16 +62,33 @@ export interface RapportProduit {
 export async function genererRapportCanevas(
   db: PrismaClient,
   periode: Periode,
-  options: { autoriserIncomplet?: boolean; textes?: Map<string, string> } = {}
+  options: {
+    autoriserIncomplet?: boolean;
+    textes?: Map<string, string>;
+    /**
+     * Nom d'un arrondissement pour produire SON rapport, au lieu du rapport
+     * départemental. Le canevas est alors rendu avec une seule colonne
+     * territoriale — la sienne — exactement comme le canevas départemental est
+     * le canevas régional ramené aux six arrondissements.
+     */
+    arrondissement?: string;
+  } = {}
 ): Promise<RapportProduit> {
   const etat = await inspecterPeriode(db, periode);
+
+  const tous = await arrondissementsDe(db);
+  if (options.arrondissement && !tous.includes(options.arrondissement)) {
+    throw new Error(
+      `Arrondissement inconnu : « ${options.arrondissement} ». Attendu l'un de : ${tous.join(", ")}.`
+    );
+  }
 
   const ctx: ContexteCanevas = {
     periodeCourt: libelleCourt(periode),
     periodeCourtN1: libelleCourt(memePeriodeAnneePrecedente(periode)),
     annee: periode.annee,
     mois: moisDeLaPeriode(periode).map((m) => MOIS_MAJ[m.mois - 1]),
-    arrondissements: await arrondissementsDe(db),
+    arrondissements: options.arrondissement ? [options.arrondissement] : tous,
   };
 
   const donnees = await preparer(db, periode, champsMobilises(), {
@@ -87,7 +105,12 @@ export async function genererRapportCanevas(
     centre("RÉPUBLIQUE DU CAMEROUN", 22, true),
     centre("Paix – Travail – Patrie", 18),
     centre("RÉGION DE L’OUEST", 18),
-    centre("DÉLÉGATION DÉPARTEMENTALE DE L’ÉLEVAGE, DES PÊCHES ET DES INDUSTRIES ANIMALES DE LA MENOUA", 18),
+    centre(
+      options.arrondissement
+        ? `DÉLÉGATION D’ARRONDISSEMENT DE L’ÉLEVAGE, DES PÊCHES ET DES INDUSTRIES ANIMALES DE ${options.arrondissement.toUpperCase()}`
+        : "DÉLÉGATION DÉPARTEMENTALE DE L’ÉLEVAGE, DES PÊCHES ET DES INDUSTRIES ANIMALES DE LA MENOUA",
+      18
+    ),
     new Paragraph({ text: "" }),
     new Paragraph({
       alignment: AlignmentType.CENTER,
@@ -134,6 +157,13 @@ export async function genererRapportCanevas(
   // Un texte fourni pour la période l'emporte sur le texte fixe : le Délégué
   // garde le dernier mot sur ce qui sort sous sa signature.
   const textes = new Map(TEXTES_FIXES);
+  // Pour un rapport d'arrondissement, ses propres textes fixes l'emportent :
+  // c'est sa présentation qui doit figurer, pas celle du département.
+  if (options.arrondissement) {
+    const sien = TEXTES_ARRONDISSEMENTS.get(options.arrondissement);
+    if (sien?.introduction) textes.set("I.introduction", sien.introduction);
+    if (sien?.presentation) textes.set("I1.organisation", sien.presentation);
+  }
   options.textes?.forEach((t, cle) => textes.set(cle, t));
 
   for (const section of SECTIONS_CANEVAS) {
@@ -166,8 +196,11 @@ export async function genererRapportCanevas(
   });
 
   const buffer = Buffer.from(await Packer.toBuffer(document));
+  const qui = options.arrondissement
+    ? `DAEPIA-${options.arrondissement.replace(/[ ’']/g, "")}`
+    : "DDEPIA-Menoua";
   const nomFichier =
-    `Rapport_${libelleCourt(periode).replace(/\s/g, "")}_DDEPIA-Menoua` +
+    `Rapport_${libelleCourt(periode).replace(/\s/g, "")}_${qui}` +
     `${provisoire ? "_BROUILLON" : ""}.docx`;
 
   return {
