@@ -32,6 +32,7 @@ import { SECTION_II_BOVIN } from "../src/server/trimestre/canevas/sectionBovin";
 import { SECTION_II_OVIN, SECTION_II_CAPRIN, SECTION_II_EQUIDES } from "../src/server/trimestre/canevas/sectionElevages";
 import { SECTION_II_PORCIN, SECTION_II_AVICOLE } from "../src/server/trimestre/canevas/sectionPorcinAvicole";
 import { SECTION_II_AUTRES, SECTION_III_PECHE } from "../src/server/trimestre/canevas/sectionPecheEtDivers";
+import { SECTION_IV_SANTE } from "../src/server/trimestre/canevas/sectionSanteAnimale";
 import { colonnesDe, lignesDe, inventaireSection } from "../src/server/trimestre/canevas/rendu";
 import { type Bloc, type ContexteCanevas, type SectionCanevas } from "../src/server/trimestre/canevas/types";
 
@@ -48,6 +49,7 @@ const CTX: ContexteCanevas = {
 const SECTIONS: SectionCanevas[] = [
   SECTION_I, SECTION_BUDGET, SECTION_II_BOVIN, SECTION_II_OVIN, SECTION_II_CAPRIN,
   SECTION_II_EQUIDES, SECTION_II_PORCIN, SECTION_II_AVICOLE, SECTION_II_AUTRES, SECTION_III_PECHE,
+  SECTION_IV_SANTE,
 ];
 
 /**
@@ -121,6 +123,7 @@ const TERRITOIRES = new Set([
   "arrondissementenginsdepeches", "departementenginsdepeches", "departementsenginsdepeches",
   "produitsarrondissement", "produitsdepartement", "produitsdepartements",
   "arrondissementespeces", "departementespeces",
+  "arrondissementaffections", "departementsaffections", "departementaffections",
 ]);
 
 const estNeutre = (s: string) => {
@@ -257,5 +260,5 @@ test("l'inventaire des sections est cohérent", () => {
     assert.ok(inv.titres > 0, `${section.cle} : aucun titre`);
     tableaux += inv.tableaux;
   }
-  assert.equal(tableaux, 68, "68 tableaux décrits à ce jour");
+  assert.equal(tableaux, 78, "78 tableaux décrits à ce jour");
 });
