@@ -24,6 +24,7 @@ import { SECTION_I } from "../src/server/trimestre/canevas/sectionI";
 import { SECTION_BUDGET } from "../src/server/trimestre/canevas/sectionBudget";
 import { SECTION_II_BOVIN } from "../src/server/trimestre/canevas/sectionBovin";
 import { SECTION_II_OVIN, SECTION_II_CAPRIN, SECTION_II_EQUIDES } from "../src/server/trimestre/canevas/sectionElevages";
+import { SECTION_II_PORCIN, SECTION_II_AVICOLE } from "../src/server/trimestre/canevas/sectionPorcinAvicole";
 import { colonnesDe, lignesDe, inventaireSection } from "../src/server/trimestre/canevas/rendu";
 import { type Bloc, type ContexteCanevas, type SectionCanevas } from "../src/server/trimestre/canevas/types";
 
@@ -50,6 +51,8 @@ const SECTIONS: { section: SectionCanevas; premierTableau: number; nbTableaux: n
   { section: SECTION_II_OVIN, premierTableau: 29, nbTableaux: 5 },
   { section: SECTION_II_CAPRIN, premierTableau: 34, nbTableaux: 5 },
   { section: SECTION_II_EQUIDES, premierTableau: 39, nbTableaux: 4 },
+  { section: SECTION_II_PORCIN, premierTableau: 43, nbTableaux: 5 },
+  { section: SECTION_II_AVICOLE, premierTableau: 48, nbTableaux: 9 },
 ];
 
 const texteDe = (f: string) =>
