@@ -181,10 +181,13 @@ export const SECTION_I: SectionCanevas = {
     { type: "titre", niveau: 2, texte: "I-3-1. Situation des infrastructures" },
     {
       type: "tableau",
-      kind: "arrondissements",
+      kind: "libre",
       numero: 7,
+      // Le régional porte une colonne « DEFICIT » après le total : elle avait
+      // disparu de l'adaptation départementale. Ce tableau devient donc
+      // « libre » pour pouvoir la rétablir après les colonnes de total.
       titre: "Situation des infrastructures",
-      enteteLibelle: "Désignation",
+      entetes: ["Désignation", "{ARRONDISSEMENTS}", "TOTAL {P}", "TOTAL {P-1}", "DEFICIT"],
       lignes: [
         "Propriété de l'Etat",
         "Abattoir",

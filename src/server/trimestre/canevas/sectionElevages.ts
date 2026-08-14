@@ -212,11 +212,13 @@ export const SECTION_II_EQUIDES: SectionCanevas = {
       kind: "libre",
       numero: 36,
       titre: "Situation de la commercialisation d’animaux sur pied dans les élevages d’équidés",
-      // Ce tableau échappe à toutes les règles de la partie : pas de colonne de
-      // total, pas de ligne d'arrondissement, et « Départements » en première
-      // colonne. Il porte « RAS » — rien à signaler — et « TOTAL ».
-      entetes: ["Départements", "Anes", "Chevaux", "Chameaux"],
-      lignes: ["RAS", "TOTAL"],
+      // RÉTABLI d'après le régional. L'adaptation départementale avait réduit ce
+      // tableau à trois colonnes et deux lignes « RAS / TOTAL » — sans doute
+      // parce qu'aucune activité n'était enregistrée au moment de sa rédaction.
+      // Le canevas régional lui donne quatre espèces et la maille territoriale
+      // ordinaire ; c'est cette forme qui fait foi.
+      entetes: ["Arrondissement", "Anes", "Chameaux", "Chevaux", "Mulets", ...TOTAUX],
+      lignes: LIGNES_ARRONDISSEMENTS,
     },
   ],
 };

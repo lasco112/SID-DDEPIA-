@@ -16,9 +16,14 @@
  *
  * Tout le reste — libellés, accents, casse, ordre — doit suivre le régional.
  *
- * LES DIVERGENCES CONNUES sont listées dans DIVERGENCES_ATTENDUES. Le test
- * échoue si une NOUVELLE apparaît, et aussi si l'une d'elles est corrigée sans
- * mettre la liste à jour : la liste doit se vider à mesure du travail.
+ * SIX ÉCARTS SONT ASSUMÉS, listés dans ECARTS_ASSUMES avec leur justification :
+ * le canevas régional a des défauts de mise en forme — une colonne sans nom, un
+ * intitulé resté en première ligne de données, un espace manquant — que
+ * l'adaptation départementale a corrigés. Les « rétablir » rendrait le document
+ * moins lisible sans le rendre plus conforme.
+ *
+ * Le test échoue dans les DEUX sens : si un écart non justifié apparaît, et si
+ * un écart assumé cesse de se produire sans que la liste soit mise à jour.
  *
  *   npm run test:canevas
  */
@@ -53,18 +58,29 @@ const SECTIONS: SectionCanevas[] = [
 ];
 
 /**
- * Tableaux dont les libellés ne correspondent pas encore au régional.
- * Chaque entrée porte la raison. La liste doit se vider.
+ * Écarts au régional qui sont ASSUMÉS, et non des oublis.
+ *
+ * Le canevas régional a des défauts de mise en forme que l'adaptation
+ * départementale a corrigés. Les « rétablir » rendrait le document moins
+ * lisible, pas plus conforme : ce ne sont pas des différences de contenu.
+ * Chaque entrée porte sa justification ; toute autre divergence est une faute.
  */
-const DIVERGENCES_ATTENDUES = new Set([
-  "I n° 4",     // le régional laisse sa première cellule vide, nous l'intitulons « Désignation »
-  "I n° 7",     // colonne « DEFICIT » du régional, non encore reprise
-  "I n° 12",    // en-tête « Structures » du régional
-  "I n° —",     // contraintes stratégiques : appariement incertain avec le régional
-  "II-1 n° 21", // « Prix moyen FCFA/Unité » — espace ajouté par le département
-  "II-4 n° 36", // « Mulets » du régional non repris ; « RAS » propre au département
-  "II-6 n° 42", // en-tête composite « Catégorie » du régional
-  "II-6 n° 44", // en-tête composite « Catégorie »
+const ECARTS_ASSUMES = new Set([
+  // Le régional laisse la première cellule d'en-tête VIDE. Le département
+  // l'intitule « Désignation ». Une colonne sans nom n'est pas un contenu à
+  // préserver.
+  "I n° 4",
+  "I n° 7",
+  // Le régional place « Structures » en PREMIÈRE LIGNE de données, séquelle
+  // d'une ligne d'en-tête scindée. Le département en a fait un en-tête propre.
+  "I n° 12",
+  // Le régional écrit « Prix moyenFCFA/Unité », sans espace. Le département a
+  // rétabli l'espace manquant.
+  "II-1 n° 21",
+  // Même séquelle qu'au n° 12 : « Catégorie » traîne en première ligne de
+  // données alors que c'est un intitulé de colonne.
+  "II-6 n° 42",
+  "II-6 n° 44",
 ]);
 
 // ------------------------------------------------------------ lecture du canevas
@@ -128,6 +144,11 @@ const TERRITOIRES = new Set([
 
 const estNeutre = (s: string) => {
   const k = cle(s);
+  // Un libellé purement numérique — « 1 », « 2 », « 3 » — ne dit rien du
+  // contenu d'un tableau. Le compter appariait le tableau des contraintes
+  // stratégiques à celui des centres d'alevinage, qui numérotent tous deux
+  // leurs lignes.
+  if (/^\d+$/.test(k)) return true;
   return !k || k.startsWith("total") || TERRITOIRES.has(k);
 };
 
@@ -187,23 +208,23 @@ test("le canevas régional est présent dans le dépôt", () => {
   assert.ok(region.length > 100, `seulement ${region.length} tableaux lus`);
 });
 
-test("aucune divergence NOUVELLE avec le canevas régional", () => {
+test("aucun écart au régional en dehors de ceux qui sont assumés", () => {
   const { divergents } = analyser();
-  const inattendues = divergents.filter((d) => !DIVERGENCES_ATTENDUES.has(d.id));
+  const inattendues = divergents.filter((d) => !ECARTS_ASSUMES.has(d.id));
   assert.deepEqual(
     inattendues.map((d) => `${d.id} — ${d.titre} : ${d.ecarts.join(" ; ")}`),
     [],
-    "un tableau s'écarte du régional sans être dans la liste des divergences connues"
+    "un tableau s'écarte du régional sans justification : c'est une faute, ou un écart à assumer explicitement"
   );
 });
 
-test("les divergences connues qui ont été corrigées sont retirées de la liste", () => {
+test("les écarts assumés se produisent tous encore", () => {
   const { divergents } = analyser();
   const ids = new Set(divergents.map((d) => d.id));
-  const corrigees = Array.from(DIVERGENCES_ATTENDUES).filter((id) => !ids.has(id));
+  const disparus = Array.from(ECARTS_ASSUMES).filter((id) => !ids.has(id));
   assert.deepEqual(
-    corrigees, [],
-    "ces divergences ne se produisent plus : retirez-les de DIVERGENCES_ATTENDUES pour que le filet reste tendu"
+    disparus, [],
+    "ces écarts ne se produisent plus : retirez-les de ECARTS_ASSUMES pour que le filet reste tendu"
   );
 });
 
