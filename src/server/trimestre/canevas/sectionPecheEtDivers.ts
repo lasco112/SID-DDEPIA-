@@ -59,6 +59,7 @@ export const SECTION_II_AUTRES: SectionCanevas = {
         "Arrondissement",
         "Aulacodes",
         "Lapins",
+        "Cochons d’inde",
         "Rat de Gambie",
         "Cobayes",
         "Escargots",
@@ -87,7 +88,7 @@ export const SECTION_II_AUTRES: SectionCanevas = {
       numero: 53,
       titre: "Etat de la commercialisation des produits de la ruche",
       // « Animaux sur pied » pour des produits de la ruche : même origine.
-      entetes: ["Arrondissement", "Animaux sur pied", ...TOTAUX],
+      entetes: ["Arrondissement", "Animaux sur pied", "Viande", ...TOTAUX],
       lignes: LIGNES_ARRONDISSEMENTS,
     },
 

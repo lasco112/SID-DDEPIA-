@@ -159,7 +159,7 @@ for (const section of SECTIONS) {
     for (const l of b2) if (!miensCles.has(cle(l))) ecarts.push({ type: "manquant chez nous", mien: "—", regional: l });
 
     if (ecarts.length === 0) conformes++;
-    else divergences.push({ section: section.cle, numero: b.numero, titre: b.titre, score, ecarts });
+    else divergences.push({ section: section.cle, numero: b.numero, titre: b.titre, score, ecarts, original: meilleur });
   }
 }
 
@@ -176,5 +176,9 @@ for (const d of divergences) {
     console.log(`       régional : « ${e.regional} »`);
   }
   if (d.ecarts.length > 8) console.log(`     … et ${d.ecarts.length - 8} autre(s)`);
+  if (d.original) {
+    console.log(`     ORIGINAL RÉGIONAL — en-tête : ${d.original.entetes.map((e) => e || "·").join(" | ")}`);
+    if (d.original.lignes.length) console.log(`     ORIGINAL RÉGIONAL — lignes  : ${d.original.lignes.join(" / ")}`);
+  }
   console.log("");
 }

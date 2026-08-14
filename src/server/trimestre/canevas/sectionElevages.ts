@@ -75,7 +75,9 @@ export const SECTION_II_OVIN: SectionCanevas = {
       kind: "libre",
       numero: 26,
       titre: "Etat de la commercialisation des animaux et de la viande",
-      entetes: ["Arrondissement", "Animaux sur pied", ...TOTAUX],
+      // « Viande » rétablie d’après le régional, qui distingue les animaux
+      // vendus sur pied de la viande commercialisée.
+      entetes: ["Arrondissement", "Animaux sur pied", "Viande", ...TOTAUX],
       lignes: LIGNES_ARRONDISSEMENTS,
     },
 
@@ -146,6 +148,7 @@ export const SECTION_II_CAPRIN: SectionCanevas = {
         "Effectifs (en têtes)",
         "Prix moyen(en FCFA)",
         "Ressources générées(en M FCFA)",
+        "Viande",
         ...TOTAUX,
       ],
       lignes: LIGNES_ARRONDISSEMENTS,
@@ -200,7 +203,7 @@ export const SECTION_II_EQUIDES: SectionCanevas = {
       kind: "libre",
       numero: 35,
       titre: "Etat de la production de viande dans les élevages d’équidés",
-      entetes: ["Arrondissement/Espèces", "Anes", "Chevaux", ...TOTAUX],
+      entetes: ["Arrondissement/Espèces", "ANES", "CHEVAUX", "CHAMEAUX", ...TOTAUX],
       lignes: LIGNES_ARRONDISSEMENTS,
     },
     { type: "titre", niveau: 4, texte: "c) Commercialisation des animaux" },
@@ -212,7 +215,7 @@ export const SECTION_II_EQUIDES: SectionCanevas = {
       // Ce tableau échappe à toutes les règles de la partie : pas de colonne de
       // total, pas de ligne d'arrondissement, et « Départements » en première
       // colonne. Il porte « RAS » — rien à signaler — et « TOTAL ».
-      entetes: ["Départements", "Anes", "Chevaux"],
+      entetes: ["Départements", "Anes", "Chevaux", "Chameaux"],
       lignes: ["RAS", "TOTAL"],
     },
   ],

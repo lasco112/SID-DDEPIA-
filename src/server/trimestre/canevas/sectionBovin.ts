@@ -92,7 +92,7 @@ export const SECTION_II_BOVIN: SectionCanevas = {
       kind: "libre",
       numero: 16,
       titre: "Les abattages contrôlés",
-      entetes: ["Catégorie Arrondissement", "Taurillon", "Génisse", "Castre", "Taureau", "Vache", "Veau", ...TOTAUX],
+      entetes: ["Catégorie Arrondissement", "Taurillon", "Génisse", "Castré", "Taureau", "Vache", "Veau", ...TOTAUX],
       lignes: LIGNES_ARRONDISSEMENTS,
     },
     { type: "titre", niveau: 4, texte: "b) Rendement moyen viande / carcasse" },
@@ -110,7 +110,7 @@ export const SECTION_II_BOVIN: SectionCanevas = {
       kind: "libre",
       numero: 18,
       titre: "Production de viande en tonnes",
-      entetes: ["Catégorie Arrondissement", "Taurillon", "Génisse", "Castre", "Taureau", "Vache", "Veau", ...TOTAUX],
+      entetes: ["Catégorie Arrondissement", "Taurillon", "Génisse", "Castré", "Taureau", "Vache", "Veau", ...TOTAUX],
       lignes: LIGNES_ARRONDISSEMENTS,
     },
     { type: "titre", niveau: 4, texte: "d) Commercialisation des animaux et ressources générées" },
@@ -119,7 +119,9 @@ export const SECTION_II_BOVIN: SectionCanevas = {
       kind: "libre",
       numero: 19,
       titre: "Synthèse des activités de commercialisation",
-      entetes: ["Arrondissement", "Animaux sur pied", ...TOTAUX],
+      // « Viande » rétablie d'après le régional : il distingue les animaux
+      // vendus sur pied de la viande commercialisée.
+      entetes: ["Arrondissement", "Animaux sur pied", "Viande", ...TOTAUX],
       lignes: LIGNES_ARRONDISSEMENTS,
     },
 

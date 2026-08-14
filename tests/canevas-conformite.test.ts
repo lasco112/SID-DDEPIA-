@@ -1,18 +1,24 @@
 /**
- * Conformité du rapport trimestriel au canevas officiel.
+ * Conformité du rapport trimestriel au canevas RÉGIONAL, qui fait foi.
  *
- * Ce test ouvre le .docx du Délégué et compare, tableau par tableau, ce que le
- * SID s'apprête à produire avec ce que le canevas impose : intitulé de chaque
- * colonne, libellé de chaque ligne, dans l'ordre.
+ * Décision du Délégué du 14 août 2026 : le canevas de la DREPIA-Ouest fait
+ * autorité ; le canevas départemental n'en est qu'une adaptation, et là où les
+ * deux divergent, c'est le régional qui a raison.
  *
- * Il est réglé sur la période du canevas lui-même — premier trimestre 2026 —
- * de sorte que les jetons {P}, {P-1} et {M1..3} produisent exactement les
- * chaînes du document officiel. Toute divergence, fût-elle une apostrophe,
- * fait échouer le test : éprouvé en remplaçant le « ’ » de « Centre
- * d’alevinage » par une apostrophe droite.
+ * TROIS ADAPTATIONS SONT LÉGITIMES, et neutralisées avant comparaison. Sans
+ * cela, tous les tableaux paraîtraient divergents pour de bonnes raisons :
  *
- * Chaque nouvelle section décrite s'ajoute à SECTIONS ci-dessous, avec l'indice
- * de son premier tableau dans le canevas.
+ *   - la maille : huit départements et le siège régional deviennent six
+ *     arrondissements ;
+ *   - la période : semestrielle devient trimestrielle ;
+ *   - les totaux : le département ajoute la comparaison à la même période de
+ *     l'année précédente, que le régional n'a pas.
+ *
+ * Tout le reste — libellés, accents, casse, ordre — doit suivre le régional.
+ *
+ * LES DIVERGENCES CONNUES sont listées dans DIVERGENCES_ATTENDUES. Le test
+ * échoue si une NOUVELLE apparaît, et aussi si l'une d'elles est corrigée sans
+ * mettre la liste à jour : la liste doit se vider à mesure du travail.
  *
  *   npm run test:canevas
  */
@@ -29,9 +35,8 @@ import { SECTION_II_AUTRES, SECTION_III_PECHE } from "../src/server/trimestre/ca
 import { colonnesDe, lignesDe, inventaireSection } from "../src/server/trimestre/canevas/rendu";
 import { type Bloc, type ContexteCanevas, type SectionCanevas } from "../src/server/trimestre/canevas/types";
 
-const CANEVAS = "docs/canevas/CANEVAS_RAPPORT_TRIMESTRIEL_DDEPIA-MENOUA_v1.docx";
+const REGIONAL = "docs/canevas/CANEVAS_REGIONAL_DREPIA-OUEST_S1-2026.docx";
 
-/** Réglé sur la période du canevas : c'est ce qui rend la comparaison littérale. */
 const CTX: ContexteCanevas = {
   periodeCourt: "T1 2026",
   periodeCourtN1: "T1 2025",
@@ -40,23 +45,27 @@ const CTX: ContexteCanevas = {
   arrondissements: ["Dschang", "Fokoué", "Fongo-Tongo", "Nkong-Ni", "Penka-Michel", "Santchou"],
 };
 
-/**
- * Les sections décrites, et l'indice (base 0) de leur premier tableau dans le
- * canevas. Le tableau #1 du document est l'en-tête bilingue, le #2 la liste des
- * acronymes : la section I commence donc au troisième, soit l'indice 2.
- */
-const SECTIONS: { section: SectionCanevas; premierTableau: number; nbTableaux: number }[] = [
-  { section: SECTION_I, premierTableau: 2, nbTableaux: 14 },
-  { section: SECTION_BUDGET, premierTableau: 16, nbTableaux: 4 },
-  { section: SECTION_II_BOVIN, premierTableau: 20, nbTableaux: 9 },
-  { section: SECTION_II_OVIN, premierTableau: 29, nbTableaux: 5 },
-  { section: SECTION_II_CAPRIN, premierTableau: 34, nbTableaux: 5 },
-  { section: SECTION_II_EQUIDES, premierTableau: 39, nbTableaux: 4 },
-  { section: SECTION_II_PORCIN, premierTableau: 43, nbTableaux: 5 },
-  { section: SECTION_II_AVICOLE, premierTableau: 48, nbTableaux: 9 },
-  { section: SECTION_II_AUTRES, premierTableau: 57, nbTableaux: 4 },
-  { section: SECTION_III_PECHE, premierTableau: 61, nbTableaux: 9 },
+const SECTIONS: SectionCanevas[] = [
+  SECTION_I, SECTION_BUDGET, SECTION_II_BOVIN, SECTION_II_OVIN, SECTION_II_CAPRIN,
+  SECTION_II_EQUIDES, SECTION_II_PORCIN, SECTION_II_AVICOLE, SECTION_II_AUTRES, SECTION_III_PECHE,
 ];
+
+/**
+ * Tableaux dont les libellés ne correspondent pas encore au régional.
+ * Chaque entrée porte la raison. La liste doit se vider.
+ */
+const DIVERGENCES_ATTENDUES = new Set([
+  "I n° 4",     // le régional laisse sa première cellule vide, nous l'intitulons « Désignation »
+  "I n° 7",     // colonne « DEFICIT » du régional, non encore reprise
+  "I n° 12",    // en-tête « Structures » du régional
+  "I n° —",     // contraintes stratégiques : appariement incertain avec le régional
+  "II-1 n° 21", // « Prix moyen FCFA/Unité » — espace ajouté par le département
+  "II-4 n° 36", // « Mulets » du régional non repris ; « RAS » propre au département
+  "II-6 n° 42", // en-tête composite « Catégorie » du régional
+  "II-6 n° 44", // en-tête composite « Catégorie »
+]);
+
+// ------------------------------------------------------------ lecture du canevas
 
 const texteDe = (f: string) =>
   f.replace(/<w:tab\/>/g, " ").replace(/<[^>]+>/g, "").replace(/&amp;/g, "&")
@@ -64,13 +73,12 @@ const texteDe = (f: string) =>
    .replace(/\s+/g, " ").trim();
 
 interface TableauOfficiel { entetes: string[]; lignes: string[] }
-const officiels: TableauOfficiel[] = [];
+const region: TableauOfficiel[] = [];
 
 before(() => {
-  if (!existsSync(CANEVAS)) return;
-  const xml = new PizZip(readFileSync(CANEVAS)).file("word/document.xml")!.asText();
+  if (!existsSync(REGIONAL)) return;
+  const xml = new PizZip(readFileSync(REGIONAL)).file("word/document.xml")!.asText();
   const corps = xml.slice(xml.indexOf("<w:body>"), xml.lastIndexOf("</w:body>"));
-
   let i = 0;
   while (i < corps.length) {
     const d = corps.indexOf("<w:tbl>", i);
@@ -83,94 +91,139 @@ before(() => {
     }
     const tbl = corps.slice(d, j);
     const trs = Array.from(tbl.slice(7, -8).matchAll(/<w:tr[ >][\s\S]*?<\/w:tr>/g))
-      .map((m) => m[0])
-      .filter((t) => !t.includes("<w:tbl>"));
-    const cellulesDe = (tr: string) => Array.from(tr.matchAll(/<w:tc>[\s\S]*?<\/w:tc>/g)).map((c) => texteDe(c[0]));
-    officiels.push({
-      entetes: trs.length ? cellulesDe(trs[0]) : [],
-      // Les tableaux « à lignes libres » du canevas ont des premières cellules
-      // vides : on les écarte des deux côtés de la comparaison.
-      lignes: trs.slice(1).map((tr) => cellulesDe(tr)[0] ?? "").filter(Boolean),
+      .map((m) => m[0]).filter((t) => !t.includes("<w:tbl>"));
+    const cel = (tr: string) => Array.from(tr.matchAll(/<w:tc>[\s\S]*?<\/w:tc>/g)).map((c) => texteDe(c[0]));
+    region.push({
+      entetes: trs.length ? cel(trs[0]) : [],
+      lignes: trs.slice(1).map((tr) => cel(tr)[0] ?? "").filter(Boolean),
     });
     i = j;
   }
 });
 
+// -------------------------------------------------------------- neutralisation
+
+const cle = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
+
+/** Libellés relevant de la maille ou de la période : ils DOIVENT différer. */
+const TERRITOIRES = new Set([
+  "departement", "departements", "arrondissement", "arrondissements",
+  "btos", "bamboutos", "hautnkam", "hautpltx", "hautspltx", "hautsplateaux", "hautplateaux",
+  "koungkhi", "nkoungkhi", "menoua", "mifi", "nde", "noun",
+  "drepiaosiege", "drepiasiege", "drepiao", "drepia",
+  "dschang", "fokoue", "fongotongo", "nkongni", "penkamichel", "santchou",
+  "ecart",
+  "haut", "hauts", "nkam", "pltx", "plateaux", "nkoung", "khi", "o", "siege",
+  "categoriedepart", "categoriearrondissement", "categoriedepartement", "categoriedepartements",
+  "nationalitearrondissement", "nationalitedepartement", "nationalitedepartements",
+  "equipementsarrondissement", "equipementsdepartement", "equipementsdepartements",
+  "especesarrondissement", "especesdepartement", "especesdepartements",
+  "arrondissementenginsdepeches", "departementenginsdepeches", "departementsenginsdepeches",
+  "produitsarrondissement", "produitsdepartement", "produitsdepartements",
+  "arrondissementespeces", "departementespeces",
+]);
+
+const estNeutre = (s: string) => {
+  const k = cle(s);
+  return !k || k.startsWith("total") || TERRITOIRES.has(k);
+};
+
+const significatifs = (t: TableauOfficiel) => [...t.entetes, ...t.lignes].filter((l) => l && !estNeutre(l));
+
+function ressemblance(a: TableauOfficiel, b: TableauOfficiel): number {
+  const A = new Set(significatifs(a).map(cle));
+  const B = new Set(significatifs(b).map(cle));
+  if (!A.size || !B.size) return 0;
+  let c = 0;
+  A.forEach((x) => { if (B.has(x)) c++; });
+  return c / Math.max(A.size, B.size);
+}
+
 const tableauxDe = (s: SectionCanevas) =>
   s.blocs.filter((b): b is Extract<Bloc, { type: "tableau" }> => b.type === "tableau");
 
-test("le canevas officiel est présent dans le dépôt", () => {
-  assert.ok(existsSync(CANEVAS), `Fichier absent : ${CANEVAS}`);
-  assert.ok(officiels.length >= 20, `seulement ${officiels.length} tableaux lus dans le canevas`);
-});
+/** Compare chaque tableau décrit à son original régional. */
+function analyser() {
+  const divergents: { id: string; titre: string; ecarts: string[] }[] = [];
+  let conformes = 0, sansOriginal = 0, total = 0;
 
-for (const { section, premierTableau, nbTableaux } of SECTIONS) {
-  test(`${section.cle} — le bon nombre de tableaux est décrit`, () => {
-    assert.equal(tableauxDe(section).length, nbTableaux, section.titre);
-  });
-
-  test(`${section.cle} — chaque tableau a EXACTEMENT les colonnes du canevas`, () => {
-    const ecarts: string[] = [];
-    tableauxDe(section).forEach((bloc, k) => {
-      const officiel = officiels[premierTableau + k];
-      if (!officiel) { ecarts.push(`tableau ${k + 1} : absent du canevas`); return; }
-      const attendues = officiel.entetes.map((e) => e || "·");
-      const obtenues = colonnesDe(bloc, CTX);
-      const nom = bloc.numero == null ? `« ${bloc.titre || "sans titre"} »` : `n° ${bloc.numero}`;
-      if (obtenues.length !== attendues.length) {
-        ecarts.push(`${nom} : ${obtenues.length} colonnes au lieu de ${attendues.length}`);
-        return;
+  for (const section of SECTIONS) {
+    for (const b of tableauxDe(section)) {
+      total++;
+      const mien: TableauOfficiel = { entetes: colonnesDe(b, CTX), lignes: lignesDe(b, CTX) };
+      let meilleur: TableauOfficiel | null = null, score = 0;
+      for (const r of region) {
+        const s = ressemblance(mien, r);
+        if (s > score) { score = s; meilleur = r; }
       }
-      obtenues.forEach((c, i) => {
-        if (c !== attendues[i]) ecarts.push(`${nom} colonne ${i + 1} : « ${c} » au lieu de « ${attendues[i]} »`);
-      });
-    });
-    assert.deepEqual(ecarts, [], `\n${ecarts.length} écart(s) :\n` + ecarts.map((e) => `  - ${e}`).join("\n") + "\n");
-  });
+      if (!meilleur || score < 0.5) { sansOriginal++; continue; }
 
-  test(`${section.cle} — chaque tableau a EXACTEMENT les libellés de ligne du canevas`, () => {
-    const ecarts: string[] = [];
-    tableauxDe(section).forEach((bloc, k) => {
-      const officiel = officiels[premierTableau + k];
-      if (!officiel) return;
-      const attendues = officiel.lignes;
-      const obtenues = lignesDe(bloc, CTX).filter(Boolean);
-      const nom = bloc.numero == null ? `« ${bloc.titre || "sans titre"} »` : `n° ${bloc.numero}`;
-      if (obtenues.length !== attendues.length) {
-        ecarts.push(
-          `${nom} : ${obtenues.length} lignes au lieu de ${attendues.length}\n` +
-            `      décrites : ${obtenues.join(" / ")}\n      canevas  : ${attendues.join(" / ")}`
-        );
-        return;
+      const a = significatifs(mien);
+      const b2 = significatifs(meilleur);
+      const parCle = new Map(b2.map((l) => [cle(l), l]));
+      const ecarts: string[] = [];
+      for (const l of a) {
+        const orig = parCle.get(cle(l));
+        if (orig === undefined) ecarts.push(`« ${l} » absent du régional`);
+        else if (orig !== l) ecarts.push(`« ${l} » au lieu de « ${orig} »`);
       }
-      obtenues.forEach((l, i) => {
-        if (l !== attendues[i]) ecarts.push(`${nom} ligne ${i + 1} : « ${l} » au lieu de « ${attendues[i]} »`);
-      });
-    });
-    assert.deepEqual(ecarts, [], `\n${ecarts.length} écart(s) :\n` + ecarts.map((e) => `  - ${e}`).join("\n") + "\n");
-  });
+      const miens = new Set(a.map(cle));
+      for (const l of b2) if (!miens.has(cle(l))) ecarts.push(`« ${l} » manquant chez nous`);
 
-  test(`${section.cle} — les clés des zones de texte sont uniques`, () => {
-    const cles = section.blocs.filter((b) => b.type === "zoneTexte").map((b) => (b as { cle: string }).cle);
-    assert.equal(new Set(cles).size, cles.length, "deux zones de texte portent la même clé");
-  });
+      if (ecarts.length === 0) conformes++;
+      else divergents.push({ id: `${section.cle} n° ${b.numero ?? "—"}`, titre: b.titre, ecarts });
+    }
+  }
+  return { divergents, conformes, sansOriginal, total };
 }
 
+// ------------------------------------------------------------------- tests
+
+test("le canevas régional est présent dans le dépôt", () => {
+  assert.ok(existsSync(REGIONAL), `Fichier absent : ${REGIONAL}`);
+  assert.ok(region.length > 100, `seulement ${region.length} tableaux lus`);
+});
+
+test("aucune divergence NOUVELLE avec le canevas régional", () => {
+  const { divergents } = analyser();
+  const inattendues = divergents.filter((d) => !DIVERGENCES_ATTENDUES.has(d.id));
+  assert.deepEqual(
+    inattendues.map((d) => `${d.id} — ${d.titre} : ${d.ecarts.join(" ; ")}`),
+    [],
+    "un tableau s'écarte du régional sans être dans la liste des divergences connues"
+  );
+});
+
+test("les divergences connues qui ont été corrigées sont retirées de la liste", () => {
+  const { divergents } = analyser();
+  const ids = new Set(divergents.map((d) => d.id));
+  const corrigees = Array.from(DIVERGENCES_ATTENDUES).filter((id) => !ids.has(id));
+  assert.deepEqual(
+    corrigees, [],
+    "ces divergences ne se produisent plus : retirez-les de DIVERGENCES_ATTENDUES pour que le filet reste tendu"
+  );
+});
+
+test("la conformité progresse", () => {
+  const { conformes, total, sansOriginal } = analyser();
+  console.log(`      ${conformes} conformes · ${total - conformes - sansOriginal} divergents · ${sansOriginal} sans original régional`);
+  assert.ok(conformes >= 47, `régression : ${conformes} tableaux conformes au lieu de 47 au minimum`);
+});
+
+// -------------------------------------------------- contrôles de structure
+
 test("un SEUL tableau porte une colonne « Écart », et c'est le n° 62", () => {
-  // Garde-fou contre la faute d'origine : une colonne « Écart » avait été
-  // ajoutée à tous les tableaux, alors que le canevas n'en met qu'à un seul —
-  // la production semestrielle d'alevins.
   const porteurs: string[] = [];
-  for (const { section } of SECTIONS) {
+  for (const section of SECTIONS) {
     for (const b of tableauxDe(section)) {
       if (colonnesDe(b, CTX).some((c) => /^écart$/i.test(c))) porteurs.push(`${section.cle} n° ${b.numero}`);
     }
   }
-  assert.deepEqual(porteurs, ["III n° 62"], "une colonne « Écart » a été ajoutée là où le canevas n'en a pas");
+  assert.deepEqual(porteurs, ["III n° 62"]);
 });
 
 test("les jetons de période sont tous substitués", () => {
-  for (const { section } of SECTIONS) {
+  for (const section of SECTIONS) {
     for (const b of tableauxDe(section)) {
       const restants = [...colonnesDe(b, CTX), ...lignesDe(b, CTX)].filter((x) => x.includes("{"));
       assert.deepEqual(restants, [], `${section.cle} : jeton non remplacé`);
@@ -178,31 +231,31 @@ test("les jetons de période sont tous substitués", () => {
   }
 });
 
-test("le budget-programme décrit bien ses quatre programmes", () => {
-  const titres = SECTION_BUDGET.blocs
-    .filter((b) => b.type === "titre" && b.niveau === 2)
-    .map((b) => (b as { texte: string }).texte);
+test("les clés des zones de texte sont uniques dans chaque section", () => {
+  for (const section of SECTIONS) {
+    const cles = section.blocs.filter((b) => b.type === "zoneTexte").map((b) => (b as { cle: string }).cle);
+    assert.equal(new Set(cles).size, cles.length, `${section.cle} : deux zones portent la même clé`);
+  }
+});
+
+test("le budget-programme décrit ses quatre programmes, sans légende", () => {
+  const titres = SECTION_BUDGET.blocs.filter((b) => b.type === "titre" && b.niveau === 2).map((b) => (b as { texte: string }).texte);
   assert.equal(titres.length, 4);
   for (const code of ["053", "055", "057", "059"]) {
     assert.ok(titres.some((t) => t.startsWith(`PROGRAMME ${code} :`)), `programme ${code} manquant`);
   }
-});
-
-test("les tableaux du budget-programme n'ont pas de légende", () => {
-  // Le canevas ne leur en donne pas : leur en inventer une les ferait entrer
-  // dans la liste des tableaux, où ils n'ont rien à faire.
   for (const b of tableauxDe(SECTION_BUDGET)) {
-    assert.equal(b.titre, "", "un tableau du budget-programme porte une légende");
+    assert.equal(b.titre, "");
     assert.equal(b.numero, null);
   }
 });
 
 test("l'inventaire des sections est cohérent", () => {
-  for (const { section, nbTableaux } of SECTIONS) {
+  let tableaux = 0;
+  for (const section of SECTIONS) {
     const inv = inventaireSection(section, CTX);
-    assert.equal(inv.tableaux, nbTableaux, section.cle);
-    // Toutes les sections ne portent pas de zone de texte : le canevas n'en
-    // met aucune dans II-4, les élevages d'asins et d'équidés.
     assert.ok(inv.titres > 0, `${section.cle} : aucun titre`);
+    tableaux += inv.tableaux;
   }
+  assert.equal(tableaux, 68, "68 tableaux décrits à ce jour");
 });

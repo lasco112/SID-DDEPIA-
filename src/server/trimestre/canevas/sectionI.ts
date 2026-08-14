@@ -167,6 +167,9 @@ export const SECTION_I: SectionCanevas = {
         "Promotion",
         "Félicitations",
         "Avertissement Verbal",
+        // Rétablie d'après le canevas régional, qui fait foi : elle avait
+        // disparu de l'adaptation départementale.
+        "Demande D'Explication",
         "Lettre D'Observation",
         "Suspension de Salaire",
         "Avancement",
@@ -267,7 +270,7 @@ export const SECTION_I: SectionCanevas = {
         "Imprimantes",
         "Gillet de sauvetage",
         "Ordinateurs de bureau",
-        "Scanner",
+        "scanner",
         "Ordinateurs portables",
         "Photocopieurs",
         "Réfrigérateurs",
