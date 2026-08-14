@@ -17,28 +17,9 @@ import { NextResponse } from "next/server";
 import { requireUser, assertRole, permissionErrorResponse } from "@/lib/permissions";
 import { trimestrielle, libelleOfficiel, libelleCourt, memePeriodeAnneePrecedente } from "@/server/periodes/calendrier";
 import { inspecterPeriode, PeriodeNonCalculableError } from "@/server/trimestre/agregation";
-import { genererRapportTrimestriel } from "@/server/trimestre/rapport-docx";
+import { genererRapportCanevas } from "@/server/trimestre/rapportCanevas";
 import { rassembler } from "@/server/trimestre/rapport-docx";
 import type { PrismaClient } from "@prisma/client";
-
-/**
- * Le rendu .docx reproduit-il le canevas officiel ?
- *
- * NON à ce jour. Le premier générateur plaquait un format unique — trois
- * colonnes de mois, une colonne d'écart, une colonne de règle — sur un canevas
- * qui n'en a pas : il impose six colonnes d'arrondissement NOMMÉES, une colonne
- * TOTAL de la période, une colonne TOTAL de la même période l'an passé, et des
- * libellés de ligne fixes (CZV, DAEPIA, Centre de Contrôle de Pêche…). Une
- * seule de ses 81 tables porte une colonne « Écart ».
- *
- * Un document non conforme ne doit pas pouvoir quitter le SID : il partirait à
- * la DREPIA sous la signature du Délégué. La voie reste fermée tant que le rendu
- * n'est pas reconstruit sur docs/CANEVAS_TRIMESTRIEL.md, qui fait foi.
- *
- * Le moteur de consolidation et la base de faits ne sont PAS en cause : ils
- * restent exacts et continuent d'alimenter l'écran de préparation.
- */
-const RENDU_CONFORME_AU_CANEVAS = false;
 
 /** Les trimestres pour lesquels au moins un mois existe en base. */
 async function trimestresDisponibles(db: PrismaClient) {
@@ -133,23 +114,12 @@ export async function POST(req: Request) {
       apercu?: boolean;
     };
 
-    if (!RENDU_CONFORME_AU_CANEVAS) {
-      return NextResponse.json(
-        {
-          message:
-            "La production du document trimestriel est suspendue : le rendu ne reproduit pas encore " +
-            "le canevas officiel (colonnes et libellés de ligne imposés). Les chiffres consolidés et " +
-            "les analyses restent consultables à l'écran.",
-          conformiteCanevas: false,
-        },
-        { status: 503 }
-      );
-    }
-
     const p = trimestrielle(annee, trimestre);
-    const { buffer, nomFichier, donnees } = await genererRapportTrimestriel(db, p, {
-      autoriserIncomplet: Boolean(apercu),
-    });
+    // Le rendu suit le canevas : ce sont ses 78 tableaux qui sont dessinés, et
+    // les valeurs consolidées viennent remplir les cases pour lesquelles une
+    // liaison a été écrite. Voir src/server/trimestre/rapportCanevas.ts.
+    const { buffer, nomFichier, etat, rubriquesAlimentees, valeursConsolidees } =
+      await genererRapportCanevas(db, p, { autoriserIncomplet: Boolean(apercu) });
 
     await db.auditLog.create({
       data: {
@@ -159,10 +129,11 @@ export async function POST(req: Request) {
         entiteId: `${annee}-T${trimestre}`,
         details: {
           periode: libelleCourt(p),
-          brouillon: donnees.brouillon,
-          moisAbsents: donnees.etat.moisAbsents,
-          moisIncomplets: donnees.etat.moisIncomplets,
-          faits: donnees.faits.length,
+          brouillon: !etat.calculable,
+          moisAbsents: etat.moisAbsents,
+          moisIncomplets: etat.moisIncomplets,
+          rubriquesAlimentees,
+          valeursConsolidees,
         },
       },
     });
