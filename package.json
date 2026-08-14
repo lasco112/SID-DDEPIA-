@@ -22,7 +22,8 @@
     "test:canevas": "node --import tsx --test tests/canevas-conformite.test.ts",
     "canevas:section": "node --import tsx scripts/generer-section-canevas.ts",
     "doc:word": "node --import tsx scripts/md-vers-docx.ts",
-    "trimestre:rapport": "node --env-file=.env --import tsx scripts/generer-rapport-trimestriel.ts"
+    "trimestre:rapport": "node --env-file=.env --import tsx scripts/generer-rapport-trimestriel.ts",
+    "test:liaison": "node --env-file=.env --import tsx --test tests/liaison.test.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.12.0",
