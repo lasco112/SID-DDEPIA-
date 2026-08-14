@@ -91,9 +91,20 @@ export class PeriodeNonCalculableError extends Error {
  * sont complets, quels champs n'ont pas de règle. C'est ce que l'écran de
  * préparation montrera au DD.
  */
-export async function inspecterPeriode(db: PrismaClient, p: Periode): Promise<EtatPeriode> {
+export async function inspecterPeriode(
+  db: PrismaClient,
+  p: Periode,
+  /**
+   * Restreint l'examen à UN arrondissement. Le rapport trimestriel d'un DA ne
+   * dépend que de ses propres transmissions : le bloquer parce qu'un autre
+   * arrondissement n'a pas transmis lui interdirait de rendre son rapport à
+   * cause du retard d'un collègue, alors que ses chiffres à lui sont complets.
+   * Le rapport départemental, lui, attend bien les six.
+   */
+  portee: { arrondissementId?: string } = {}
+): Promise<EtatPeriode> {
   const attendus = moisDeLaPeriode(p);
-  const nbArrondissements = await db.arrondissement.count();
+  const nbArrondissements = portee.arrondissementId ? 1 : await db.arrondissement.count();
 
   const mois: MoisSource[] = [];
   for (const m of attendus) {
@@ -105,7 +116,11 @@ export async function inspecterPeriode(db: PrismaClient, p: Periode): Promise<Et
       continue;
     }
     const transmis = await db.rapportArrondissement.count({
-      where: { periodeId: periodeMois.id, statut: { in: [...STATUTS_TRANSMIS] } },
+      where: {
+        periodeId: periodeMois.id,
+        statut: { in: [...STATUTS_TRANSMIS] },
+        ...(portee.arrondissementId ? { arrondissementId: portee.arrondissementId } : {}),
+      },
     });
     mois.push({
       ...m,
@@ -163,6 +178,11 @@ export interface OptionsAgregation {
    * APERÇU explicitement marqué comme provisoire — jamais pour un rapport signé.
    */
   autoriserIncomplet?: boolean;
+  /**
+   * Juger la complétude sur ce seul arrondissement — cas du rapport
+   * trimestriel d'un DA. Voir `inspecterPeriode`.
+   */
+  arrondissementId?: string;
 }
 
 /**
@@ -174,7 +194,7 @@ export async function agreger(
   p: Periode,
   options: OptionsAgregation = {}
 ): Promise<{ etat: EtatPeriode; valeurs: ValeurAgregee[] }> {
-  const etat = await inspecterPeriode(db, p);
+  const etat = await inspecterPeriode(db, p, { arrondissementId: options.arrondissementId });
   if (!etat.calculable && !options.autoriserIncomplet) throw new PeriodeNonCalculableError(etat);
 
   const periodeIds = etat.mois.filter((m) => m.periodeId).map((m) => m.periodeId!);

@@ -23,7 +23,7 @@ export const TEXTES_ARRONDISSEMENTS = new Map<string, TextesArrondissement>([
     "Dschang",
     {
       introduction: null,
-      presentation: "La Délégation d’Arrondissement de l’Elevage, des Pêches et des Industries Animales de Dschang compte un seul Centre Zootechnique et Vétérinaire : Celui de Dschang.\n\nLes services locaux ont pour ressort territorial la circonscription administrative dont il porte le nom. Etant donné la grande étendue de l’Arrondissement et le besoin de rendre service à tous, nos services couvrent difficilement le territoire, d’où la nécessité de création de nouvelles structures.\n\nLes tableaux ci-dessous présentent les besoins en nouvelles structures et poste de responsabilité.\n\nTableau n° 1 : Etat des besoins en création de nouvelles structures XE \"Tableau n°1 \\: Etat des besoins en création de nouvelles structures\" \\b",
+      presentation: "La Délégation d’Arrondissement de l’Elevage, des Pêches et des Industries Animales de Dschang compte un seul Centre Zootechnique et Vétérinaire : Celui de Dschang.\n\nLes services locaux ont pour ressort territorial la circonscription administrative dont il porte le nom. Etant donné la grande étendue de l’Arrondissement et le besoin de rendre service à tous, nos services couvrent difficilement le territoire, d’où la nécessité de création de nouvelles structures.\n\nLes tableaux ci-dessous présentent les besoins en nouvelles structures et poste de responsabilité.\n\nTableau n° 1 : Etat des besoins en création de nouvelles structures \\b",
     },
   ],
   [

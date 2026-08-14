@@ -38,7 +38,7 @@ export async function preparer(
   db: PrismaClient,
   periode: Periode,
   champs: string[],
-  options: { autoriserIncomplet?: boolean } = {}
+  options: { autoriserIncomplet?: boolean; arrondissementId?: string } = {}
 ): Promise<DonneesRemplissage> {
   const vide = () => new Map<string, Map<string | null, number | null>>();
   if (champs.length === 0) return { valeurs: vide(), valeursN1: vide(), renseignees: 0 };
@@ -55,7 +55,11 @@ export async function preparer(
     return { m, n };
   };
 
-  const courant = await agreger(db, periode, { champs, autoriserIncomplet: options.autoriserIncomplet });
+  const courant = await agreger(db, periode, {
+    champs,
+    autoriserIncomplet: options.autoriserIncomplet,
+    arrondissementId: options.arrondissementId,
+  });
 
   // L'absence de l'année précédente ne doit pas empêcher de produire la période :
   // elle prive seulement le rapport de sa colonne et de sa ligne de comparaison.

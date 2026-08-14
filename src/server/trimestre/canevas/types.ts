@@ -26,6 +26,30 @@ export interface ContexteCanevas {
   mois: string[];
   /** Les six arrondissements, dans l'ordre du canevas. */
   arrondissements: string[];
+  /**
+   * Renseigné quand on produit le rapport d'UN arrondissement. Les titres du
+   * canevas, écrits pour le niveau départemental, sont alors transposés :
+   * « DU DÉPARTEMENT DE LA MENOUA » devient « DE L'ARRONDISSEMENT DE DSCHANG ».
+   */
+  arrondissement?: string;
+}
+
+/**
+ * Transpose un titre départemental au niveau d'un arrondissement.
+ * Sans cette transposition, le rapport de Dschang s'intitulerait
+ * « PRÉSENTATION GÉOGRAPHIQUE DU DÉPARTEMENT DE LA MENOUA » — ce qui est le
+ * titre du rapport de son chef, pas du sien.
+ */
+export function adapterTitre(texte: string, ctx: ContexteCanevas): string {
+  const arr = ctx.arrondissement;
+  if (!arr) return texte;
+  const MAJ = arr.toUpperCase();
+  return texte
+    .replace(/DU DÉPARTEMENT DE LA MENOUA/gi, `DE L'ARRONDISSEMENT DE ${MAJ}`)
+    .replace(/DE LA DDEPIA-MENOUA/gi, `DE LA DAEPIA-${MAJ}`)
+    .replace(/AU NIVEAU DÉPARTEMENTAL/gi, `AU NIVEAU DE L'ARRONDISSEMENT`)
+    .replace(/\bDDEPIA\b/g, "DAEPIA")
+    .replace(/CARTE ÉPIDÉMIOLOGIQUE ACTUALISÉE DU DÉPARTEMENT/gi, `CARTE ÉPIDÉMIOLOGIQUE ACTUALISÉE DE L'ARRONDISSEMENT`);
 }
 
 /** Remplace les jetons de période dans un libellé du canevas. */

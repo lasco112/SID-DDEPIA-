@@ -96,6 +96,9 @@ export default async function DashboardPage() {
   const actions: { href: string; glyph: string; label: string; sub: string }[] = [];
   if (role === "DA") {
     actions.push({ href: "/da/saisie", glyph: "＋", label: "Saisir mes données", sub: "Les 28 tableaux du mois, hors-ligne possible" });
+    // Les DA produisent eux aussi un rapport trimestriel — ils le retapaient
+    // jusqu'ici entièrement à la main, chacun dans sa forme.
+    actions.push({ href: "/da/trimestre", glyph: "▤", label: "Mon rapport trimestriel", sub: "Le canevas officiel, rempli par mes saisies" });
   }
   if (role === "DD") {
     actions.push({ href: "/dd/supervision", glyph: "✓", label: "Superviser les arrondissements", sub: "Soumissions, validations, déverrouillage" });

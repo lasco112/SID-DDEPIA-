@@ -44,9 +44,8 @@ export const SECTIONS_CANEVAS: SectionCanevas[] = [
 ];
 
 /** Les six arrondissements, dans l'ordre du canevas. */
-async function arrondissementsDe(db: PrismaClient): Promise<string[]> {
-  const a = await db.arrondissement.findMany({ orderBy: { ordre: "asc" }, select: { nom: true } });
-  return a.map((x) => x.nom);
+async function arrondissementsDe(db: PrismaClient): Promise<{ id: string; nom: string }[]> {
+  return db.arrondissement.findMany({ orderBy: { ordre: "asc" }, select: { id: true, nom: true } });
 }
 
 export interface RapportProduit {
@@ -74,25 +73,33 @@ export async function genererRapportCanevas(
     arrondissement?: string;
   } = {}
 ): Promise<RapportProduit> {
-  const etat = await inspecterPeriode(db, periode);
-
   const tous = await arrondissementsDe(db);
-  if (options.arrondissement && !tous.includes(options.arrondissement)) {
+  const sien = options.arrondissement
+    ? tous.find((a) => a.nom === options.arrondissement)
+    : undefined;
+  if (options.arrondissement && !sien) {
     throw new Error(
-      `Arrondissement inconnu : « ${options.arrondissement} ». Attendu l'un de : ${tous.join(", ")}.`
+      `Arrondissement inconnu : « ${options.arrondissement} ». ` +
+        `Attendu l'un de : ${tous.map((a) => a.nom).join(", ")}.`
     );
   }
+
+  // Le rapport d'un DA est jugé complet sur SES transmissions ; le rapport
+  // départemental attend les six arrondissements.
+  const etat = await inspecterPeriode(db, periode, { arrondissementId: sien?.id });
 
   const ctx: ContexteCanevas = {
     periodeCourt: libelleCourt(periode),
     periodeCourtN1: libelleCourt(memePeriodeAnneePrecedente(periode)),
     annee: periode.annee,
     mois: moisDeLaPeriode(periode).map((m) => MOIS_MAJ[m.mois - 1]),
-    arrondissements: options.arrondissement ? [options.arrondissement] : tous,
+    arrondissements: sien ? [sien.nom] : tous.map((a) => a.nom),
+    arrondissement: options.arrondissement,
   };
 
   const donnees = await preparer(db, periode, champsMobilises(), {
     autoriserIncomplet: options.autoriserIncomplet,
+    arrondissementId: sien?.id,
   });
   const valeur = fournisseur(donnees, ctx);
   const bilan = bilanLiaisons();
@@ -152,13 +159,22 @@ export async function genererRapportCanevas(
     ...champsAutomatiques()
   );
 
-  // Les textes qui ne changent pas d'une période à l'autre — présentation du
-  // département, missions, vision, organisation — sont repris automatiquement.
-  // Un texte fourni pour la période l'emporte sur le texte fixe : le Délégué
-  // garde le dernier mot sur ce qui sort sous sa signature.
-  const textes = new Map(TEXTES_FIXES);
-  // Pour un rapport d'arrondissement, ses propres textes fixes l'emportent :
-  // c'est sa présentation qui doit figurer, pas celle du département.
+  /**
+   * Les textes qui ne changent pas d'une période à l'autre sont repris
+   * automatiquement. Un texte fourni pour la période l'emporte : le rédacteur
+   * garde le dernier mot sur ce qui sort sous sa signature.
+   *
+   * Les textes du Délégué départemental ne doivent JAMAIS figurer dans le
+   * rapport d'un arrondissement : son introduction annonce « l'ensemble des 06
+   * arrondissements », ses missions sont celles de la Délégation
+   * départementale. Un DA qui signerait cela signerait le texte d'un autre.
+   *
+   * Dans un rapport d'arrondissement, on ne reprend donc QUE ses propres
+   * textes. Les zones qu'il n'a pas renseignées gardent leur consigne — mieux
+   * vaut une consigne visible qu'un texte emprunté.
+   */
+  const textes = options.arrondissement ? new Map<string, string>() : new Map(TEXTES_FIXES);
+
   if (options.arrondissement) {
     const sien = TEXTES_ARRONDISSEMENTS.get(options.arrondissement);
     if (sien?.introduction) textes.set("I.introduction", sien.introduction);
@@ -172,7 +188,17 @@ export async function genererRapportCanevas(
 
   enfants.push(
     new Paragraph({ text: "" }),
-    new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: "Le Délégué Départemental", size: 20 })] })
+    // Un rapport d'arrondissement ne se signe pas « Le Délégué Départemental » :
+    // il est signé par le DA, et transmis à son chef.
+    new Paragraph({
+      alignment: AlignmentType.RIGHT,
+      children: [
+        new TextRun({
+          text: options.arrondissement ? "Le Délégué d’Arrondissement" : "Le Délégué Départemental",
+          size: 20,
+        }),
+      ],
+    })
   );
 
   const document = new Document({

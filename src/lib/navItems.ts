@@ -13,6 +13,7 @@ export const NAV_PAR_ROLE: Record<string, NavItem[]> = {
   DA: [
     { href: "/dashboard", label: "Tableau de bord" },
     { href: "/da/saisie", label: "Saisie de données" },
+    { href: "/da/trimestre", label: "Mon rapport trimestriel" },
     { href: "/etablissements", label: "Établissements" },
     { href: "/da/supervision-agents", label: "Suivi des agents de saisie" },
     { href: "/da/assignations", label: "Organisation du travail" },

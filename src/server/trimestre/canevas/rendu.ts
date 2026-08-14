@@ -15,7 +15,7 @@ import {
   Paragraph, TextRun, Table, TableRow, TableCell, HeadingLevel,
   WidthType, BorderStyle, AlignmentType, SimpleField, TableOfContents,
 } from "docx";
-import { type Bloc, type ContexteCanevas, type SectionCanevas, resoudre } from "./types";
+import { type Bloc, type ContexteCanevas, type SectionCanevas, resoudre, adapterTitre } from "./types";
 
 /**
  * Fournit la valeur d'une case. Renvoie `null` quand le SID ne porte pas la
@@ -219,7 +219,7 @@ export function rendreSection(section: SectionCanevas, o: OptionsRendu): (Paragr
       sortie.push(
         new Paragraph({
           heading: NIVEAUX[bloc.niveau],
-          children: [new TextRun({ text: bloc.texte, bold: true })],
+          children: [new TextRun({ text: adapterTitre(bloc.texte, o.ctx), bold: true })],
         })
       );
     } else if (bloc.type === "zoneTexte") {

@@ -18,10 +18,19 @@ import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 const DOSSIER = "docs/canevas/rapports-da";
 const ARRONDISSEMENTS = ["Dschang", "Fokoué", "Fongo-Tongo", "Nkong-Ni", "Penka-Michel", "Santchou"];
 
+/**
+ * Word glisse des entrées d'index — XE "…" — dans le texte des paragraphes.
+ * Ce n'est pas du contenu : les laisser ferait apparaître
+ * « XE "Tableau n°1 \: Etat des besoins…" » au milieu de la présentation d'un
+ * arrondissement, dans un document officiel.
+ */
+const sansChampsWord = (t) => t.replace(/XE\s*"[^"]*"/g, " ").replace(/\s+/g, " ").trim();
+
 const texteDe = (f) =>
-  f.replace(/<w:tab\/>/g, " ").replace(/<[^>]+>/g, "").replace(/&amp;/g, "&")
-   .replace(/&apos;/g, "'").replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">")
-   .replace(/\s+/g, " ").trim();
+  sansChampsWord(
+    f.replace(/<w:tab\/>/g, " ").replace(/<[^>]+>/g, "").replace(/&amp;/g, "&")
+     .replace(/&apos;/g, "'").replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+  );
 
 /** Découpe le corps en paragraphes et tableaux, dans l'ordre. */
 function blocsDe(chemin) {
