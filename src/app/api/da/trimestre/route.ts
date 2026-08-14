@@ -24,6 +24,7 @@ import { requireUser, assertRole, permissionErrorResponse } from "@/lib/permissi
 import { trimestrielle, libelleOfficiel, libelleCourt } from "@/server/periodes/calendrier";
 import { inspecterPeriode, PeriodeNonCalculableError } from "@/server/trimestre/agregation";
 import { genererRapportCanevas } from "@/server/trimestre/rapportCanevas";
+import { archiverRapportTrimestriel } from "@/server/trimestre/archivage";
 import type { PrismaClient } from "@prisma/client";
 
 /**
@@ -140,6 +141,18 @@ export async function POST(req: Request) {
     const { buffer, nomFichier, etat, rubriquesAlimentees, valeursConsolidees } =
       await genererRapportCanevas(db, p, { autoriserIncomplet: Boolean(apercu), arrondissement });
 
+    // Comme pour le rapport départemental : seul le définitif est conservé.
+    // Un brouillon n'est transmis à personne.
+    const sien = await db.arrondissement.findFirst({
+      where: { nom: arrondissement },
+      select: { id: true },
+    });
+    const archive = etat.calculable
+      ? await archiverRapportTrimestriel(db, p, {
+          buffer, nomFichier, auteurId: user.id, arrondissementId: sien!.id,
+        })
+      : null;
+
     await db.auditLog.create({
       data: {
         userId: user.id,
@@ -154,6 +167,8 @@ export async function POST(req: Request) {
           moisIncomplets: etat.moisIncomplets,
           rubriquesAlimentees,
           valeursConsolidees,
+          version: archive?.version ?? null,
+          identiqueAuPrecedent: archive?.identiqueAuPrecedent ?? null,
         },
       },
     });

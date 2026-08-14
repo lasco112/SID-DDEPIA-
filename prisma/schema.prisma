@@ -616,6 +616,12 @@ enum TypeExport {
   RAPPORT_DD_DOCX
   RAPPORT_EXACT_DOCX // reproduction structurelle littérale du canevas officiel, sans les enrichissements du rapport DD
   RAPPORT_DD_PDF
+  /// Rapport trimestriel du Délégué départemental, conforme au canevas officiel.
+  /// Distinct de RAPPORT_DD_DOCX, qui est le rapport MENSUEL : les confondre
+  /// ferait remonter un trimestre dans la liste des rapports d'un mois.
+  RAPPORT_TRIMESTRIEL_DD_DOCX
+  /// Rapport trimestriel d'un Délégué d'arrondissement.
+  RAPPORT_TRIMESTRIEL_DA_DOCX
   PPT_TRIMESTRIEL
   EXPORT_DREPIA_XLSX // export normalisé vers la Délégation Régionale
   EXPORT_DREPIA_DOCX // format canevas régional (phase ultérieure)

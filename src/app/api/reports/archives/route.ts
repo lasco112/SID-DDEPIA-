@@ -20,7 +20,14 @@ export async function GET(req: Request) {
       where:
         user.role === "DD"
           ? { periodeId }
-          : { periodeId, type: "RAPPORT_DA_DOCX", arrondissementId: user.arrondissementId ?? "__aucun__" },
+          : {
+              periodeId,
+              // Le DA relit ses rapports MENSUELS comme ses rapports
+              // TRIMESTRIELS. N'énumérer que le mensuel, comme avant, rendait
+              // son rapport trimestriel introuvable une fois téléchargé.
+              type: { in: ["RAPPORT_DA_DOCX", "RAPPORT_TRIMESTRIEL_DA_DOCX"] },
+              arrondissementId: user.arrondissementId ?? "__aucun__",
+            },
       orderBy: { createdAt: "desc" },
       select: {
         id: true,

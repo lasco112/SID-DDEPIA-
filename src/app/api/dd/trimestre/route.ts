@@ -18,6 +18,7 @@ import { requireUser, assertRole, permissionErrorResponse } from "@/lib/permissi
 import { trimestrielle, libelleOfficiel, libelleCourt, memePeriodeAnneePrecedente } from "@/server/periodes/calendrier";
 import { inspecterPeriode, PeriodeNonCalculableError } from "@/server/trimestre/agregation";
 import { genererRapportCanevas } from "@/server/trimestre/rapportCanevas";
+import { archiverRapportTrimestriel } from "@/server/trimestre/archivage";
 import { rassembler } from "@/server/trimestre/rapport-docx";
 import type { PrismaClient } from "@prisma/client";
 
@@ -121,6 +122,19 @@ export async function POST(req: Request) {
     const { buffer, nomFichier, etat, rubriquesAlimentees, valeursConsolidees } =
       await genererRapportCanevas(db, p, { autoriserIncomplet: Boolean(apercu) });
 
+    /*
+     * Seul le rapport DÉFINITIF est conservé. Un brouillon se régénère dix fois
+     * pendant la rédaction ; en garder chaque exemplaire remplirait la base de
+     * documents que personne ne relira, sans rien apporter à la traçabilité —
+     * un brouillon n'est transmis à personne. Sa production reste tracée dans
+     * le journal d'activité.
+     */
+    const archive = etat.calculable
+      ? await archiverRapportTrimestriel(db, p, {
+          buffer, nomFichier, auteurId: user.id, arrondissementId: null,
+        })
+      : null;
+
     await db.auditLog.create({
       data: {
         userId: user.id,
@@ -134,6 +148,8 @@ export async function POST(req: Request) {
           moisIncomplets: etat.moisIncomplets,
           rubriquesAlimentees,
           valeursConsolidees,
+          version: archive?.version ?? null,
+          identiqueAuPrecedent: archive?.identiqueAuPrecedent ?? null,
         },
       },
     });
