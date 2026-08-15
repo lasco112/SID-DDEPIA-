@@ -9,28 +9,32 @@
 | 14 776 lignes rattachées à la Menoua | **fait** |
 | `user.db` déclare le département à chaque opération | **fait** |
 | Les 29 fichiers avec session passent par `user.db` | **fait** |
-| Les 7 fichiers sans session | **à faire — décision prise, voir ci-dessous** |
+| Les 7 fichiers sans session | **fait** — lot 19 |
 | Politiques de sécurité par ligne activées | **à faire** |
 | Test d'intrusion | **à faire** |
 
-Contrôle rejouable à tout moment :
+Contrôles rejouables à tout moment :
 
 ```bash
 node --env-file=.env --import tsx scripts/verifier-cloisonnement.ts
+node --env-file=.env --import tsx scripts/verifier-relances-cloisonnees.ts
 ```
 
 ## Pourquoi les politiques ne sont pas encore activées
 
-Les politiques compareraient le département de chaque ligne au réglage
+Les politiques comparent le département de chaque ligne au réglage
 `app.departement_id`. Ce réglage n'est posé que par le client cloisonné, donc
-uniquement quand le code passe par `user.db`. Il reste **7 fichiers** qui
-importent `db` directement — sur 36 au départ. Les activer aujourd'hui rendrait
-ces 7 chemins aveugles : ils ne verraient plus aucune ligne. Parmi eux, l'envoi
-des notifications et les tâches planifiées, dont la panne serait silencieuse.
+uniquement quand le code passe par `user.db`.
 
-Et l'inverse — une politique permissive quand le réglage est absent — serait
-pire : elle donnerait le sentiment d'une sécurité qui n'existe pas. C'est
-exactement ce que le mémorandum d'architecture interdit.
+Une politique permissive quand le réglage est absent serait pire que rien :
+elle donnerait le sentiment d'une sécurité qui n'existe pas. C'est exactement
+ce que le mémorandum d'architecture interdit. Le réglage absent doit donc
+signifier « aucune ligne » — et tout chemin qui lit une table cloisonnée doit
+avoir été converti AVANT d'activer quoi que ce soit.
+
+Les chemins applicatifs le sont désormais tous. Reste l'amorçage de
+l'authentification, décrit à l'étape 4 : il faut lire un compte AVANT de
+connaître son département.
 
 ## La piste à ne pas retenter
 
@@ -51,23 +55,45 @@ Conversion mécanique : `db.` devient `user.db.`. Ces fichiers appellent déjà
 tests, puis les contrôles de bout en bout (`scripts/verifier-rubriques.ts`,
 `scripts/verifier-archivage-trimestriel.ts`).
 
-### 2. Les 7 fichiers SANS session — une décision, pas une réécriture
+### 2. Les 7 fichiers SANS session — FAIT
 
-| Fichier | Nature | Ce qu'il faut trancher |
-|---|---|---|
-| `api/mon-compte/premiere-connexion/route.ts` | avant authentification | légitime hors département : il change un mot de passe, il ne lit aucune donnée métier |
-| `app/etablissements/page.tsx` | page serveur | doit passer par `contexteSession` |
-| `server/cron/planificateur.ts` | tâche de fond | traverse TOUS les départements par nature |
-| `server/cron/triggers.ts` | tâche de fond | idem |
-| `server/notifications/dispatcher.ts` | tâche de fond | idem |
-| `server/export/drepia-xlsx.ts` | export | reçoit son client en paramètre : lui passer `user.db` |
-| `server/export/rapport-thematique.ts` | export | idem |
+**DÉCISION APPLIQUÉE : boucler département par département.** Donner la
+connexion d'administration aux tâches de fond reviendrait à laisser une porte
+ouverte en permanence — et cette porte serait précisément celle qui contourne
+toutes les politiques. Une tâche qui boucle sur les départements est plus longue
+à écrire, mais elle ne crée aucun chemin privilégié durable.
 
-**DÉCISION PRISE : boucler département par département.** Donner la connexion
-d'administration aux tâches de fond reviendrait à laisser une porte ouverte en
-permanence — et cette porte serait précisément celle qui contourne toutes les
-politiques. Une tâche qui boucle sur les départements est plus longue à écrire,
-mais elle ne crée aucun chemin privilégié durable.
+| Fichier | Ce qui a été fait |
+|---|---|
+| `api/mon-compte/premiere-connexion/route.ts` | lit le département du compte, puis écrit avec `clientCloisonne` |
+| `app/etablissements/page.tsx` | passe par `contexteSession`, lit avec `user.db` |
+| `server/cron/planificateur.ts` | boucle sur `Departement`, un client cloisonné par tour |
+| `server/cron/triggers.ts` | les 4 déclencheurs reçoivent le client du département traité |
+| `server/notifications/dispatcher.ts` | reçoit son client, comme `evenements.ts` et `push.ts` |
+| `server/export/drepia-xlsx.ts` | reçoit `user.db` de la route appelante |
+| `server/export/rapport-thematique.ts` | idem |
+
+Trois points qui ne se déduisent pas du tableau :
+
+**Un huitième fichier manquait à l'inventaire : `components/AppShell.tsx`.** Il
+lit `PeriodeReporting` — table cloisonnée — mais passe `db` en **paramètre** à
+`resoudrePeriode`, sans jamais écrire « `db.` ». Aucun recensement par motif
+textuel ne le voyait. Il enveloppe pourtant toutes les pages authentifiées : les
+politiques activées, le sélecteur de période se serait vidé partout. Chercher
+les fichiers qui *importent* `db`, jamais ceux qui l'*utilisent*.
+
+**Le marqueur des relances porte maintenant le code du département.**
+`ConfigSysteme` est une table commune : sans le département dans la clé, le
+premier département traité marquerait la relance « faite » pour tous les autres,
+qui ne seraient jamais prévenus. L'ancienne forme de clé reste consultée tant
+qu'il n'y a qu'un département, pour ne pas renvoyer sur les téléphones des DA
+une relance déjà partie le mois de la mise en service.
+
+**`server/cron/alerts.ts` délègue désormais au planificateur.** Cet ancien
+process séparé (`npm run cron`) dupliquait la planification. Plutôt que d'y
+recopier la boucle des départements, il appelle `verifierRelances` : la logique
+du cloisonnement n'existe qu'à un seul endroit, et les deux process peuvent
+tourner ensemble sans notifier deux fois — le marqueur les départage.
 
 ### 3. Les 7 transactions applicatives
 

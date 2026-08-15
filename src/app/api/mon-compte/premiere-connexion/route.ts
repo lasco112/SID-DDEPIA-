@@ -9,6 +9,7 @@ import bcrypt from "bcryptjs";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { clientCloisonne } from "@/lib/dbCloisonne";
 
 interface Body {
   nom: string;
@@ -33,9 +34,26 @@ export async function POST(req: Request) {
   }
 
   const userId = (session.user as any).id as string;
+
+  /*
+   * Pas `requireUser()` ici : pendant une démonstration globale, il remappe le
+   * compte réel sur son jumeau fictif — le mot de passe changerait alors sur la
+   * mauvaise base, et le compte réel resterait bloqué en première connexion.
+   *
+   * On reste donc sur le compte de la session, dont on lit le département pour
+   * déclarer le cloisonnement au moment d'écrire. Cette lecture-là est la seule
+   * qui précède le cloisonnement, exactement comme celle que `resoudreContexte`
+   * fait à chaque requête (voir docs/CLOISONNEMENT.md).
+   */
+  const compte = await db.user.findUnique({ where: { id: userId }, select: { departementId: true } });
+  if (!compte) {
+    return NextResponse.json({ message: "Compte introuvable" }, { status: 401 });
+  }
+  const base = clientCloisonne(db, compte.departementId);
+
   const passwordHash = await bcrypt.hash(body.nouveauMotDePasse, 10);
 
-  await db.user.update({
+  await base.user.update({
     where: { id: userId },
     data: {
       nom: body.nom.trim(),
@@ -47,7 +65,7 @@ export async function POST(req: Request) {
     },
   });
 
-  await db.auditLog.create({
+  await base.auditLog.create({
     data: { userId, action: "PREMIERE_CONNEXION_COMPLETEE", entite: "User", entiteId: userId },
   });
 

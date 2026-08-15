@@ -1,19 +1,22 @@
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { contexteSession } from "@/lib/permissions";
 import AppShell from "@/components/AppShell";
 import EtablissementsClient from "@/components/EtablissementsClient";
 import SupprimerEtablissementsDemoButton from "@/components/SupprimerEtablissementsDemoButton";
 
 export default async function EtablissementsPage() {
   const session = await getServerSession(authOptions);
-  if (!session?.user) redirect("/");
-  const role = (session.user as any).role as string;
+  const user = await contexteSession(session);
+  if (!user) redirect("/");
+  const role = user.role as string;
   if (role !== "DA" && role !== "DD" && role !== "AGENT_SAISIE") redirect("/dashboard");
 
-  const arrondissements = await db.arrondissement.findMany({ orderBy: { ordre: "asc" } });
-  const ownArrondissementId = (session.user as any).arrondissementId as string | null;
+  // `user.db` plutôt que le client global : la liste des arrondissements est
+  // celle du département de la session, pas celle de tout le pays.
+  const arrondissements = await user.db.arrondissement.findMany({ orderBy: { ordre: "asc" } });
+  const ownArrondissementId = user.arrondissementId;
 
   return (
     <AppShell allowedRoles={["DA", "DD", "AGENT_SAISIE"]}>

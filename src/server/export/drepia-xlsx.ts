@@ -7,11 +7,16 @@
  */
 
 import ExcelJS from "exceljs";
-import { db } from "@/lib/db";
+import type { PrismaClient } from "@prisma/client";
 
 const ARR_CODES = ["DSC", "FOK", "FGT", "NKN", "PKM", "STC"] as const;
 
-export async function genererExportDrepia(periodeId: string): Promise<Buffer> {
+/**
+ * `db` est le client de la session appelante (`user.db`), qui déclare son
+ * département à la base. Ce module n'importe plus le client global : un export
+ * doit voir exactement ce que voit l'utilisateur qui le demande, ni plus.
+ */
+export async function genererExportDrepia(db: PrismaClient, periodeId: string): Promise<Buffer> {
   const periode = await db.periodeReporting.findUniqueOrThrow({ where: { id: periodeId } });
 
   const periodeN1 = await db.periodeReporting.findFirst({
@@ -71,7 +76,7 @@ export async function genererExportDrepia(periodeId: string): Promise<Buffer> {
         let auMoinsUneValeur = false;
 
         for (const arr of ARR_CODES) {
-          const v = await sommeField(periodeId, field.code, arr);
+          const v = await sommeField(db, periodeId, field.code, arr);
           if (v == null) {
             row.push("—");
           } else {
@@ -83,7 +88,7 @@ export async function genererExportDrepia(periodeId: string): Promise<Buffer> {
         row.push(auMoinsUneValeur ? totalCourant : "—");
 
         if (periodeN1) {
-          const vN1 = await sommeField(periodeN1.id, field.code, null);
+          const vN1 = await sommeField(db, periodeN1.id, field.code, null);
           row.push(vN1 ?? "—");
           row.push(vN1 != null && auMoinsUneValeur ? totalCourant - vN1 : "—");
         } else {
@@ -99,7 +104,7 @@ export async function genererExportDrepia(periodeId: string): Promise<Buffer> {
   return Buffer.from(await wb.xlsx.writeBuffer());
 }
 
-async function sommeField(periodeId: string, fieldCode: string, arrCode: string | null): Promise<number | null> {
+async function sommeField(db: PrismaClient, periodeId: string, fieldCode: string, arrCode: string | null): Promise<number | null> {
   const [matrice, nominatif] = await Promise.all([
     db.saisieMatrice.findMany({
       where: {

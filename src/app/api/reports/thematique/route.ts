@@ -47,7 +47,7 @@ export async function POST(req: Request) {
       periodeIds,
     };
 
-    const tableaux = await collecterDonneesThematiques(filtre);
+    const tableaux = await collecterDonneesThematiques(user.db, filtre);
     if (tableaux.length === 0) {
       return NextResponse.json({ message: "Aucune donnée ne correspond à cette combinaison de filtres." }, { status: 404 });
     }

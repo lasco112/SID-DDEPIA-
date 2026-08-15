@@ -12,7 +12,7 @@
  * déclaration pour ÉVÉNEMENT) — l'objectif est une extraction exploitable
  * pour analyse, pas un document de synthèse déjà agrégé.
  */
-import { db } from "@/lib/db";
+import type { PrismaClient } from "@prisma/client";
 import {
   THEME_ESPECE,
   champCorrespondEspece,
@@ -54,7 +54,12 @@ function fmtValeur(v: unknown): string | number {
   return String(v);
 }
 
-export async function collecterDonneesThematiques(filtre: FiltreThematique): Promise<TableauThematique[]> {
+/**
+ * `db` est le client de la session appelante (`user.db`), qui déclare son
+ * département à la base : une extraction thématique ne sort jamais du
+ * périmètre de celui qui la demande.
+ */
+export async function collecterDonneesThematiques(db: PrismaClient, filtre: FiltreThematique): Promise<TableauThematique[]> {
   if (filtre.periodeIds.length === 0) throw new Error("Au moins une période est requise.");
 
   const especeSuffixes = filtre.especeCodes.map(suffixeEspeceFiltre);

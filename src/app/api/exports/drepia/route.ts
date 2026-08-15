@@ -21,7 +21,7 @@ export async function GET(req: Request) {
     const periode = await user.db.periodeReporting.findUnique({ where: { id: periodeId } });
     if (!periode) return NextResponse.json({ message: "Période introuvable" }, { status: 404 });
 
-    const buf = await genererExportDrepia(periodeId);
+    const buf = await genererExportDrepia(user.db, periodeId);
     const hash = crypto.createHash("sha256").update(buf).digest("hex");
 
     const version = (await user.db.exportDocument.count({ where: { periodeId, type: "EXPORT_DREPIA_XLSX" } })) + 1;

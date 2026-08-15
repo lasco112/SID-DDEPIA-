@@ -24,9 +24,20 @@
  * période choisie ici : chaque déclencheur résout lui-même sa période (le mois
  * calendaire en cours, ou le précédent pour le rappel de clôture). Marquer
  * autre chose reviendrait à noter « fait » une relance qui n'a rien traité.
+ *
+ * Cloisonnement — pourquoi une boucle et non une connexion d'administration
+ * -------------------------------------------------------------------------
+ * Une relance concerne tous les départements, mais la traiter avec un client
+ * privilégié ouvrirait en permanence la seule porte qui contourne les
+ * politiques de sécurité par ligne. On parcourt donc les départements l'un
+ * après l'autre, avec le client cloisonné de chacun : plus long à écrire,
+ * aucun chemin privilégié durable. Un département en échec n'empêche pas les
+ * autres d'être traités.
  */
 import cron from "node-cron";
+import type { PrismaClient } from "@prisma/client";
 import { db } from "@/lib/db";
+import { clientCloisonne } from "@/lib/dbCloisonne";
 import { rappelJ1DA, verrouillageEtAlerteRetardDA, alerteRetardSections, rappelClotureDD } from "@/server/cron/triggers";
 
 let demarre = false;
@@ -45,7 +56,8 @@ interface Relance {
   echeance: (maintenant: Date) => Date;
   /** Mois visé par le déclencheur — sert de clé au marqueur. */
   moisVise: (maintenant: Date) => { annee: number; mois: number };
-  executer: () => Promise<{ notifies: number }>;
+  /** Reçoit le client cloisonné du département en cours de traitement. */
+  executer: (base: PrismaClient) => Promise<{ notifies: number }>;
 }
 
 const moisCourant = (d: Date) => ({ annee: d.getUTCFullYear(), mois: d.getUTCMonth() + 1 });
@@ -66,16 +78,34 @@ const RELANCES: Relance[] = [
 
 const UN_JOUR = 24 * 60 * 60 * 1000;
 
-function cleMarqueur(code: string, annee: number, mois: number) {
+/**
+ * Le marqueur porte le code du département : sans lui, le premier département
+ * traité marquerait la relance « faite » pour tous les autres, qui ne seraient
+ * jamais prévenus. `ConfigSysteme` est une table commune (pas de colonne
+ * `departementId`), le département tient donc dans la clé.
+ */
+function cleMarqueur(code: string, departement: string, annee: number, mois: number) {
+  return `relance_${code}_${departement}_${annee}-${String(mois).padStart(2, "0")}`;
+}
+
+/** Forme de la clé avant le cloisonnement, sans département. Voir plus bas. */
+function cleMarqueurHeritee(code: string, annee: number, mois: number) {
   return `relance_${code}_${annee}-${String(mois).padStart(2, "0")}`;
 }
 
 /**
- * Passe en revue les relances dues et non encore parties. Sans effet la
- * plupart des heures du mois.
+ * Passe en revue les relances dues et non encore parties, département par
+ * département. Sans effet la plupart des heures du mois.
+ *
+ * `maintenant` n'est là que pour la vérification : sans lui, on ne pourrait
+ * exercer cette fonction qu'aux quelques heures du mois où une relance est due
+ * (voir `scripts/verifier-relances-cloisonnees.ts`). Les appelants réels ne le
+ * passent jamais.
  */
-export async function verifierRelances(): Promise<void> {
-  const maintenant = new Date();
+export async function verifierRelances(maintenant: Date = new Date()): Promise<void> {
+  // `Departement` n'est pas une table cloisonnée : c'est l'unité de
+  // cloisonnement elle-même, lisible sans réglage de session.
+  const departements = await db.departement.findMany({ orderBy: { code: "asc" } });
 
   for (const relance of RELANCES) {
     const due = relance.echeance(maintenant);
@@ -87,21 +117,34 @@ export async function verifierRelances(): Promise<void> {
     if (maintenant.getTime() - due.getTime() > 10 * UN_JOUR) continue;
 
     const vise = relance.moisVise(maintenant);
-    const cle = cleMarqueur(relance.code, vise.annee, vise.mois);
 
-    try {
-      if (await db.configSysteme.findUnique({ where: { cle } })) continue;
+    for (const departement of departements) {
+      const cle = cleMarqueur(relance.code, departement.code, vise.annee, vise.mois);
 
-      const r = await relance.executer();
-      await db.configSysteme.upsert({
-        where: { cle },
-        update: { valeur: `${maintenant.toISOString()} — ${r.notifies} notification(s)` },
-        create: { cle, valeur: `${maintenant.toISOString()} — ${r.notifies} notification(s)` },
-      });
-      console.log(`[relances] ${relance.code} ${vise.mois}/${vise.annee} : ${r.notifies} notification(s).`);
-    } catch (e) {
-      console.error(`[relances] ${relance.code} a échoué :`, e);
-      // Pas de marqueur : la relance sera retentée à l'heure suivante.
+      // Le mois de la mise en service du cloisonnement, les relances déjà
+      // parties ne portent que l'ancienne clé, sans département. La consulter
+      // évite un second envoi sur les téléphones des DA. Uniquement quand il
+      // n'y a qu'un département : c'est la situation dans laquelle cette clé a
+      // été écrite, et au-delà elle en masquerait d'autres à tort.
+      const cles = departements.length === 1
+        ? [cle, cleMarqueurHeritee(relance.code, vise.annee, vise.mois)]
+        : [cle];
+
+      try {
+        if (await db.configSysteme.findFirst({ where: { cle: { in: cles } } })) continue;
+
+        const r = await relance.executer(clientCloisonne(db, departement.id));
+        await db.configSysteme.upsert({
+          where: { cle },
+          update: { valeur: `${maintenant.toISOString()} — ${r.notifies} notification(s)` },
+          create: { cle, valeur: `${maintenant.toISOString()} — ${r.notifies} notification(s)` },
+        });
+        console.log(`[relances] ${relance.code} ${departement.code} ${vise.mois}/${vise.annee} : ${r.notifies} notification(s).`);
+      } catch (e) {
+        console.error(`[relances] ${relance.code} a échoué pour ${departement.code} :`, e);
+        // Pas de marqueur : la relance sera retentée à l'heure suivante, et les
+        // départements suivants sont traités malgré cet échec.
+      }
     }
   }
 }

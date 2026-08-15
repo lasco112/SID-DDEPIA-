@@ -6,11 +6,16 @@
  *   28 à 18h00 : verrouillage de la période + alerte retard aux DA non soumis
  *   29 à 18h00 : alerte retard aux chefs de sections non validées
  *   02 à 08h00 : rappel de clôture au DD si le rapport n'est pas généré
+ *
+ * Chaque déclencheur reçoit le client d'UN département — celui que le
+ * planificateur traite à cet instant — et ne voit donc que ses périodes, ses
+ * comptes et ses rapports. Aucune connexion d'administration n'est utilisée
+ * ici : voir docs/CLOISONNEMENT.md, étape 2.
  */
-import { db } from "@/lib/db";
+import type { PrismaClient } from "@prisma/client";
 import { notifier } from "@/server/notifications/dispatcher";
 
-async function periodeMensuelleCourante() {
+async function periodeMensuelleCourante(db: PrismaClient) {
   const now = new Date();
   return db.periodeReporting.findFirst({
     where: { type: "MENSUEL", annee: now.getFullYear(), mois: now.getMonth() + 1 },
@@ -18,7 +23,7 @@ async function periodeMensuelleCourante() {
   });
 }
 
-async function periodeMensuellePrecedente() {
+async function periodeMensuellePrecedente(db: PrismaClient) {
   const now = new Date();
   let annee = now.getFullYear();
   let mois = now.getMonth(); // 0-indexé -> mois précédent en 1-indexé
@@ -32,8 +37,8 @@ async function periodeMensuellePrecedente() {
   });
 }
 
-export async function rappelJ1DA() {
-  const periode = await periodeMensuelleCourante();
+export async function rappelJ1DA(db: PrismaClient) {
+  const periode = await periodeMensuelleCourante(db);
   if (!periode || periode.statut !== "OUVERTE") return { notifies: 0 };
 
   const das = await db.user.findMany({ where: { role: "DA", actif: true }, include: { arrondissement: true } });
@@ -41,7 +46,7 @@ export async function rappelJ1DA() {
   for (const da of das) {
     const soumis = periode.rapports.some((r) => r.arrondissementId === da.arrondissementId && (r.statut === "SOUMIS" || r.statut === "CLOTURE"));
     if (!soumis) {
-      await notifier({
+      await notifier(db, {
         userId: da.id,
         nom: da.nom,
         telephone: da.telephone,
@@ -55,8 +60,8 @@ export async function rappelJ1DA() {
   return { notifies };
 }
 
-export async function verrouillageEtAlerteRetardDA() {
-  const periode = await periodeMensuelleCourante();
+export async function verrouillageEtAlerteRetardDA(db: PrismaClient) {
+  const periode = await periodeMensuelleCourante(db);
   if (!periode || periode.statut !== "OUVERTE") return { verrouille: false, notifies: 0 };
   // Le DD peut repousser dateLimiteDA (report d'échéance pour tout le monde) : dans ce
   // cas, le déclencheur du 28 ne verrouille pas tant que la nouvelle date n'est pas passée.
@@ -72,7 +77,7 @@ export async function verrouillageEtAlerteRetardDA() {
   for (const da of das) {
     const rapport = periode.rapports.find((r) => r.arrondissementId === da.arrondissementId);
     if (!rapport || (rapport.statut !== "SOUMIS" && rapport.statut !== "CLOTURE")) {
-      await notifier({
+      await notifier(db, {
         userId: da.id,
         nom: da.nom,
         telephone: da.telephone,
@@ -86,8 +91,8 @@ export async function verrouillageEtAlerteRetardDA() {
   return { verrouille: true, notifies };
 }
 
-export async function alerteRetardSections() {
-  const periode = await periodeMensuelleCourante();
+export async function alerteRetardSections(db: PrismaClient) {
+  const periode = await periodeMensuelleCourante(db);
   if (!periode) return { notifies: 0 };
 
   // Une section qui n'a encore jamais été touchée par son chef n'a pas de
@@ -108,7 +113,7 @@ export async function alerteRetardSections() {
         where: { sectionId: v.sectionId, actif: true, role: { in: ["CHEF_BAC", "CHEF_SSV", "CHEF_PSA", "CHEF_SPAIH"] } },
       });
       for (const chef of chefs) {
-        await notifier({
+        await notifier(db, {
           userId: chef.id,
           nom: chef.nom,
           telephone: chef.telephone,
@@ -123,8 +128,8 @@ export async function alerteRetardSections() {
   return { notifies };
 }
 
-export async function rappelClotureDD() {
-  const periode = await periodeMensuellePrecedente();
+export async function rappelClotureDD(db: PrismaClient) {
+  const periode = await periodeMensuellePrecedente(db);
   if (!periode) return { notifies: 0 };
 
   const rapportGenere = periode.exports.some((e) => e.type === "RAPPORT_DD_DOCX");
@@ -133,7 +138,7 @@ export async function rappelClotureDD() {
   const dds = await db.user.findMany({ where: { role: "DD", actif: true } });
   let notifies = 0;
   for (const dd of dds) {
-    await notifier({
+    await notifier(db, {
       userId: dd.id,
       nom: dd.nom,
       telephone: dd.telephone,

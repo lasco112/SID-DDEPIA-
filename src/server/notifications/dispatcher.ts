@@ -5,8 +5,13 @@
  * l'application). SMS/WHATSAPP sont journalisés et placés EN_ATTENTE — la
  * passerelle réelle (phase 3) les enverra sans qu'il faille toucher aux
  * déclencheurs de cron/alerts.ts.
+ *
+ * Comme `evenements.ts` et `push.ts`, ce module reçoit son client au lieu de
+ * l'importer : l'appelant est une tâche de fond qui parcourt les départements
+ * l'un après l'autre, et la notification doit s'écrire dans celui du
+ * destinataire.
  */
-import { db } from "@/lib/db";
+import type { PrismaClient } from "@prisma/client";
 import { envoyerPush } from "@/server/notifications/push";
 
 export type Canal = "IN_APP" | "SMS" | "WHATSAPP";
@@ -20,7 +25,7 @@ export interface NotifierOptions {
   message: string;
 }
 
-export async function notifier(opts: NotifierOptions) {
+export async function notifier(db: PrismaClient, opts: NotifierOptions) {
   // Les relances calendaires partent aussi sur le téléphone, comme les
   // notifications d'événement : c'est justement quand l'agent n'ouvre pas
   // l'application qu'un rappel d'échéance a de la valeur.
