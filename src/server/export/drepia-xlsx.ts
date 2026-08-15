@@ -8,8 +8,7 @@
 
 import ExcelJS from "exceljs";
 import type { PrismaClient } from "@prisma/client";
-
-const ARR_CODES = ["DSC", "FOK", "FGT", "NKN", "PKM", "STC"] as const;
+import { listerArrondissements } from "../../lib/arrondissements";
 
 /**
  * `db` est le client de la session appelante (`user.db`), qui déclare son
@@ -18,6 +17,10 @@ const ARR_CODES = ["DSC", "FOK", "FGT", "NKN", "PKM", "STC"] as const;
  */
 export async function genererExportDrepia(db: PrismaClient, periodeId: string): Promise<Buffer> {
   const periode = await db.periodeReporting.findUniqueOrThrow({ where: { id: periodeId } });
+
+  // Les colonnes territoriales sont celles du département de l'appelant, dans
+  // l'ordre du canevas — elles ne sont plus écrites en dur.
+  const ARR_CODES = (await listerArrondissements(db)).map((a) => a.code);
 
   const periodeN1 = await db.periodeReporting.findFirst({
     where: {

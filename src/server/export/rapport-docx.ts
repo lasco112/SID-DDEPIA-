@@ -30,18 +30,17 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import type { PrismaClient } from "@prisma/client";
 import { CANEVAS_LAYOUTS, EVENEMENTS_SYNTHESE_DEPARTEMENTALE } from "../../../prisma/seed-lib/canevasLayout";
+import { listerArrondissements, graphieCanevas } from "../../lib/arrondissements";
 
-const ARR_CODES = ["DSC", "FOK", "FGT", "NKN", "PKM", "STC"] as const;
 const MOIS_FR = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"];
-// Graphie exacte du canevas (majuscules, sans accent) — voir buildReportTemplates.ts.
-const ARR_NOMS_CANEVAS: Record<string, string> = {
-  DSC: "DSCHANG",
-  FOK: "FOKOUE",
-  FGT: "FONGO TONGO",
-  NKN: "NKONG NI",
-  PKM: "PENKA MICHEL",
-  STC: "SANTCHOU",
-};
+
+/*
+ * Les six arrondissements de la Menoua étaient écrits ici, avec leur graphie
+ * canevas. Un autre département aurait reçu ces colonnes-là, et toutes vides :
+ * ses chiffres étaient cherchés sous des codes qui n'existent pas chez lui.
+ * Ils viennent désormais de la base, via le client de l'appelant — donc du
+ * département de l'appelant. Voir src/lib/arrondissements.ts.
+ */
 
 function fmt(v: number | null): string {
   if (v == null) return "—";
@@ -509,6 +508,9 @@ export async function genererPayloadDD(db: PrismaClient, periodeId: string, agre
   const periode = await db.periodeReporting.findUniqueOrThrow({ where: { id: periodeId } });
   const { payload, templates, moisPrecedent } = await construirePayloadCommun(db, periodeId, periode.mois!, periode.annee);
 
+  // Les arrondissements du département de l'appelant, dans l'ordre du canevas.
+  const arrondissements = (await listerArrondissements(db)).map((a) => a.code);
+
   const rawTotal = new Map<string, number | null>();
   const rawTotalPrec = new Map<string, number | null>();
 
@@ -517,14 +519,14 @@ export async function genererPayloadDD(db: PrismaClient, periodeId: string, agre
     if (t.type === "MATRICE") {
       for (const f of t.fields) {
         if (f.typeValeur === "TEXTE") {
-          for (const arr of ARR_CODES) {
+          for (const arr of arrondissements) {
             payload[`${f.code}_${arr}`] = (await dernierTexteMatrice(db, periodeId, f.code, arr)) ?? "—";
           }
           continue;
         }
         let total = 0;
         let auMoinsUne = false;
-        for (const arr of ARR_CODES) {
+        for (const arr of arrondissements) {
           const v = await sommeMatrice(db, periodeId, f.code, arr);
           payload[`${f.code}_${arr}`] = fmt(v);
           if (v != null) {
@@ -569,7 +571,7 @@ export async function genererPayloadDA(db: PrismaClient, periodeId: string, arro
   const periode = await db.periodeReporting.findUniqueOrThrow({ where: { id: periodeId } });
   const { payload, templates, moisPrecedent } = await construirePayloadCommun(db, periodeId, periode.mois!, periode.annee);
   payload.ARRONDISSEMENT_NOM = arrondissementNom;
-  payload.ARRONDISSEMENT_NOM_CANEVAS = ARR_NOMS_CANEVAS[arrondissementCode] ?? arrondissementNom;
+  payload.ARRONDISSEMENT_NOM_CANEVAS = graphieCanevas(arrondissementNom);
 
   const rawTotal = new Map<string, number | null>();
   const rawTotalPrec = new Map<string, number | null>();

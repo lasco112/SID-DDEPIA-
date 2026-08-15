@@ -41,6 +41,8 @@ import fs from "node:fs/promises";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { CANEVAS_LAYOUTS, ColDef, EVENEMENTS_SYNTHESE_DEPARTEMENTALE } from "./canevasLayout";
+import { listerArrondissements } from "../../src/lib/arrondissements";
+import { clientCloisonne } from "../../src/lib/dbCloisonne";
 
 // En-tête officiel bilingue MINEPIA (fourni par le DD) : utilisé tel quel en
 // image plutôt que recréé en texte, pour rester identique au letterhead
@@ -51,17 +53,21 @@ const HEADER_IMAGE_RATIO = 855 / 3900; // dimensions réelles du PNG fourni
 
 const prisma = new PrismaClient();
 
-const ARR_CODES = ["DSC", "FOK", "FGT", "NKN", "PKM", "STC"] as const;
-// Graphie exacte du canevas officiel (majuscules, sans accent ni tiret) — utilisée dans les
-// tableaux générés pour rester identique au document papier (DSCHANG, FOKOUE, FONGO TONGO...).
-const ARR_NOMS: Record<string, string> = {
-  DSC: "DSCHANG",
-  FOK: "FOKOUE",
-  FGT: "FONGO TONGO",
-  NKN: "NKONG NI",
-  PKM: "PENKA MICHEL",
-  STC: "SANTCHOU",
-};
+/*
+ * Les arrondissements et leur graphie canevas (DSCHANG, FOKOUE, FONGO TONGO…)
+ * étaient écrits ici. Ils sont désormais LUS EN BASE par `main()`, avant toute
+ * construction — un gabarit est ainsi celui d'un département, et non celui de la
+ * Menoua pour tout le monde.
+ *
+ * Deux variables de module plutôt qu'un paramètre : elles sont utilisées au fond
+ * d'un arbre d'appels entièrement synchrone, et ce fichier est un script de
+ * génération lancé à la main, pas un chemin de production.
+ */
+let ARR_CODES: string[] = [];
+let ARR_NOMS: Record<string, string> = {};
+
+/** Le département dont on fabrique les gabarits. */
+const DEPARTEMENT = process.env.DEPARTEMENT_GABARITS ?? "dep_menoua";
 
 function cell(text: string, opts: { bold?: boolean; width?: number } = {}): TableCell {
   return new TableCell({
@@ -742,6 +748,23 @@ function buildDocExact(templates: Awaited<ReturnType<typeof chargerTemplates>>):
 }
 
 async function main() {
+  /*
+   * `Arrondissement` est une table cloisonnée : sans département déclaré, la
+   * lecture ne rendrait RIEN et l'on fabriquerait des tableaux sans une seule
+   * ligne de territoire — un gabarit vide, d'apparence normale. D'où le client
+   * cloisonné, et l'échec franc juste en dessous.
+   */
+  const arrondissements = await listerArrondissements(clientCloisonne(prisma, DEPARTEMENT));
+  if (arrondissements.length === 0) {
+    throw new Error(
+      `Aucun arrondissement lu pour le département « ${DEPARTEMENT} ». ` +
+        "Les gabarits seraient produits sans aucune ligne de territoire."
+    );
+  }
+  ARR_CODES = arrondissements.map((a) => a.code);
+  ARR_NOMS = Object.fromEntries(arrondissements.map((a) => [a.code, a.nomCanevas]));
+  console.log(`Arrondissements lus (${DEPARTEMENT}) : ${ARR_CODES.join(", ")}`);
+
   const templates = await chargerTemplates();
   const outDir = path.join(process.cwd(), "templates");
   await fs.mkdir(outDir, { recursive: true });

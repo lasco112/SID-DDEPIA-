@@ -226,13 +226,43 @@ Ce qui suit a été éprouvé par des tests automatiques, pas seulement annoncé
 
 ### Priorité 3 — Cloisonnement régional *(rien ne se livre avant le lot 18)*
 
-| N° | Lot |
-|---|---|
-| **18** | **Rôle PostgreSQL dédié sans BYPASSRLS — préalable impératif** |
-| 19 | Modèles Département et Région, cloisonnement de chaque requête |
-| 9 | Retirer les arrondissements codés en dur du module mensuel |
-| 15 | Sortir le nom du département du code |
-| 16 | Export consolidé destiné au niveau régional |
+| N° | Lot | État |
+|---|---|---|
+| **18** | **Rôle PostgreSQL dédié sans BYPASSRLS — préalable impératif** | fait |
+| 19 | Modèles Département et Région, cloisonnement de chaque requête | fait — politiques posées et éprouvées |
+| 9 | Retirer les arrondissements codés en dur du module mensuel | fait côté code — voir réserve ci-dessous |
+| 15 | Sortir le nom du département du code | à faire |
+| 16 | Export consolidé destiné au niveau régional | à faire |
+
+#### Lot 9 — ce qui est fait, et ce qui ne l'est pas
+
+Les six arrondissements de la Menoua étaient écrits en dur à quatre endroits :
+le générateur du rapport mensuel, le fabricant des gabarits, l'export DREPIA et
+le remplissage trimestriel. Ils viennent maintenant de la table
+`Arrondissement`, lue à travers le cloisonnement — donc du département de
+l'appelant (`src/lib/arrondissements.ts`).
+
+La graphie du canevas (`FOKOUE`, `FONGO TONGO`, `NKONG NI`) n'est plus une table
+de correspondance recopiée à la main : elle se déduit du nom — majuscules,
+accents retirés, tirets en espaces. Un test fige les six correspondances telles
+qu'elles étaient écrites avant le lot et vérifie que la règle les reproduit.
+
+L'appariement nom → code du remplissage trimestriel se faisait **par position**
+contre la liste des six codes. Il se fait désormais par le nom : l'ordre du
+canevas et celui de la base n'ont plus à coïncider.
+
+Vérifié : golden master mensuel au chiffre près, et les trois gabarits
+régénérés depuis la base sont identiques **au caractère près** à ceux qui
+étaient versionnés — la lecture en base redonne exactement ce que le code
+disait.
+
+**Réserve — le gabarit du rapport départemental reste celui de la Menoua.**
+`templates/rapport_mensuel_DD.docx` est un fichier unique et versionné : ses
+tableaux portent six lignes intitulées DSCHANG, FOKOUE… et des repères
+`{CHAMP_DSC}`. Le PAYLOAD s'adapte désormais au département, mais pas le
+gabarit. Un second département recevrait donc un document aux lignes de la
+Menoua, et vides. Y remédier suppose un gabarit par département — un changement
+du mécanisme de rendu, pas un renommage. À traiter avec le lot 15.
 
 ### Priorité 4 — Assistance rédactionnelle
 
