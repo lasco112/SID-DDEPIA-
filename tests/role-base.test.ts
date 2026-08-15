@@ -61,8 +61,24 @@ test("le rôle applicatif ne possède aucune table", async () => {
 });
 
 test("le rôle applicatif ne peut pas modifier la structure de la base", async () => {
-  await assert.rejects(
-    () => db.$executeRawUnsafe(`CREATE TABLE "essai_structure_interdite"(id int)`),
+  let cree = false;
+  try {
+    await db.$executeRawUnsafe(`CREATE TABLE "essai_structure_interdite"(id int)`);
+    cree = true;
+  } catch {
+    // Attendu : le rôle applicatif n'a pas le droit de créer une table.
+  } finally {
+    /*
+     * Nettoyer MÊME quand la création a réussi — c'est-à-dire précisément
+     * quand le test échoue. Sans ce filet, éprouver ce test contre une
+     * connexion privilégiée (ce qu'il faut faire pour vérifier qu'il tombe
+     * bien) laissait la table derrière lui, et Prisma voyait ensuite une
+     * dérive du schéma qui bloquait toute nouvelle migration.
+     */
+    if (cree) await db.$executeRawUnsafe(`DROP TABLE IF EXISTS "essai_structure_interdite"`);
+  }
+  assert.equal(
+    cree, false,
     "Le rôle applicatif a pu créer une table : il a des droits qu'il ne devrait pas avoir."
   );
 });

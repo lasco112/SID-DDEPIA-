@@ -33,6 +33,11 @@ enum Role {
 }
 
 model User {
+  /// Département propriétaire de cette ligne. Dénormalisé À DESSEIN : les
+  /// politiques de sécurité par ligne comparent une colonne, pas une jointure.
+  departementId String?
+  departement   Departement? @relation(fields: [departementId], references: [id])
+
   id                 String    @id @default(cuid())
   nom                String
   fonction           String?
@@ -66,25 +71,71 @@ model User {
   auditLogs          AuditLog[]
   validationsSection ValidationSection[]
 
-  saisiesMatriceEnTantQueAuteur   SaisieMatrice[]    @relation("SaisiParMatrice")
-  saisiesNominativeEnTantQueAuteur SaisieNominative[] @relation("SaisiParNominative")
-  saisiesEvenementEnTantQueAuteur SaisieEvenement[]  @relation("SaisiParEvenement")
-  referentielsProposes            ReferentielItem[]  @relation("ReferentielProposePar")
-  referentielsValides             ReferentielItem[]  @relation("ReferentielValideParDD")
-  configsModifiees                ConfigSysteme[]
-  periodesCloturees               PeriodeReporting[]  @relation("PeriodesCloturees")
-  abonnementsPush                 AbonnementPush[]
-  tableauxTermines                AssignationSaisie[] @relation("AgentTermine")
-  assignationsRecues              AssignationSaisie[] @relation("AgentAssigne")
-  assignationsFaites              AssignationSaisie[] @relation("AssignateurDA")
-  demandesAide                    DemandeAide[]
+  saisiesMatriceEnTantQueAuteur    SaisieMatrice[]     @relation("SaisiParMatrice")
+  saisiesNominativeEnTantQueAuteur SaisieNominative[]  @relation("SaisiParNominative")
+  saisiesEvenementEnTantQueAuteur  SaisieEvenement[]   @relation("SaisiParEvenement")
+  referentielsProposes             ReferentielItem[]   @relation("ReferentielProposePar")
+  referentielsValides              ReferentielItem[]   @relation("ReferentielValideParDD")
+  configsModifiees                 ConfigSysteme[]
+  periodesCloturees                PeriodeReporting[]  @relation("PeriodesCloturees")
+  abonnementsPush                  AbonnementPush[]
+  tableauxTermines                 AssignationSaisie[] @relation("AgentTermine")
+  assignationsRecues               AssignationSaisie[] @relation("AgentAssigne")
+  assignationsFaites               AssignationSaisie[] @relation("AssignateurDA")
+  demandesAide                     DemandeAide[]
 
   @@index([role, actif])
 }
 
+/// Une région du Cameroun. Le SID sert d'abord la région de l'Ouest ; le
+/// modèle existe pour que servir une autre région ne demande pas de migration.
+model Region {
+  id           String        @id @default(cuid())
+  code         String        @unique /// "OU" pour l'Ouest
+  nom          String
+  departements Departement[]
+}
+
+/// Un département. Toute donnée du SID appartient à un et un seul département :
+/// c'est l'unité de cloisonnement.
+model Departement {
+  id       String @id @default(cuid())
+  code     String @unique /// "MEN" pour la Menoua
+  nom      String
+  regionId String
+  region   Region @relation(fields: [regionId], references: [id])
+
+  arrondissements        Arrondissement[]
+  periodeReportings      PeriodeReporting[]
+  users                  User[]
+  etablissements         Etablissement[]
+  assignationSaisies     AssignationSaisie[]
+  rapportArrondissements RapportArrondissement[]
+  validationSections     ValidationSection[]
+  saisieMatrices         SaisieMatrice[]
+  saisieNominatives      SaisieNominative[]
+  saisieEvenements       SaisieEvenement[]
+  corrections            Correction[]
+  rubriqueNarratives     RubriqueNarrative[]
+  syntheseSections       SyntheseSection[]
+  exportDocuments        ExportDocument[]
+  notifications          Notification[]
+  abonnementPushs        AbonnementPush[]
+  pointSIGs              PointSIG[]
+  auditLogs              AuditLog[]
+  demandeAides           DemandeAide[]
+
+  @@index([regionId])
+}
+
 model Arrondissement {
-  id       String  @id @default(cuid())
-  code     String  @unique // "DSC", "FOK", "FGT", "NKN", "PKM", "STC"
+  /// Département propriétaire de cette ligne. Dénormalisé À DESSEIN : les
+  /// politiques de sécurité par ligne comparent une colonne, pas une jointure.
+  departementId String?
+  departement   Departement? @relation(fields: [departementId], references: [id])
+
+  id       String                                       @id @default(cuid())
+  code     String                                       @unique // "DSC", "FOK", "FGT", "NKN", "PKM", "STC"
   nom      String // Dschang, Fokoué, Fongo-Tongo, Nkong-Ni, Penka-Michel, Santchou
   ordre    Int // ordre d'affichage dans les tableaux officiels
   // Géométrie des limites administratives (PostGIS) — module SIG §10.1
@@ -175,19 +226,19 @@ enum TypeTableau {
 }
 
 model FormTemplate {
-  id        String      @id @default(cuid())
-  code      String      @unique // "T1_1_CHEPTEL", "T1_4_OEUFS_TABLE", "T3_2_VACCINATIONS"
-  numero    String // "1.1", "1.4", "3.2" — numérotation du canevas officiel
-  titre     String // "Effectif du cheptel"
-  type      TypeTableau
-  sectionId String // section responsable du contrôle (PSA, SSV, SPAIH, BAC)
-  ordre     Int
-  actif     Boolean     @default(true)
+  id              String      @id @default(cuid())
+  code            String      @unique // "T1_1_CHEPTEL", "T1_4_OEUFS_TABLE", "T3_2_VACCINATIONS"
+  numero          String // "1.1", "1.4", "3.2" — numérotation du canevas officiel
+  titre           String // "Effectif du cheptel"
+  type            TypeTableau
+  sectionId       String // section responsable du contrôle (PSA, SSV, SPAIH, BAC)
+  ordre           Int
+  actif           Boolean     @default(true)
   // Pour les EVENEMENT : définition des colonnes attendues et de leurs
   // catégories de référentiel, ex: [{key:"maladie",ref:"MALADIE"},{key:"espece",ref:"ESPECE"}]
   schemaEvenement Json?
 
-  section  Section          @relation(fields: [sectionId], references: [id])
+  section  Section            @relation(fields: [sectionId], references: [id])
   fields   FormField[]
   saisiesN SaisieNominative[]
   saisiesE SaisieEvenement[]
@@ -195,18 +246,18 @@ model FormTemplate {
 }
 
 model FormField {
-  id         String   @id @default(cuid())
+  id         String    @id @default(cuid())
   templateId String
-  code       String   @unique // CODE STABLE : "CHEPTEL_BOVIN", "VOL_MOD_PONDEUSE", "ABAT_PORCIN"
+  code       String    @unique // CODE STABLE : "CHEPTEL_BOVIN", "VOL_MOD_PONDEUSE", "ABAT_PORCIN"
   libelle    String // "Bovins", "Pondeuse (élevage moderne)"
   uniteCode  String? // FK logique vers ReferentielItem(UNITE) par code
-  typeValeur String   @default("ENTIER") // ENTIER | DECIMAL | TEXTE
+  typeValeur String    @default("ENTIER") // ENTIER | DECIMAL | TEXTE
   ordre      Int
-  actif      Boolean  @default(true)
+  actif      Boolean   @default(true)
   disabledAt DateTime?
 
-  template        FormTemplate       @relation(fields: [templateId], references: [id])
-  saisiesMatrice  SaisieMatrice[]
+  template           FormTemplate       @relation(fields: [templateId], references: [id])
+  saisiesMatrice     SaisieMatrice[]
   saisiesNominatives SaisieNominative[]
 
   @@index([templateId, actif])
@@ -218,20 +269,25 @@ model FormField {
 // ============================================================================
 
 model Etablissement {
-  id               String   @id @default(cuid())
+  /// Département propriétaire de cette ligne. Dénormalisé À DESSEIN : les
+  /// politiques de sécurité par ligne comparent une colonne, pas une jointure.
+  departementId String?
+  departement   Departement? @relation(fields: [departementId], references: [id])
+
+  id               String                                @id @default(cuid())
   typeCode         String // FK logique ReferentielItem(TYPE_ETABLISSEMENT) : FERME_PONTE, FERME_CHAIR, COUVOIR, PROVENDERIE, ABATTOIR, AIRE_ABATTAGE, MARCHE, ETANG, CLINIQUE_PRIVEE
   nom              String
   localite         String
   arrondissementId String
   proprietaire     String?
   telephone        String?
-  actif            Boolean  @default(true)
+  actif            Boolean                               @default(true)
   // Position GPS — alimente le module SIG (§10)
   geom             Unsupported("geometry(Point, 4326)")?
   sourceGPS        String? // agent collecteur (§10.3 : champs qualité obligatoires)
   dateCollecteGPS  DateTime?
   precisionGPS     Float?
-  createdAt        DateTime @default(now())
+  createdAt        DateTime                              @default(now())
 
   arrondissement Arrondissement     @relation(fields: [arrondissementId], references: [id])
   saisies        SaisieNominative[]
@@ -262,37 +318,42 @@ enum StatutPeriode {
 }
 
 model PeriodeReporting {
-  id             String        @id @default(cuid())
-  type           TypePeriode
-  annee          Int
-  mois           Int? // 1-12 si MENSUEL ; null sinon
-  trimestre      Int? // 1-4 si TRIMESTRIEL
-  semestre       Int? // 1-2 si SEMESTRIEL
-  dateOuverture  DateTime
-  dateLimiteDA   DateTime // le 28 du mois
-  dateLimiteChef DateTime // le 29 du mois
-  dateLimiteDD   DateTime // le 02 du mois suivant
-  statut         StatutPeriode @default(OUVERTE)
+  /// Département propriétaire de cette ligne. Dénormalisé À DESSEIN : les
+  /// politiques de sécurité par ligne comparent une colonne, pas une jointure.
+  departementId String?
+  departement   Departement? @relation(fields: [departementId], references: [id])
+
+  id               String        @id @default(cuid())
+  type             TypePeriode
+  annee            Int
+  mois             Int? // 1-12 si MENSUEL ; null sinon
+  trimestre        Int? // 1-4 si TRIMESTRIEL
+  semestre         Int? // 1-2 si SEMESTRIEL
+  dateOuverture    DateTime
+  dateLimiteDA     DateTime // le 28 du mois
+  dateLimiteChef   DateTime // le 29 du mois
+  dateLimiteDD     DateTime // le 02 du mois suivant
+  statut           StatutPeriode @default(OUVERTE)
   /// Clôture définitive du mois (§13) : les données sont figées, seules la
   /// consultation et le téléchargement restent possibles. `ARCHIVEE` est le
   /// statut correspondant.
-  clotureeLe     DateTime?
-  clotureeParId  String?
+  clotureeLe       DateTime?
+  clotureeParId    String?
   /// Dernière réouverture exceptionnelle après clôture. Le motif est
   /// OBLIGATOIRE : rouvrir un mois administrativement clos doit toujours
   /// pouvoir être justifié a posteriori.
-  reouverteLe       DateTime?
-  reouvertePar      String?
-  motifReouverture  String?
+  reouverteLe      DateTime?
+  reouvertePar     String?
+  motifReouverture String?
 
   clotureePar User? @relation("PeriodesCloturees", fields: [clotureeParId], references: [id])
 
-  rapports    RapportArrondissement[]
-  validations ValidationSection[]
-  syntheses   SyntheseSection[]
-  exports     ExportDocument[]
+  rapports     RapportArrondissement[]
+  validations  ValidationSection[]
+  syntheses    SyntheseSection[]
+  exports      ExportDocument[]
   assignations AssignationSaisie[]
-  rubriques   RubriqueNarrative[]
+  rubriques    RubriqueNarrative[]
 
   @@unique([type, annee, mois, trimestre, semestre])
   @@index([statut, dateLimiteDA])
@@ -310,13 +371,18 @@ model PeriodeReporting {
 // réellement écrit chaque valeur, indépendamment de cette table.
 // ============================================================================
 model AssignationSaisie {
-  id               String   @id @default(cuid())
+  /// Département propriétaire de cette ligne. Dénormalisé À DESSEIN : les
+  /// politiques de sécurité par ligne comparent une colonne, pas une jointure.
+  departementId String?
+  departement   Departement? @relation(fields: [departementId], references: [id])
+
+  id               String    @id @default(cuid())
   periodeId        String
   arrondissementId String
   templateCode     String
   agentId          String? // null = non attribué explicitement
   assignePar       String
-  assigneLe        DateTime @default(now())
+  assigneLe        DateTime  @default(now())
   /// L agent de saisie signale qu il a terminé ce tableau : le DA en est
   /// notifié. L agent ne peut jamais soumettre le rapport — ce signal est sa
   /// seule façon de dire « c est fini de mon côté ».
@@ -340,15 +406,20 @@ enum StatutRapportDA {
 }
 
 model RapportArrondissement {
-  id               String          @id @default(cuid())
-  periodeId        String
-  arrondissementId String
-  statut           StatutRapportDA @default(EN_SAISIE)
-  soumisParId      String?
-  dateSoumission   DateTime?
-  motifRejet       String?
+  /// Département propriétaire de cette ligne. Dénormalisé À DESSEIN : les
+  /// politiques de sécurité par ligne comparent une colonne, pas une jointure.
+  departementId String?
+  departement   Departement? @relation(fields: [departementId], references: [id])
+
+  id                  String          @id @default(cuid())
+  periodeId           String
+  arrondissementId    String
+  statut              StatutRapportDA @default(EN_SAISIE)
+  soumisParId         String?
+  dateSoumission      DateTime?
+  motifRejet          String?
   // Déverrouillage exceptionnel post-28 (risque offline identifié) :
-  deverrouillePar  String?
+  deverrouillePar     String?
   motifDeverrouillage String?
   dateDeverrouillage  DateTime?
 
@@ -372,18 +443,23 @@ enum StatutValidationSection {
 }
 
 model ValidationSection {
-  id             String                  @id @default(cuid())
-  periodeId      String
-  sectionId      String
-  statut         StatutValidationSection @default(EN_ATTENTE)
-  valideParId    String?
-  dateValidation DateTime?
+  /// Département propriétaire de cette ligne. Dénormalisé À DESSEIN : les
+  /// politiques de sécurité par ligne comparent une colonne, pas une jointure.
+  departementId String?
+  departement   Departement? @relation(fields: [departementId], references: [id])
+
+  id                  String                  @id @default(cuid())
+  periodeId           String
+  sectionId           String
+  statut              StatutValidationSection @default(EN_ATTENTE)
+  valideParId         String?
+  dateValidation      DateTime?
   /// Validation exercée par le DD au titre de son pouvoir hiérarchique (§9),
   /// faute de validation du chef de section compétent. Le SID ne doit pas
   /// rendre le DD dépendant de l'action informatique d'un subordonné — mais
   /// le document doit dire qui a validé, et à quel titre. Repasse à false si
   /// le chef valide ensuite lui-même.
-  validationDirecteDD Boolean @default(false)
+  validationDirecteDD Boolean                 @default(false)
   motifValidationDD   String?
 
   periode   PeriodeReporting @relation(fields: [periodeId], references: [id])
@@ -400,34 +476,39 @@ model ValidationSection {
 // ============================================================================
 
 model SaisieMatrice {
-  id          String  @id @default(cuid())
-  rapportId   String
-  fieldCode   String // FK vers FormField.code (code stable)
-  valeur      Decimal? @db.Decimal(14, 3)
-  valeurTexte String? // champs MATRICE de type TEXTE (ex. T21_LIEUX) — non sommé, une valeur par arrondissement
-  nonRenseigne Boolean @default(false)
+  /// Département propriétaire de cette ligne. Dénormalisé À DESSEIN : les
+  /// politiques de sécurité par ligne comparent une colonne, pas une jointure.
+  departementId String?
+  departement   Departement? @relation(fields: [departementId], references: [id])
+
+  id                String    @id @default(cuid())
+  rapportId         String
+  fieldCode         String // FK vers FormField.code (code stable)
+  valeur            Decimal?  @db.Decimal(14, 3)
+  valeurTexte       String? // champs MATRICE de type TEXTE (ex. T21_LIEUX) — non sommé, une valeur par arrondissement
+  nonRenseigne      Boolean   @default(false)
   motifNonRenseigne String?
   /// Valeur REPRISE du mois précédent, pas encore confirmée par l'agent.
   /// Elle s'affiche en grisé et bloque la transmission du rapport tant que
   /// le tableau n'a pas été confirmé : sans cela, un mois entier de
   /// production pourrait être validé sans que personne ne l'ait regardé.
-  reporte     Boolean @default(false)
+  reporte           Boolean   @default(false)
   // Identifiant client généré offline (idempotence de la synchronisation)
-  clientId    String  @unique
-  syncedAt    DateTime @default(now())
+  clientId          String    @unique
+  syncedAt          DateTime  @default(now())
   /// Date de la dernière modification SUR L'APPAREIL — à ne pas confondre avec
   /// syncedAt, qui est la date d'ARRIVÉE au serveur. C'est elle qui arbitre les
   /// conflits : entre deux appareils ayant touché la même cellule, la
   /// modification la plus RÉCENTE gagne, et non la dernière synchronisée. Un
   /// agent longtemps hors ligne ne peut donc plus écraser, en se reconnectant,
   /// une correction faite entre-temps par son DA.
-  modifieLe   DateTime?
+  modifieLe         DateTime?
   // Traçabilité (DA délègue parfois la saisie à un AGENT_SAISIE) : dernier auteur réel de la valeur.
-  saisiParId  String?
+  saisiParId        String?
 
-  rapport RapportArrondissement @relation(fields: [rapportId], references: [id])
-  field   FormField             @relation(fields: [fieldCode], references: [code])
-  saisiPar User?                @relation("SaisiParMatrice", fields: [saisiParId], references: [id])
+  rapport  RapportArrondissement @relation(fields: [rapportId], references: [id])
+  field    FormField             @relation(fields: [fieldCode], references: [code])
+  saisiPar User?                 @relation("SaisiParMatrice", fields: [saisiParId], references: [id])
 
   corrections Correction[]
 
@@ -436,25 +517,30 @@ model SaisieMatrice {
 }
 
 model SaisieNominative {
-  id              String  @id @default(cuid())
-  rapportId       String
-  templateId      String
-  etablissementId String
-  fieldCode       String
-  valeur          Decimal? @db.Decimal(14, 3)
-  valeurTexte     String?
-  nonRenseigne    Boolean @default(false)
+  /// Département propriétaire de cette ligne. Dénormalisé À DESSEIN : les
+  /// politiques de sécurité par ligne comparent une colonne, pas une jointure.
+  departementId String?
+  departement   Departement? @relation(fields: [departementId], references: [id])
+
+  id                String    @id @default(cuid())
+  rapportId         String
+  templateId        String
+  etablissementId   String
+  fieldCode         String
+  valeur            Decimal?  @db.Decimal(14, 3)
+  valeurTexte       String?
+  nonRenseigne      Boolean   @default(false)
   motifNonRenseigne String?
   /// Valeur REPRISE du mois précédent, pas encore confirmée par l'agent.
   /// Elle s'affiche en grisé et bloque la transmission du rapport tant que
   /// le tableau n'a pas été confirmé : sans cela, un mois entier de
   /// production pourrait être validé sans que personne ne l'ait regardé.
-  reporte     Boolean @default(false)
-  clientId        String  @unique
-  syncedAt        DateTime @default(now())
+  reporte           Boolean   @default(false)
+  clientId          String    @unique
+  syncedAt          DateTime  @default(now())
   /// Voir SaisieMatrice.modifieLe — arbitrage des conflits par date de modification.
-  modifieLe       DateTime?
-  saisiParId      String?
+  modifieLe         DateTime?
+  saisiParId        String?
 
   rapport       RapportArrondissement @relation(fields: [rapportId], references: [id])
   template      FormTemplate          @relation(fields: [templateId], references: [id])
@@ -469,15 +555,20 @@ model SaisieNominative {
 }
 
 model SaisieEvenement {
-  id         String   @id @default(cuid())
+  /// Département propriétaire de cette ligne. Dénormalisé À DESSEIN : les
+  /// politiques de sécurité par ligne comparent une colonne, pas une jointure.
+  departementId String?
+  departement   Departement? @relation(fields: [departementId], references: [id])
+
+  id         String    @id @default(cuid())
   rapportId  String
   templateId String
   // Payload validé côté serveur contre FormTemplate.schemaEvenement.
   // Ex. vaccination : {maladie:"MAL_PPR", espece:"ESP_CAPRIN", vaccin:"VAC_PPRVAC",
   //                    effectifVaccine: 1250, localite:"Baloum"}
   payload    Json
-  clientId   String   @unique
-  syncedAt   DateTime @default(now())
+  clientId   String    @unique
+  syncedAt   DateTime  @default(now())
   /// Voir SaisieMatrice.modifieLe — arbitrage des conflits par date de modification.
   modifieLe  DateTime?
   saisiParId String?
@@ -496,6 +587,11 @@ model SaisieEvenement {
 // ============================================================================
 
 model Correction {
+  /// Département propriétaire de cette ligne. Dénormalisé À DESSEIN : les
+  /// politiques de sécurité par ligne comparent une colonne, pas une jointure.
+  departementId String?
+  departement   Departement? @relation(fields: [departementId], references: [id])
+
   id                 String   @id @default(cuid())
   // Une seule des trois FK est renseignée selon la famille de saisie
   saisieMatriceId    String?
@@ -532,7 +628,12 @@ model Correction {
 /// (BAC, SSV, PSA, SPAIH) et sert le rapport mensuel. Les zones du canevas
 /// trimestriel appartiennent au rapport, pas à une section.
 model RubriqueNarrative {
-  id               String  @id @default(cuid())
+  /// Département propriétaire de cette ligne. Dénormalisé À DESSEIN : les
+  /// politiques de sécurité par ligne comparent une colonne, pas une jointure.
+  departementId String?
+  departement   Departement? @relation(fields: [departementId], references: [id])
+
+  id               String   @id @default(cuid())
   periodeId        String
   /// null = rubrique du rapport départemental ; sinon celle d'un arrondissement.
   /// Même convention que `ExportDocument.arrondissementId`.
@@ -540,10 +641,10 @@ model RubriqueNarrative {
   /// Clé stable de la zone dans le canevas : « I.introduction »,
   /// « I4.performances »… Voir les descriptions de section.
   cle              String
-  contenu          String? @db.Text
+  contenu          String?  @db.Text
   /// Texte proposé par l'assistance rédactionnelle, conservé à part : le texte
   /// de l'agent humain ne doit JAMAIS être écrasé par la machine (lots 12-13).
-  brouillonIA      String? @db.Text
+  brouillonIA      String?  @db.Text
   auteurId         String?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
@@ -561,16 +662,21 @@ model RubriqueNarrative {
 }
 
 model SyntheseSection {
-  id             String   @id @default(cuid())
-  periodeId      String
-  sectionId      String
-  blocCode       String? // rattachement fin : un commentaire par bloc/tableau si besoin
-  brouillonIA    String?  @db.Text // texte proposé par l'IA — jamais écrasé
-  promptIA       String?  @db.Text // traçabilité : chiffres cités dans le prompt (§8.2)
-  contenuFinal   String?  @db.Text // texte édité et validé par le chef de section
-  auteurId       String?
-  valideDD       Boolean  @default(false)
-  updatedAt      DateTime @updatedAt
+  /// Département propriétaire de cette ligne. Dénormalisé À DESSEIN : les
+  /// politiques de sécurité par ligne comparent une colonne, pas une jointure.
+  departementId String?
+  departement   Departement? @relation(fields: [departementId], references: [id])
+
+  id           String   @id @default(cuid())
+  periodeId    String
+  sectionId    String
+  blocCode     String? // rattachement fin : un commentaire par bloc/tableau si besoin
+  brouillonIA  String?  @db.Text // texte proposé par l'IA — jamais écrasé
+  promptIA     String?  @db.Text // traçabilité : chiffres cités dans le prompt (§8.2)
+  contenuFinal String?  @db.Text // texte édité et validé par le chef de section
+  auteurId     String?
+  valideDD     Boolean  @default(false)
+  updatedAt    DateTime @updatedAt
 
   periode PeriodeReporting @relation(fields: [periodeId], references: [id])
   section Section          @relation(fields: [sectionId], references: [id])
@@ -593,14 +699,14 @@ enum TypeAggregation {
 }
 
 model MappingRapport {
-  id              String          @id @default(cuid())
-  docTag          String          @unique // balise dans le template : "T14_BOVIN_DSC", "T14_BOVIN_TOTAL"
-  documentCible   String // "RAPPORT_MENSUEL_DD" | "RAPPORT_ANNUEL_DD" | "EXPORT_DREPIA" | "RAPPORT_DA"
-  templateId      String? // tableau de collecte source
-  fieldCodes      String[] // codes FormField sources (souvent 1, parfois n)
+  id                 String          @id @default(cuid())
+  docTag             String          @unique // balise dans le template : "T14_BOVIN_DSC", "T14_BOVIN_TOTAL"
+  documentCible      String // "RAPPORT_MENSUEL_DD" | "RAPPORT_ANNUEL_DD" | "EXPORT_DREPIA" | "RAPPORT_DA"
+  templateId         String? // tableau de collecte source
+  fieldCodes         String[] // codes FormField sources (souvent 1, parfois n)
   arrondissementCode String? // null = agrégat départemental
-  aggregation     TypeAggregation @default(SOMME)
-  calculeEcartN1  Boolean         @default(false)
+  aggregation        TypeAggregation @default(SOMME)
+  calculeEcartN1     Boolean         @default(false)
 
   template FormTemplate? @relation(fields: [templateId], references: [id])
 
@@ -629,26 +735,31 @@ enum TypeExport {
 }
 
 model ExportDocument {
-  id           String     @id @default(cuid())
-  type         TypeExport
-  periodeId    String
-  auteurId     String
-  version      Int
+  /// Département propriétaire de cette ligne. Dénormalisé À DESSEIN : les
+  /// politiques de sécurité par ligne comparent une colonne, pas une jointure.
+  departementId String?
+  departement   Departement? @relation(fields: [departementId], references: [id])
+
+  id               String     @id @default(cuid())
+  type             TypeExport
+  periodeId        String
+  auteurId         String
+  version          Int
   /// Nom du fichier tel que proposé au téléchargement. Historiquement un chemin
   /// sur disque — voir `contenu` pour la raison de l'abandon.
-  cheminFichier String
+  cheminFichier    String
   /// Le document lui-même. Le disque du conteneur Railway est EFFACÉ à chaque
   /// redéploiement : les rapports écrits sur disque disparaissaient donc, ne
   /// laissant que leur trace en base. Les conserver ici les rend réellement
   /// consultables et téléchargeables plus tard, et les inclut dans les
   /// sauvegardes de la base.
-  contenu      Bytes?
+  contenu          Bytes?
   /// Arrondissement concerné pour un rapport de DA ; null pour un document
   /// départemental. Sans cette colonne il était impossible de retrouver « le
   /// rapport de Santchou » autrement qu'en devinant via l'auteur.
   arrondissementId String?
-  hashSha256   String?
-  createdAt    DateTime   @default(now())
+  hashSha256       String?
+  createdAt        DateTime   @default(now())
 
   periode        PeriodeReporting @relation(fields: [periodeId], references: [id])
   auteur         User             @relation(fields: [auteurId], references: [id])
@@ -673,6 +784,11 @@ enum StatutNotification {
 }
 
 model Notification {
+  /// Département propriétaire de cette ligne. Dénormalisé À DESSEIN : les
+  /// politiques de sécurité par ligne comparent une colonne, pas une jointure.
+  departementId String?
+  departement   Departement? @relation(fields: [departementId], references: [id])
+
   id             String             @id @default(cuid())
   destinataireId String
   canal          CanalNotification
@@ -703,13 +819,18 @@ model Notification {
 /// L endpoint est fourni par le navigateur ; il devient invalide si l utilisateur
 /// retire l autorisation ou désinstalle — on supprime alors l abonnement.
 model AbonnementPush {
-  id         String   @id @default(cuid())
-  userId     String
-  endpoint   String   @unique
-  p256dh     String
-  auth       String
-  appareil   String?
-  createdAt  DateTime @default(now())
+  /// Département propriétaire de cette ligne. Dénormalisé À DESSEIN : les
+  /// politiques de sécurité par ligne comparent une colonne, pas une jointure.
+  departementId String?
+  departement   Departement? @relation(fields: [departementId], references: [id])
+
+  id           String    @id @default(cuid())
+  userId       String
+  endpoint     String    @unique
+  p256dh       String
+  auth         String
+  appareil     String?
+  createdAt    DateTime  @default(now())
   dernierEnvoi DateTime?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -718,7 +839,12 @@ model AbonnementPush {
 }
 
 model PointSIG {
-  id               String   @id @default(cuid())
+  /// Département propriétaire de cette ligne. Dénormalisé À DESSEIN : les
+  /// politiques de sécurité par ligne comparent une colonne, pas une jointure.
+  departementId String?
+  departement   Departement? @relation(fields: [departementId], references: [id])
+
+  id               String                               @id @default(cuid())
   typeCode         String // FK logique ReferentielItem(TYPE_POINT_SIG) : POINT_EAU, FOYER, VACCINATION, CONFLIT, INFRASTRUCTURE...
   libelle          String
   arrondissementId String
@@ -729,7 +855,7 @@ model PointSIG {
   agentCollecteur  String
   precision        Float?
   observation      String?
-  valide           Boolean  @default(false) // carte brouillon vs support officiel
+  valide           Boolean                              @default(false) // carte brouillon vs support officiel
   periodeRef       String? // rattachement à une période si événementiel
 
   arrondissement Arrondissement @relation(fields: [arrondissementId], references: [id])
@@ -738,6 +864,11 @@ model PointSIG {
 }
 
 model AuditLog {
+  /// Département propriétaire de cette ligne. Dénormalisé À DESSEIN : les
+  /// politiques de sécurité par ligne comparent une colonne, pas une jointure.
+  departementId String?
+  departement   Departement? @relation(fields: [departementId], references: [id])
+
   id        String   @id @default(cuid())
   userId    String?
   action    String // LOGIN, SYNC, SOUMISSION, CORRECTION, VALIDATION, REJET, EXPORT, DEVERROUILLAGE, ADMIN_REFERENTIEL...
@@ -760,13 +891,18 @@ model AuditLog {
 // FAQ vivante (questions réellement posées, au-delà de la FAQ pré-écrite).
 // ============================================================================
 model DemandeAide {
-  id         String   @id @default(cuid())
-  userId     String
-  page       String // ex. "/da/saisie/T13"
+  /// Département propriétaire de cette ligne. Dénormalisé À DESSEIN : les
+  /// politiques de sécurité par ligne comparent une colonne, pas une jointure.
+  departementId String?
+  departement   Departement? @relation(fields: [departementId], references: [id])
+
+  id          String   @id @default(cuid())
+  userId      String
+  page        String // ex. "/da/saisie/T13"
   tableauCode String?
-  message    String
-  traite     Boolean  @default(false)
-  createdAt  DateTime @default(now())
+  message     String
+  traite      Boolean  @default(false)
+  createdAt   DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id])
 
@@ -777,10 +913,10 @@ model DemandeAide {
 /// réglages globaux pilotés par le Super Administrateur (correction n°10).
 /// Clé actuelle : "MODE_DEMO_GLOBAL" ("actif" | "inactif").
 model ConfigSysteme {
-  cle         String   @id
-  valeur      String
+  cle          String   @id
+  valeur       String
   modifieParId String?
-  updatedAt   DateTime @updatedAt
+  updatedAt    DateTime @updatedAt
 
   modifiePar User? @relation(fields: [modifieParId], references: [id])
 }

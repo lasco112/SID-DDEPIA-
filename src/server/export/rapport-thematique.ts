@@ -167,6 +167,10 @@ export async function collecterDonneesThematiques(filtre: FiltreThematique): Pro
           rapport: { periodeId: { in: filtre.periodeIds }, statut: { in: ["SOUMIS", "CLOTURE"] }, arrondissementId: { in: arrondissements.map((a) => a.id) } },
         },
         include: { rapport: { include: { arrondissement: true } } },
+        // Même raison qu'au rapport mensuel : sans ordre explicite, deux
+        // tirages du même rapport thématique listent les mêmes faits dans un
+        // ordre différent. Voir rapport-docx.ts.
+        orderBy: [{ syncedAt: "asc" }, { id: "asc" }],
       });
 
       const refCategories = Array.from(new Set(schema.filter((c) => c.ref).map((c) => c.ref!)));

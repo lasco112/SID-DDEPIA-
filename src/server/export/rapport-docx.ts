@@ -190,6 +190,21 @@ async function evenementLoopRows(
   const saisies = await db.saisieEvenement.findMany({
     where: { templateId: template.id, rapport: { periodeId, statut: { in: ["SOUMIS", "CLOTURE"] }, ...(arrCode ? { arrondissement: { code: arrCode } } : {}) } },
     include: { rapport: { include: { arrondissement: true } } },
+    /*
+     * ORDRE EXPLICITE, indispensable.
+     *
+     * Sans lui, PostgreSQL rend les lignes dans l'ordre où il les trouve sur le
+     * disque — un ordre qui change dès qu'une ligne est réécrite. Une simple
+     * mise à jour de masse, ou un VACUUM, suffisait à réordonner les listes du
+     * rapport mensuel : mêmes maladies, mêmes chiffres, mêmes sous-totaux, mais
+     * dans un autre ordre d'un tirage à l'autre. Deux exemplaires du même
+     * rapport ne se ressemblaient pas.
+     *
+     * `syncedAt` est l'ordre d'arrivée des saisies, donc l'ordre de lecture
+     * naturel. `id` départage les arrivées simultanées — sans quoi le problème
+     * reviendrait au sein d'une même seconde.
+     */
+    orderBy: [{ syncedAt: "asc" }, { id: "asc" }],
   });
 
   const refCategories = Array.from(new Set(cols.filter((c) => c.ref).map((c) => c.ref!)));
@@ -308,6 +323,21 @@ async function evenementLoopRowsGroupes(
   const saisies = await db.saisieEvenement.findMany({
     where: { templateId: template.id, rapport: { periodeId, statut: { in: ["SOUMIS", "CLOTURE"] } } },
     include: { rapport: { include: { arrondissement: true } } },
+    /*
+     * ORDRE EXPLICITE, indispensable.
+     *
+     * Sans lui, PostgreSQL rend les lignes dans l'ordre où il les trouve sur le
+     * disque — un ordre qui change dès qu'une ligne est réécrite. Une simple
+     * mise à jour de masse, ou un VACUUM, suffisait à réordonner les listes du
+     * rapport mensuel : mêmes maladies, mêmes chiffres, mêmes sous-totaux, mais
+     * dans un autre ordre d'un tirage à l'autre. Deux exemplaires du même
+     * rapport ne se ressemblaient pas.
+     *
+     * `syncedAt` est l'ordre d'arrivée des saisies, donc l'ordre de lecture
+     * naturel. `id` départage les arrivées simultanées — sans quoi le problème
+     * reviendrait au sein d'une même seconde.
+     */
+    orderBy: [{ syncedAt: "asc" }, { id: "asc" }],
   });
 
   const refCategories = Array.from(new Set(cols.filter((c) => c.ref).map((c) => c.ref!)));
