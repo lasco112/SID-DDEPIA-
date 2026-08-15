@@ -17,13 +17,23 @@
  */
 import { spawnSync } from "node:child_process";
 
-const demo = process.env.DEMO_DATABASE_URL;
+/*
+ * DEMO_DATABASE_URL est la connexion de l'APPLICATION à la base de
+ * démonstration : depuis la séparation des rôles, elle n'a plus le droit de
+ * modifier une table. Migrer avec elle échouerait. On prend donc la connexion
+ * d'administration quand elle existe, avec le même repli qu'ailleurs — sans
+ * quoi ce script casserait sur un environnement où la variable n'a pas encore
+ * été créée.
+ */
+const demo = process.env.MIGRATE_DEMO_DATABASE_URL ?? process.env.DEMO_DATABASE_URL;
 
 if (!demo) {
   console.log("[migrations-demo] DEMO_DATABASE_URL absente : rien à faire.");
   process.exit(0);
 }
-if (demo === process.env.DATABASE_URL) {
+// La comparaison porte sur les deux connexions APPLICATIVES : ce sont elles
+// qui doivent désigner des bases distinctes.
+if (process.env.DEMO_DATABASE_URL === process.env.DATABASE_URL) {
   console.error("[migrations-demo] DEMO_DATABASE_URL identique à DATABASE_URL : migration ignorée (ces bases doivent rester distinctes).");
   process.exit(0);
 }
