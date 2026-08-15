@@ -10,7 +10,7 @@
  *   npm run trimestre:rapport -- 2026 1 --brouillon
  */
 import { writeFileSync, mkdirSync } from "node:fs";
-import { PrismaClient } from "@prisma/client";
+import { base } from "../src/lib/baseDeTravail";
 import { trimestrielle, libelleOfficiel } from "../src/server/periodes/calendrier";
 import { genererRapportCanevas } from "../src/server/trimestre/rapportCanevas";
 
@@ -19,7 +19,7 @@ async function principal() {
   const trimestre = Number(process.argv[3] ?? 3);
   const brouillon = process.argv.includes("--brouillon");
 
-  const db = new PrismaClient();
+  const db = base;
   const p = trimestrielle(annee, trimestre);
 
   const { buffer, nomFichier, etat, rubriquesAlimentees, valeursConsolidees } =

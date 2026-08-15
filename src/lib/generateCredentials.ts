@@ -3,6 +3,7 @@
  * nouveau compte créé par le DD (CDC §4.1 : pas d'inscription libre).
  */
 import { db } from "@/lib/db";
+import { identifiantDisponible } from "@/lib/comptes";
 import { randomInt } from "node:crypto";
 
 function slug(s: string): string {
@@ -29,7 +30,10 @@ export async function genererIdentifiant(opts: {
 
   let candidat = base;
   let n = 2;
-  while (await db.user.findUnique({ where: { username: candidat } })) {
+  // L'unicité d'un identifiant est GLOBALE, pas départementale : la recherche
+  // d'un nom libre traverse les départements par nature. Elle passe donc par la
+  // fonction dédiée, qui ne rend qu'un booléen — jamais une ligne de compte.
+  while (!(await identifiantDisponible(db, candidat))) {
     candidat = `${base}${n}`;
     n += 1;
   }

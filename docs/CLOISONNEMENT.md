@@ -10,7 +10,7 @@
 | `user.db` déclare le département à chaque opération | **fait** |
 | Les 29 fichiers avec session passent par `user.db` | **fait** |
 | Les 7 fichiers sans session | **fait** — lot 19 |
-| Politiques de sécurité par ligne activées | **à faire** |
+| Politiques de sécurité par ligne activées | **fait** — lot 19 |
 | Test d'intrusion | **à faire** |
 
 Contrôles rejouables à tout moment :
@@ -19,6 +19,7 @@ Contrôles rejouables à tout moment :
 node --env-file=.env --import tsx scripts/verifier-cloisonnement.ts
 node --env-file=.env --import tsx scripts/verifier-relances-cloisonnees.ts
 node --env-file=.env --import tsx scripts/verifier-transactions-cloisonnees.ts
+node --env-file=.env --import tsx scripts/verifier-authentification-cloisonnee.ts
 ```
 
 ## Pourquoi les politiques ne sont pas encore activées
@@ -129,9 +130,10 @@ Un `WeakSet` dans `dbCloisonne.ts` retient les clients fabriqués par
 `clientCloisonne`, et `transactionCloisonnee` refuse désormais net, avec le
 message qui indique quoi utiliser à la place.
 
-### 4. Activer les politiques
+### 4. Activer les politiques — FAIT
 
-Une migration, par table cloisonnée :
+Migration `20260815120000_politiques_cloisonnement`. Les 19 tables cloisonnées
+portent leur politique :
 
 ```sql
 ALTER TABLE "X" ENABLE ROW LEVEL SECURITY;
@@ -144,8 +146,75 @@ CREATE POLICY "X_departement" ON "X"
 comparaison est alors fausse et **aucune ligne ne passe**. C'est le bon sens de
 l'échec — un chemin non cloisonné ne voit rien, plutôt que de tout voir.
 
-Ne PAS mettre `FORCE ROW LEVEL SECURITY` : `postgres` reste propriétaire et
-doit pouvoir migrer.
+Pas de `FORCE ROW LEVEL SECURITY` : `postgres` reste propriétaire et doit
+pouvoir migrer.
+
+#### L'amorçage de l'authentification — ce que le plan n'avait pas prévu
+
+`User` fait partie des 19 tables. Or la connexion doit lire un compte **avant**
+de connaître son département : on cherche par nom d'utilisateur, et c'est la
+ligne trouvée qui apprend à quel département elle appartient. La vérification de
+révocation du jeton relit le compte à chaque requête, avant tout cloisonnement.
+Aucune politique ne résout cette circularité — activer les politiques sans rien
+faire d'autre empêchait toute connexion, pour tout le monde.
+
+Une seule porte est donc ouverte : `compte_pour_authentification`, fonction SQL
+`SECURITY DEFINER` qui rend **un** compte par identifiant ou par nom
+d'utilisateur, et rien d'autre. Elle ne permet ni de parcourir la table, ni de
+la filtrer, ni d'atteindre une autre table. `identifiant_disponible` la
+complète : elle ne rend qu'un booléen, l'unicité d'un identifiant étant globale
+et non départementale.
+
+`src/lib/comptes.ts` est le **seul** endroit du code autorisé à les appeler —
+trois usages, pas un de plus : la connexion, la résolution d'une session, la
+révocation d'un jeton. Chaque usage ajouté élargit la porte.
+
+Tout le reste a été ramené sous cloisonnement sans aucun privilège : la mise à
+jour de `lastLoginAt` et la trace d'audit de connexion se font avec un client
+cloisonné une fois le département connu, et le jumeau de démonstration se
+retrouve en passant par le CODE du département, stable d'une base à l'autre —
+`Departement` n'étant pas une table cloisonnée.
+
+#### Les tests et les scripts voyaient une base vide
+
+Un `new PrismaClient()` qui ne déclare aucun département ne voit plus rien. Les
+assertions passaient alors au vert **pour de mauvaises raisons** : « aucune
+ligne » ressemble à « aucune anomalie ». Douze tests sont tombés, et le
+recensement de `verifier-cloisonnement.ts` affichait « 0 ligne, aucune
+orpheline » en vert.
+
+`src/lib/baseDeTravail.ts` donne désormais le client cloisonné une fois pour
+toutes, et le recensement compte département par département. Deux contrôles
+ont été ajoutés là où l'ancien mentait :
+
+- `role-base.test.ts` : sans département déclaré, le rôle applicatif ne voit
+  AUCUNE ligne ;
+- `verifier-cloisonnement.ts` : le total doit être non nul, sans quoi le
+  contrôle ne prouve rien.
+
+#### Piège de banc d'essai : `fournisseur.authorize` rend toujours `null`
+
+`CredentialsProvider` ne garde pas la fonction qu'on lui donne à la racine du
+fournisseur : il y laisse un `authorize: () => null` et range les options sous
+`.options`. Un contrôle qui appelle `fournisseur.authorize` conclut donc « la
+connexion est cassée » alors que l'application fonctionne. La vraie fonction est
+`fournisseur.options.authorize`.
+
+#### Au déploiement
+
+Les fonctions d'amorçage sont créées avant les politiques : aucune fenêtre où
+l'authentification serait cassée. En revanche, si l'ancien code tourne encore
+contre la base migrée — le temps d'une bascule de conteneur — il ne déclare
+aucun département et ne voit donc plus rien. **Déployer à une heure creuse.**
+
+#### Ce qui reste ouvert : l'écriture pour un second département
+
+Le client cloisonné pose le réglage de session mais n'INJECTE pas
+`departementId` dans les lignes créées. Aujourd'hui la colonne a pour valeur par
+défaut `dep_menoua`, ce qui suffit tant qu'il n'y a qu'un département. Dès qu'un
+second existe, ses créations prendront la valeur par défaut et seront refusées
+par le `WITH CHECK`. L'échec est franc, pas silencieux — mais il faudra injecter
+le département à la création avant d'accueillir un second territoire.
 
 ### 5. Le test d'intrusion
 

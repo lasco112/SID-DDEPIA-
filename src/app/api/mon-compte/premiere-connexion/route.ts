@@ -10,6 +10,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { clientCloisonne } from "@/lib/dbCloisonne";
+import { compteParId } from "@/lib/comptes";
 
 interface Body {
   nom: string;
@@ -45,7 +46,7 @@ export async function POST(req: Request) {
    * qui précède le cloisonnement, exactement comme celle que `resoudreContexte`
    * fait à chaque requête (voir docs/CLOISONNEMENT.md).
    */
-  const compte = await db.user.findUnique({ where: { id: userId }, select: { departementId: true } });
+  const compte = await compteParId(db, userId);
   if (!compte) {
     return NextResponse.json({ message: "Compte introuvable" }, { status: 401 });
   }

@@ -12,7 +12,7 @@
  */
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
-import { PrismaClient } from "@prisma/client";
+import { base } from "../src/lib/baseDeTravail";
 import { LIAISONS, champsMobilises, bilanLiaisons } from "../src/server/trimestre/liaison";
 import { SECTION_I } from "../src/server/trimestre/canevas/sectionI";
 import { SECTION_BUDGET } from "../src/server/trimestre/canevas/sectionBudget";
@@ -25,7 +25,7 @@ import { colonnesDe, lignesDe } from "../src/server/trimestre/canevas/rendu";
 import { regleDuChamp } from "../src/server/trimestre/reglesChamps";
 import { type Bloc, type ContexteCanevas } from "../src/server/trimestre/canevas/types";
 
-const db = new PrismaClient();
+const db = base;
 after(async () => { await db.$disconnect(); });
 
 const CTX: ContexteCanevas = {

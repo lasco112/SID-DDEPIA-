@@ -15,6 +15,7 @@ import { demoDb } from "@/lib/demoDb";
 import type { PrismaClient, Role } from "@prisma/client";
 import { Prisma } from "@prisma/client";
 import { clientCloisonne, transactionCloisonnee, type Transactionnelle } from "./dbCloisonne";
+import { compteParId } from "./comptes";
 
 export interface SessionUser {
   id: string;
@@ -94,14 +95,37 @@ export async function modeDemoGlobalActif(): Promise<boolean> {
 type IdentiteUtilisateur = { id: string; role: Role; username: string; arrondissementId: string | null; sectionId: string | null; departementId: string | null };
 
 /** Retrouve, dans la base démo, le compte équivalent à un compte réel : même rôle et même
- *  périmètre (code d'arrondissement / code de section, stables entre les deux bases). */
+ *  périmètre (code d'arrondissement / code de section, stables entre les deux bases).
+ *
+ *  Aucune lecture privilégiée ici, malgré les deux bases : `Departement` n'est pas
+ *  une table cloisonnée — c'est l'unité de cloisonnement elle-même — et son CODE
+ *  est stable d'une base à l'autre. Il suffit donc pour fabriquer, côté démo, un
+ *  client cloisonné sur le département équivalent. */
 async function jumeauDemo(reel: IdentiteUtilisateur): Promise<IdentiteUtilisateur | null> {
   if (!demoDb) return null;
+  if (!reel.departementId) return null;
+
+  const departementReel = await db.departement.findUnique({
+    where: { id: reel.departementId },
+    select: { code: true },
+  });
+  if (!departementReel) return null;
+
+  const departementDemo = await demoDb.departement.findUnique({
+    where: { code: departementReel.code },
+    select: { id: true },
+  });
+  if (!departementDemo) return null;
+
+  const reelCloisonne = clientCloisonne(db, reel.departementId);
+  const demoCloisonne = clientCloisonne(demoDb, departementDemo.id);
+
   const [arr, sec] = await Promise.all([
-    reel.arrondissementId ? db.arrondissement.findUnique({ where: { id: reel.arrondissementId }, select: { code: true } }) : null,
+    reel.arrondissementId ? reelCloisonne.arrondissement.findUnique({ where: { id: reel.arrondissementId }, select: { code: true } }) : null,
+    // `Section` est une table COMMUNE (nomenclature du MINEPIA) : pas de cloisonnement.
     reel.sectionId ? db.section.findUnique({ where: { id: reel.sectionId }, select: { code: true } }) : null,
   ]);
-  return demoDb.user.findFirst({
+  return demoCloisonne.user.findFirst({
     where: {
       role: reel.role,
       actif: true,
@@ -120,7 +144,10 @@ async function resoudreContexte(sessionUser: any): Promise<SessionUser> {
   if (sessionEstDemo && !demoDb) throw new UnauthorizedError("Environnement de démonstration indisponible.");
 
   const client = sessionEstDemo ? (demoDb as PrismaClient) : db;
-  const user = await client.user.findUnique({ where: { id: sessionUser?.id } });
+  // Résoudre une session, c'est retrouver le département de son titulaire : la
+  // lecture précède donc forcément le cloisonnement. C'est le rôle exact de la
+  // porte d'amorçage (voir lib/comptes.ts), et son seul usage hors auth.ts.
+  const user = await compteParId(client, String(sessionUser?.id ?? ""));
   if (!user || !user.actif) throw new UnauthorizedError("Compte introuvable ou désactivé");
 
   // L'ADMIN_TECH n'est jamais remappé : c'est lui qui pilote la démonstration et

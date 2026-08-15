@@ -9,7 +9,7 @@
  *   node --env-file=.env --import tsx scripts/verifier-rubriques.ts
  */
 import { encode } from "next-auth/jwt";
-import { PrismaClient } from "@prisma/client";
+import { base } from "../src/lib/baseDeTravail";
 import PizZip from "pizzip";
 import { trimestrielle } from "../src/server/periodes/calendrier";
 import { genererRapportCanevas } from "../src/server/trimestre/rapportCanevas";
@@ -37,7 +37,7 @@ const texteDu = (b: Buffer) =>
 const dire = (quoi: string, ok: boolean) => console.log(`  ${ok ? "ok    " : "FAUTE "}  ${quoi}`);
 
 async function principal() {
-  const db = new PrismaClient();
+  const db = base;
   const dd = await db.user.findFirst({
     where: { role: "DD" },
     select: { id: true, username: true, role: true, arrondissementId: true },

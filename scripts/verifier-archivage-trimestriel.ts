@@ -8,7 +8,7 @@
  *   node --env-file=.env --import tsx scripts/verifier-archivage-trimestriel.ts
  */
 import { encode } from "next-auth/jwt";
-import { PrismaClient } from "@prisma/client";
+import { base } from "../src/lib/baseDeTravail";
 
 const BASE = process.env.BASE_URL ?? "http://localhost:3000";
 const P = { annee: 2026, trimestre: 3 };
@@ -28,7 +28,7 @@ async function cookie(u: { id: string; username: string; role: string; arrondiss
 const dire = (quoi: string, ok: boolean) => console.log(`  ${ok ? "ok    " : "FAUTE "}  ${quoi}`);
 
 async function principal() {
-  const db = new PrismaClient();
+  const db = base;
   const dd = await db.user.findFirst({
     where: { role: "DD" }, select: { id: true, username: true, role: true, arrondissementId: true },
   });

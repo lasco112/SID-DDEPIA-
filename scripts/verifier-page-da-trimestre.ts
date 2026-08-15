@@ -6,7 +6,7 @@
  *   node --env-file=.env --import tsx scripts/verifier-page-da-trimestre.ts
  */
 import { encode } from "next-auth/jwt";
-import { PrismaClient } from "@prisma/client";
+import { base } from "../src/lib/baseDeTravail";
 
 const BASE = process.env.BASE_URL ?? "http://localhost:3000";
 
@@ -19,7 +19,7 @@ async function cookie(u: { id: string; username: string; role: string }) {
 }
 
 async function principal() {
-  const db = new PrismaClient();
+  const db = base;
   const da = await db.user.findFirst({
     where: { role: "DA", arrondissementId: { not: null } },
     select: { id: true, username: true, role: true },

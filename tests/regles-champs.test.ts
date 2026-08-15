@@ -10,13 +10,13 @@
  */
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
-import { PrismaClient } from "@prisma/client";
+import { base } from "../src/lib/baseDeTravail";
 import {
   regleDuChamp, regleExpliquee, champsDePonderation,
   verifierCouverture, ChampSansRegleError,
 } from "../src/server/trimestre/reglesChamps";
 
-const db = new PrismaClient();
+const db = base;
 after(async () => { await db.$disconnect(); });
 
 // ------------------------------------------------------- ce qui ne s'additionne pas

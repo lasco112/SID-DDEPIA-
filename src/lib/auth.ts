@@ -3,6 +3,8 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
 import { demoDb } from "@/lib/demoDb";
+import { clientCloisonne } from "@/lib/dbCloisonne";
+import { compteParUsername, compteParId } from "@/lib/comptes";
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -16,16 +18,19 @@ export const authOptions: NextAuthOptions = {
       async authorize(credentials) {
         if (!credentials?.username || !credentials?.password) return null;
 
-        const user = await db.user.findUnique({
-          where: { username: credentials.username.trim() }
-        });
+        // La seule lecture qui précède le cloisonnement : on cherche par nom
+        // d'utilisateur, et c'est la ligne trouvée qui apprend le département.
+        // Voir lib/comptes.ts.
+        const user = await compteParUsername(db, credentials.username.trim());
         if (!user || !user.actif) return null;
 
         const valid = await bcrypt.compare(credentials.password, user.passwordHash);
         if (!valid) return null;
 
-        await db.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
-        await db.auditLog.create({
+        // Le département est connu : tout ce qui suit est cloisonné normalement.
+        const base = clientCloisonne(db, user.departementId);
+        await base.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
+        await base.auditLog.create({
           data: { userId: user.id, action: "LOGIN", entite: "User", entiteId: user.id },
         });
 
@@ -55,9 +60,9 @@ export const authOptions: NextAuthOptions = {
         if (!demoDb) return null; // DEMO_DATABASE_URL absent : le mode démo n'est pas configuré ici
         if (!credentials?.username || !credentials?.password) return null;
 
-        const user = await demoDb.user.findUnique({
-          where: { username: credentials.username.trim() }
-        });
+        // Même amorçage que ci-dessus : la base de démonstration reçoit les
+        // mêmes migrations, donc les mêmes politiques et la même porte.
+        const user = await compteParUsername(demoDb, credentials.username.trim());
         if (!user || !user.actif) return null;
 
         const valid = await bcrypt.compare(credentials.password, user.passwordHash);
@@ -90,7 +95,7 @@ export const authOptions: NextAuthOptions = {
       // update() pour rafraîchir mustChangePassword sans exiger une reconnexion.
       // Jamais pour une session démo : les comptes démo n'ont pas de première connexion.
       if (trigger === "update" && token.sub && !token.isDemo) {
-        const fresh = await db.user.findUnique({ where: { id: token.sub } });
+        const fresh = await compteParId(db, token.sub);
         if (fresh) {
           token.mustChangePassword = fresh.mustChangePassword;
           token.role = fresh.role;
@@ -106,10 +111,9 @@ export const authOptions: NextAuthOptions = {
       // révocation échoue ici ; l'utilisateur peut toujours se reconnecter
       // normalement ensuite (seul le jeton déjà émis est invalidé, pas le compte).
       if (!token.isDemo && token.sub && trigger !== "update") {
-        const fresh = await db.user.findUnique({
-          where: { id: token.sub },
-          select: { actif: true, sessionRevoqueeLe: true },
-        });
+        // Vérifiée à chaque requête, donc avant tout cloisonnement possible :
+        // c'est le second usage — et le dernier — de la porte d'amorçage.
+        const fresh = await compteParId(db, token.sub);
         const emisLe = typeof token.iat === "number" ? token.iat * 1000 : 0;
         if (!fresh || !fresh.actif || (fresh.sessionRevoqueeLe && emisLe < fresh.sessionRevoqueeLe.getTime())) {
           token.revoque = true;

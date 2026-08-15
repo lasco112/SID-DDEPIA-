@@ -13,7 +13,7 @@
  * Usage :
  *   npm run golden:generer -- 2026 7
  */
-import { PrismaClient } from "@prisma/client";
+import { base } from "../src/lib/baseDeTravail";
 import { writeFileSync, mkdirSync } from "node:fs";
 import path from "node:path";
 import { genererPayloadDD } from "../src/server/export/rapport-docx";
@@ -27,7 +27,7 @@ async function principal() {
     process.exit(1);
   }
 
-  const db = new PrismaClient();
+  const db = base;
   const periode = await db.periodeReporting.findFirst({ where: { type: "MENSUEL", annee, mois } });
   if (!periode) {
     console.error(`Aucune période mensuelle ${mois}/${annee} en base.`);

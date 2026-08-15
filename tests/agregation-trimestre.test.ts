@@ -12,13 +12,13 @@
  */
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
-import { PrismaClient } from "@prisma/client";
+import { base } from "../src/lib/baseDeTravail";
 import { trimestrielle, moisDeLaPeriode } from "../src/server/periodes/calendrier";
 import {
   agreger, inspecterPeriode, PeriodeNonCalculableError, type ValeurAgregee,
 } from "../src/server/trimestre/agregation";
 
-const db = new PrismaClient();
+const db = base;
 const T3_2026 = trimestrielle(2026, 3);
 
 let valeurs: ValeurAgregee[] = [];

@@ -16,9 +16,10 @@
  */
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
-import { PrismaClient } from "@prisma/client";
+import { base, baseBrute } from "../src/lib/baseDeTravail";
 
-const db = new PrismaClient();
+/** Le client tel quel : c'est LUI qu'on interroge sur ses droits. */
+const db = baseBrute;
 
 async function attributs() {
   const [r] = await db.$queryRawUnsafe<{ u: string; s: boolean; b: boolean }[]>(
@@ -83,13 +84,24 @@ test("le rôle applicatif ne peut pas modifier la structure de la base", async (
   );
 });
 
-test("il peut néanmoins lire et écrire les données", async () => {
-  const utilisateur = await db.user.findFirst({ select: { id: true } });
+test("sans département déclaré, il ne voit AUCUNE ligne", async () => {
+  /*
+   * Le bon sens de l'échec. Une connexion qui ne déclare pas son département
+   * doit tomber sur une base vide, et non sur toute la base. C'est ce qui rend
+   * inoffensif un chemin de code qu'on aurait oublié de cloisonner : il ne
+   * fonctionne pas, au lieu de tout laisser voir en silence.
+   */
+  assert.equal(await db.user.count(), 0, "Le rôle applicatif voit des comptes sans avoir déclaré de département.");
+  assert.equal(await db.saisieMatrice.count(), 0, "Il voit des saisies sans avoir déclaré de département.");
+});
+
+test("il peut néanmoins lire et écrire les données de SON département", async () => {
+  const utilisateur = await base.user.findFirst({ select: { id: true } });
   assert.ok(utilisateur, "Base sans utilisateur : le test ne prouverait rien.");
-  const ligne = await db.auditLog.create({
+  const ligne = await base.auditLog.create({
     data: { userId: utilisateur.id, action: "ESSAI_ROLE_BASE", entite: "Essai", entiteId: "x", details: {} },
   });
-  await db.auditLog.delete({ where: { id: ligne.id } });
+  await base.auditLog.delete({ where: { id: ligne.id } });
 });
 
 after(async () => { await db.$disconnect(); });

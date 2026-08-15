@@ -19,7 +19,7 @@
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
-import { PrismaClient } from "@prisma/client";
+import { base } from "../src/lib/baseDeTravail";
 import { genererPayloadDD } from "../src/server/export/rapport-docx";
 import { CHAMPS_VOLATILES, cheminFixture } from "./golden-commun";
 
@@ -27,7 +27,7 @@ import { CHAMPS_VOLATILES, cheminFixture } from "./golden-commun";
 const ANNEE = 2026;
 const MOIS = 7;
 
-const db = new PrismaClient();
+const db = base;
 let reference: any = null;
 let periodeId: string | null = null;
 

@@ -12,14 +12,14 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import PizZip from "pizzip";
-import { PrismaClient } from "@prisma/client";
+import { base } from "../src/lib/baseDeTravail";
 import { trimestrielle } from "../src/server/periodes/calendrier";
 import { genererRapportCanevas, SECTIONS_CANEVAS } from "../src/server/trimestre/rapportCanevas";
 import { adapterTitre } from "../src/server/trimestre/canevas/types";
 import { TEXTES_FIXES } from "../src/server/trimestre/canevas/textesFixes";
 import { TEXTES_ARRONDISSEMENTS } from "../src/server/trimestre/canevas/textesArrondissements";
 
-const db = new PrismaClient();
+const db = base;
 const P = trimestrielle(2026, 3);
 
 /** Le texte visible du document, apostrophes et espaces normalisés. */

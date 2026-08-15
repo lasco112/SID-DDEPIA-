@@ -9,6 +9,7 @@
  *   node --env-file=.env --import tsx scripts/verifier-cloisonnement.ts
  */
 import { PrismaClient } from "@prisma/client";
+import { transactionCloisonnee } from "../src/lib/dbCloisonne";
 
 const db = new PrismaClient();
 
@@ -71,20 +72,42 @@ async function principal() {
   dire(`chaque colonne pointe vraiment un département (${fks[0].n} clés étrangères)`, fks[0].n >= CLOISONNEES.length);
 
   // --- Les lignes orphelines ------------------------------------------------
+  //
+  // ATTENTION : une fois les politiques posées, ce recensement fait avec le
+  // rôle applicatif ne verrait plus RIEN — et « 0 ligne, aucune orpheline »
+  // s'afficherait en vert. On compte donc département par département, avec le
+  // client cloisonné de chacun, exactement comme l'application.
   console.log("\nRattachement des lignes");
+  const departements = await db.departement.findMany({ orderBy: { code: "asc" } });
   let total = 0;
   const orphelines: string[] = [];
-  for (const t of CLOISONNEES) {
-    const [{ n, sans }] = await db.$queryRawUnsafe<{ n: number; sans: number }[]>(
-      `SELECT count(*)::int AS n,
-              count(*) FILTER (WHERE "departementId" IS NULL)::int AS sans
-         FROM "${t}"`
-    );
-    total += n;
-    if (sans > 0) orphelines.push(`${t} (${sans}/${n})`);
+
+  for (const departement of departements) {
+    const parDepartement = await transactionCloisonnee(db, departement.id, async (tx) => {
+      let n = 0;
+      for (const t of CLOISONNEES) {
+        const [{ c, sans }] = await tx.$queryRawUnsafe<{ c: number; sans: number }[]>(
+          `SELECT count(*)::int AS c,
+                  count(*) FILTER (WHERE "departementId" IS NULL)::int AS sans
+             FROM "${t}"`
+        );
+        n += c;
+        if (sans > 0) orphelines.push(`${departement.code}/${t} (${sans}/${c})`);
+      }
+      return n;
+    });
+    console.log(`  ${departement.code} : ${parDepartement} ligne(s)`);
+    total += parDepartement;
   }
-  dire(`${total} lignes rattachées, aucune orpheline`, orphelines.length === 0);
+
+  dire(`${total} lignes rattachées, aucune orpheline`, orphelines.length === 0 && total > 0);
   if (orphelines.length) console.log(`        orphelines : ${orphelines.join(", ")}`);
+  if (total === 0) console.log("        aucune ligne visible : le contrôle ne prouverait rien");
+
+  // Le contrôle qui donne son sens à tous les autres : sans département
+  // déclaré, la connexion applicative ne doit voir aucune ligne.
+  const [{ n: vues }] = await db.$queryRawUnsafe<{ n: number }[]>(`SELECT count(*)::int AS n FROM "SaisieMatrice"`);
+  dire("sans réglage de session, l'application ne voit aucune ligne", vues === 0);
 
   // --- Les politiques de sécurité par ligne ---------------------------------
   console.log("\nSécurité par ligne");

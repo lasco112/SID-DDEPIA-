@@ -23,10 +23,10 @@
  *   npx tsx scripts/donnees-fictives-trimestre.ts
  *   npx tsx scripts/donnees-fictives-trimestre.ts --supprimer
  */
-import { PrismaClient } from "@prisma/client";
+import { base } from "../src/lib/baseDeTravail";
 import { regleDuChamp } from "../src/server/trimestre/reglesChamps";
 
-const db = new PrismaClient();
+const db = base;
 
 /** Mois à fabriquer. 07/2026 est délibérément absent : il existe déjà et sert de référence. */
 const MOIS_A_CREER = [
