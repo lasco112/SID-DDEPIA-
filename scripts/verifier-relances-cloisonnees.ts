@@ -13,11 +13,21 @@
  *
  *   node --env-file=.env --import tsx scripts/verifier-relances-cloisonnees.ts
  */
-import { PrismaClient } from "@prisma/client";
 import { transactionCloisonnee, REGLAGE_DEPARTEMENT } from "../src/lib/dbCloisonne";
 import { verifierRelances } from "../src/server/cron/planificateur";
+import { base, baseBrute } from "../src/lib/baseDeTravail";
 
-const db = new PrismaClient({ log: ["error"] });
+/*
+ * Deux clients, et il faut les distinguer :
+ *
+ *   `db`   — nu. Pour `Departement` et `ConfigSysteme`, qui ne sont pas des
+ *            tables cloisonnées, et pour ouvrir les transactions de contrôle
+ *            (transactionCloisonnee refuse un client déjà cloisonné).
+ *   `base` — cloisonné. Pour `PeriodeReporting` et `Notification`, qui le sont :
+ *            les lire à nu rendrait ce contrôle aveugle, et il conclurait
+ *            « rien à signaler » sur une base qu'il ne voit pas.
+ */
+const db = baseBrute;
 
 const dire = (quoi: string, ok: boolean) => {
   console.log(`  ${ok ? "ok    " : "FAUTE "}  ${quoi}`);
@@ -33,7 +43,7 @@ const CODE_FICTIF = "ZZT";
 
 async function principal() {
   const menoua = await db.departement.findFirstOrThrow({ where: { code: "MEN" } });
-  const notificationsAvant = await db.notification.count();
+  const notificationsAvant = await base.notification.count();
   const marqueursCrees: string[] = [];
   let departementFictifId: string | null = null;
 
@@ -79,7 +89,7 @@ async function principal() {
     // --- Le marqueur porte le département -----------------------------------
     console.log("\nLe marqueur d'une relance");
 
-    const periode = await db.periodeReporting.findFirst({ where: { type: "MENSUEL", annee: 2026, mois: 8 } });
+    const periode = await base.periodeReporting.findFirst({ where: { type: "MENSUEL", annee: 2026, mois: 8 } });
     if (!periode || periode.statut === "OUVERTE") {
       noter("la période 08/2026 est ouverte (ou absente) : jouer le rappel du 27 enverrait de vraies notifications");
     } else {
@@ -116,7 +126,7 @@ async function principal() {
 
     // --- Rien n'est parti ----------------------------------------------------
     console.log("\nCe qui a été envoyé");
-    const notificationsApres = await db.notification.count();
+    const notificationsApres = await base.notification.count();
     dire(
       `aucune notification produite par ce contrôle (${notificationsAvant} avant, ${notificationsApres} après)`,
       notificationsApres === notificationsAvant

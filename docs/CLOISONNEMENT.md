@@ -11,7 +11,7 @@
 | Les 29 fichiers avec session passent par `user.db` | **fait** |
 | Les 7 fichiers sans session | **fait** — lot 19 |
 | Politiques de sécurité par ligne activées | **fait** — lot 19 |
-| Test d'intrusion | **à faire** |
+| Test d'intrusion | **fait** — lot 19 |
 
 Contrôles rejouables à tout moment :
 
@@ -216,12 +216,36 @@ second existe, ses créations prendront la valeur par défaut et seront refusée
 par le `WITH CHECK`. L'échec est franc, pas silencieux — mais il faudra injecter
 le département à la création avant d'accueillir un second territoire.
 
-### 5. Le test d'intrusion
+### 5. Le test d'intrusion — FAIT
 
-Exigé par le mémorandum, et il ne suffit pas de vérifier qu'un délégué voit ses
-données : il faut **tenter** de lire celles d'un autre département et que le
-test échoue si la lecture aboutit. Créer un second département fictif avec
-quelques lignes, se déclarer dans le premier, et compter ce qu'on obtient.
+`tests/intrusion.test.ts`, dans la suite : neuf contrôles, joués à chaque
+exécution. Un second département fictif est créé avec ses lignes, on se déclare
+dans le premier, et on tente d'atteindre les siennes.
 
-Une politique non éprouvée par une tentative d'intrusion n'est pas une
-politique de sécurité.
+Ce qui est éprouvé :
+
+| Tentative | Attendu |
+|---|---|
+| lire l'arrondissement, le compte, la période du voisin | rien |
+| lister — sans filtre — arrondissements et comptes | aucune ligne du voisin |
+| passer par une **jointure** (`arrondissement: { code }`) | rien |
+| modifier une ligne du voisin | 0 ligne touchée, et la sienne intacte |
+| supprimer une ligne du voisin | 0 ligne touchée |
+| **créer** une ligne au nom du voisin | refus de la base (`WITH CHECK`) |
+| ne rien déclarer du tout | rien, dans les deux départements |
+
+Deux précautions rendent ce test sérieux :
+
+**Il vérifie d'abord que les lignes visées existent vraiment.** Sans cela, tous
+les contrôles suivants passeraient au vert sur une base vide — c'est exactement
+le piège dans lequel les tests étaient tombés à l'étape 4.
+
+**Il a été vu échouer.** `ALTER TABLE "Arrondissement" DISABLE ROW LEVEL
+SECURITY`, puis rejeu : quatre contrôles virent au rouge, et uniquement ceux qui
+portent sur cette table — ceux sur `User` et `PeriodeReporting` restent verts. La
+politique a été remise aussitôt (19/19). Un test d'intrusion qui n'a jamais
+échoué ne prouve rien.
+
+Le `WITH CHECK` mérite d'être souligné : c'est la moitié qu'on oublie. Sans lui,
+on ne pourrait pas LIRE les données d'un autre département, mais on pourrait y
+en DÉPOSER.
