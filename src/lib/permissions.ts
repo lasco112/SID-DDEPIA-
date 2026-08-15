@@ -14,6 +14,7 @@ import { db } from "@/lib/db";
 import { demoDb } from "@/lib/demoDb";
 import type { PrismaClient, Role } from "@prisma/client";
 import { Prisma } from "@prisma/client";
+import { clientCloisonne } from "./dbCloisonne";
 
 export interface SessionUser {
   id: string;
@@ -21,6 +22,9 @@ export interface SessionUser {
   username: string;
   arrondissementId: string | null;
   sectionId: string | null;
+  /** Département de l'utilisateur — l'unité de cloisonnement. Nul pour
+   *  l'ADMIN_TECH, qui n'a aucun droit métier. */
+  departementId: string | null;
   /** Session de démonstration (correction n°10) : jamais vrai pour un compte réel. */
   isDemo: boolean;
   /** Client Prisma à utiliser pour CETTE session — demoDb si isDemo, sinon la production.
@@ -70,7 +74,7 @@ export async function modeDemoGlobalActif(): Promise<boolean> {
   return actif;
 }
 
-type IdentiteUtilisateur = { id: string; role: Role; username: string; arrondissementId: string | null; sectionId: string | null };
+type IdentiteUtilisateur = { id: string; role: Role; username: string; arrondissementId: string | null; sectionId: string | null; departementId: string | null };
 
 /** Retrouve, dans la base démo, le compte équivalent à un compte réel : même rôle et même
  *  périmètre (code d'arrondissement / code de section, stables entre les deux bases). */
@@ -87,7 +91,7 @@ async function jumeauDemo(reel: IdentiteUtilisateur): Promise<IdentiteUtilisateu
       ...(arr ? { arrondissement: { code: arr.code } } : {}),
       ...(sec ? { section: { code: sec.code } } : {}),
     },
-    select: { id: true, role: true, username: true, arrondissementId: true, sectionId: true },
+    select: { id: true, role: true, username: true, arrondissementId: true, sectionId: true, departementId: true },
   });
 }
 
@@ -107,7 +111,7 @@ async function resoudreContexte(sessionUser: any): Promise<SessionUser> {
   if (!sessionEstDemo && user.role !== "ADMIN_TECH" && (await modeDemoGlobalActif())) {
     const jumeau = await jumeauDemo(user);
     if (jumeau) {
-      return { ...jumeau, isDemo: true, db: demoDb as PrismaClient };
+      return { ...jumeau, isDemo: true, db: clientCloisonne(demoDb as PrismaClient, jumeau.departementId) };
     }
   }
 
@@ -117,8 +121,15 @@ async function resoudreContexte(sessionUser: any): Promise<SessionUser> {
     username: user.username,
     arrondissementId: user.arrondissementId,
     sectionId: user.sectionId,
+    departementId: user.departementId,
     isDemo: sessionEstDemo,
-    db: client,
+    /*
+     * SECONDE barrière : chaque opération faite avec ce client déclare le
+     * département de l'utilisateur à la base, qui refusera les lignes des
+     * autres dès que les politiques seront posées. La PREMIÈRE barrière reste
+     * le filtrage écrit dans les routes.
+     */
+    db: clientCloisonne(client, user.departementId),
   };
 }
 
