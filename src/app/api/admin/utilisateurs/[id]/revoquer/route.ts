@@ -7,7 +7,6 @@
  * lui-même n'est pas désactivé : une reconnexion normale reste possible.
  */
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
 import { requireUser, assertRole, permissionErrorResponse } from "@/lib/permissions";
 
 export async function POST(_req: Request, { params }: { params: { id: string } }) {
@@ -15,9 +14,9 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
     const admin = await requireUser();
     assertRole(admin, ["DD", "ADMIN_TECH"]);
 
-    const updated = await db.user.update({ where: { id: params.id }, data: { sessionRevoqueeLe: new Date() } });
+    const updated = await admin.db.user.update({ where: { id: params.id }, data: { sessionRevoqueeLe: new Date() } });
 
-    await db.auditLog.create({
+    await admin.db.auditLog.create({
       data: { userId: admin.id, action: "REVOCATION_SESSION", entite: "User", entiteId: updated.id },
     });
 

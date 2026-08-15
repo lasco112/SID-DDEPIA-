@@ -12,14 +12,13 @@
  * (« Lire le rapport » plutôt que « Télécharger »).
  */
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
 import { requireUser, permissionErrorResponse } from "@/lib/permissions";
 
 export async function GET(req: Request, { params }: { params: { id: string } }) {
   try {
     const user = await requireUser();
 
-    const doc = await db.exportDocument.findUnique({
+    const doc = await user.db.exportDocument.findUnique({
       where: { id: params.id },
       select: { cheminFichier: true, contenu: true, type: true, arrondissementId: true, version: true },
     });

@@ -5,7 +5,6 @@
  * vivante (voir lib/faq.ts pour la FAQ pré-écrite).
  */
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
 import { requireUser, assertRole, permissionErrorResponse } from "@/lib/permissions";
 
 export async function GET() {
@@ -13,7 +12,7 @@ export async function GET() {
     const user = await requireUser();
     assertRole(user, ["DD", "ADMIN_TECH"]);
 
-    const demandes = await db.demandeAide.findMany({
+    const demandes = await user.db.demandeAide.findMany({
       orderBy: [{ traite: "asc" }, { createdAt: "desc" }],
       include: { user: { select: { nom: true, username: true, role: true } } },
       take: 200,
@@ -32,7 +31,7 @@ export async function POST(req: Request) {
     const { page, tableauCode, message } = (await req.json()) as { page: string; tableauCode?: string | null; message: string };
     if (!message?.trim()) return NextResponse.json({ message: "Question vide." }, { status: 400 });
 
-    await db.demandeAide.create({
+    await user.db.demandeAide.create({
       data: { userId: user.id, page: page ?? "", tableauCode: tableauCode ?? null, message: message.trim() },
     });
 

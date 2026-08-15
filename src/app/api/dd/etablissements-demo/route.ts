@@ -14,7 +14,6 @@
  * exécute la suppression dans une transaction unique + trace un AuditLog.
  */
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
 import { requireUser, assertRole, permissionErrorResponse } from "@/lib/permissions";
 
 /** Les jeux de démonstration sont tous suffixés « (DÉMO) » par prisma/seed-demo.ts. */
@@ -30,14 +29,14 @@ export async function GET() {
     const user = await requireUser();
     assertRole(user, ["DD"]);
 
-    const etablissements = await db.etablissement.findMany({
+    const etablissements = await user.db.etablissement.findMany({
       where: FILTRE_DEMO,
       include: { arrondissement: { select: { nom: true } } },
       orderBy: [{ typeCode: "asc" }, { nom: "asc" }],
     });
 
     const ids = etablissements.map((e) => e.id);
-    const saisies = ids.length ? await db.saisieNominative.count({ where: { etablissementId: { in: ids } } }) : 0;
+    const saisies = ids.length ? await user.db.saisieNominative.count({ where: { etablissementId: { in: ids } } }) : 0;
 
     return NextResponse.json({
       total: etablissements.length,
@@ -65,19 +64,19 @@ export async function POST(req: Request) {
       return NextResponse.json({ message: "Confirmation invalide." }, { status: 400 });
     }
 
-    const etablissements = await db.etablissement.findMany({ where: FILTRE_DEMO, select: { id: true, nom: true } });
+    const etablissements = await user.db.etablissement.findMany({ where: FILTRE_DEMO, select: { id: true, nom: true } });
     const ids = etablissements.map((e) => e.id);
     if (ids.length === 0) return NextResponse.json({ ok: true, supprimes: 0, saisiesSupprimees: 0 });
 
-    const saisies = await db.saisieNominative.count({ where: { etablissementId: { in: ids } } });
+    const saisies = await user.db.saisieNominative.count({ where: { etablissementId: { in: ids } } });
 
-    await db.$transaction([
-      db.correction.deleteMany({ where: { saisieNominative: { etablissementId: { in: ids } } } }),
-      db.saisieNominative.deleteMany({ where: { etablissementId: { in: ids } } }),
-      db.etablissement.deleteMany({ where: { id: { in: ids } } }),
+    await user.db.$transaction([
+      user.db.correction.deleteMany({ where: { saisieNominative: { etablissementId: { in: ids } } } }),
+      user.db.saisieNominative.deleteMany({ where: { etablissementId: { in: ids } } }),
+      user.db.etablissement.deleteMany({ where: { id: { in: ids } } }),
     ]);
 
-    await db.auditLog.create({
+    await user.db.auditLog.create({
       data: {
         userId: user.id,
         action: "SUPPRESSION_ETABLISSEMENTS_DEMO",

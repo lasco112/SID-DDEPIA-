@@ -8,7 +8,8 @@
 | Modèles `Region` / `Departement`, colonne sur 19 tables | **fait** |
 | 14 776 lignes rattachées à la Menoua | **fait** |
 | `user.db` déclare le département à chaque opération | **fait** |
-| Tout le code passe par un client cloisonné | **à faire** |
+| Les 29 fichiers avec session passent par `user.db` | **fait** |
+| Les 7 fichiers sans session | **à faire — décision prise, voir ci-dessous** |
 | Politiques de sécurité par ligne activées | **à faire** |
 | Test d'intrusion | **à faire** |
 
@@ -22,9 +23,10 @@ node --env-file=.env --import tsx scripts/verifier-cloisonnement.ts
 
 Les politiques compareraient le département de chaque ligne au réglage
 `app.departement_id`. Ce réglage n'est posé que par le client cloisonné, donc
-uniquement quand le code passe par `user.db`. Or **36 fichiers importent `db`
-directement**. Les activer aujourd'hui rendrait ces 36 chemins aveugles : ils
-ne verraient plus aucune ligne.
+uniquement quand le code passe par `user.db`. Il reste **7 fichiers** qui
+importent `db` directement — sur 36 au départ. Les activer aujourd'hui rendrait
+ces 7 chemins aveugles : ils ne verraient plus aucune ligne. Parmi eux, l'envoi
+des notifications et les tâches planifiées, dont la panne serait silencieuse.
 
 Et l'inverse — une politique permissive quand le réglage est absent — serait
 pire : elle donnerait le sentiment d'une sécurité qui n'existe pas. C'est
@@ -40,7 +42,7 @@ silencieux — aucune erreur, aucun cloisonnement. Le détail est en tête de
 
 ## Ce qu'il reste, dans l'ordre
 
-### 1. Les 29 fichiers qui ont une session sous la main
+### 1. Les 29 fichiers qui ont une session sous la main — FAIT
 
 Conversion mécanique : `db.` devient `user.db.`. Ces fichiers appellent déjà
 `requireUser` ou `contexteSession` ; l'objet `user` est dans la portée.
@@ -61,11 +63,11 @@ tests, puis les contrôles de bout en bout (`scripts/verifier-rubriques.ts`,
 | `server/export/drepia-xlsx.ts` | export | reçoit son client en paramètre : lui passer `user.db` |
 | `server/export/rapport-thematique.ts` | export | idem |
 
-Les tâches de fond ne peuvent pas être cloisonnées sur un département : elles
-servent tout le monde. Deux réponses possibles, à choisir explicitement — leur
-donner la connexion d'administration (`MIGRATE_DATABASE_URL`, qui contourne les
-politiques), ou les faire boucler département par département. La seconde est
-plus sûre et prépare le multi-départements ; la première est immédiate.
+**DÉCISION PRISE : boucler département par département.** Donner la connexion
+d'administration aux tâches de fond reviendrait à laisser une porte ouverte en
+permanence — et cette porte serait précisément celle qui contourne toutes les
+politiques. Une tâche qui boucle sur les départements est plus longue à écrire,
+mais elle ne crée aucun chemin privilégié durable.
 
 ### 3. Les 7 transactions applicatives
 

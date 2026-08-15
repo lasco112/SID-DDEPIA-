@@ -4,7 +4,6 @@
  * validation par le DD avant de créer de nouvelles colonnes dans le canevas.
  */
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
 import { requireUser, assertRole, permissionErrorResponse } from "@/lib/permissions";
 
 export async function GET() {
@@ -12,7 +11,7 @@ export async function GET() {
     const user = await requireUser();
     assertRole(user, ["DD"]);
 
-    const items = await db.referentielItem.findMany({
+    const items = await user.db.referentielItem.findMany({
       where: { enAttenteValidationDD: true },
       orderBy: { createdAt: "asc" },
       include: { proposePar: { select: { nom: true, username: true } } },

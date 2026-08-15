@@ -18,7 +18,6 @@
  * dernier compte DD actif (le système doit toujours garder au moins un DD).
  */
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
 import { requireUser, assertRole, permissionErrorResponse } from "@/lib/permissions";
 
 export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
@@ -30,38 +29,38 @@ export async function DELETE(_req: Request, { params }: { params: { id: string }
       return NextResponse.json({ message: "Vous ne pouvez pas supprimer votre propre compte." }, { status: 400 });
     }
 
-    const cible = await db.user.findUnique({ where: { id: params.id } });
+    const cible = await admin.db.user.findUnique({ where: { id: params.id } });
     if (!cible) return NextResponse.json({ message: "Compte introuvable." }, { status: 404 });
 
     if (cible.role === "DD") {
-      const nbDD = await db.user.count({ where: { role: "DD", actif: true } });
+      const nbDD = await admin.db.user.count({ where: { role: "DD", actif: true } });
       if (nbDD <= 1) {
         return NextResponse.json({ message: "Impossible de supprimer le dernier compte Délégué Départemental actif." }, { status: 400 });
       }
     }
 
-    await db.$transaction([
+    await admin.db.$transaction([
       // Traces à supprimer (clé d'auteur obligatoire, ne peut pas être détachée)
-      db.correction.deleteMany({ where: { auteurId: params.id } }),
-      db.exportDocument.deleteMany({ where: { auteurId: params.id } }),
-      db.demandeAide.deleteMany({ where: { userId: params.id } }),
-      db.assignationSaisie.deleteMany({ where: { OR: [{ assignePar: params.id }, { agentId: params.id }] } }),
-      db.notification.deleteMany({ where: { destinataireId: params.id } }),
+      admin.db.correction.deleteMany({ where: { auteurId: params.id } }),
+      admin.db.exportDocument.deleteMany({ where: { auteurId: params.id } }),
+      admin.db.demandeAide.deleteMany({ where: { userId: params.id } }),
+      admin.db.assignationSaisie.deleteMany({ where: { OR: [{ assignePar: params.id }, { agentId: params.id }] } }),
+      admin.db.notification.deleteMany({ where: { destinataireId: params.id } }),
       // Données statistiques conservées, référence d'auteur détachée
-      db.saisieMatrice.updateMany({ where: { saisiParId: params.id }, data: { saisiParId: null } }),
-      db.saisieNominative.updateMany({ where: { saisiParId: params.id }, data: { saisiParId: null } }),
-      db.saisieEvenement.updateMany({ where: { saisiParId: params.id }, data: { saisiParId: null } }),
-      db.rapportArrondissement.updateMany({ where: { soumisParId: params.id }, data: { soumisParId: null } }),
-      db.validationSection.updateMany({ where: { valideParId: params.id }, data: { valideParId: null } }),
-      db.syntheseSection.updateMany({ where: { auteurId: params.id }, data: { auteurId: null } }),
-      db.referentielItem.updateMany({ where: { proposeParId: params.id }, data: { proposeParId: null } }),
-      db.referentielItem.updateMany({ where: { valideParDDId: params.id }, data: { valideParDDId: null } }),
-      db.configSysteme.updateMany({ where: { modifieParId: params.id }, data: { modifieParId: null } }),
-      db.auditLog.updateMany({ where: { userId: params.id }, data: { userId: null } }),
-      db.user.delete({ where: { id: params.id } }),
+      admin.db.saisieMatrice.updateMany({ where: { saisiParId: params.id }, data: { saisiParId: null } }),
+      admin.db.saisieNominative.updateMany({ where: { saisiParId: params.id }, data: { saisiParId: null } }),
+      admin.db.saisieEvenement.updateMany({ where: { saisiParId: params.id }, data: { saisiParId: null } }),
+      admin.db.rapportArrondissement.updateMany({ where: { soumisParId: params.id }, data: { soumisParId: null } }),
+      admin.db.validationSection.updateMany({ where: { valideParId: params.id }, data: { valideParId: null } }),
+      admin.db.syntheseSection.updateMany({ where: { auteurId: params.id }, data: { auteurId: null } }),
+      admin.db.referentielItem.updateMany({ where: { proposeParId: params.id }, data: { proposeParId: null } }),
+      admin.db.referentielItem.updateMany({ where: { valideParDDId: params.id }, data: { valideParDDId: null } }),
+      admin.db.configSysteme.updateMany({ where: { modifieParId: params.id }, data: { modifieParId: null } }),
+      admin.db.auditLog.updateMany({ where: { userId: params.id }, data: { userId: null } }),
+      admin.db.user.delete({ where: { id: params.id } }),
     ]);
 
-    await db.auditLog.create({
+    await admin.db.auditLog.create({
       data: {
         userId: admin.id,
         action: "SUPPRESSION_COMPTE",

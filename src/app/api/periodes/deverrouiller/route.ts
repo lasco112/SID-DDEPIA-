@@ -4,7 +4,6 @@
  * négociable : toute exception est tracée).
  */
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
 import { requireUser, assertRole, permissionErrorResponse } from "@/lib/permissions";
 
 export async function POST(req: Request) {
@@ -17,7 +16,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ message: "Le motif de déverrouillage est obligatoire." }, { status: 400 });
     }
 
-    const rapport = await db.rapportArrondissement.update({
+    const rapport = await user.db.rapportArrondissement.update({
       where: { id: rapportId },
       data: {
         deverrouillePar: user.id,
@@ -26,7 +25,7 @@ export async function POST(req: Request) {
       },
     });
 
-    await db.auditLog.create({
+    await user.db.auditLog.create({
       data: { userId: user.id, action: "DEVERROUILLAGE", entite: "RapportArrondissement", entiteId: rapport.id, details: { motif } },
     });
 

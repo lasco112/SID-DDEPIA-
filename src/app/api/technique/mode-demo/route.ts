@@ -9,7 +9,6 @@
  * restent, elles, dans la base de démonstration.
  */
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
 import { demoDb } from "@/lib/demoDb";
 import {
   requireUser,
@@ -23,7 +22,7 @@ export async function GET() {
   try {
     const user = await requireUser();
     assertRole(user, ["ADMIN_TECH"]);
-    const config = await db.configSysteme.findUnique({ where: { cle: CLE_MODE_DEMO_GLOBAL } });
+    const config = await user.db.configSysteme.findUnique({ where: { cle: CLE_MODE_DEMO_GLOBAL } });
     return NextResponse.json({
       actif: config?.valeur === "actif",
       disponible: Boolean(demoDb),
@@ -49,14 +48,14 @@ export async function POST(req: Request) {
     }
 
     const valeur = actif ? "actif" : "inactif";
-    await db.configSysteme.upsert({
+    await user.db.configSysteme.upsert({
       where: { cle: CLE_MODE_DEMO_GLOBAL },
       update: { valeur, modifieParId: user.id },
       create: { cle: CLE_MODE_DEMO_GLOBAL, valeur, modifieParId: user.id },
     });
     invaliderCacheModeDemo();
 
-    await db.auditLog.create({
+    await user.db.auditLog.create({
       data: {
         userId: user.id,
         action: actif ? "MODE_DEMO_ACTIVE" : "MODE_DEMO_ARRETE",

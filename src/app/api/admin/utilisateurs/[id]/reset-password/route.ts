@@ -7,7 +7,6 @@
  */
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
-import { db } from "@/lib/db";
 import { requireUser, assertRole, permissionErrorResponse } from "@/lib/permissions";
 import { genererMotDePasseTemporaire } from "@/lib/generateCredentials";
 
@@ -22,12 +21,12 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       return NextResponse.json({ message: "Le mot de passe doit contenir au moins 4 caractères." }, { status: 400 });
     }
     const passwordHash = await bcrypt.hash(motDePasseTemporaire, 10);
-    const updated = await db.user.update({
+    const updated = await admin.db.user.update({
       where: { id: params.id },
       data: { passwordHash, mustChangePassword: true },
     });
 
-    await db.auditLog.create({
+    await admin.db.auditLog.create({
       data: { userId: admin.id, action: "REINITIALISATION_MOT_DE_PASSE", entite: "User", entiteId: updated.id },
     });
 

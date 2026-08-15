@@ -3,7 +3,6 @@
  * ADMIN_TECH. Lecture seule : personne ne modifie ni ne supprime l'historique.
  */
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
 import { requireUser, assertRole, permissionErrorResponse } from "@/lib/permissions";
 
 const TAILLE_PAGE = 50;
@@ -22,15 +21,15 @@ export async function GET(req: Request) {
 
     const where = action ? { action } : {};
     const [total, entrees, actionsDistinctes] = await Promise.all([
-      db.auditLog.count({ where }),
-      db.auditLog.findMany({
+      user.db.auditLog.count({ where }),
+      user.db.auditLog.findMany({
         where,
         orderBy: { createdAt: "desc" },
         skip: (page - 1) * TAILLE_PAGE,
         take: TAILLE_PAGE,
         include: { user: { select: { username: true, nom: true, role: true } } },
       }),
-      db.auditLog.findMany({ distinct: ["action"], select: { action: true }, orderBy: { action: "asc" } }),
+      user.db.auditLog.findMany({ distinct: ["action"], select: { action: true }, orderBy: { action: "asc" } }),
     ]);
 
     return NextResponse.json({

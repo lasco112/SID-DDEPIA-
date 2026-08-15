@@ -7,7 +7,6 @@
  * rapport transmis » sans le régénérer.
  */
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
 import { requireUser, permissionErrorResponse } from "@/lib/permissions";
 
 export async function GET(req: Request) {
@@ -16,7 +15,7 @@ export async function GET(req: Request) {
     const periodeId = new URL(req.url).searchParams.get("periodeId");
     if (!periodeId) return NextResponse.json({ message: "Période non précisée." }, { status: 400 });
 
-    const documents = await db.exportDocument.findMany({
+    const documents = await user.db.exportDocument.findMany({
       where:
         user.role === "DD"
           ? { periodeId }
@@ -41,7 +40,7 @@ export async function GET(req: Request) {
 
     // `disponible` distingue un document réellement relisible d'une simple
     // trace d'export antérieure à l'archivage en base (fichier perdu).
-    const contenus = await db.exportDocument.findMany({
+    const contenus = await user.db.exportDocument.findMany({
       where: { id: { in: documents.map((d) => d.id) }, contenu: { not: null } },
       select: { id: true },
     });

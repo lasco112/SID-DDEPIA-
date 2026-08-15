@@ -8,7 +8,6 @@
  */
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
-import { db } from "@/lib/db";
 import { requireUser, assertRole, permissionErrorResponse } from "@/lib/permissions";
 import { genererIdentifiant, genererMotDePasseTemporaire } from "@/lib/generateCredentials";
 
@@ -18,9 +17,9 @@ export async function GET() {
     assertRole(user, ["DD"]);
 
     const [users, arrondissements, sections] = await Promise.all([
-      db.user.findMany({ orderBy: [{ role: "asc" }, { nom: "asc" }], include: { arrondissement: true, section: true } }),
-      db.arrondissement.findMany({ orderBy: { ordre: "asc" } }),
-      db.section.findMany({ orderBy: { ordre: "asc" } }),
+      user.db.user.findMany({ orderBy: [{ role: "asc" }, { nom: "asc" }], include: { arrondissement: true, section: true } }),
+      user.db.arrondissement.findMany({ orderBy: { ordre: "asc" } }),
+      user.db.section.findMany({ orderBy: { ordre: "asc" } }),
     ]);
 
     return NextResponse.json({
@@ -79,13 +78,13 @@ export async function POST(req: Request) {
 
     let arrondissementNom: string | undefined;
     if (body.arrondissementId) {
-      const arr = await db.arrondissement.findUnique({ where: { id: body.arrondissementId } });
+      const arr = await admin.db.arrondissement.findUnique({ where: { id: body.arrondissementId } });
       if (!arr) return NextResponse.json({ message: "Arrondissement introuvable." }, { status: 404 });
       arrondissementNom = arr.nom;
     }
     let sectionCode: string | undefined;
     if (body.sectionId) {
-      const sec = await db.section.findUnique({ where: { id: body.sectionId } });
+      const sec = await admin.db.section.findUnique({ where: { id: body.sectionId } });
       if (!sec) return NextResponse.json({ message: "Section introuvable." }, { status: 404 });
       sectionCode = sec.code;
     }
@@ -94,7 +93,7 @@ export async function POST(req: Request) {
     const motDePasseTemporaire = genererMotDePasseTemporaire();
     const passwordHash = await bcrypt.hash(motDePasseTemporaire, 10);
 
-    const created = await db.user.create({
+    const created = await admin.db.user.create({
       data: {
         nom: body.nom.trim(),
         username,
@@ -110,7 +109,7 @@ export async function POST(req: Request) {
       },
     });
 
-    await db.auditLog.create({
+    await admin.db.auditLog.create({
       data: { userId: admin.id, action: "CREATION_COMPTE", entite: "User", entiteId: created.id, details: { role: body.role, username } },
     });
 

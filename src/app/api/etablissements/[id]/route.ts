@@ -15,7 +15,6 @@
  */
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
-import { db } from "@/lib/db";
 import { requireUser, assertRole, permissionErrorResponse } from "@/lib/permissions";
 
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
@@ -23,7 +22,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     const user = await requireUser();
     assertRole(user, ["DA", "DD", "AGENT_SAISIE"]);
 
-    const etablissement = await db.etablissement.findUnique({ where: { id: params.id } });
+    const etablissement = await user.db.etablissement.findUnique({ where: { id: params.id } });
     if (!etablissement) return NextResponse.json({ message: "Établissement introuvable" }, { status: 404 });
 
     if (user.role !== "DD" && etablissement.arrondissementId !== user.arrondissementId) {
@@ -51,9 +50,9 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     if (body.telephone !== undefined) data.telephone = body.telephone?.trim() || null;
     if (body.actif !== undefined) data.actif = body.actif;
 
-    const mis_a_jour = await db.etablissement.update({ where: { id: params.id }, data });
+    const mis_a_jour = await user.db.etablissement.update({ where: { id: params.id }, data });
 
-    await db.auditLog.create({
+    await user.db.auditLog.create({
       data: {
         userId: user.id,
         action: "MODIFICATION_ETABLISSEMENT",
@@ -75,7 +74,7 @@ export async function DELETE(_req: Request, { params }: { params: { id: string }
     const user = await requireUser();
     assertRole(user, ["DD", "DA", "AGENT_SAISIE"]);
 
-    const etablissement = await db.etablissement.findUnique({ where: { id: params.id } });
+    const etablissement = await user.db.etablissement.findUnique({ where: { id: params.id } });
     if (!etablissement) return NextResponse.json({ message: "Établissement introuvable" }, { status: 404 });
 
     // Cloisonnement par arrondissement : contrôle refait ICI, côté serveur, et
@@ -92,15 +91,15 @@ export async function DELETE(_req: Request, { params }: { params: { id: string }
     // explicitant « même ceux écrit démo dessus » : ces entrées ont
     // généralement des saisies de test attachées, et bloquer la suppression
     // dans ce cas rendrait le bouton inutile pour l'usage prévu.
-    const nbSaisies = await db.saisieNominative.count({ where: { etablissementId: params.id } });
+    const nbSaisies = await user.db.saisieNominative.count({ where: { etablissementId: params.id } });
 
-    await db.$transaction([
-      db.correction.deleteMany({ where: { saisieNominative: { etablissementId: params.id } } }),
-      db.saisieNominative.deleteMany({ where: { etablissementId: params.id } }),
-      db.etablissement.delete({ where: { id: params.id } }),
+    await user.db.$transaction([
+      user.db.correction.deleteMany({ where: { saisieNominative: { etablissementId: params.id } } }),
+      user.db.saisieNominative.deleteMany({ where: { etablissementId: params.id } }),
+      user.db.etablissement.delete({ where: { id: params.id } }),
     ]);
 
-    await db.auditLog.create({
+    await user.db.auditLog.create({
       data: {
         userId: user.id,
         action: "SUPPRESSION_ETABLISSEMENT",

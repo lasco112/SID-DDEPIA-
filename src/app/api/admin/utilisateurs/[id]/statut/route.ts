@@ -3,7 +3,6 @@
  * ou désactiver un compte (CDC §4.1). Rien n'est supprimé.
  */
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
 import { requireUser, assertRole, permissionErrorResponse } from "@/lib/permissions";
 
 export async function POST(req: Request, { params }: { params: { id: string } }) {
@@ -12,9 +11,9 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     assertRole(admin, ["DD"]);
 
     const { actif } = (await req.json()) as { actif: boolean };
-    const updated = await db.user.update({ where: { id: params.id }, data: { actif } });
+    const updated = await admin.db.user.update({ where: { id: params.id }, data: { actif } });
 
-    await db.auditLog.create({
+    await admin.db.auditLog.create({
       data: {
         userId: admin.id,
         action: actif ? "AUTORISATION_COMPTE" : "DESACTIVATION_COMPTE",

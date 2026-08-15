@@ -14,7 +14,6 @@
  */
 import { NextResponse } from "next/server";
 import { requireUser, assertRole, permissionErrorResponse } from "@/lib/permissions";
-import { db } from "@/lib/db";
 import { collecterDonneesThematiques, libelleDomaine, type FiltreThematique } from "@/server/export/rapport-thematique";
 import { rendreThematiqueXlsx, rendreThematiqueDocx, rendreThematiquePdf } from "@/server/export/rapport-thematique-render";
 
@@ -77,7 +76,7 @@ export async function POST(req: Request) {
       ext = "pdf";
     }
 
-    await db.auditLog.create({
+    await user.db.auditLog.create({
       data: {
         userId: user.id,
         action: "EXPORT_THEMATIQUE",

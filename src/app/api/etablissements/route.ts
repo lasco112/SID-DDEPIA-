@@ -11,7 +11,6 @@
  * ADMIN_TECH exclu (aucun droit métier, CDC §A.2).
  */
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
 import { requireUser, assertRole, permissionErrorResponse } from "@/lib/permissions";
 
 const TYPES_VALIDES = ["ETAB_COUVOIR", "ETAB_FERME_PONTE", "ETAB_FERME_CHAIR", "ETAB_PROVENDERIE"];
@@ -37,7 +36,7 @@ export async function GET(req: Request) {
       arrondissementId = arrondissementIdParam;
     }
 
-    const etablissements = await db.etablissement.findMany({
+    const etablissements = await user.db.etablissement.findMany({
       where: { typeCode, arrondissementId },
       orderBy: [{ actif: "desc" }, { nom: "asc" }],
     });
@@ -98,14 +97,14 @@ export async function POST(req: Request) {
     // un même envoi rejoué après une coupure réseau met simplement à jour la
     // ligne déjà créée, au lieu d'ajouter un doublon.
     const etablissement = body.id
-      ? await db.etablissement.upsert({
+      ? await user.db.etablissement.upsert({
           where: { id: body.id },
           create: { id: body.id, ...donnees },
           update: donnees,
         })
-      : await db.etablissement.create({ data: donnees });
+      : await user.db.etablissement.create({ data: donnees });
 
-    await db.auditLog.create({
+    await user.db.auditLog.create({
       data: { userId: user.id, action: "CREATION_ETABLISSEMENT", entite: "Etablissement", entiteId: etablissement.id, details: { nom: etablissement.nom, typeCode: etablissement.typeCode } },
     });
 

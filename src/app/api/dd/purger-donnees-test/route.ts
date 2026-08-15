@@ -12,10 +12,13 @@
  * la suppression dans une seule transaction atomique + trace un AuditLog.
  */
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import type { PrismaClient } from "@prisma/client";
 import { requireUser, assertRole, permissionErrorResponse } from "@/lib/permissions";
 
-async function compter() {
+// Le client est reçu en paramètre : cette fonction est hors handler, aucune
+// session n en est visible. Lui faire importer `db` la laisserait en dehors du
+// cloisonnement par département.
+async function compter(db: PrismaClient) {
   const [saisiesMatrice, saisiesNominatives, saisiesEvenement, rapports, validations, syntheses, corrections, exports, notifications] =
     await Promise.all([
       db.saisieMatrice.count(),
@@ -43,7 +46,7 @@ export async function GET() {
   try {
     const user = await requireUser();
     assertRole(user, ["DD"]);
-    return NextResponse.json(await compter());
+    return NextResponse.json(await compter(user.db));
   } catch (e) {
     const { status, message } = permissionErrorResponse(e);
     return NextResponse.json({ message }, { status });
@@ -60,18 +63,18 @@ export async function POST(req: Request) {
       return NextResponse.json({ message: "Confirmation invalide." }, { status: 400 });
     }
 
-    const avant = await compter();
+    const avant = await compter(user.db);
 
-    await db.$transaction([
-      db.correction.deleteMany({}),
-      db.syntheseSection.deleteMany({}),
-      db.validationSection.deleteMany({}),
-      db.exportDocument.deleteMany({}),
-      db.notification.deleteMany({}),
-      db.saisieMatrice.deleteMany({}),
-      db.saisieNominative.deleteMany({}),
-      db.saisieEvenement.deleteMany({}),
-      db.rapportArrondissement.deleteMany({}),
+    await user.db.$transaction([
+      user.db.correction.deleteMany({}),
+      user.db.syntheseSection.deleteMany({}),
+      user.db.validationSection.deleteMany({}),
+      user.db.exportDocument.deleteMany({}),
+      user.db.notification.deleteMany({}),
+      user.db.saisieMatrice.deleteMany({}),
+      user.db.saisieNominative.deleteMany({}),
+      user.db.saisieEvenement.deleteMany({}),
+      user.db.rapportArrondissement.deleteMany({}),
     ]);
 
     // Marqueur horodaté lu par /api/bootstrap : sans lui, la purge ne vidait
@@ -80,13 +83,13 @@ export async function POST(req: Request) {
     // reconnexion, recréant les données qu'on venait de purger. Les appareils
     // comparent cette date à la leur et vident leur base locale d'eux-mêmes.
     const purgeLe = new Date().toISOString();
-    await db.configSysteme.upsert({
+    await user.db.configSysteme.upsert({
       where: { cle: "donnees_purgees_le" },
       create: { cle: "donnees_purgees_le", valeur: purgeLe, modifieParId: user.id },
       update: { valeur: purgeLe, modifieParId: user.id },
     });
 
-    await db.auditLog.create({
+    await user.db.auditLog.create({
       data: {
         userId: user.id,
         action: "PURGE_DONNEES_TEST",

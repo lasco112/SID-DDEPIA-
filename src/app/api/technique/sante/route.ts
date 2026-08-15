@@ -6,7 +6,6 @@
 import { NextResponse } from "next/server";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { db } from "@/lib/db";
 import { requireUser, assertRole, permissionErrorResponse } from "@/lib/permissions";
 
 export async function GET() {
@@ -17,20 +16,20 @@ export async function GET() {
     const debut = Date.now();
     let dbOk = true;
     try {
-      await db.$queryRaw`SELECT 1`;
+      await user.db.$queryRaw`SELECT 1`;
     } catch {
       dbOk = false;
     }
     const latenceMs = Date.now() - debut;
 
     const [utilisateurs, arrondissements, rapports, saisiesMatrice, saisiesNominative, saisiesEvenement, auditLogs] = await Promise.all([
-      db.user.count(),
-      db.arrondissement.count(),
-      db.rapportArrondissement.count(),
-      db.saisieMatrice.count(),
-      db.saisieNominative.count(),
-      db.saisieEvenement.count(),
-      db.auditLog.count(),
+      user.db.user.count(),
+      user.db.arrondissement.count(),
+      user.db.rapportArrondissement.count(),
+      user.db.saisieMatrice.count(),
+      user.db.saisieNominative.count(),
+      user.db.saisieEvenement.count(),
+      user.db.auditLog.count(),
     ]);
 
     let dernierBackup: { fichier: string; dateModification: string; tailleOctets: number } | null = null;

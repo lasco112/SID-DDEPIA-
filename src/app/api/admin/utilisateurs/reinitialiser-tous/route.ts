@@ -7,7 +7,6 @@
  */
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
-import { db } from "@/lib/db";
 import { requireUser, assertRole, permissionErrorResponse } from "@/lib/permissions";
 
 export async function POST(req: Request) {
@@ -21,12 +20,12 @@ export async function POST(req: Request) {
     }
 
     const passwordHash = await bcrypt.hash("password123", 10);
-    const { count } = await db.user.updateMany({
+    const { count } = await admin.db.user.updateMany({
       where: { actif: true, id: { not: admin.id } },
       data: { passwordHash, mustChangePassword: true },
     });
 
-    await db.auditLog.create({
+    await admin.db.auditLog.create({
       data: {
         userId: admin.id,
         action: "REINITIALISATION_GLOBALE_MOTS_DE_PASSE",

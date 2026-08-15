@@ -9,7 +9,6 @@
  * Rejet : l'item est désactivé, jamais supprimé (§A.7 règle 1).
  */
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
 import { requireUser, assertRole, permissionErrorResponse } from "@/lib/permissions";
 import { CATEGORIES_STRUCTURELLES, suffixeDepuisCode } from "@/lib/categoriesStructurelles";
 
@@ -18,7 +17,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     const user = await requireUser();
     assertRole(user, ["DD"]);
 
-    const item = await db.referentielItem.findUnique({ where: { id: params.id } });
+    const item = await user.db.referentielItem.findUnique({ where: { id: params.id } });
     if (!item) return NextResponse.json({ message: "Item introuvable" }, { status: 404 });
     if (!item.enAttenteValidationDD) {
       return NextResponse.json({ message: "Cet item n'est pas en attente de validation." }, { status: 400 });
@@ -30,11 +29,11 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     }
 
     if (body.decision === "REJETE") {
-      await db.referentielItem.update({
+      await user.db.referentielItem.update({
         where: { id: item.id },
         data: { enAttenteValidationDD: false, actif: false, disabledAt: new Date() },
       });
-      await db.auditLog.create({
+      await user.db.auditLog.create({
         data: { userId: user.id, action: "REJET_REFERENTIEL", entite: "ReferentielItem", entiteId: item.id, details: { categorie: item.categorie, code: item.code } },
       });
       return NextResponse.json({ ok: true, decision: "REJETE" });
@@ -48,11 +47,11 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
     const champsCrees: string[] = [];
     for (const m of mappings) {
-      const template = await db.formTemplate.findUnique({ where: { code: m.templateCode } });
+      const template = await user.db.formTemplate.findUnique({ where: { code: m.templateCode } });
       if (!template) continue;
       const code = `${m.codePrefix}${suffixe}`;
-      const dernier = await db.formField.findFirst({ where: { templateId: template.id }, orderBy: { ordre: "desc" } });
-      await db.formField.upsert({
+      const dernier = await user.db.formField.findFirst({ where: { templateId: template.id }, orderBy: { ordre: "desc" } });
+      await user.db.formField.upsert({
         where: { code },
         update: { actif: true, disabledAt: null },
         create: {
@@ -67,12 +66,12 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       champsCrees.push(code);
     }
 
-    const mis_a_jour = await db.referentielItem.update({
+    const mis_a_jour = await user.db.referentielItem.update({
       where: { id: item.id },
       data: { enAttenteValidationDD: false, valideParDDId: user.id, valideLe: new Date() },
     });
 
-    await db.auditLog.create({
+    await user.db.auditLog.create({
       data: {
         userId: user.id,
         action: "VALIDATION_REFERENTIEL",

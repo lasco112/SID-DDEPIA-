@@ -4,7 +4,6 @@
  * code reste stable, seul actif/disabledAt change.
  */
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
 import { requireUser, assertRole, permissionErrorResponse } from "@/lib/permissions";
 
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
@@ -12,7 +11,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     const user = await requireUser();
     assertRole(user, ["ADMIN_TECH"]);
 
-    const item = await db.referentielItem.findUnique({ where: { id: params.id } });
+    const item = await user.db.referentielItem.findUnique({ where: { id: params.id } });
     if (!item) return NextResponse.json({ message: "Item introuvable" }, { status: 404 });
 
     const body = (await req.json()) as { libelle?: string; libelleEn?: string | null; actif?: boolean };
@@ -27,9 +26,9 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       data.disabledAt = body.actif ? null : new Date();
     }
 
-    const mis_a_jour = await db.referentielItem.update({ where: { id: params.id }, data });
+    const mis_a_jour = await user.db.referentielItem.update({ where: { id: params.id }, data });
 
-    await db.auditLog.create({
+    await user.db.auditLog.create({
       data: {
         userId: user.id,
         action: "MODIFICATION_REFERENTIEL",

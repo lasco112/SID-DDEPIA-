@@ -6,7 +6,6 @@
  * métier — d'où l'autorisation pour ce rôle (CDC §A.2).
  */
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
 import { requireUser, assertRole, permissionErrorResponse } from "@/lib/permissions";
 import { CATEGORIES_STRUCTURELLES } from "@/lib/categoriesStructurelles";
 
@@ -34,7 +33,7 @@ export async function GET(req: Request) {
       return NextResponse.json({ message: "categorie invalide", categoriesValides: CATEGORIES_VALIDES }, { status: 400 });
     }
 
-    const items = await db.referentielItem.findMany({
+    const items = await user.db.referentielItem.findMany({
       where: { categorie: categorie as any },
       orderBy: [{ actif: "desc" }, { ordre: "asc" }, { libelle: "asc" }],
     });
@@ -58,7 +57,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ message: "Code et libellé requis" }, { status: 400 });
     }
 
-    const existant = await db.referentielItem.findUnique({
+    const existant = await user.db.referentielItem.findUnique({
       where: { categorie_code: { categorie: body.categorie as any, code: body.code.trim() } },
     });
     if (existant) {
@@ -67,7 +66,7 @@ export async function POST(req: Request) {
 
     const structurelle = body.categorie in CATEGORIES_STRUCTURELLES;
 
-    const item = await db.referentielItem.create({
+    const item = await user.db.referentielItem.create({
       data: {
         categorie: body.categorie as any,
         code: body.code.trim(),
@@ -80,7 +79,7 @@ export async function POST(req: Request) {
       },
     });
 
-    await db.auditLog.create({
+    await user.db.auditLog.create({
       data: {
         userId: user.id,
         action: structurelle ? "PROPOSITION_REFERENTIEL" : "CREATION_REFERENTIEL",

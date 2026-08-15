@@ -8,7 +8,6 @@
  */
 import { NextResponse } from "next/server";
 import PizZip from "pizzip";
-import { db } from "@/lib/db";
 import { requireUser, assertRole, permissionErrorResponse } from "@/lib/permissions";
 
 export async function GET(req: Request) {
@@ -19,7 +18,7 @@ export async function GET(req: Request) {
     const periodeId = new URL(req.url).searchParams.get("periodeId");
     if (!periodeId) return NextResponse.json({ message: "Période non précisée." }, { status: 400 });
 
-    const periode = await db.periodeReporting.findUnique({ where: { id: periodeId } });
+    const periode = await user.db.periodeReporting.findUnique({ where: { id: periodeId } });
     if (!periode || periode.mois == null) {
       return NextResponse.json({ message: "Période mensuelle introuvable." }, { status: 404 });
     }
@@ -28,7 +27,7 @@ export async function GET(req: Request) {
     // chaque arrondissement SANS charger les fichiers, puis on ne lit que
     // celles-là. Lire d'un coup toutes les versions ferait entrer plusieurs
     // dizaines de Mo en mémoire pour n'en garder que six.
-    const entetes = await db.exportDocument.findMany({
+    const entetes = await user.db.exportDocument.findMany({
       where: { periodeId, type: "RAPPORT_DA_DOCX", contenu: { not: null }, arrondissementId: { not: null } },
       orderBy: { version: "desc" },
       select: { id: true, arrondissementId: true },
@@ -39,7 +38,7 @@ export async function GET(req: Request) {
     }
 
     const documents = retenus.size
-      ? await db.exportDocument.findMany({
+      ? await user.db.exportDocument.findMany({
           where: { id: { in: Array.from(retenus.values()) } },
           select: { cheminFichier: true, contenu: true },
         })
@@ -63,7 +62,7 @@ export async function GET(req: Request) {
     const buf = zip.generate({ type: "nodebuffer", compression: "DEFLATE" }) as Buffer;
     const nom = `Rapports_DA_DDEPIA-Menoua_${periode.annee}-${String(periode.mois).padStart(2, "0")}.zip`;
 
-    await db.auditLog.create({
+    await user.db.auditLog.create({
       data: {
         userId: user.id,
         action: "EXPORT",

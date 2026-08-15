@@ -2,7 +2,6 @@
  * POST /api/aide/questions/[id] — marquer une demande d'aide comme traitée.
  */
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
 import { requireUser, assertRole, permissionErrorResponse } from "@/lib/permissions";
 
 export async function POST(_req: Request, { params }: { params: { id: string } }) {
@@ -10,7 +9,7 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
     const user = await requireUser();
     assertRole(user, ["DD", "ADMIN_TECH"]);
 
-    await db.demandeAide.update({ where: { id: params.id }, data: { traite: true } });
+    await user.db.demandeAide.update({ where: { id: params.id }, data: { traite: true } });
     return NextResponse.json({ ok: true });
   } catch (e) {
     const { status, message } = permissionErrorResponse(e);

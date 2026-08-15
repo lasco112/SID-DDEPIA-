@@ -9,7 +9,6 @@ import { promisify } from "node:util";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { requireUser, assertRole, permissionErrorResponse } from "@/lib/permissions";
-import { db } from "@/lib/db";
 
 const execFileAsync = promisify(execFile);
 
@@ -79,7 +78,7 @@ export async function POST() {
       return NextResponse.json({ message: "La sauvegarde a produit un fichier vide — vérifiez la configuration." }, { status: 500 });
     }
 
-    await db.auditLog.create({
+    await user.db.auditLog.create({
       data: { userId: user.id, action: "SAUVEGARDE_BASE", entite: "Database", details: { fichier: nomFichier, tailleOctets: stats.size } },
     });
 

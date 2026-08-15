@@ -17,7 +17,6 @@
  * soumis, sans qu'ils aient besoin d'un déverrouillage individuel.
  */
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
 import { requireUser, assertRole, permissionErrorResponse } from "@/lib/permissions";
 
 export async function PATCH(req: Request) {
@@ -34,7 +33,7 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ message: "Date invalide." }, { status: 400 });
     }
 
-    const periode = await db.periodeReporting.findFirst({
+    const periode = await user.db.periodeReporting.findFirst({
       where: { type: "MENSUEL" },
       orderBy: [{ annee: "desc" }, { mois: "desc" }],
     });
@@ -42,7 +41,7 @@ export async function PATCH(req: Request) {
 
     const rouvre = periode.statut === "VERROUILLEE_DA" && nouvelleDate.getTime() > Date.now();
 
-    const mise_a_jour = await db.periodeReporting.update({
+    const mise_a_jour = await user.db.periodeReporting.update({
       where: { id: periode.id },
       data: {
         dateLimiteDA: nouvelleDate,
@@ -50,7 +49,7 @@ export async function PATCH(req: Request) {
       },
     });
 
-    await db.auditLog.create({
+    await user.db.auditLog.create({
       data: {
         userId: user.id,
         action: "REPORT_ECHEANCE",
