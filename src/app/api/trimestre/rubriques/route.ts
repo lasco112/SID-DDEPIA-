@@ -99,7 +99,7 @@ export async function PUT(req: Request) {
       return NextResponse.json({ message: `Zone inconnue du canevas : « ${cle} ».` }, { status: 400 });
     }
 
-    const { enregistre } = await ecrireRubrique(db, p, arrondissementId, cle, contenu ?? "", user.id);
+    const { enregistre } = await ecrireRubrique(db, user.transaction, p, arrondissementId, cle, contenu ?? "", user.id);
 
     /*
      * Trace, sans exiger de motif. La règle « jamais de correction silencieuse »

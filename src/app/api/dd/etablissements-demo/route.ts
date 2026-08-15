@@ -70,11 +70,11 @@ export async function POST(req: Request) {
 
     const saisies = await user.db.saisieNominative.count({ where: { etablissementId: { in: ids } } });
 
-    await user.db.$transaction([
-      user.db.correction.deleteMany({ where: { saisieNominative: { etablissementId: { in: ids } } } }),
-      user.db.saisieNominative.deleteMany({ where: { etablissementId: { in: ids } } }),
-      user.db.etablissement.deleteMany({ where: { id: { in: ids } } }),
-    ]);
+    await user.transaction(async (tx) => {
+      await tx.correction.deleteMany({ where: { saisieNominative: { etablissementId: { in: ids } } } });
+      await tx.saisieNominative.deleteMany({ where: { etablissementId: { in: ids } } });
+      await tx.etablissement.deleteMany({ where: { id: { in: ids } } });
+    });
 
     await user.db.auditLog.create({
       data: {

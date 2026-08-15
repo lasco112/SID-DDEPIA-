@@ -18,6 +18,7 @@ Contrôles rejouables à tout moment :
 ```bash
 node --env-file=.env --import tsx scripts/verifier-cloisonnement.ts
 node --env-file=.env --import tsx scripts/verifier-relances-cloisonnees.ts
+node --env-file=.env --import tsx scripts/verifier-transactions-cloisonnees.ts
 ```
 
 ## Pourquoi les politiques ne sont pas encore activées
@@ -95,15 +96,38 @@ recopier la boucle des départements, il appelle `verifierRelances` : la logique
 du cloisonnement n'existe qu'à un seul endroit, et les deux process peuvent
 tourner ensemble sans notifier deux fois — le marqueur les départage.
 
-### 3. Les 7 transactions applicatives
+### 3. Les 7 transactions applicatives — FAIT
 
-Six utilisent la forme en tableau — `db.$transaction([...])` — qui ne survit
-pas à une extension de client. Les convertir en `transactionCloisonnee`
-(`src/lib/dbCloisonne.ts`).
+Les routes n'appellent plus `transactionCloisonnee` directement : la session
+porte sa propre transaction, `user.transaction(async (tx) => …)`, qui ferme sur
+le client de base et le département. L'appelant n'a jamais à manipuler l'un ni
+l'autre — et ne peut donc plus se tromper de client.
 
-Fichiers : `api/admin/utilisateurs/[id]`, `api/dd/etablissements-demo`,
+Fichiers convertis : `api/admin/utilisateurs/[id]`, `api/dd/etablissements-demo`,
 `api/dd/purger-donnees-test`, `api/etablissements/[id]`, `api/exports/drepia`,
 `api/reports/generate`, `server/trimestre/rubriques.ts`.
+
+**Le défaut n'était pas théorique.** `scripts/verifier-transactions-cloisonnees.ts`
+le reproduit : sur un client cloisonné, `$transaction([a, b])` dont `b` échoue
+laisse `a` VALIDÉE en base. Chaque opération partait dans sa propre transaction.
+Une suppression de compte à moitié faite, une purge à moitié faite, un document
+archivé sans sa trace d'audit — tout cela était possible.
+
+**La forme en fonction était pire encore.** `db.$transaction(async (tx) => …)`
+sur un client cloisonné rend un `tx` lui-même étendu : chaque opération rouvre
+sa propre transaction et sort de celle qu'on croyait tenir. Le code a l'air
+atomique, il ne l'est pas, et rien ne le signale.
+
+### Le piège à ne pas retenter (bis) : ne jamais passer `user.db` à `transactionCloisonnee`
+
+Un client déjà cloisonné donne un `tx` étendu ; chaque opération repasse par
+l'extension, qui se rappelle sur le même `tx`, **sans fin**. Le processus
+consomme toute la mémoire disponible avant d'être tué — mesuré, 2 Go en une
+minute. Sur Railway, le service redémarre sans laisser d'erreur exploitable.
+
+Un `WeakSet` dans `dbCloisonne.ts` retient les clients fabriqués par
+`clientCloisonne`, et `transactionCloisonnee` refuse désormais net, avec le
+message qui indique quoi utiliser à la place.
 
 ### 4. Activer les politiques
 

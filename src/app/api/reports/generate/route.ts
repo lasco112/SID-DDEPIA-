@@ -125,8 +125,10 @@ export async function POST(req: Request) {
     // Le document est conservé EN BASE : le disque du conteneur Railway est
     // effacé à chaque redéploiement, les fichiers écrits sur disque étaient
     // donc perdus et le DD ne pouvait pas relire un rapport transmis.
-    await db.$transaction([
-      db.exportDocument.create({
+    // Le document archivé et sa trace d'audit vont ensemble : un document sans
+    // trace, ou une trace sans document, ne se rattrape pas après coup.
+    await user.transaction(async (tx) => {
+      await tx.exportDocument.create({
         data: {
           type: exportType,
           periodeId,
@@ -137,9 +139,9 @@ export async function POST(req: Request) {
           contenu: buf,
           hashSha256: hash,
         },
-      }),
-      db.auditLog.create({ data: { userId: user.id, action: "EXPORT", entite: "ExportDocument", details: { type: exportType, periodeId, version, hash } } }),
-    ]);
+      });
+      await tx.auditLog.create({ data: { userId: user.id, action: "EXPORT", entite: "ExportDocument", details: { type: exportType, periodeId, version, hash } } });
+    });
 
     return new NextResponse(new Uint8Array(buf), {
       status: 200,

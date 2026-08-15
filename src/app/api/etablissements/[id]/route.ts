@@ -93,11 +93,11 @@ export async function DELETE(_req: Request, { params }: { params: { id: string }
     // dans ce cas rendrait le bouton inutile pour l'usage prévu.
     const nbSaisies = await user.db.saisieNominative.count({ where: { etablissementId: params.id } });
 
-    await user.db.$transaction([
-      user.db.correction.deleteMany({ where: { saisieNominative: { etablissementId: params.id } } }),
-      user.db.saisieNominative.deleteMany({ where: { etablissementId: params.id } }),
-      user.db.etablissement.delete({ where: { id: params.id } }),
-    ]);
+    await user.transaction(async (tx) => {
+      await tx.correction.deleteMany({ where: { saisieNominative: { etablissementId: params.id } } });
+      await tx.saisieNominative.deleteMany({ where: { etablissementId: params.id } });
+      await tx.etablissement.delete({ where: { id: params.id } });
+    });
 
     await user.db.auditLog.create({
       data: {

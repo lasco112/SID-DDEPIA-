@@ -31,14 +31,14 @@ export async function GET(req: Request) {
     const outPath = path.join(outDir, fileName);
     await fs.writeFile(outPath, buf);
 
-    await user.db.$transaction([
-      user.db.exportDocument.create({
+    await user.transaction(async (tx) => {
+      await tx.exportDocument.create({
         data: { type: "EXPORT_DREPIA_XLSX", periodeId, auteurId: user.id, version, cheminFichier: outPath, hashSha256: hash },
-      }),
-      user.db.auditLog.create({
+      });
+      await tx.auditLog.create({
         data: { userId: user.id, action: "EXPORT", entite: "ExportDocument", details: { type: "EXPORT_DREPIA_XLSX", periodeId, version, hash } },
-      }),
-    ]);
+      });
+    });
 
     return new NextResponse(new Uint8Array(buf), {
       status: 200,

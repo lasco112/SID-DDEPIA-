@@ -39,26 +39,29 @@ export async function DELETE(_req: Request, { params }: { params: { id: string }
       }
     }
 
-    await admin.db.$transaction([
+    // Une suppression de compte laissée à moitié faite est bien pire qu'une
+    // suppression refusée : la forme en tableau n'étant plus atomique une fois
+    // le client cloisonné, la séquence passe par la transaction de la session.
+    await admin.transaction(async (tx) => {
       // Traces à supprimer (clé d'auteur obligatoire, ne peut pas être détachée)
-      admin.db.correction.deleteMany({ where: { auteurId: params.id } }),
-      admin.db.exportDocument.deleteMany({ where: { auteurId: params.id } }),
-      admin.db.demandeAide.deleteMany({ where: { userId: params.id } }),
-      admin.db.assignationSaisie.deleteMany({ where: { OR: [{ assignePar: params.id }, { agentId: params.id }] } }),
-      admin.db.notification.deleteMany({ where: { destinataireId: params.id } }),
+      await tx.correction.deleteMany({ where: { auteurId: params.id } });
+      await tx.exportDocument.deleteMany({ where: { auteurId: params.id } });
+      await tx.demandeAide.deleteMany({ where: { userId: params.id } });
+      await tx.assignationSaisie.deleteMany({ where: { OR: [{ assignePar: params.id }, { agentId: params.id }] } });
+      await tx.notification.deleteMany({ where: { destinataireId: params.id } });
       // Données statistiques conservées, référence d'auteur détachée
-      admin.db.saisieMatrice.updateMany({ where: { saisiParId: params.id }, data: { saisiParId: null } }),
-      admin.db.saisieNominative.updateMany({ where: { saisiParId: params.id }, data: { saisiParId: null } }),
-      admin.db.saisieEvenement.updateMany({ where: { saisiParId: params.id }, data: { saisiParId: null } }),
-      admin.db.rapportArrondissement.updateMany({ where: { soumisParId: params.id }, data: { soumisParId: null } }),
-      admin.db.validationSection.updateMany({ where: { valideParId: params.id }, data: { valideParId: null } }),
-      admin.db.syntheseSection.updateMany({ where: { auteurId: params.id }, data: { auteurId: null } }),
-      admin.db.referentielItem.updateMany({ where: { proposeParId: params.id }, data: { proposeParId: null } }),
-      admin.db.referentielItem.updateMany({ where: { valideParDDId: params.id }, data: { valideParDDId: null } }),
-      admin.db.configSysteme.updateMany({ where: { modifieParId: params.id }, data: { modifieParId: null } }),
-      admin.db.auditLog.updateMany({ where: { userId: params.id }, data: { userId: null } }),
-      admin.db.user.delete({ where: { id: params.id } }),
-    ]);
+      await tx.saisieMatrice.updateMany({ where: { saisiParId: params.id }, data: { saisiParId: null } });
+      await tx.saisieNominative.updateMany({ where: { saisiParId: params.id }, data: { saisiParId: null } });
+      await tx.saisieEvenement.updateMany({ where: { saisiParId: params.id }, data: { saisiParId: null } });
+      await tx.rapportArrondissement.updateMany({ where: { soumisParId: params.id }, data: { soumisParId: null } });
+      await tx.validationSection.updateMany({ where: { valideParId: params.id }, data: { valideParId: null } });
+      await tx.syntheseSection.updateMany({ where: { auteurId: params.id }, data: { auteurId: null } });
+      await tx.referentielItem.updateMany({ where: { proposeParId: params.id }, data: { proposeParId: null } });
+      await tx.referentielItem.updateMany({ where: { valideParDDId: params.id }, data: { valideParDDId: null } });
+      await tx.configSysteme.updateMany({ where: { modifieParId: params.id }, data: { modifieParId: null } });
+      await tx.auditLog.updateMany({ where: { userId: params.id }, data: { userId: null } });
+      await tx.user.delete({ where: { id: params.id } });
+    });
 
     await admin.db.auditLog.create({
       data: {

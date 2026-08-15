@@ -65,17 +65,19 @@ export async function POST(req: Request) {
 
     const avant = await compter(user.db);
 
-    await user.db.$transaction([
-      user.db.correction.deleteMany({}),
-      user.db.syntheseSection.deleteMany({}),
-      user.db.validationSection.deleteMany({}),
-      user.db.exportDocument.deleteMany({}),
-      user.db.notification.deleteMany({}),
-      user.db.saisieMatrice.deleteMany({}),
-      user.db.saisieNominative.deleteMany({}),
-      user.db.saisieEvenement.deleteMany({}),
-      user.db.rapportArrondissement.deleteMany({}),
-    ]);
+    // Une purge interrompue au milieu laisserait des saisies orphelines de leur
+    // rapport : la séquence doit réussir ou échouer d'un bloc.
+    await user.transaction(async (tx) => {
+      await tx.correction.deleteMany({});
+      await tx.syntheseSection.deleteMany({});
+      await tx.validationSection.deleteMany({});
+      await tx.exportDocument.deleteMany({});
+      await tx.notification.deleteMany({});
+      await tx.saisieMatrice.deleteMany({});
+      await tx.saisieNominative.deleteMany({});
+      await tx.saisieEvenement.deleteMany({});
+      await tx.rapportArrondissement.deleteMany({});
+    });
 
     // Marqueur horodaté lu par /api/bootstrap : sans lui, la purge ne vidait
     // que le serveur, et chaque téléphone gardait ses brouillons locaux « en

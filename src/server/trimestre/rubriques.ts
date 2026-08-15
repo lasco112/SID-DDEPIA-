@@ -9,6 +9,7 @@
  * que les chiffres soient complets.
  */
 import type { PrismaClient } from "@prisma/client";
+import type { Transactionnelle } from "@/lib/dbCloisonne";
 import { type Periode, libelleOfficiel, moisDeLaPeriode } from "../periodes/calendrier";
 
 /**
@@ -81,9 +82,15 @@ export async function lireRubriques(
  * départementales est un index PARTIEL, que Prisma ne sait pas viser. La
  * séquence est donc faite à la main dans une transaction, et l'index partiel
  * reste le garde-fou en cas d'écriture simultanée.
+ *
+ * `transaction` est celle de la session (`user.transaction`) : appeler
+ * `db.$transaction` sur un client cloisonné ne tiendrait rien — chaque
+ * opération du `tx` rouvrirait sa propre transaction, et la lecture puis
+ * l'écriture ci-dessous cesseraient d'être solidaires.
  */
 export async function ecrireRubrique(
   db: PrismaClient,
+  transaction: Transactionnelle,
   p: Periode,
   arrondissementId: string | null,
   cle: string,
@@ -93,7 +100,7 @@ export async function ecrireRubrique(
   const periodeId = await periodeTrimestrielle(db, p);
   const texte = contenu.trim();
 
-  return db.$transaction(async (tx) => {
+  return transaction(async (tx) => {
     const existante = await tx.rubriqueNarrative.findFirst({
       where: { periodeId, arrondissementId, cle },
       select: { id: true },

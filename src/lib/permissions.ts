@@ -14,7 +14,7 @@ import { db } from "@/lib/db";
 import { demoDb } from "@/lib/demoDb";
 import type { PrismaClient, Role } from "@prisma/client";
 import { Prisma } from "@prisma/client";
-import { clientCloisonne } from "./dbCloisonne";
+import { clientCloisonne, transactionCloisonnee, type Transactionnelle } from "./dbCloisonne";
 
 export interface SessionUser {
   id: string;
@@ -32,6 +32,23 @@ export interface SessionUser {
    *  (comportement inchangé) ; seules celles qui utilisent explicitement `user.db` deviennent
    *  démo-conscientes. Ne jamais faire l'inverse (ne jamais utiliser `db` pour une session démo). */
   db: PrismaClient;
+  /**
+   * Une VRAIE transaction, cloisonnée, pour cette session.
+   *
+   * À utiliser partout où plusieurs écritures doivent réussir ou échouer
+   * ensemble — à la place de `user.db.$transaction`, qui ne tient pas ses
+   * promesses une fois le client étendu :
+   *
+   *   - la forme en tableau, `$transaction([a, b])`, exécute chaque opération
+   *     dans sa propre transaction : rien n'est atomique ;
+   *   - la forme en fonction rend un `tx` étendu, dont chaque opération
+   *     rouvre une transaction séparée : les écritures sortent de celle qu'on
+   *     croyait tenir, et un échec tardif ne défait pas les précédentes.
+   *
+   * Cette fonction ferme sur le client de base et le département : l'appelant
+   * n'a jamais à manipuler l'un ni l'autre.
+   */
+  transaction: Transactionnelle;
 }
 
 export class ForbiddenError extends Error {
@@ -111,7 +128,13 @@ async function resoudreContexte(sessionUser: any): Promise<SessionUser> {
   if (!sessionEstDemo && user.role !== "ADMIN_TECH" && (await modeDemoGlobalActif())) {
     const jumeau = await jumeauDemo(user);
     if (jumeau) {
-      return { ...jumeau, isDemo: true, db: clientCloisonne(demoDb as PrismaClient, jumeau.departementId) };
+      const baseDemo = demoDb as PrismaClient;
+      return {
+        ...jumeau,
+        isDemo: true,
+        db: clientCloisonne(baseDemo, jumeau.departementId),
+        transaction: (travail) => transactionCloisonnee(baseDemo, jumeau.departementId, travail),
+      };
     }
   }
 
@@ -130,6 +153,7 @@ async function resoudreContexte(sessionUser: any): Promise<SessionUser> {
      * le filtrage écrit dans les routes.
      */
     db: clientCloisonne(client, user.departementId),
+    transaction: (travail) => transactionCloisonnee(client, user.departementId, travail),
   };
 }
 

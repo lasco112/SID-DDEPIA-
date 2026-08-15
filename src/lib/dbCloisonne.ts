@@ -59,6 +59,28 @@ const transactionCourante = new AsyncLocalStorage<{ tx: unknown }>();
 /** Nom du réglage PostgreSQL lu par les politiques de sécurité par ligne. */
 export const REGLAGE_DEPARTEMENT = "app.departement_id";
 
+/**
+ * Une transaction cloisonnée toute prête — le `user.transaction` d'une session.
+ *
+ * Ce type permet aux modules serveur d'exiger une vraie transaction sans
+ * dépendre de `lib/permissions`, donc sans traîner next-auth derrière eux.
+ */
+export type Transactionnelle = <T>(travail: (tx: PrismaClient) => Promise<T>) => Promise<T>;
+
+/**
+ * Les clients fabriqués par `clientCloisonne`, pour pouvoir les reconnaître.
+ *
+ * Motif — mesuré, pas supposé. Passer un client DÉJÀ étendu à
+ * `transactionCloisonnee` part en récursion infinie : la transaction ouverte
+ * depuis un client étendu rend un `tx` lui-même étendu, chaque opération
+ * repasse donc par l'extension, qui se rappelle sur le même `tx`, sans fin. Le
+ * processus consomme toute la mémoire disponible avant d'être tué — sur
+ * Railway, le service redémarre sans laisser d'erreur exploitable.
+ *
+ * Le garde-fou ci-dessous transforme cette panne en refus immédiat et lisible.
+ */
+const clientsEtendus = new WeakSet<object>();
+
 /** Déclare le département auprès de la base, pour la durée de la transaction. */
 async function declarer(tx: { $executeRawUnsafe: (s: string, ...a: unknown[]) => Promise<unknown> }, departementId: string) {
   // `true` : local à la transaction. Sans lui, la valeur survivrait sur la
@@ -80,6 +102,14 @@ export function transactionCloisonnee<T>(
   departementId: string | null,
   travail: (tx: PrismaClient) => Promise<T>
 ): Promise<T> {
+  if (clientsEtendus.has(base)) {
+    throw new Error(
+      "transactionCloisonnee attend le client de base, jamais un client déjà cloisonné " +
+        "(`user.db`) : la transaction partirait en récursion infinie. Depuis une route, " +
+        "utiliser `user.transaction(...)`."
+    );
+  }
+
   const dejaOuverte = transactionCourante.getStore();
   if (dejaOuverte) return travail(dejaOuverte.tx as PrismaClient);
 
@@ -100,7 +130,7 @@ export function transactionCloisonnee<T>(
 export function clientCloisonne(base: PrismaClient, departementId: string | null): PrismaClient {
   if (!departementId) return base;
 
-  return base.$extends({
+  const etendu = base.$extends({
     query: {
       $allOperations({ model, operation, args, query }) {
         // Les opérations sans modèle — $queryRaw, $executeRaw, $connect — ne
@@ -122,4 +152,7 @@ export function clientCloisonne(base: PrismaClient, departementId: string | null
       },
     },
   }) as unknown as PrismaClient;
+
+  clientsEtendus.add(etendu);
+  return etendu;
 }
