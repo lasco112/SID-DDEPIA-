@@ -207,14 +207,52 @@ l'authentification serait cassée. En revanche, si l'ancien code tourne encore
 contre la base migrée — le temps d'une bascule de conteneur — il ne déclare
 aucun département et ne voit donc plus rien. **Déployer à une heure creuse.**
 
-#### Ce qui reste ouvert : l'écriture pour un second département
+#### L'écriture pour un second département — FAIT
 
-Le client cloisonné pose le réglage de session mais n'INJECTE pas
-`departementId` dans les lignes créées. Aujourd'hui la colonne a pour valeur par
-défaut `dep_menoua`, ce qui suffit tant qu'il n'y a qu'un département. Dès qu'un
-second existe, ses créations prendront la valeur par défaut et seront refusées
-par le `WITH CHECK`. L'échec est franc, pas silencieux — mais il faudra injecter
-le département à la création avant d'accueillir un second territoire.
+Migration `20260815160000_departement_a_la_creation`.
+
+Le client cloisonné déclarait le département à la base — ce qui suffit pour LIRE
+et pour MODIFIER — mais ne l'inscrivait pas dans les lignes créées. Une valeur
+par défaut, `dep_menoua`, comblait le trou : juste tant qu'il n'y a qu'un
+département, faux dès le second, dont les créations auraient pris la valeur par
+défaut et se seraient fait refuser par le `WITH CHECK`.
+
+**Une règle de la base, pas du code.** Une injection écrite dans le client
+cloisonné n'aurait pas tout couvert : `transactionCloisonnee` remet à l'appelant
+un client de transaction BRUT, qui ne passe pas par l'extension — les sept
+transactions applicatives lui auraient échappé. Un déclencheur `BEFORE INSERT`
+s'applique à toute insertion, quel que soit le chemin, y compris du SQL écrit à
+la main.
+
+**La valeur par défaut est retirée.** Une insertion sans département déclaré
+n'est plus rattachée à la Menoua par accident : elle est refusée. Une ligne qui
+n'appartient à personne est pire qu'une insertion qui échoue — elle devient
+invisible à tous et fausse les totaux sans que rien ne le signale.
+
+La liste des tables n'est pas recopiée dans la migration : elle est **lue dans
+le catalogue** comme étant l'ensemble des tables portant une colonne
+`departementId`. Une table cloisonnée ajoutée demain ne peut pas être oubliée.
+
+#### Piège : Prisma avale le message d'un code d'erreur qu'il connaît
+
+Le déclencheur levait d'abord avec `ERRCODE = '23502'` (violation de non-nullité).
+Prisma reconnaît ce code, le traduit en `P2011` et **remplace le message** par
+« Null constraint violation on the fields: () ». Le motif réel était perdu, et
+qui lisait l'erreur ne pouvait pas savoir quoi corriger. Sans code explicite,
+`RAISE` emploie `P0001`, que Prisma ne reconnaît pas : le message français passe
+alors intact, comme le fait déjà le refus des politiques.
+
+#### Le semis était cassé, et personne ne l'avait vu
+
+`prisma/seed.ts` et `prisma/seed-demo.ts` écrivaient avec un client nu. Depuis
+les politiques, chacune de leurs insertions était refusée — l'application
+n'était donc plus installable sur une base neuve. Ils résolvent maintenant le
+département (`Departement` n'est pas cloisonnée, elle se lit sans réglage) et
+poursuivent avec un client cloisonné.
+
+Vérifié pour de vrai : base jetable créée, les 22 migrations appliquées, le
+semis exécuté avec le rôle applicatif, 67 lignes semées et **aucune orpheline**,
+puis la base supprimée.
 
 ### 5. Le test d'intrusion — FAIT
 

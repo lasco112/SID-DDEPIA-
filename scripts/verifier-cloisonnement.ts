@@ -58,8 +58,25 @@ async function principal() {
   dire("aucune table commune ne la porte à tort", enTrop.length === 0);
   if (enTrop.length) console.log(`        en trop : ${enTrop.join(", ")}`);
 
-  dire("chacune a une valeur par défaut (compatibilité de déploiement)", sansDefaut.length === 0);
-  if (sansDefaut.length) console.log(`        sans défaut : ${sansDefaut.join(", ")}`);
+  // La valeur par défaut a été RETIRÉE, et c'est voulu : elle rattachait à la
+  // Menoua toute ligne créée sans département déclaré. Un déclencheur la
+  // remplace — il pose le département de la session, et refuse la ligne s'il
+  // n'y en a pas. Une insertion non cloisonnée échoue au lieu de produire une
+  // ligne mal rattachée.
+  const avecDefaut = colonnes.filter((c) => c.column_default).map((c) => c.table_name);
+  dire("aucune n'a de valeur par défaut (elle masquerait l'absence de département)", avecDefaut.length === 0);
+  if (avecDefaut.length) console.log(`        avec défaut : ${avecDefaut.join(", ")}`);
+
+  const declencheurs = await db.$queryRawUnsafe<{ n: number }[]>(
+    `SELECT count(*)::int AS n
+       FROM pg_trigger
+      WHERE NOT tgisinternal
+        AND tgfoid = 'public.poser_departement'::regproc`
+  );
+  dire(
+    `le département est posé à la création (${declencheurs[0].n} déclencheur(s))`,
+    declencheurs[0].n >= CLOISONNEES.length
+  );
 
   const fks = await db.$queryRawUnsafe<{ n: number }[]>(
     `SELECT count(*)::int AS n

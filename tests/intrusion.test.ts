@@ -20,6 +20,7 @@
  */
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
+import type { PrismaClient } from "@prisma/client";
 import { baseBrute, DEPARTEMENT_DE_TRAVAIL, exigerDepartementDeTravail } from "../src/lib/baseDeTravail";
 import { transactionCloisonnee } from "../src/lib/dbCloisonne";
 
@@ -38,8 +39,9 @@ const cible = {
 };
 
 /** Agir en se déclarant dans un département donné. */
-const dans = <T>(departementId: string, travail: (tx: any) => Promise<T>) =>
-  transactionCloisonnee(baseBrute, departementId, travail as any);
+function dans<T>(departementId: string, travail: (tx: PrismaClient) => Promise<T>): Promise<T> {
+  return transactionCloisonnee(baseBrute, departementId, travail);
+}
 
 before(async () => {
   await exigerDepartementDeTravail();
@@ -199,6 +201,53 @@ test("je ne peux pas créer une ligne AU NOM du voisin", async () => {
   await dans(AUTRE, async (tx) => {
     assert.equal(await tx.arrondissement.count({ where: { code: "ZZ2" } }), 0);
   });
+});
+
+// ---------------------------------------------------------------------------
+// La CRÉATION : une ligne prend le département de qui la crée
+// ---------------------------------------------------------------------------
+
+test("une ligne créée sans le préciser prend le département de l'appelant", async () => {
+  // C'est le point qui manquait au lot 19 : le client déclarait le département
+  // à la base, mais ne l'inscrivait pas dans les lignes créées. Une valeur par
+  // défaut, 'dep_menoua', comblait le trou — juste tant qu'il n'y a qu'un
+  // département, faux dès le second.
+  const cree = await dans(AUTRE, (tx) =>
+    tx.arrondissement.create({
+      data: { code: "ZZ3", nom: "Cree sans departement", ordre: 97 },
+      select: { id: true, departementId: true },
+    })
+  );
+  assert.equal(cree.departementId, AUTRE, "La ligne n'a pas pris le département de celui qui l'a créée.");
+
+  // Et le voisin ne la voit pas : elle est bien rattachée, pas seulement étiquetée.
+  await dans(MIEN, async (tx) => {
+    assert.equal(await tx.arrondissement.count({ where: { id: cree.id } }), 0);
+  });
+
+  await dans(AUTRE, (tx) => tx.arrondissement.delete({ where: { id: cree.id } }));
+});
+
+test("une insertion sans aucun département déclaré est refusée, pas rattachée au hasard", async () => {
+  // Sans la règle, la valeur par défaut aurait rattaché cette ligne à la Menoua
+  // — silencieusement, et sans que personne ne l'ait voulu.
+  await assert.rejects(
+    () => baseBrute.arrondissement.create({ data: { code: "ZZ4", nom: "Sans departement", ordre: 96 } }),
+    (e: Error) => /d[ée]partement/i.test(e.message),
+    "Une ligne a pu être insérée sans qu'aucun département soit déclaré."
+  );
+});
+
+test("le département déclaré prime : on ne peut pas en inscrire un autre", async () => {
+  // Le déclencheur ne renseigne que si la colonne est vide ; s'il est fourni,
+  // c'est le WITH CHECK de la politique qui tranche.
+  await assert.rejects(
+    () =>
+      dans(MIEN, (tx) =>
+        tx.arrondissement.create({ data: { code: "ZZ5", nom: "Chez le voisin", ordre: 95, departementId: AUTRE } })
+      ),
+    "Une ligne a pu être créée avec le département d'un autre."
+  );
 });
 
 // ---------------------------------------------------------------------------

@@ -27,6 +27,7 @@ import bcrypt from "bcryptjs";
 import { parseDictionnaire, EVENEMENT_SCHEMAS, type ChampEvenement } from "./seed-lib/parseDictionnaire";
 import { NOMINATIF_ETABLISSEMENT_TYPE } from "./seed-lib/nominatifEtablissementTypes";
 import { ARRONDISSEMENTS, SECTIONS, GROUPES_REFERENTIELS } from "./seed-lib/referentielsDeBase";
+import { clientCloisonne } from "../src/lib/dbCloisonne";
 
 // Ces vérifications ne doivent JAMAIS s'exécuter au simple IMPORT de ce
 // fichier : Next.js importe (donc évalue) chaque route API au build pour en
@@ -494,6 +495,23 @@ export async function seedDemoComplet(): Promise<void> {
     throw new Error("DEMO_DATABASE_URL manquant — le seed de démonstration ne doit jamais retomber sur DATABASE_URL.");
   }
   console.log(`Seed DÉMONSTRATION — base : ${DEMO_URL.replace(/:[^:@]+@/, ":***@")}`);
+
+  /*
+   * La base de démonstration reçoit les mêmes migrations, donc les mêmes
+   * politiques et le même déclencheur : sans département déclaré, chaque
+   * insertion est refusée. On résout le département une fois, et on remplace le
+   * client par un client cloisonné — le Proxy ci-dessus s'en servira ensuite.
+   */
+  const brut = creerClientDemo();
+  const departement = await brut.departement.findFirst({ orderBy: { code: "asc" } });
+  if (!departement) {
+    throw new Error(
+      "Aucun département dans la base de démonstration : appliquer les migrations avant le semis."
+    );
+  }
+  clientDemo = clientCloisonne(brut, departement.id);
+  console.log(`Département du semis : ${departement.code} ${departement.nom}`);
+
   await seedTerritoireEtSections();
   await seedReferentiels();
   await seedFormulaires();

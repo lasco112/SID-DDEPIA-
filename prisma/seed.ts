@@ -18,8 +18,18 @@ import bcrypt from "bcryptjs";
 import { parseDictionnaire, EVENEMENT_SCHEMAS } from "./seed-lib/parseDictionnaire";
 import { NOMINATIF_ETABLISSEMENT_TYPE } from "./seed-lib/nominatifEtablissementTypes";
 import { ARRONDISSEMENTS, SECTIONS, GROUPES_REFERENTIELS } from "./seed-lib/referentielsDeBase";
+import { clientCloisonne } from "../src/lib/dbCloisonne";
 
-const prisma = new PrismaClient();
+/*
+ * Le semis écrit dans des tables cloisonnées : sans département déclaré, chaque
+ * insertion est refusée par le déclencheur, et rien n'est lisible. `main()`
+ * remplace donc ce client par un client cloisonné dès qu'il a résolu le
+ * département — d'où le `let`.
+ *
+ * Le département lui-même n'est pas créé ici : il vient de la migration
+ * `20260815000000_departements_et_regions`, avec sa région.
+ */
+let prisma = new PrismaClient();
 
 function slugUnite(raw: string): { code: string; libelle: string } {
   const slug = raw
@@ -284,6 +294,18 @@ async function seedPeriodeOuverte() {
 
 async function main() {
   console.log("Seeding SID DDEPIA-Menoua...");
+
+  // `Departement` n'est pas une table cloisonnée : elle se lit sans réglage.
+  const departement = await prisma.departement.findFirst({ orderBy: { code: "asc" } });
+  if (!departement) {
+    throw new Error(
+      "Aucun département en base : appliquer les migrations avant le semis " +
+        "(le département et sa région sont créés par la migration des territoires)."
+    );
+  }
+  prisma = clientCloisonne(prisma, departement.id);
+  console.log(`Département du semis : ${departement.code} ${departement.nom}`);
+
   await seedTerritoireEtSections();
   await seedReferentiels();
   await seedFormulaires();
