@@ -18,6 +18,7 @@ import { liaisonDe } from "./liaison";
 import type { FournisseurValeur } from "./canevas/rendu";
 import type { ContexteCanevas } from "./canevas/types";
 import { listerArrondissements, graphieCanevas } from "../../lib/arrondissements";
+import { lireSaisiesCanevas, cleCellule, type ValeurCellule } from "./saisieCanevas";
 
 const nf = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 3 });
 
@@ -38,6 +39,11 @@ export interface DonneesRemplissage {
    * département. On apparie désormais sur le nom, quel que soit l'ordre.
    */
   codeParNom: Map<string, string>;
+  /**
+   * Les cellules saisies à la main — les treize tableaux du BAC. Vide tant que
+   * la période trimestrielle n'existe pas encore en base.
+   */
+  saisies: Map<string, ValeurCellule>;
 }
 
 /**
@@ -59,7 +65,19 @@ export async function preparer(
     (await listerArrondissements(db)).map((a) => [a.nomCanevas, a.code] as const)
   );
 
-  if (champs.length === 0) return { valeurs: vide(), valeursN1: vide(), renseignees: 0, codeParNom };
+  /*
+   * Les cellules saisies à la main, si le trimestre existe déjà en base. On ne
+   * le CRÉE pas ici : produire un aperçu ne doit pas matérialiser une période.
+   */
+  const trimestre = await db.periodeReporting.findFirst({
+    where: { type: "TRIMESTRIEL", annee: periode.annee, trimestre: periode.rang },
+    select: { id: true },
+  });
+  const saisies = trimestre ? await lireSaisiesCanevas(db, trimestre.id) : new Map<string, ValeurCellule>();
+
+  if (champs.length === 0) {
+    return { valeurs: vide(), valeursN1: vide(), renseignees: 0, codeParNom, saisies };
+  }
 
   const ranger = (agregees: ValeurAgregee[]) => {
     const m = vide();
@@ -90,7 +108,7 @@ export async function preparer(
 
   const a = ranger(courant.valeurs);
   const b = ranger(precedent);
-  return { valeurs: a.m, valeursN1: b.m, renseignees: a.n, codeParNom };
+  return { valeurs: a.m, valeursN1: b.m, renseignees: a.n, codeParNom, saisies };
 }
 
 /**
@@ -118,6 +136,19 @@ export function fournisseur(donnees: DonneesRemplissage, ctx: ContexteCanevas): 
     (n1 ? donnees.valeursN1 : donnees.valeurs).get(champ)?.get(arr) ?? null;
 
   return ({ numeroTableau, ligne, colonne }) => {
+    // Les tableaux du BAC sont saisis à la main : ils ne viennent d'aucun mois,
+    // et rien ne les alimenterait autrement. On les sert AVANT la liaison —
+    // sans conflit possible, puisqu'un tableau saisi à la main n'en a pas.
+    if (numeroTableau != null) {
+      const saisie = donnees.saisies.get(cleCellule({ numeroTableau, ligne, colonne }));
+      if (saisie) {
+        // Même format que les valeurs consolidées : le lecteur ne doit pas voir
+        // à l'œil quelles cases ont été saisies et lesquelles sont calculées.
+        if (saisie.valeur != null) return nf.format(saisie.valeur);
+        if (saisie.texte) return saisie.texte;
+      }
+    }
+
     const liaison = liaisonDe(numeroTableau);
     if (!liaison) return null;
 

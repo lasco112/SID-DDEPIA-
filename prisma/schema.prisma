@@ -66,6 +66,7 @@ model User {
   corrections        Correction[]
   syntheses          SyntheseSection[]       @relation("AuteurSynthese")
   rubriques          RubriqueNarrative[]     @relation("AuteurRubrique")
+  saisiesCanevas     SaisieCanevas[]         @relation("AuteurSaisieCanevas")
   exports            ExportDocument[]
   notifications      Notification[]
   auditLogs          AuditLog[]
@@ -99,9 +100,9 @@ model Region {
 /// Un département. Toute donnée du SID appartient à un et un seul département :
 /// c'est l'unité de cloisonnement.
 model Departement {
-  id   String @id @default(cuid())
-  code String @unique /// "MEN" pour la Menoua
-  nom  String
+  id             String  @id @default(cuid())
+  code           String  @unique /// "MEN" pour la Menoua
+  nom            String
   /// Le nom precede de son article, tel qu'il s'ecrit dans une phrase :
   /// « de la Menoua », « du Noun », « des Bamboutos ». L'article depend du nom
   /// et non d'une regle mecanique : le composer dans le code ecrirait
@@ -123,6 +124,7 @@ model Departement {
   saisieEvenements       SaisieEvenement[]
   corrections            Correction[]
   rubriqueNarratives     RubriqueNarrative[]
+  saisieCanevas          SaisieCanevas[]
   syntheseSections       SyntheseSection[]
   exportDocuments        ExportDocument[]
   notifications          Notification[]
@@ -354,12 +356,13 @@ model PeriodeReporting {
 
   clotureePar User? @relation("PeriodesCloturees", fields: [clotureeParId], references: [id])
 
-  rapports     RapportArrondissement[]
-  validations  ValidationSection[]
-  syntheses    SyntheseSection[]
-  exports      ExportDocument[]
-  assignations AssignationSaisie[]
-  rubriques    RubriqueNarrative[]
+  rapports       RapportArrondissement[]
+  validations    ValidationSection[]
+  syntheses      SyntheseSection[]
+  exports        ExportDocument[]
+  assignations   AssignationSaisie[]
+  rubriques      RubriqueNarrative[]
+  saisiesCanevas SaisieCanevas[]
 
   @@unique([type, annee, mois, trimestre, semestre])
   @@index([statut, dateLimiteDA])
@@ -665,6 +668,55 @@ model RubriqueNarrative {
   /// eux couvrent les deux cas. Voir la migration correspondante.
   @@unique([periodeId, arrondissementId, cle])
   @@index([periodeId, arrondissementId])
+}
+
+/// Une CELLULE d'un tableau du canevas, saisie directement.
+///
+/// Pourquoi ce modèle existe — et pourquoi il n'enfreint PAS l'invariant
+/// « une donnée est saisie une seule fois ».
+/// -------------------------------------------------------------------------
+/// Les treize tableaux du Bureau des Affaires Communes (n° 1 à 13 : personnel,
+/// infrastructures, matériel, budget, recettes) ne sont collectés NULLE PART
+/// ailleurs : la section BAC ne porte aucun formulaire mensuel. Ils ne se
+/// déduisent donc d'aucun mois, contrairement au cheptel ou aux abattages. Les
+/// stocker ici ne duplique rien — c'est leur seule et unique saisie.
+///
+/// L'interdiction que l'invariant pose vise une table trimestrielle PARALLÈLE
+/// qui redemanderait ce que les mois portent déjà. Ce n'est pas le cas ici.
+///
+/// La cellule est repérée par ses coordonnées DANS LE CANEVAS — numéro de
+/// tableau, libellé de ligne, libellé de colonne — et non par un champ inventé.
+/// Le canevas décrit déjà ces tableaux et sait les rendre ; il devient sa
+/// propre grille de saisie, et aucune structure ne peut diverger de lui.
+model SaisieCanevas {
+  /// Département propriétaire de cette ligne. Dénormalisé À DESSEIN : les
+  /// politiques de sécurité par ligne comparent une colonne, pas une jointure.
+  departementId String?
+  departement   Departement? @relation(fields: [departementId], references: [id])
+
+  id            String   @id @default(cuid())
+  periodeId     String
+  /// Numéro du tableau au canevas officiel (1 à 72). Ne jamais renuméroter.
+  numeroTableau Int
+  /// Libellé de ligne, tel que le canevas le nomme.
+  ligne         String
+  /// Libellé de colonne, tel que le canevas le nomme.
+  colonne       String
+  valeur        Decimal? @db.Decimal(14, 3)
+  /// Cellules non numériques du canevas (observations, noms, dates).
+  valeurTexte   String?
+  auteurId      String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  periode PeriodeReporting @relation(fields: [periodeId], references: [id])
+  auteur  User?            @relation("AuteurSaisieCanevas", fields: [auteurId], references: [id])
+
+  /// Les quatre parties de la clé sont obligatoires : contrairement aux
+  /// rubriques narratives, aucune n'est nullable, et cet index unique suffit
+  /// donc réellement — pas besoin d'index partiel.
+  @@unique([periodeId, numeroTableau, ligne, colonne])
+  @@index([periodeId, numeroTableau])
 }
 
 model SyntheseSection {
