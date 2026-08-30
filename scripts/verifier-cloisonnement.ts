@@ -17,7 +17,7 @@ const db = new PrismaClient();
 const CLOISONNEES = [
   "Arrondissement", "PeriodeReporting", "User", "Etablissement", "AssignationSaisie",
   "RapportArrondissement", "ValidationSection", "SaisieMatrice", "SaisieNominative",
-  "SaisieEvenement", "Correction", "RubriqueNarrative", "SaisieCanevas", "SyntheseSection",
+  "SaisieEvenement", "Correction", "RubriqueNarrative", "SaisieCanevas", "AppelIA", "SyntheseSection",
   "ExportDocument", "Notification", "AbonnementPush", "PointSIG", "AuditLog", "DemandeAide",
 ];
 

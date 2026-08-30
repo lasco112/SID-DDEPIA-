@@ -125,6 +125,7 @@ model Departement {
   corrections            Correction[]
   rubriqueNarratives     RubriqueNarrative[]
   saisieCanevas          SaisieCanevas[]
+  appelsIA               AppelIA[]
   syntheseSections       SyntheseSection[]
   exportDocuments        ExportDocument[]
   notifications          Notification[]
@@ -717,6 +718,60 @@ model SaisieCanevas {
   /// donc réellement — pas besoin d'index partiel.
   @@unique([periodeId, numeroTableau, ligne, colonne])
   @@index([periodeId, numeroTableau])
+}
+
+/// Un appel à l'assistance rédactionnelle, et ce qu'il en est advenu.
+///
+/// Une seule table, proportionnée (étude § 8). Elle conserve les RÉFÉRENCES des
+/// faits, pas les données : reproductible sans être redondant.
+///
+/// Deux durées de conservation, à ne pas confondre : `sortieBrute` porte de la
+/// donnée et s'efface au bout de 30 jours ; le reste est permanent — quelques
+/// centaines d'octets par appel, quelques centaines d'appels par an.
+model AppelIA {
+  /// Département propriétaire de cette ligne. Dénormalisé À DESSEIN : les
+  /// politiques de sécurité par ligne comparent une colonne, pas une jointure.
+  departementId String?
+  departement   Departement? @relation(fields: [departementId], references: [id])
+
+  id        String   @id @default(cuid())
+  userId    String?
+  createdAt DateTime @default(now())
+
+  /// Quelle fonction d'assistance : mise en forme, regroupement, reformulation…
+  fonction      String
+  /// Un changement de modèle ou de version change les sorties : sans ces
+  /// colonnes, on ne saurait pas expliquer pourquoi le texte d'hier diffère.
+  modele        String
+  versionModele String?
+  versionPrompt String
+
+  /// Les identifiants des faits soumis — les références, pas les valeurs.
+  faitIds         String[]
+  /// SHA-256 des faits : prouve que l'entrée n'a pas changé depuis.
+  empreinteEntree String
+
+  /// Ce que le modèle a répondu. EFFACÉ au bout de 30 jours (il porte de la
+  /// donnée). Null signifie « purgé », pas « vide ».
+  sortieBrute String? @db.Text
+
+  /// Verdict des garde-fous. Absent de l'étude, ajouté ici : sans lui, on ne
+  /// saurait pas si un texte a été écarté, ni pourquoi — c'est précisément ce
+  /// qu'il faudra montrer à la hiérarchie.
+  retenu     Boolean
+  motifRejet String?
+
+  /// Ce que l'humain a finalement validé.
+  texteValide      String?  @db.Text
+  /// LA mesure la plus utile : si le Délégué réécrit neuf textes sur dix, la
+  /// fonction ne fait pas gagner de temps et doit être retirée. Sans cette
+  /// colonne, personne ne le saura jamais.
+  modifieParHumain Boolean?
+
+  exportDocumentId String?
+
+  @@index([createdAt])
+  @@index([fonction, retenu])
 }
 
 model SyntheseSection {

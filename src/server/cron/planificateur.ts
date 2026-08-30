@@ -38,6 +38,7 @@ import cron from "node-cron";
 import type { PrismaClient } from "@prisma/client";
 import { db } from "@/lib/db";
 import { clientCloisonne } from "@/lib/dbCloisonne";
+import { purgerSortiesBrutes } from "@/server/redaction/journal";
 import { rappelJ1DA, verrouillageEtAlerteRetardDA, alerteRetardSections, rappelClotureDD } from "@/server/cron/triggers";
 
 let demarre = false;
@@ -145,6 +146,27 @@ export async function verifierRelances(maintenant: Date = new Date()): Promise<v
         // Pas de marqueur : la relance sera retentée à l'heure suivante, et les
         // départements suivants sont traités malgré cet échec.
       }
+    }
+  }
+
+  /*
+   * L'entretien des sorties brutes de l'assistance rédactionnelle : elles
+   * portent de la donnée et ne se conservent que trente jours.
+   *
+   * Ici plutôt que dans une tâche à part : le passage horaire existe déjà, il
+   * est éprouvé, et il tourne dans le processus de l'application. Ajouter un
+   * ordonnanceur pour une requête par heure serait de l'infrastructure pour
+   * rien. Un échec est avalé — un ménage manqué ne doit pas empêcher une
+   * relance de partir.
+   */
+  for (const departement of departements) {
+    try {
+      // Département par département, comme les relances : `AppelIA` est une
+      // table cloisonnée, et purger avec le client nu ne verrait AUCUNE ligne —
+      // le ménage n'aurait jamais lieu, sans que rien ne le signale.
+      await purgerSortiesBrutes(clientCloisonne(db, departement.id), maintenant);
+    } catch (e) {
+      console.error(`[assistance] purge des sorties brutes (${departement.code}) :`, e);
     }
   }
 }
