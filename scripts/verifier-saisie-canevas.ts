@@ -21,6 +21,7 @@ import {
   cleCellule,
 } from "../src/server/trimestre/saisieCanevas";
 import { periodeTrimestrielle } from "../src/server/trimestre/rubriques";
+import { grillesBac } from "../src/server/trimestre/grilleBac";
 import { genererRapportCanevas } from "../src/server/trimestre/rapportCanevas";
 import { trimestrielle } from "../src/server/periodes/calendrier";
 
@@ -77,6 +78,24 @@ async function principal() {
 
     const parTableau = await compterSaisiesParTableau(base, periodeId);
     dire("le compteur du tableau 13 la voit", parTableau.get(13) === 1);
+
+    // --- La clé doit être écrivable en base ----------------------------------
+    // Le séparateur avait été saisi comme un caractère NUL invisible : la clé
+    // servait de repère en mémoire sans qu'on s'en aperçoive, mais PostgreSQL
+    // refuse 0x00 et la trace d'audit échouait — après l'écriture, donc en
+    // laissant la cellule enregistrée et l'écran en erreur.
+    console.log("\nLa clé d'une cellule");
+    const cle = cleCellule(CELLULE);
+    dire(`elle est lisible — « ${cle} »`, /^\d+ \| .+ \| .+$/.test(cle));
+    dire(
+      "elle ne contient aucun caractère de contrôle, que la base refuserait",
+      // eslint-disable-next-line no-control-regex
+      !/[\u0000-\u001f]/.test(cle)
+    );
+
+    const grilles = await grillesBac(base, periode, await lireSaisiesCanevas(base, periodeId));
+    const g13 = grilles.find((g) => g.numero === 13);
+    dire("le compteur de la grille voit la cellule saisie", g13?.renseignees === 1);
 
     // --- Elle ressort dans le document ---------------------------------------
     console.log("\nDans le rapport produit");

@@ -111,6 +111,11 @@ export default async function DashboardPage() {
     actions.push({ href: "/section/controle", glyph: "⊞", label: "Vue croisée de contrôle", sub: "Comparer les 6 arrondissements" });
     actions.push({ href: "/section/analyse", glyph: "✎", label: "Rédiger la synthèse", sub: "Analyse qualitative de la section" });
   }
+  // Les treize tableaux administratifs ne sont collectés nulle part ailleurs :
+  // sans cette saisie, ils sortent vides du rapport trimestriel.
+  if (role === "CHEF_BAC" || role === "DD") {
+    actions.push({ href: "/section/bac", glyph: "▦", label: "Tableaux du BAC", sub: "Personnel, budget, recettes, infrastructures" });
+  }
 
   return (
     <AppShell>
