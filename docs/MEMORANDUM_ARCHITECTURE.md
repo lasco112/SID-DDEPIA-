@@ -351,6 +351,25 @@ tel quel — c'est un identifiant technique, pas un libellé affiché.
 - **Les treize tableaux du BAC** : personnel, infrastructures, budget, recettes.
   Sont-ils collectés dans le SID, ou rédigés hors système ?
 
+- **Les cinq contrôles croisés bloquants ne sont pas calculables** — constat
+  vérifié, pas une estimation. `CLAUDE.md` pose qu'« aucune génération n'est
+  possible tant que ces contrôles échouent ». Or, sur les tableaux qu'ils
+  mettent en rapport, seuls **69, 24, 29 et 59** sont alimentés par une liaison
+  (13 tableaux liés sur 72) :
+
+  | Contrôle | Tableaux nécessaires | Manquants |
+  |---|---|---|
+  | 69 = 16+24+29+39+45 | 69, 16, 24, 29, 39, 45 | **16, 39, 45** |
+  | 70 ≤ 69 | 70, 69 | **70** |
+  | 48 ≤ 47 | 47, 48 | **47, 48** |
+  | 60 ≤ 59 | 59, 60 | **60** |
+  | 13 : lignes = colonnes | 13 | **13** (tableau BAC) |
+
+  Écrire le moteur de contrôles aujourd'hui produirait cinq contrôles rendant
+  tous « non calculable » — et l'apparence d'un invariant tenu. Le préalable
+  n'est pas du code : c'est la **collecte** de ces tableaux, dont le n° 13
+  dépend directement de la question du BAC ci-dessus.
+
 ---
 
 *Document de travail interne. Les vérifications techniques qui le fondent sont
