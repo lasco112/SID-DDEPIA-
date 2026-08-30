@@ -17,7 +17,7 @@ import { NextResponse } from "next/server";
 import { requireUser, assertRole, permissionErrorResponse } from "@/lib/permissions";
 import { trimestrielle, libelleOfficiel, libelleCourt, memePeriodeAnneePrecedente } from "@/server/periodes/calendrier";
 import { inspecterPeriode, PeriodeNonCalculableError } from "@/server/trimestre/agregation";
-import { genererRapportCanevas } from "@/server/trimestre/rapportCanevas";
+import { genererRapportCanevas, ControlesCroisesError } from "@/server/trimestre/rapportCanevas";
 import { archiverRapportTrimestriel } from "@/server/trimestre/archivage";
 import { rassembler } from "@/server/trimestre/rapport-docx";
 import type { PrismaClient } from "@prisma/client";
@@ -164,6 +164,11 @@ export async function POST(req: Request) {
   } catch (e) {
     if (e instanceof PeriodeNonCalculableError) {
       return NextResponse.json({ message: e.message, etat: e.etat }, { status: 409 });
+    }
+    // Un contrôle croisé du canevas a constaté une incohérence : ce n'est pas
+    // une panne mais un refus motivé, et le Délégué doit lire quoi corriger.
+    if (e instanceof ControlesCroisesError) {
+      return NextResponse.json({ message: e.message }, { status: 409 });
     }
     const { status, message } = permissionErrorResponse(e);
     return NextResponse.json({ message }, { status });
