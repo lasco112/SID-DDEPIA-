@@ -25,6 +25,12 @@ import { TEXTES_FIXES } from "./canevas/textesFixes";
 import { TEXTES_ARRONDISSEMENTS } from "./canevas/textesArrondissements";
 import type { ContexteCanevas, SectionCanevas } from "./canevas/types";
 import { identiteDepartement } from "@/lib/departement";
+import { passerControles, messageBlocage } from "./controles";
+
+/** Un contrôle croisé du canevas a constaté une incohérence : on ne produit pas. */
+export class ControlesCroisesError extends Error {
+  name = "ControlesCroisesError";
+}
 import { champsMobilises, bilanLiaisons } from "./liaison";
 import { lireRubriques } from "./rubriques";
 import { preparer, fournisseur } from "./remplissage";
@@ -144,6 +150,27 @@ export async function genererRapportCanevas(
     arrondissement: options.arrondissement,
     departement: { nomAvecArticle: identite.nomAvecArticle, sigle: identite.sigle },
   };
+
+  /*
+   * Les contrôles croisés du canevas (CDC) : « aucune génération n'est possible
+   * tant que ces contrôles échouent ». Un contrôle NON CALCULABLE ne bloque
+   * pas — il n'a rien constaté ; seul un contrôle qui a vu une incohérence
+   * arrête la production. Le rapport d'un arrondissement n'y est pas soumis :
+   * ces contrôles portent sur des tableaux départementaux.
+   */
+  const trimestreExistant = await db.periodeReporting.findFirst({
+    where: { type: "TRIMESTRIEL", annee: periode.annee, trimestre: periode.rang },
+    select: { id: true },
+  });
+  const controles = options.arrondissement
+    ? null
+    : await passerControles(db, periode, trimestreExistant?.id ?? null, ctx.mois, [
+        "DDEPIA",
+        ...tous.map((a) => a.nom),
+      ]);
+  if (controles && controles.violations.length > 0) {
+    throw new ControlesCroisesError(messageBlocage(controles));
+  }
 
   const donnees = await preparer(db, periode, champsMobilises(), {
     autoriserIncomplet: options.autoriserIncomplet,

@@ -365,9 +365,31 @@ tel quel — c'est un identifiant technique, pas un libellé affiché.
   aux n° 1 à 13, et saisir un tableau alimenté par les mois est refusé
   explicitement, au motif de la double saisie.
 
-- **Les cinq contrôles croisés bloquants ne sont pas calculables** — constat
-  vérifié, pas une estimation. `CLAUDE.md` pose qu'« aucune génération n'est
-  possible tant que ces contrôles échouent ». Or, sur les tableaux qu'ils
+- **Les contrôles croisés : le moteur existe, la donnée manque pour trois d'entre eux.**
+  `CLAUDE.md` pose qu'« aucune génération n'est possible tant que ces contrôles
+  échouent ». C'est désormais tenu — `src/server/trimestre/controles.ts` refuse
+  de produire le rapport trimestriel départemental quand un contrôle constate
+  une incohérence, avec le motif chiffré.
+
+  Ce que le moteur sait faire, vérifié champ par champ :
+
+  | Contrôle | État |
+  |---|---|
+  | 13 : lignes = colonnes | **calculable** — le seul qui puisse échouer, car il porte sur la saisie manuelle du chef BAC |
+  | 69 = 16+24+29+39+45 | calculable, mais les cinq tableaux tirent des **mêmes** champs `T21_ABAT_*` : il ne peut pas diverger tant que 16, 39 et 45 n'ont pas leur collecte par catégorie |
+  | 70 ≤ 69 | **non calculable** — les lésions décelées ne sont pas collectées ; le SID porte les SAISIES (`T34_SAISIE_*`), autre donnée |
+  | 48 ≤ 47 | **non calculable** — les œufs commercialisés ne sont pas collectés ; seul `T14_OEUFS_PRODUITS` existe |
+  | 60 ≤ 59 | **non calculable** — les ventes de poisson ne sont pas collectées ; les 186 champs de vente portent tous sur le bétail (`T51_*`) |
+
+  Un contrôle non calculable est déclaré comme tel, **jamais compté comme
+  respecté** : le confondre donnerait l'assurance d'une vérification qui n'a
+  jamais eu lieu. Il ne bloque pas non plus — il n'a rien constaté.
+
+  **Ce n'est pas une liaison qui manque, c'est la collecte.** Combler les trois
+  suppose de nouveaux champs MENSUELS, donc de toucher au module en production.
+  Ce n'est pas une décision de code.
+
+  Constat initial conservé pour mémoire : sur les tableaux que ces contrôles
   mettent en rapport, seuls **69, 24, 29 et 59** sont alimentés par une liaison
   (13 tableaux liés sur 72) :
 
