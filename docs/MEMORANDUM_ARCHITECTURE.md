@@ -348,8 +348,22 @@ tel quel — c'est un identifiant technique, pas un libellé affiché.
   valeurs consolidées du département : la DREPIA a les deux sans qu'aucun accès
   ne soit ouvert. Rouvrir la question supposerait une maille « région » et son
   propre test d'intrusion.
-- **Les treize tableaux du BAC** : personnel, infrastructures, budget, recettes.
-  Sont-ils collectés dans le SID, ou rédigés hors système ?
+- ~~**Les treize tableaux du BAC**~~ — **tranché : ils sont saisis dans le SID.**
+  Livré. La section BAC ne portait aucun formulaire : le chef BAC n'avait rien à
+  saisir, et les tableaux n° 1 à 13 sortaient vides du rapport trimestriel sans
+  que rien ne le signale. Le lot 7 n'était donc clos que pour les DA.
+
+  Le chef BAC saisit désormais **les cellules du canevas lui-même** — numéro de
+  tableau, libellé de ligne, libellé de colonne. Le canevas décrivait déjà ces
+  tableaux et savait les rendre ; il devient sa propre grille de saisie, et
+  aucune structure parallèle ne peut diverger de lui. La colonne **DDEPIA** — la
+  régie départementale, qui n'est pas un arrondissement et n'avait aucune place
+  dans `RapportArrondissement` — est ainsi couverte sans cas particulier.
+
+  Cela n'enfreint pas « une donnée est saisie une seule fois » : ces données ne
+  se déduisent d'aucun mois. La liste des tableaux saisissables est **fermée**
+  aux n° 1 à 13, et saisir un tableau alimenté par les mois est refusé
+  explicitement, au motif de la double saisie.
 
 - **Les cinq contrôles croisés bloquants ne sont pas calculables** — constat
   vérifié, pas une estimation. `CLAUDE.md` pose qu'« aucune génération n'est
@@ -363,12 +377,16 @@ tel quel — c'est un identifiant technique, pas un libellé affiché.
   | 70 ≤ 69 | 70, 69 | **70** |
   | 48 ≤ 47 | 47, 48 | **47, 48** |
   | 60 ≤ 59 | 59, 60 | **60** |
-  | 13 : lignes = colonnes | 13 | **13** (tableau BAC) |
+  | 13 : lignes = colonnes | 13 | *aucun* — **débloqué par le lot BAC** |
 
-  Écrire le moteur de contrôles aujourd'hui produirait cinq contrôles rendant
-  tous « non calculable » — et l'apparence d'un invariant tenu. Le préalable
-  n'est pas du code : c'est la **collecte** de ces tableaux, dont le n° 13
-  dépend directement de la question du BAC ci-dessus.
+  Le n° 13 est désormais collecté : son contrôle devient calculable. **Les quatre
+  autres restent bloqués** — les tableaux 16, 39, 45, 70, 47, 48 et 60 sont des
+  tableaux PSA/SSV, alimentés par les rapports mensuels, et leur liaison n'est
+  pas écrite (13 tableaux liés sur 72).
+
+  Écrire le moteur aujourd'hui produirait donc un contrôle calculable et quatre
+  « non calculable » — et l'apparence d'un invariant tenu. Le préalable n'est
+  pas du code : c'est l'écriture des liaisons manquantes.
 
 ---
 
