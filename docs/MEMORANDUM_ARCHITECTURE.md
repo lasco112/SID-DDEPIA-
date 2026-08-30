@@ -232,7 +232,34 @@ Ce qui suit a été éprouvé par des tests automatiques, pas seulement annoncé
 | 19 | Modèles Département et Région, cloisonnement de chaque requête | fait — politiques posées et éprouvées |
 | 9 | Retirer les arrondissements codés en dur du module mensuel | fait |
 | 15 | Sortir le nom du département du code | fait — voir réserve ci-dessous |
-| 16 | Export consolidé destiné au niveau régional | à faire |
+| 16 | Export consolidé destiné au niveau régional | fait |
+
+#### Lot 16 — la DREPIA reçoit un document, elle ne consulte pas le SID
+
+**Décision prise, et elle ferme une question ouverte du §9.** Le canevas
+régional est semestriel et sa colonne territoriale porte les huit départements.
+La DDEPIA produit donc SA contribution — ses valeurs consolidées du semestre —
+et la transmet. **Aucun rôle régional n'est créé, aucune politique de
+cloisonnement n'est rouverte** : un département ne voit toujours que lui-même.
+
+C'est la lecture littérale de l'intitulé — « export **destiné au** niveau
+régional » — et la seule qui ne défasse pas ce que les lots 18 et 19 ont posé et
+éprouvé. Le jour où la DREPIA voudra consulter en ligne, ce sera un chantier
+distinct, avec sa propre maille de cloisonnement (la région) et son test
+d'intrusion.
+
+**Un semestre ne se somme pas.** Il n'a aucune saisie propre : ses valeurs se
+calculent depuis les six mois, et surtout pas toutes par addition. Un cheptel
+sommé sur six mois serait multiplié par six, dans un document paraissant
+normal, transmis au MINEPIA. L'export passe donc par le moteur d'agrégation,
+qui applique à chaque champ sa règle explicite. Le contrôle rejouable vérifie
+sur 40 indicateurs de stock qu'aucun n'est la somme de ses mois.
+
+Le document porte une colonne **« Règle »** : le lecteur régional voit si une
+valeur est une somme des six mois ou un état de fin de période. Une période
+incomplète est refusée avec la liste des mois manquants ; la génération sous
+réserve reste possible, et le document porte alors la mention DOCUMENT
+PROVISOIRE, jusque dans son nom de fichier.
 
 #### Lot 9 — ce qui est fait, et ce qui ne l'est pas
 
@@ -315,9 +342,12 @@ tel quel — c'est un identifiant technique, pas un libellé affiché.
 
 ## 9. Ce qui reste à trancher
 
-- **Le rôle régional** : la DREPIA consulte-t-elle le détail par arrondissement,
-  ou seulement les valeurs consolidées de chaque département ? La réponse change
-  l'étendue du cloisonnement à écrire.
+- ~~**Le rôle régional**~~ — **tranché au lot 16** : la DREPIA reçoit un
+  document, elle ne consulte pas le SID. Le cloisonnement n'a donc pas été
+  élargi. Le document transmis porte le détail par arrondissement *et* les
+  valeurs consolidées du département : la DREPIA a les deux sans qu'aucun accès
+  ne soit ouvert. Rouvrir la question supposerait une maille « région » et son
+  propre test d'intrusion.
 - **Les treize tableaux du BAC** : personnel, infrastructures, budget, recettes.
   Sont-ils collectés dans le SID, ou rédigés hors système ?
 
