@@ -24,6 +24,7 @@ import { rendreSection, champsAutomatiques } from "./canevas/rendu";
 import { TEXTES_FIXES } from "./canevas/textesFixes";
 import { TEXTES_ARRONDISSEMENTS } from "./canevas/textesArrondissements";
 import type { ContexteCanevas, SectionCanevas } from "./canevas/types";
+import { identiteDepartement } from "@/lib/departement";
 import { champsMobilises, bilanLiaisons } from "./liaison";
 import { lireRubriques } from "./rubriques";
 import { preparer, fournisseur } from "./remplissage";
@@ -118,6 +119,7 @@ export async function genererRapportCanevas(
     arrondissement?: string;
   } = {}
 ): Promise<RapportProduit> {
+  const identite = await identiteDepartement(db);
   const tous = await arrondissementsDe(db);
   const sien = options.arrondissement
     ? tous.find((a) => a.nom === options.arrondissement)
@@ -140,6 +142,7 @@ export async function genererRapportCanevas(
     mois: moisDeLaPeriode(periode).map((m) => MOIS_MAJ[m.mois - 1]),
     arrondissements: sien ? [sien.nom] : tous.map((a) => a.nom),
     arrondissement: options.arrondissement,
+    departement: { nomAvecArticle: identite.nomAvecArticle, sigle: identite.sigle },
   };
 
   const donnees = await preparer(db, periode, champsMobilises(), {
@@ -160,7 +163,7 @@ export async function genererRapportCanevas(
     centre(
       options.arrondissement
         ? `DÉLÉGATION D’ARRONDISSEMENT DE L’ÉLEVAGE, DES PÊCHES ET DES INDUSTRIES ANIMALES DE ${options.arrondissement.toUpperCase()}`
-        : "DÉLÉGATION DÉPARTEMENTALE DE L’ÉLEVAGE, DES PÊCHES ET DES INDUSTRIES ANIMALES DE LA MENOUA",
+        : identite.intituleOfficiel,
       18
     ),
     new Paragraph({ text: "" }),
@@ -274,7 +277,7 @@ export async function genererRapportCanevas(
   const buffer = Buffer.from(await Packer.toBuffer(document));
   const qui = options.arrondissement
     ? `DAEPIA-${options.arrondissement.replace(/[ ’']/g, "")}`
-    : "DDEPIA-Menoua";
+    : identite.sigle;
   const nomFichier =
     `Rapport_${libelleCourt(periode).replace(/\s/g, "")}_${qui}` +
     `${provisoire ? "_BROUILLON" : ""}.docx`;

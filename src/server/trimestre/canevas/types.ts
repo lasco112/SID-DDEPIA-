@@ -32,7 +32,24 @@ export interface ContexteCanevas {
    * « DU DÉPARTEMENT DE LA MENOUA » devient « DE L'ARRONDISSEMENT DE DSCHANG ».
    */
   arrondissement?: string;
+  /**
+   * Le département dont on produit le rapport. Le canevas est écrit avec les
+   * intitulés de la Menoua — c'est le document officiel qui fait foi — et le
+   * rendu y transpose le territoire, exactement comme il le fait déjà pour un
+   * arrondissement. Le mémorandum l'autorise expressément : « seules la période
+   * et la maille géographique sont transposées ».
+   */
+  departement?: { nomAvecArticle: string; sigle: string };
 }
+
+/*
+ * Les intitulés du canevas de référence qui désignent le territoire. Ce sont
+ * ceux de la Menoua, puisque c'est le document officiel dont le SID part.
+ * Ils servent de POINT D'ANCRAGE à la transposition — ils ne sont pas une
+ * préférence pour la Menoua.
+ */
+const REFERENCE_DEPARTEMENT = "DE LA MENOUA";
+const REFERENCE_SIGLE = "DDEPIA-MENOUA";
 
 /**
  * Transpose un titre départemental au niveau d'un arrondissement.
@@ -42,7 +59,19 @@ export interface ContexteCanevas {
  */
 export function adapterTitre(texte: string, ctx: ContexteCanevas): string {
   const arr = ctx.arrondissement;
-  if (!arr) return texte;
+
+  if (!arr) {
+    // Rapport départemental : on transpose le territoire du canevas de
+    // référence vers celui du département traité. Pour la Menoua, la
+    // substitution rend le texte inchangé — c'est ce que vérifie le test de
+    // conformité au canevas.
+    const d = ctx.departement;
+    if (!d) return texte;
+    return texte
+      .split(REFERENCE_SIGLE).join(d.sigle.toUpperCase())
+      .split(REFERENCE_DEPARTEMENT).join(d.nomAvecArticle.toUpperCase());
+  }
+
   const MAJ = arr.toUpperCase();
   return texte
     .replace(/DU DÉPARTEMENT DE LA MENOUA/gi, `DE L'ARRONDISSEMENT DE ${MAJ}`)

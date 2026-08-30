@@ -66,8 +66,6 @@ const prisma = new PrismaClient();
 let ARR_CODES: string[] = [];
 let ARR_NOMS: Record<string, string> = {};
 
-/** Le département dont on fabrique les gabarits. */
-const DEPARTEMENT = process.env.DEPARTEMENT_GABARITS ?? "dep_menoua";
 
 function cell(text: string, opts: { bold?: boolean; width?: number } = {}): TableCell {
   return new TableCell({
@@ -748,37 +746,64 @@ function buildDocExact(templates: Awaited<ReturnType<typeof chargerTemplates>>):
 }
 
 async function main() {
-  /*
-   * `Arrondissement` est une table cloisonnée : sans département déclaré, la
-   * lecture ne rendrait RIEN et l'on fabriquerait des tableaux sans une seule
-   * ligne de territoire — un gabarit vide, d'apparence normale. D'où le client
-   * cloisonné, et l'échec franc juste en dessous.
-   */
-  const arrondissements = await listerArrondissements(clientCloisonne(prisma, DEPARTEMENT));
-  if (arrondissements.length === 0) {
-    throw new Error(
-      `Aucun arrondissement lu pour le département « ${DEPARTEMENT} ». ` +
-        "Les gabarits seraient produits sans aucune ligne de territoire."
-    );
-  }
-  ARR_CODES = arrondissements.map((a) => a.code);
-  ARR_NOMS = Object.fromEntries(arrondissements.map((a) => [a.code, a.nomCanevas]));
-  console.log(`Arrondissements lus (${DEPARTEMENT}) : ${ARR_CODES.join(", ")}`);
-
   const templates = await chargerTemplates();
   const outDir = path.join(process.cwd(), "templates");
   await fs.mkdir(outDir, { recursive: true });
 
-  const dd = buildDoc("DD", templates);
-  await fs.writeFile(path.join(outDir, "rapport_mensuel_DD.docx"), await Packer.toBuffer(dd));
+  /*
+   * UN JEU DE GABARITS PAR DÉPARTEMENT.
+   *
+   * Les tableaux du canevas portent une ligne par arrondissement, avec son nom
+   * et des repères `{CHAMP_DSC}`. Un fichier unique aurait donc servi à tout le
+   * monde les lignes de la Menoua — et vides chez le voisin, dont les
+   * arrondissements portent d'autres codes.
+   *
+   * `DEPARTEMENT_GABARITS` permet de n'en refaire qu'un seul ; sans elle, on
+   * les refait tous.
+   */
+  const voulus = process.env.DEPARTEMENT_GABARITS;
+  const departements = await prisma.departement.findMany({
+    where: voulus ? { OR: [{ id: voulus }, { code: voulus }] } : undefined,
+    orderBy: { code: "asc" },
+  });
+  if (departements.length === 0) {
+    throw new Error(
+      voulus
+        ? `Département « ${voulus} » introuvable.`
+        : "Aucun département en base : appliquer les migrations avant de fabriquer les gabarits."
+    );
+  }
 
-  const da = buildDoc("DA", templates);
-  await fs.writeFile(path.join(outDir, "rapport_mensuel_DA.docx"), await Packer.toBuffer(da));
+  for (const departement of departements) {
+    /*
+     * `Arrondissement` est une table cloisonnée : sans département déclaré, la
+     * lecture ne rendrait RIEN et l'on fabriquerait des tableaux sans une seule
+     * ligne de territoire — un gabarit vide, d'apparence normale. D'où le
+     * client cloisonné, et l'échec franc juste en dessous.
+     */
+    const arrondissements = await listerArrondissements(clientCloisonne(prisma, departement.id));
+    if (arrondissements.length === 0) {
+      throw new Error(
+        `Aucun arrondissement pour « ${departement.code} ». ` +
+          "Les gabarits seraient produits sans aucune ligne de territoire."
+      );
+    }
+    ARR_CODES = arrondissements.map((a) => a.code);
+    ARR_NOMS = Object.fromEntries(arrondissements.map((a) => [a.code, a.nomCanevas]));
 
-  const exact = buildDocExact(templates);
-  await fs.writeFile(path.join(outDir, "rapport_mensuel_exact.docx"), await Packer.toBuffer(exact));
+    const produits: string[] = [];
+    for (const [modele, document] of [
+      ["rapport_mensuel_DD", buildDoc("DD", templates)],
+      ["rapport_mensuel_DA", buildDoc("DA", templates)],
+      ["rapport_mensuel_exact", buildDocExact(templates)],
+    ] as const) {
+      const nom = `${modele}_${departement.code}.docx`;
+      await fs.writeFile(path.join(outDir, nom), await Packer.toBuffer(document));
+      produits.push(nom);
+    }
 
-  console.log("Templates générés : rapport_mensuel_DD.docx, rapport_mensuel_DA.docx, rapport_mensuel_exact.docx");
+    console.log(`${departement.code} (${ARR_CODES.join(", ")}) → ${produits.join(", ")}`);
+  }
 }
 
 main()

@@ -12,9 +12,9 @@ import type { TableauThematique } from "./rapport-thematique";
 // ---------------------------------------------------------------------------
 // XLSX — un onglet par tableau retenu.
 // ---------------------------------------------------------------------------
-export async function rendreThematiqueXlsx(tableaux: TableauThematique[], titreGeneral: string): Promise<Buffer> {
+export async function rendreThematiqueXlsx(tableaux: TableauThematique[], titreGeneral: string, application: string): Promise<Buffer> {
   const wb = new ExcelJS.Workbook();
-  wb.creator = "SID DDEPIA-Menoua";
+  wb.creator = application;
   wb.created = new Date();
 
   const meta = wb.addWorksheet("LISEZ-MOI");

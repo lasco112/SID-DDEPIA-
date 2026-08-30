@@ -5,6 +5,7 @@
 import { NextResponse } from "next/server";
 import { requireUser, assertRole, permissionErrorResponse } from "@/lib/permissions";
 import { genererExportDrepia } from "@/server/export/drepia-xlsx";
+import { identiteDepartement } from "@/lib/departement";
 import fs from "node:fs/promises";
 import path from "node:path";
 import crypto from "node:crypto";
@@ -21,11 +22,12 @@ export async function GET(req: Request) {
     const periode = await user.db.periodeReporting.findUnique({ where: { id: periodeId } });
     if (!periode) return NextResponse.json({ message: "Période introuvable" }, { status: 404 });
 
+    const identite = await identiteDepartement(user.db);
     const buf = await genererExportDrepia(user.db, periodeId);
     const hash = crypto.createHash("sha256").update(buf).digest("hex");
 
     const version = (await user.db.exportDocument.count({ where: { periodeId, type: "EXPORT_DREPIA_XLSX" } })) + 1;
-    const fileName = `Export_DREPIA_Menoua_${periode.annee}-${String(periode.mois ?? 0).padStart(2, "0")}_v${version}.xlsx`;
+    const fileName = `Export_DREPIA_${identite.nom}_${periode.annee}-${String(periode.mois ?? 0).padStart(2, "0")}_v${version}.xlsx`;
     const outDir = path.join(process.cwd(), "storage", "exports");
     await fs.mkdir(outDir, { recursive: true });
     const outPath = path.join(outDir, fileName);

@@ -14,6 +14,7 @@
  */
 import type { PrismaClient } from "@prisma/client";
 import { notifier } from "@/server/notifications/dispatcher";
+import { identiteDepartement } from "@/lib/departement";
 
 async function periodeMensuelleCourante(db: PrismaClient) {
   const now = new Date();
@@ -38,6 +39,9 @@ async function periodeMensuellePrecedente(db: PrismaClient) {
 }
 
 export async function rappelJ1DA(db: PrismaClient) {
+  // Le service qui signe le message est celui du département traité, et non
+  // « Menoua » pour tout le monde.
+  const identite = await identiteDepartement(db);
   const periode = await periodeMensuelleCourante(db);
   if (!periode || periode.statut !== "OUVERTE") return { notifies: 0 };
 
@@ -52,7 +56,7 @@ export async function rappelJ1DA(db: PrismaClient) {
         telephone: da.telephone,
         whatsapp: da.whatsapp,
         declencheur: "RAPPEL_J-1",
-        message: `MINEPIA DDEPIA-Menoua : rappel. La soumission des données mensuelles de ${da.arrondissement?.nom ?? "votre arrondissement"} est attendue au plus tard le 28. Merci de finaliser la saisie et de synchroniser.`,
+        message: `${identite.expediteur} : rappel. La soumission des données mensuelles de ${da.arrondissement?.nom ?? "votre arrondissement"} est attendue au plus tard le 28. Merci de finaliser la saisie et de synchroniser.`,
       });
       notifies++;
     }
@@ -61,6 +65,7 @@ export async function rappelJ1DA(db: PrismaClient) {
 }
 
 export async function verrouillageEtAlerteRetardDA(db: PrismaClient) {
+  const identite = await identiteDepartement(db);
   const periode = await periodeMensuelleCourante(db);
   if (!periode || periode.statut !== "OUVERTE") return { verrouille: false, notifies: 0 };
   // Le DD peut repousser dateLimiteDA (report d'échéance pour tout le monde) : dans ce
@@ -83,7 +88,7 @@ export async function verrouillageEtAlerteRetardDA(db: PrismaClient) {
         telephone: da.telephone,
         whatsapp: da.whatsapp,
         declencheur: "RETARD_DA",
-        message: `MINEPIA DDEPIA-Menoua : le délai de soumission du rapport mensuel est dépassé. Votre formulaire est verrouillé. Contactez le Délégué Départemental pour un déverrouillage exceptionnel et synchronisez vos données dès que possible.`,
+        message: `${identite.expediteur} : le délai de soumission du rapport mensuel est dépassé. Votre formulaire est verrouillé. Contactez le Délégué Départemental pour un déverrouillage exceptionnel et synchronisez vos données dès que possible.`,
       });
       notifies++;
     }
@@ -92,6 +97,7 @@ export async function verrouillageEtAlerteRetardDA(db: PrismaClient) {
 }
 
 export async function alerteRetardSections(db: PrismaClient) {
+  const identite = await identiteDepartement(db);
   const periode = await periodeMensuelleCourante(db);
   if (!periode) return { notifies: 0 };
 
@@ -119,7 +125,7 @@ export async function alerteRetardSections(db: PrismaClient) {
           telephone: chef.telephone,
           whatsapp: chef.whatsapp,
           declencheur: "RETARD_SECTION",
-          message: `MINEPIA DDEPIA-Menoua : la validation sectorielle (${v.section.code}) du mois n'est pas finalisée. Merci de contrôler les données des arrondissements et de transmettre vos analyses au Délégué Départemental.`,
+          message: `${identite.expediteur} : la validation sectorielle (${v.section.code}) du mois n'est pas finalisée. Merci de contrôler les données des arrondissements et de transmettre vos analyses au Délégué Départemental.`,
         });
         notifies++;
       }
@@ -129,6 +135,7 @@ export async function alerteRetardSections(db: PrismaClient) {
 }
 
 export async function rappelClotureDD(db: PrismaClient) {
+  const identite = await identiteDepartement(db);
   const periode = await periodeMensuellePrecedente(db);
   if (!periode) return { notifies: 0 };
 
@@ -144,7 +151,7 @@ export async function rappelClotureDD(db: PrismaClient) {
       telephone: dd.telephone,
       whatsapp: dd.whatsapp,
       declencheur: "RAPPEL_CLOTURE_DD",
-      message: `MINEPIA DDEPIA-Menoua : le rapport départemental du mois précédent n'est pas encore généré. Merci de valider les synthèses et de procéder à la génération.`,
+      message: `${identite.expediteur} : le rapport départemental du mois précédent n'est pas encore généré. Merci de valider les synthèses et de procéder à la génération.`,
     });
     notifies++;
   }

@@ -16,6 +16,7 @@ import { NextResponse } from "next/server";
 import { requireUser, assertRole, permissionErrorResponse } from "@/lib/permissions";
 import { collecterDonneesThematiques, libelleDomaine, type FiltreThematique } from "@/server/export/rapport-thematique";
 import { rendreThematiqueXlsx, rendreThematiqueDocx, rendreThematiquePdf } from "@/server/export/rapport-thematique-render";
+import { identiteDepartement } from "@/lib/departement";
 
 interface Body {
   especeCodes?: string[];
@@ -47,13 +48,14 @@ export async function POST(req: Request) {
       periodeIds,
     };
 
+    const identite = await identiteDepartement(user.db);
     const tableaux = await collecterDonneesThematiques(user.db, filtre);
     if (tableaux.length === 0) {
       return NextResponse.json({ message: "Aucune donnée ne correspond à cette combinaison de filtres." }, { status: 404 });
     }
 
     const titreGeneral = [
-      "Rapport thématique — SID DDEPIA-Menoua",
+      `Rapport thématique — ${identite.application}`,
       filtre.domaines.length ? filtre.domaines.map(libelleDomaine).join(", ") : null,
     ]
       .filter(Boolean)
@@ -63,7 +65,7 @@ export async function POST(req: Request) {
     let contentType: string;
     let ext: string;
     if (format === "xlsx") {
-      buf = await rendreThematiqueXlsx(tableaux, titreGeneral);
+      buf = await rendreThematiqueXlsx(tableaux, titreGeneral, identite.application);
       contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
       ext = "xlsx";
     } else if (format === "docx") {

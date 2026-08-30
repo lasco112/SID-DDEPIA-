@@ -230,8 +230,8 @@ Ce qui suit a été éprouvé par des tests automatiques, pas seulement annoncé
 |---|---|---|
 | **18** | **Rôle PostgreSQL dédié sans BYPASSRLS — préalable impératif** | fait |
 | 19 | Modèles Département et Région, cloisonnement de chaque requête | fait — politiques posées et éprouvées |
-| 9 | Retirer les arrondissements codés en dur du module mensuel | fait côté code — voir réserve ci-dessous |
-| 15 | Sortir le nom du département du code | à faire |
+| 9 | Retirer les arrondissements codés en dur du module mensuel | fait |
+| 15 | Sortir le nom du département du code | fait — voir réserve ci-dessous |
 | 16 | Export consolidé destiné au niveau régional | à faire |
 
 #### Lot 9 — ce qui est fait, et ce qui ne l'est pas
@@ -256,13 +256,51 @@ régénérés depuis la base sont identiques **au caractère près** à ceux qui
 étaient versionnés — la lecture en base redonne exactement ce que le code
 disait.
 
-**Réserve — le gabarit du rapport départemental reste celui de la Menoua.**
-`templates/rapport_mensuel_DD.docx` est un fichier unique et versionné : ses
-tableaux portent six lignes intitulées DSCHANG, FOKOUE… et des repères
-`{CHAMP_DSC}`. Le PAYLOAD s'adapte désormais au département, mais pas le
-gabarit. Un second département recevrait donc un document aux lignes de la
-Menoua, et vides. Y remédier suppose un gabarit par département — un changement
-du mécanisme de rendu, pas un renommage. À traiter avec le lot 15.
+**La réserve sur le gabarit est levée** — voir le lot 15 ci-dessous.
+
+#### Lot 15 — le nom du département sort du code
+
+« Menoua » était écrit à la main dans une trentaine d'endroits : en-têtes de
+documents officiels, messages de relance envoyés sur les téléphones, noms des
+fichiers produits, métadonnées d'export, bandeau de l'application, identifiant
+du compte DD. `src/lib/departement.ts` les compose désormais à partir de la
+base.
+
+**Le français ne se compose pas par une règle.** « de la Menoua », mais « du
+Noun », « des Bamboutos ». L'article est donc porté par la donnée
+(`Departement.nomAvecArticle`), et non déduit — sans quoi un rapport transmis au
+MINEPIA aurait été intitulé « DE NOUN ». À défaut de valeur, on se rabat sur
+« de <nom> » : juste dans la majorité des cas, et visible quand ça ne l'est pas.
+
+Comme au lot 9, un test fige les intitulés **tels qu'ils étaient écrits avant**
+et vérifie que la composition les redonne au caractère près — y compris
+l'apostrophe typographique de « L’ÉLEVAGE », qu'une apostrophe droite aurait
+remplacée sans que personne ne le voie.
+
+**Les titres du canevas se transposent, comme pour un arrondissement.** Deux
+titres de la section I nomment le département. Le canevas garde la rédaction
+officielle — c'est lui qui fait foi — et le rendu y transpose le territoire,
+exactement comme il le faisait déjà pour les rapports de DA. Le mémorandum
+l'autorise expressément : « seules la période et la maille géographique sont
+transposées ».
+
+**Un jeu de gabarits par département.** `rapport_mensuel_DD.docx` devient
+`rapport_mensuel_DD_MEN.docx`, et le fabricant boucle sur les départements. Les
+gabarits produits pour la Menoua sont identiques **au caractère près** aux
+anciens. Un gabarit absent donne un message qui dit quoi faire, au lieu d'un
+plantage.
+
+**Réserve — les pages AVANT connexion restent génériques.** La page de connexion
+et la page de démonstration affichent encore « SID DDEPIA-Menoua », de même que
+le titre d'onglet (`layout.tsx`). C'est délibéré : avant identification, aucune
+session ne dit à quel département appartient le visiteur, et une page d'accueil
+partagée entre plusieurs délégations ne peut en nommer aucune. Le jour où un
+second département arrive, c'est au Délégué de trancher ce qu'elle doit dire.
+
+**Le nom de la base locale hors ligne n'est pas touché.** `SID_DDEPIA_MENOUA`
+(`src/lib/dexie.ts`) est le nom de la base IndexedDB des appareils : le changer
+ferait perdre à chaque téléphone sa file de synchronisation en attente. Il reste
+tel quel — c'est un identifiant technique, pas un libellé affiché.
 
 ### Priorité 4 — Assistance rédactionnelle
 

@@ -20,12 +20,14 @@ export async function genererIdentifiant(opts: {
   arrondissementNom?: string;
   sectionCode?: string;
   nom: string;
+  /** Le département du compte créé — « dd.menoua » n'était juste que pour un seul. */
+  departementNom?: string;
 }): Promise<string> {
   let base: string;
   if (opts.role === "DA" && opts.arrondissementNom) base = `da.${slug(opts.arrondissementNom)}`;
   else if (opts.role === "AGENT_SAISIE" && opts.arrondissementNom) base = `agent.${slug(opts.arrondissementNom)}`;
   else if (opts.role.startsWith("CHEF_") && opts.sectionCode) base = `chef.${slug(opts.sectionCode)}`;
-  else if (opts.role === "DD") base = "dd.menoua";
+  else if (opts.role === "DD") base = `dd.${slug(opts.departementNom ?? "departement")}`;
   else base = `admin.${slug(opts.nom).slice(0, 12) || "technique"}`;
 
   let candidat = base;

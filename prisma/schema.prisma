@@ -99,11 +99,17 @@ model Region {
 /// Un département. Toute donnée du SID appartient à un et un seul département :
 /// c'est l'unité de cloisonnement.
 model Departement {
-  id       String @id @default(cuid())
-  code     String @unique /// "MEN" pour la Menoua
-  nom      String
-  regionId String
-  region   Region @relation(fields: [regionId], references: [id])
+  id   String @id @default(cuid())
+  code String @unique /// "MEN" pour la Menoua
+  nom  String
+  /// Le nom precede de son article, tel qu'il s'ecrit dans une phrase :
+  /// « de la Menoua », « du Noun », « des Bamboutos ». L'article depend du nom
+  /// et non d'une regle mecanique : le composer dans le code ecrirait
+  /// « DE NOUN » dans un rapport transmis au MINEPIA. A defaut, le code se
+  /// rabat sur « de <nom> ».
+  nomAvecArticle String?
+  regionId       String
+  region         Region  @relation(fields: [regionId], references: [id])
 
   arrondissements        Arrondissement[]
   periodeReportings      PeriodeReporting[]

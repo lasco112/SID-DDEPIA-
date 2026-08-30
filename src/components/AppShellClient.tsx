@@ -36,6 +36,8 @@ const LIBELLES_ROLE: Record<string, string> = {
 export default function AppShellClient({
   role,
   username,
+  application,
+  departement,
   periodeLabel,
   periodes = [],
   couranteId = null,
@@ -43,6 +45,10 @@ export default function AppShellClient({
 }: {
   role: string;
   username: string;
+  /** « SID DDEPIA-Menoua » — composé depuis la base par AppShell, jamais écrit ici. */
+  application: string;
+  /** « Menoua ». */
+  departement: string;
   periodeLabel?: string;
   periodes?: PeriodeOption[];
   couranteId?: string | null;
@@ -67,8 +73,8 @@ export default function AppShellClient({
         <div className="flex shrink-0 items-center gap-[11px]">
           <img src="/icon-512.png?v=2" alt="SID DDEPIA" className="h-[34px] w-[34px] shrink-0 rounded-[7px]" />
           <div className="hidden leading-tight sm:block">
-            <div className="text-[15px] font-bold">SID DDEPIA-Menoua</div>
-            <div className="text-[11px] text-white/70">Délégation Départementale · Menoua</div>
+            <div className="text-[15px] font-bold">{application}</div>
+            <div className="text-[11px] text-white/70">{"Délégation Départementale · " + departement}</div>
           </div>
         </div>
 

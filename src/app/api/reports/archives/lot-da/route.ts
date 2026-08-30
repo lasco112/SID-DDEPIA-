@@ -9,11 +9,13 @@
 import { NextResponse } from "next/server";
 import PizZip from "pizzip";
 import { requireUser, assertRole, permissionErrorResponse } from "@/lib/permissions";
+import { identiteDepartement } from "@/lib/departement";
 
 export async function GET(req: Request) {
   try {
     const user = await requireUser();
     assertRole(user, ["DD"]);
+    const identite = await identiteDepartement(user.db);
 
     const periodeId = new URL(req.url).searchParams.get("periodeId");
     if (!periodeId) return NextResponse.json({ message: "Période non précisée." }, { status: 400 });
@@ -60,7 +62,7 @@ export async function GET(req: Request) {
     }
 
     const buf = zip.generate({ type: "nodebuffer", compression: "DEFLATE" }) as Buffer;
-    const nom = `Rapports_DA_DDEPIA-Menoua_${periode.annee}-${String(periode.mois).padStart(2, "0")}.zip`;
+    const nom = `Rapports_DA_${identite.sigle}_${periode.annee}-${String(periode.mois).padStart(2, "0")}.zip`;
 
     await user.db.auditLog.create({
       data: {

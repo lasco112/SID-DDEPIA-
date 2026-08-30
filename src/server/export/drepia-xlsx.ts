@@ -9,6 +9,7 @@
 import ExcelJS from "exceljs";
 import type { PrismaClient } from "@prisma/client";
 import { listerArrondissements } from "../../lib/arrondissements";
+import { identiteDepartement } from "../../lib/departement";
 
 /**
  * `db` est le client de la session appelante (`user.db`), qui déclare son
@@ -21,6 +22,7 @@ export async function genererExportDrepia(db: PrismaClient, periodeId: string): 
   // Les colonnes territoriales sont celles du département de l'appelant, dans
   // l'ordre du canevas — elles ne sont plus écrites en dur.
   const ARR_CODES = (await listerArrondissements(db)).map((a) => a.code);
+  const identite = await identiteDepartement(db);
 
   const periodeN1 = await db.periodeReporting.findFirst({
     where: {
@@ -33,16 +35,16 @@ export async function genererExportDrepia(db: PrismaClient, periodeId: string): 
   });
 
   const wb = new ExcelJS.Workbook();
-  wb.creator = "SID DDEPIA-Menoua";
+  wb.creator = identite.application;
   wb.created = new Date();
 
   const meta = wb.addWorksheet("LISEZ-MOI");
   meta.addRows([
-    ["EXPORT NORMALISÉ DDEPIA-MENOUA → DREPIA-OUEST"],
+    [`EXPORT NORMALISÉ ${identite.sigle.toUpperCase()} → DREPIA-OUEST`],
     [],
     ["Période", libellePeriode(periode)],
     ["Date de génération", new Date().toLocaleString("fr-FR")],
-    ["Source", "Système d'Information Décisionnel DDEPIA-Menoua"],
+    ["Source", `Système d'Information Décisionnel ${identite.sigle}`],
     [],
     ["Convention", "Les codes de la colonne A sont stables d'un mois à l'autre."],
     ["", "Une cellule « — » signifie donnée non renseignée (≠ zéro)."],
@@ -62,7 +64,7 @@ export async function genererExportDrepia(db: PrismaClient, periodeId: string): 
     if (templates.length === 0) continue;
 
     const ws = wb.addWorksheet(section.code);
-    const header = ["CODE", "Indicateur", "Unité", ...ARR_CODES, "TOTAL MENOUA", `TOTAL ${periode.annee - 1}`, "ECART"];
+    const header = ["CODE", "Indicateur", "Unité", ...ARR_CODES, identite.colonneTotal, `TOTAL ${periode.annee - 1}`, "ECART"];
     ws.addRow(header).font = { bold: true };
     ws.getColumn(1).width = 32;
     ws.getColumn(2).width = 48;

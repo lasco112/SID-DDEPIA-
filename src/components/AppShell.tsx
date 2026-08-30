@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import { contexteSession } from "@/lib/permissions";
+import { identiteDepartement } from "@/lib/departement";
 import AppShellClient from "@/components/AppShellClient";
 import { resoudrePeriode, listerPeriodes } from "@/server/periodes/courante";
 
@@ -38,13 +39,20 @@ export default async function AppShell({
 
   // Période de TRAVAIL (celle choisie par l'utilisateur), et non plus « la plus
   // récente » : c'est elle qui pilote ce que chaque page affiche et enregistre.
-  const [periode, periodes] = await Promise.all([resoudrePeriode(user.db), listerPeriodes(user.db)]);
+  const [periode, periodes, identite] = await Promise.all([
+    resoudrePeriode(user.db),
+    listerPeriodes(user.db),
+    // Le bandeau nomme le service : celui de l'utilisateur, pas la Menoua par défaut.
+    identiteDepartement(user.db),
+  ]);
   const periodeLabel = periode ? `${MOIS_FR[(periode.mois ?? 1) - 1]} ${periode.annee}` : undefined;
 
   return (
     <AppShellClient
       role={role}
       username={username}
+      application={identite.application}
+      departement={identite.nom}
       periodeLabel={periodeLabel}
       periodes={periodes.map((p) => ({
         id: p.id,

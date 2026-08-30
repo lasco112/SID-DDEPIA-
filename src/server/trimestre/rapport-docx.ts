@@ -25,6 +25,7 @@ import {
   HeadingLevel, AlignmentType, WidthType, BorderStyle, Header,
 } from "docx";
 import type { PrismaClient } from "@prisma/client";
+import { identiteDepartement } from "@/lib/departement";
 import {
   type Periode, libelleOfficiel, libelleCourt, memePeriodeAnneePrecedente, moisDeLaPeriode,
 } from "../periodes/calendrier";
@@ -129,6 +130,7 @@ export async function genererRapportTrimestriel(
   periode: Periode,
   options: { autoriserIncomplet?: boolean } = {}
 ): Promise<{ buffer: Buffer; nomFichier: string; donnees: DonneesRapportTrimestriel }> {
+  const identite = await identiteDepartement(db);
   const donnees = await rassembler(db, periode, options);
   const { etat, valeurs, valeursN1, faits, brouillon } = donnees;
 
@@ -172,7 +174,7 @@ export async function genererRapportTrimestriel(
     }),
     new Paragraph({
       alignment: AlignmentType.CENTER,
-      children: [new TextRun({ text: "Délégation Départementale de la Menoua", size: 18 })],
+      children: [new TextRun({ text: identite.intituleCourt, size: 18 })],
     }),
     new Paragraph({ text: "" }),
     new Paragraph({
@@ -367,7 +369,7 @@ export async function genererRapportTrimestriel(
 
   const buffer = await Packer.toBuffer(document);
   const nomFichier =
-    `Rapport_${libelleCourt(periode).replace(/[ /]/g, "")}_DDEPIA-Menoua` +
+    `Rapport_${libelleCourt(periode).replace(/[ /]/g, "")}_${identite.sigle}` +
     `${brouillon ? "_BROUILLON" : ""}.docx`;
 
   return { buffer: Buffer.from(buffer), nomFichier, donnees };

@@ -605,9 +605,33 @@ export async function genererPayloadDA(db: PrismaClient, periodeId: string, arro
   return payload;
 }
 
+/**
+ * Le nom du gabarit d'un département.
+ *
+ * Les gabarits portent les arrondissements en lignes de tableau, avec leurs
+ * noms et des repères `{CHAMP_DSC}` : ils sont donc propres à un territoire.
+ * Un fichier unique aurait servi à tout le monde les lignes de la Menoua, et
+ * vides — les repères ne correspondant à aucun code chez le voisin.
+ *
+ *   nomGabarit("rapport_mensuel_DD", "MEN") → "rapport_mensuel_DD_MEN.docx"
+ */
+export function nomGabarit(modele: string, codeDepartement: string): string {
+  return `${modele}_${codeDepartement}.docx`;
+}
+
 export async function rendreDocx(templateFile: string, payload: Record<string, unknown>): Promise<Buffer> {
   const templatePath = path.join(process.cwd(), "templates", templateFile);
-  const templateBuf = await fs.readFile(templatePath);
+  let templateBuf: Buffer;
+  try {
+    templateBuf = await fs.readFile(templatePath);
+  } catch {
+    // Message destiné à un agent administratif, pas à un développeur : il doit
+    // savoir quoi demander, pas lire un chemin de fichier.
+    throw new Error(
+      `Le modèle de document de votre département est absent (${templateFile}). ` +
+        "Les modèles se regénèrent avec « npx tsx prisma/seed-lib/buildReportTemplates.ts »."
+    );
+  }
   const zip = new PizZip(templateBuf);
   const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true, nullGetter: () => "—" });
   try {

@@ -15,13 +15,17 @@
  */
 import { NextResponse } from "next/server";
 import { requireUser, assertRole, permissionErrorResponse } from "@/lib/permissions";
-import { verifierCompletudeDD, genererPayloadDD, genererPayloadDA, rendreDocx } from "@/server/export/rapport-docx";
+import { verifierCompletudeDD, genererPayloadDD, genererPayloadDA, rendreDocx, nomGabarit } from "@/server/export/rapport-docx";
+import { identiteDepartement } from "@/lib/departement";
 import crypto from "node:crypto";
 
 export async function POST(req: Request) {
   try {
     const user = await requireUser();
     const db = user.db;
+    // Le nom du service figure dans le nom du fichier remis au Délégué : il est
+    // celui de SON département, pas de la Menoua par défaut.
+    const identite = await identiteDepartement(db);
     const { periodeId, type } = (await req.json()) as { periodeId: string; type: "DD" | "DA" | "EXACT" | "APERCU" };
 
     const periode = await db.periodeReporting.findUnique({ where: { id: periodeId } });
@@ -47,8 +51,8 @@ export async function POST(req: Request) {
 
       const payload = await genererPayloadDD(db, periodeId, true);
       payload.MENTION_DEMO = mentions.join("  —  ");
-      const apercu = await rendreDocx("rapport_mensuel_DD.docx", payload);
-      const nom = `Apercu_Rapport_DDEPIA-Menoua_${periode.annee}-${String(periode.mois).padStart(2, "0")}.docx`;
+      const apercu = await rendreDocx(nomGabarit("rapport_mensuel_DD", identite.code), payload);
+      const nom = `Apercu_Rapport_${identite.sigle}_${periode.annee}-${String(periode.mois).padStart(2, "0")}.docx`;
 
       await db.auditLog.create({
         data: {
@@ -87,12 +91,12 @@ export async function POST(req: Request) {
       const payload = await genererPayloadDD(db, periodeId, type !== "EXACT");
       payload.MENTION_DEMO = mentions.join("  —  ");
       if (type === "DD") {
-        buf = await rendreDocx("rapport_mensuel_DD.docx", payload);
-        fileNameBase = `Rapport_Mensuel_DDEPIA-Menoua_${periode.annee}-${String(periode.mois).padStart(2, "0")}`;
+        buf = await rendreDocx(nomGabarit("rapport_mensuel_DD", identite.code), payload);
+        fileNameBase = `Rapport_Mensuel_${identite.sigle}_${periode.annee}-${String(periode.mois).padStart(2, "0")}`;
         exportType = "RAPPORT_DD_DOCX";
       } else {
-        buf = await rendreDocx("rapport_mensuel_exact.docx", payload);
-        fileNameBase = `Fiche_Collecte_DDEPIA-Menoua_${periode.annee}-${String(periode.mois).padStart(2, "0")}`;
+        buf = await rendreDocx(nomGabarit("rapport_mensuel_exact", identite.code), payload);
+        fileNameBase = `Fiche_Collecte_${identite.sigle}_${periode.annee}-${String(periode.mois).padStart(2, "0")}`;
         exportType = "RAPPORT_EXACT_DOCX";
       }
     } else {
@@ -109,7 +113,7 @@ export async function POST(req: Request) {
       }
       const payload = await genererPayloadDA(db, periodeId, rapport.arrondissement.code, rapport.arrondissement.nom);
       payload.MENTION_DEMO = mentions.join("  —  ");
-      buf = await rendreDocx("rapport_mensuel_DA.docx", payload);
+      buf = await rendreDocx(nomGabarit("rapport_mensuel_DA", identite.code), payload);
       fileNameBase = `Rapport_Mensuel_${rapport.arrondissement.nom}_${periode.annee}-${String(periode.mois).padStart(2, "0")}`;
       exportType = "RAPPORT_DA_DOCX";
       arrondissementId = rapport.arrondissementId;

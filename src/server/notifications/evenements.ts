@@ -15,6 +15,7 @@
  */
 import type { PrismaClient, Role } from "@prisma/client";
 import { envoyerPush } from "@/server/notifications/push";
+import { identiteDepartement } from "@/lib/departement";
 
 export interface EvenementNotifiable {
   /** Code court, repris dans le journal : SOUMISSION_DA, REJET, CORRECTION… */
@@ -81,7 +82,7 @@ export async function notifierEvenement(
 
     // Envoi système (téléphone) : indépendant, et sans conséquence s'il échoue.
     void envoyerPush(db, destinataires, {
-      titre: "SID DDEPIA-Menoua",
+      titre: (await identiteDepartement(db)).application,
       corps: evenement.message,
       lien: evenement.lien ?? "/dashboard",
     });

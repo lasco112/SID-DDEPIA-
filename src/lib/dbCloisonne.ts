@@ -79,7 +79,19 @@ export type Transactionnelle = <T>(travail: (tx: PrismaClient) => Promise<T>) =>
  *
  * Le garde-fou ci-dessous transforme cette panne en refus immédiat et lisible.
  */
-const clientsEtendus = new WeakSet<object>();
+const clientsEtendus = new WeakMap<object, string>();
+
+/**
+ * Le département qu'un client cloisonné déclare, ou `null` s'il n'en déclare
+ * aucun (client de base, client de transaction).
+ *
+ * Sert à NOMMER le département sans avoir à le déduire des lignes qu'on voit :
+ * la déduction par les arrondissements échouait pour un département qui n'en a
+ * pas encore, et faisait alors échouer ses relances.
+ */
+export function departementDeClient(client: unknown): string | null {
+  return (typeof client === "object" && client !== null && clientsEtendus.get(client)) || null;
+}
 
 /** Déclare le département auprès de la base, pour la durée de la transaction. */
 async function declarer(tx: { $executeRawUnsafe: (s: string, ...a: unknown[]) => Promise<unknown> }, departementId: string) {
@@ -153,6 +165,6 @@ export function clientCloisonne(base: PrismaClient, departementId: string | null
     },
   }) as unknown as PrismaClient;
 
-  clientsEtendus.add(etendu);
+  clientsEtendus.set(etendu, departementId);
   return etendu;
 }

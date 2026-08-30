@@ -29,4 +29,4 @@ cron.schedule(
 
 verifierRelances().catch((e) => console.error("[CRON] passage initial :", e));
 
-console.log(`[CRON] Planificateur d'alertes SID DDEPIA-Menoua démarré (fuseau ${TZ}).`);
+console.log(`[CRON] Planificateur d'alertes SID démarré (fuseau ${TZ}) — tous départements.`);

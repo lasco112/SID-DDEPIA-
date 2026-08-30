@@ -10,6 +10,7 @@ import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { requireUser, assertRole, permissionErrorResponse } from "@/lib/permissions";
 import { genererIdentifiant, genererMotDePasseTemporaire } from "@/lib/generateCredentials";
+import { identiteDepartement } from "@/lib/departement";
 
 export async function GET() {
   try {
@@ -89,7 +90,13 @@ export async function POST(req: Request) {
       sectionCode = sec.code;
     }
 
-    const username = await genererIdentifiant({ role: body.role, arrondissementNom, sectionCode, nom: body.nom });
+    const username = await genererIdentifiant({
+      role: body.role,
+      arrondissementNom,
+      sectionCode,
+      nom: body.nom,
+      departementNom: (await identiteDepartement(admin.db)).nom,
+    });
     const motDePasseTemporaire = genererMotDePasseTemporaire();
     const passwordHash = await bcrypt.hash(motDePasseTemporaire, 10);
 

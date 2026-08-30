@@ -13,6 +13,7 @@
  */
 import type { PrismaClient } from "@prisma/client";
 import { envoyerPush } from "@/server/notifications/push";
+import { identiteDepartement } from "@/lib/departement";
 
 export type Canal = "IN_APP" | "SMS" | "WHATSAPP";
 
@@ -26,11 +27,15 @@ export interface NotifierOptions {
 }
 
 export async function notifier(db: PrismaClient, opts: NotifierOptions) {
+  // Le nom du service sur l'écran du téléphone est celui du département du
+  // destinataire, et non « Menoua » pour tout le monde.
+  const identite = await identiteDepartement(db);
+
   // Les relances calendaires partent aussi sur le téléphone, comme les
   // notifications d'événement : c'est justement quand l'agent n'ouvre pas
   // l'application qu'un rappel d'échéance a de la valeur.
   void envoyerPush(db, [opts.userId], {
-    titre: "SID DDEPIA-Menoua",
+    titre: identite.application,
     corps: opts.message,
     lien: "/dashboard",
   }).catch(() => {});
