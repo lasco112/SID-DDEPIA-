@@ -986,6 +986,11 @@ modestes traitent correctement.
 
 ## 11.3 Comment choisir — et pourquoi pas maintenant
 
+> **MISE À JOUR — la condition posée ici est levée.** La base de faits existe
+> désormais : 610 faits produits sur le trimestre 3 de 2025, dont 502
+> d’importance suffisante. Les garde-fous, le journal et le banc d’essai sont
+> écrits. Voir `docs/CHOIX_MODELE.md`.
+
 **Ne pas choisir de modèle aujourd'hui.** Non par précaution rhétorique : parce
 que l'entrée du modèle — la base de faits — n'existe pas, et qu'on ne peut donc
 pas l'évaluer sur la tâche réelle.
