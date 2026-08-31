@@ -126,6 +126,7 @@ model Departement {
   rubriqueNarratives     RubriqueNarrative[]
   saisieCanevas          SaisieCanevas[]
   appelsIA               AppelIA[]
+  casBancEssai           CasBancEssai[]
   syntheseSections       SyntheseSection[]
   exportDocuments        ExportDocument[]
   notifications          Notification[]
@@ -772,6 +773,41 @@ model AppelIA {
 
   @@index([createdAt])
   @@index([fonction, retenu])
+}
+
+/// Un cas du banc d'essai : trois textes anonymes, et la lettre retenue.
+///
+/// Conserver l'avancement permet d'interrompre l'essai et de le reprendre. Sans
+/// cela, fermer l'onglet au douzième cas oblige à tout recommencer — et un
+/// essai qu'on doit refaire est un essai qu'on ne fait pas.
+///
+/// ATTENTION : `propositions` porte le nom du modèle de chaque lettre. Cette
+/// colonne ne doit JAMAIS partir vers le navigateur avant que la lettre soit
+/// choisie, sans quoi l'essai cesse d'être à l'aveugle. C'est la raison d'être
+/// de `casSuivant()`, qui ne rend que les lettres et les textes.
+model CasBancEssai {
+  /// Département propriétaire de cette ligne. Dénormalisé À DESSEIN : les
+  /// politiques de sécurité par ligne comparent une colonne, pas une jointure.
+  departementId String?
+  departement   Departement? @relation(fields: [departementId], references: [id])
+
+  id String @id @default(cuid())
+  /// Regroupe les cas d'un même essai.
+  essaiId String
+  /// Rang du cas dans l'essai, à partir de 1.
+  ordre Int
+  /// Ce que le cas fait juger : « Élevage porcin, trimestre 3 ».
+  intitule String
+  /// [{ lettre, texte, modele }] — le modèle reste au serveur.
+  propositions Json
+  /// La lettre retenue par le Délégué. Null tant qu'il n'a pas répondu :
+  /// c'est ce qui dit où reprendre.
+  lettreChoisie String?
+  repondueLe    DateTime?
+  createdAt     DateTime  @default(now())
+
+  @@unique([essaiId, ordre])
+  @@index([essaiId, lettreChoisie])
 }
 
 model SyntheseSection {
