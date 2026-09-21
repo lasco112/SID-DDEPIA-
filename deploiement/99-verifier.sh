@@ -104,6 +104,33 @@ else
   dire non "aucune sauvegarde n'a jamais été faite"
 fi
 
+# --- La mémoire -------------------------------------------------------------
+# Sur un petit serveur, c'est la mémoire qui lâche en premier, et elle lâche
+# brutalement : le noyau tue l'application sans prévenir. Mieux vaut l'apprendre
+# ici, un jour calme, qu'un mardi de fin de trimestre.
+echo
+echo "  La mémoire"
+TOTAL_MO=$(awk '/MemTotal/ {print int($2/1024)}' /proc/meminfo)
+DISPO_MO=$(awk '/MemAvailable/ {print int($2/1024)}' /proc/meminfo)
+SWAP_MO=$(awk '/SwapTotal/ {print int($2/1024)}' /proc/meminfo)
+
+[ "$SWAP_MO" -ge 2048 ] \
+  && dire ok "fichier d'échange de $((SWAP_MO/1024)) Go" \
+  || dire non "échange insuffisant (${SWAP_MO} Mo) — relancez ./01-serveur.sh"
+
+# Moins d'un quart de la mémoire disponible, c'est la zone où un rendu de
+# rapport peut faire basculer la machine.
+SEUIL=$((TOTAL_MO / 4))
+[ "$DISPO_MO" -gt "$SEUIL" ] \
+  && dire ok "${DISPO_MO} Mo disponibles sur ${TOTAL_MO} Mo" \
+  || dire non "plus que ${DISPO_MO} Mo disponibles sur ${TOTAL_MO} — il est temps d'agrandir le serveur"
+
+# La preuve, et non la supposition : le noyau a-t-il DÉJÀ tué quelque chose ?
+TUES=$(journalctl -k --since "7 days ago" 2>/dev/null | grep -c "Out of memory: Killed" || true)
+[ "${TUES:-0}" -eq 0 ] \
+  && dire ok "aucun processus tué par manque de mémoire en 7 jours" \
+  || dire non "${TUES} processus tué(s) par manque de mémoire cette semaine — passez à une formule supérieure"
+
 # --- Conclusion -------------------------------------------------------------
 echo
 echo "  ─────────────────────────────────────────"

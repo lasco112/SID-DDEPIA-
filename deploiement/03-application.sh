@@ -47,7 +47,17 @@ echo "    node $(node -v)"
 apt-get install -y -qq git
 
 # --- Le code ---------------------------------------------------------------
-if [ -d "$CIBLE/.git" ]; then
+# Trois cas, dans cet ordre.
+#
+# Le premier existe parce que le code du serveur n'est pas forcément celui de
+# GitHub : tant que le travail n'est pas poussé, le dépôt distant est EN RETARD.
+# Cloner reviendrait alors à installer une version ancienne sans s'en rendre
+# compte — le service démarrerait, et il manquerait le cloisonnement.
+# Si le code a été déposé à la main (scp depuis le poste), on n'y touche pas.
+if [ -f "$CIBLE/package.json" ] && [ ! -d "$CIBLE/.git" ]; then
+  echo "  → Code déposé à la main, conservé tel quel"
+  echo "    (les mises à jour se feront par scp, pas par git)"
+elif [ -d "$CIBLE/.git" ]; then
   echo "  → Mise à jour du dépôt"
   git -C "$CIBLE" fetch --quiet origin
   git -C "$CIBLE" reset --hard --quiet origin/HEAD 2>/dev/null || git -C "$CIBLE" pull --quiet

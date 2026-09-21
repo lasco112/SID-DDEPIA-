@@ -47,6 +47,26 @@ if [ -n "$IP_SERVEUR" ] && [ -n "$IP_DOMAINE" ] && [ "$IP_SERVEUR" != "$IP_DOMAI
   exit 1
 fi
 
+# --- Étaler les générations de rapports -------------------------------------
+# Rendre un rapport .docx coûte cher en mémoire : le modèle fait plus d'un
+# mégaoctet, docxtemplater le décompresse, le remplit et le recomprime. Sur une
+# machine de 2 Go, six agents qui cliquent à la même seconde en fin de trimestre
+# peuvent épuiser la mémoire — le noyau tue alors l'application, et tout le
+# monde perd son écran en cours.
+#
+# La clé est $server_name et NON $binary_remote_addr : on veut un plafond
+# GLOBAL. Limiter par adresse IP ne servirait à rien ici, puisque le risque
+# vient justement de six personnes différentes.
+#
+# 30r/m = un départ toutes les deux secondes ; burst=20 met les suivants EN
+# ATTENTE au lieu de les refuser. Personne n'est rejeté, les rendus se
+# chevauchent simplement moins.
+echo "  → File d'attente sur la génération des rapports"
+cat > /etc/nginx/conf.d/sid-limites.conf <<'EOF'
+limit_req_zone $server_name zone=rapports:1m rate=30r/m;
+limit_req_status 429;
+EOF
+
 # --- Le relais vers l'application ------------------------------------------
 echo "  → Configuration de nginx"
 cat > /etc/nginx/sites-available/sid <<EOF
@@ -57,6 +77,24 @@ server {
     # Les rapports .docx font plusieurs mégaoctets ; la valeur par défaut de
     # nginx (1 Mo) ferait échouer les envois volumineux depuis les appareils.
     client_max_body_size 32M;
+
+    # Les seules routes qui rendent des documents. Une location en expression
+    # régulière prime sur le préfixe « / » ci-dessous, donc elle capte bien ces
+    # chemins-là et eux seuls : la saisie ordinaire n'est jamais ralentie.
+    location ~ ^/api/(reports|exports)/ {
+        limit_req zone=rapports burst=20;
+
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+
+        # Un rapport mis en file peut attendre son tour puis prendre son temps.
+        proxy_read_timeout 300s;
+        proxy_send_timeout 300s;
+    }
 
     location / {
         proxy_pass http://127.0.0.1:3000;

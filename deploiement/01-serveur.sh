@@ -40,13 +40,40 @@ EOF
 # --- Mémoire d'échange ------------------------------------------------------
 # PostgreSQL et Node ensemble peuvent dépasser la mémoire lors d'un pic. Sans
 # échange, le système tue l'un des deux — en général la base, au pire moment.
-if ! swapon --show | grep -q .; then
-  echo "  → Fichier d'échange de 2 Go"
-  fallocate -l 2G /swapfile
+#
+# La taille se règle sur la mémoire de la machine. Sur un petit serveur (2 Go),
+# `npm run build` de Next.js demande à lui seul plus que la mémoire physique :
+# 2 Go d'échange ne suffisent pas, la compilation est tuée en cours de route.
+# Sur une machine plus grande, 2 Go restent le filet suffisant.
+MO=$(awk '/MemTotal/ {print int($2/1024)}' /proc/meminfo)
+if [ "$MO" -lt 3072 ]; then TAILLE=4; else TAILLE=2; fi
+
+ACTUEL=$(awk '/^\/swapfile/ {print int($3/1024/1024)}' /proc/swaps 2>/dev/null | head -1)
+ACTUEL=${ACTUEL:-0}
+
+if [ "$ACTUEL" -lt "$TAILLE" ]; then
+  echo "  → Fichier d'échange de ${TAILLE} Go (mémoire physique : ${MO} Mo)"
+  swapoff /swapfile 2>/dev/null || true
+  rm -f /swapfile
+  # fallocate échoue sur certains systèmes de fichiers ; dd est plus lent mais
+  # fonctionne partout. On ne veut pas d'un serveur sans échange parce que la
+  # méthode rapide n'était pas disponible.
+  fallocate -l "${TAILLE}G" /swapfile 2>/dev/null \
+    || dd if=/dev/zero of=/swapfile bs=1M count=$((TAILLE*1024)) status=none
   chmod 600 /swapfile
   mkswap -q /swapfile
   swapon /swapfile
   grep -q '/swapfile' /etc/fstab || echo '/swapfile none swap sw 0 0' >> /etc/fstab
+else
+  echo "  → Fichier d'échange déjà à ${ACTUEL} Go"
+fi
+
+# L'échange est un filet, pas un lieu de séjour : on ne veut y descendre que
+# sous pression réelle, sinon les pages de PostgreSQL y migrent et la base
+# ralentit sans raison.
+if ! grep -q '^vm.swappiness' /etc/sysctl.d/99-sid.conf 2>/dev/null; then
+  echo 'vm.swappiness=10' >> /etc/sysctl.d/99-sid.conf
+  sysctl -q -p /etc/sysctl.d/99-sid.conf 2>/dev/null || true
 fi
 
 # --- Pare-feu ---------------------------------------------------------------
