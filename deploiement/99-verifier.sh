@@ -114,8 +114,12 @@ TOTAL_MO=$(awk '/MemTotal/ {print int($2/1024)}' /proc/meminfo)
 DISPO_MO=$(awk '/MemAvailable/ {print int($2/1024)}' /proc/meminfo)
 SWAP_MO=$(awk '/SwapTotal/ {print int($2/1024)}' /proc/meminfo)
 
+# En Go avec une décimale : la division entière affichait « 3 Go » pour un
+# échange de 4 Go (4095 Mo / 1024 = 3), ce qui faisait douter d'un script qui
+# avait pourtant bien travaillé.
+SWAP_GO=$(awk -v m="$SWAP_MO" 'BEGIN{printf "%.1f", m/1024}')
 [ "$SWAP_MO" -ge 2048 ] \
-  && dire ok "fichier d'échange de $((SWAP_MO/1024)) Go" \
+  && dire ok "fichier d'échange de ${SWAP_GO} Go" \
   || dire non "échange insuffisant (${SWAP_MO} Mo) — relancez ./01-serveur.sh"
 
 # Moins d'un quart de la mémoire disponible, c'est la zone où un rendu de
