@@ -23,10 +23,36 @@ const nextConfig = {
   // tentait donc d'y résoudre http, https et net, et le build échouait. On le
   // déclare externe pour toute la compilation serveur : au démarrage, un
   // require() normal le charge depuis node_modules.
-  webpack: (config, { isServer }) => {
+  webpack: (config, { isServer, nextRuntime, webpack }) => {
     if (isServer) {
       config.externals = [...(config.externals ?? []), "web-push", "node-cron"];
     }
+
+    // Le paquet « edge » ne doit jamais contenir le planificateur.
+    //
+    // instrumentation.ts sort immédiatement quand NEXT_RUNTIME n'est pas
+    // "nodejs" : ce module n'est donc JAMAIS exécuté en edge. Mais webpack
+    // traverse tout de même le graphe de son import dynamique, atteint
+    // journal.ts et bute sur son « node:crypto » :
+    //
+    //   UnhandledSchemeError: Reading from "node:crypto" is not handled by
+    //   plugins (Unhandled scheme).
+    //
+    // Le compilateur edge ne sait pas lire le préfixe « node: », et TOUTE la
+    // construction échoue — pour du code qui n'y tournerait jamais. Le préfixe
+    // est la convention du projet (vingt fichiers l'emploient) et n'a pas à
+    // être abandonné pour contourner cela.
+    //
+    // On retire donc ce seul module du seul paquet edge. La compilation nodejs
+    // le garde intact : c'est elle qui fait réellement partir les relances.
+    if (nextRuntime === "edge") {
+      config.plugins.push(
+        new webpack.IgnorePlugin({
+          resourceRegExp: /server[\\/]cron[\\/]planificateur/,
+        })
+      );
+    }
+
     return config;
   },
 
