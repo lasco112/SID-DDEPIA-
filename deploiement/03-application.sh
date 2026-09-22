@@ -112,7 +112,13 @@ cd "$CIBLE"
 sudo -u sid npm ci --silent 2>&1 | tail -3 || sudo -u sid npm install --silent 2>&1 | tail -3
 
 echo "  → Migrations de la base"
-sudo -u sid --preserve-env=HOME env HOME="$CIBLE" node scripts/migrer.mjs deploy 2>&1 | tail -4
+# migrer.mjs lit DATABASE_URL / MIGRATE_DATABASE_URL dans l'environnement. En
+# production, systemd les injecte depuis .env (EnvironmentFile, plus bas) ; mais
+# ICI, à l'installation, node est lancé à la main et ne lit aucun .env de
+# lui-même. Sans --env-file, la migration s'arrête sur « Ni MIGRATE_DATABASE_URL
+# ni DATABASE_URL : impossible de migrer. » et tout le reste (droits, semis,
+# build, service) ne se fait jamais. Node 22 sait charger le fichier lui-même.
+sudo -u sid --preserve-env=HOME env HOME="$CIBLE" node --env-file="$CIBLE/.env" scripts/migrer.mjs deploy 2>&1 | tail -4
 
 # Les droits sur les tables ne peuvent être accordés qu'une fois les tables
 # créées. C'est pourquoi cette étape est ici, et non dans le script 02.
