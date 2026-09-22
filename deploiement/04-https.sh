@@ -131,13 +131,33 @@ else
   systemctl enable --now certbot.timer >/dev/null 2>&1 || true
 fi
 
+# --- L'adresse publique de l'application -----------------------------------
+# NextAuth compare l'adresse d'où vient la requête à NEXTAUTH_URL. Si les deux
+# ne correspondent pas EXACTEMENT, la connexion échoue sans message : l'agent
+# saisit son mot de passe, la page revient au formulaire, et rien n'explique
+# pourquoi. Le script se contentait d'un rappel à la fin ; un rappel s'oublie,
+# surtout après vingt minutes d'installation. Il le fait donc lui-même.
+ENV_APP="/opt/sid/.env"
+if [ -f "$ENV_APP" ]; then
+  ATTENDU="https://${DOMAINE}"
+  ACTUEL=$(grep -m1 '^NEXTAUTH_URL=' "$ENV_APP" | cut -d= -f2- | tr -d '"')
+  if [ "$ACTUEL" != "$ATTENDU" ]; then
+    echo "  → Adresse publique de l'application : ${ATTENDU}"
+    echo "    (elle valait « ${ACTUEL:-rien} »)"
+    sed -i "s|^NEXTAUTH_URL=.*|NEXTAUTH_URL=\"${ATTENDU}\"|" "$ENV_APP"
+    systemctl restart sid 2>/dev/null || true
+    sleep 5
+    systemctl is-active --quiet sid \
+      && echo "    application redémarrée" \
+      || echo "    ✗ l'application n'a pas redémarré : journalctl -u sid -n 30"
+  else
+    echo "  → Adresse publique déjà correcte"
+  fi
+fi
+
 echo
 echo "  ✔ HTTPS en place"
 echo "    https://${DOMAINE}"
-echo
-echo "  N'OUBLIEZ PAS de corriger NEXTAUTH_URL dans /opt/sid/.env s'il ne"
-echo "  correspond pas exactement à https://${DOMAINE} — l'authentification"
-echo "  échouerait silencieusement. Puis :  systemctl restart sid"
 echo
 echo "  Suite, et ne la remettez pas à plus tard :  ./05-sauvegarde.sh"
 echo
