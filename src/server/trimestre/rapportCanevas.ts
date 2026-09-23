@@ -16,6 +16,7 @@ import type { PrismaClient } from "@prisma/client";
 import { SECTIONS_CANEVAS } from "./canevas/sections";
 import { rendreSection, champsAutomatiques } from "./canevas/rendu";
 import { pageDeGarde, tableauAcronymes } from "./canevas/pageDeGarde";
+import { preremplirTablesAutomatiques } from "./canevas/tablesAutomatiques";
 import { TEXTES_FIXES } from "./canevas/textesFixes";
 import { TEXTES_ARRONDISSEMENTS } from "./canevas/textesArrondissements";
 import type { ContexteCanevas, SectionCanevas } from "./canevas/types";
@@ -277,7 +278,9 @@ export async function genererRapportCanevas(
     ],
   });
 
-  const buffer = Buffer.from(await Packer.toBuffer(document));
+  // Table des matières et listes écrites d’avance : jamais de page blanche,
+  // même sans mise à jour des champs par Word (canevas/tablesAutomatiques.ts).
+  const buffer = preremplirTablesAutomatiques(Buffer.from(await Packer.toBuffer(document)));
   const qui = options.arrondissement
     ? `DAEPIA-${options.arrondissement.replace(/[ ’']/g, "")}`
     : identite.sigle;

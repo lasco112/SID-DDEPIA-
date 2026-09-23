@@ -93,7 +93,8 @@ test("le rapport d'un DA porte les lignes DA, jamais les lignes DD", async () =>
   const complet = (await produire("Dschang")).texte;
   // La liste des acronymes DÉFINIT « DDEPIA » : c'est un glossaire, pas une
   // ligne de tableau. On la met de côté pour ce contrôle.
-  const debutGlossaire = complet.indexOf("LISTE DES ACRONYMES, SIGLES ET ABRÉVIATIONS");
+  // lastIndexOf : le titre figure d'abord dans la table des matières.
+  const debutGlossaire = complet.lastIndexOf("LISTE DES ACRONYMES, SIGLES ET ABRÉVIATIONS");
   const finGlossaire = complet.indexOf("INTRODUCTION", debutGlossaire);
   assert.ok(debutGlossaire > 0 && finGlossaire > debutGlossaire, "Liste des acronymes introuvable.");
   const texte = complet.slice(0, debutGlossaire) + complet.slice(finGlossaire);
@@ -193,6 +194,22 @@ test("l'introduction annonce les mois de SA période, jamais ceux d'une autre", 
   );
   assert.ok(!texte.includes("Janvier à Mars"), "L'introduction annonce encore les mois du premier trimestre.");
   assert.ok(!/\{[A-Z_0-9-]+\}/.test(texte), "Un jeton de période est resté tel quel dans le document.");
+});
+
+test("table des matières et liste des tableaux sont écrites d'avance, jamais blanches", async () => {
+  for (const arrondissement of [undefined, "Santchou"]) {
+    const xml = new PizZip((await produire(arrondissement)).buffer).file("word/document.xml")!.asText();
+    const [matieres, tableaux, graphiques] = xml.match(/<w:sdt>[\s\S]*?<\/w:sdt>/g) ?? [];
+    const liens = (x = "") => (x.match(/w:anchor="/g) ?? []).length;
+    // Autant de lignes que de titres et de légendes réellement présents.
+    assert.equal(liens(matieres), (xml.match(/<w:pStyle w:val="Heading[1-4]"\/>/g) ?? []).length);
+    assert.equal(liens(tableaux), (xml.match(/<w:fldSimple w:instr="SEQ Tableau/g) ?? []).length);
+    assert.ok(liens(tableaux) > 80);
+    assert.match(tableaux, /Tableau n° 1 : Structures administratives/);
+    assert.match(graphiques ?? "", /Aucun graphique dans ce rapport/);
+    // Chaque lien mène à un signet qui existe.
+    for (const [, cible] of Array.from(xml.matchAll(/w:anchor="([^"]+)"/g))) assert.ok(xml.includes(`w:name="${cible}"`), cible);
+  }
 });
 
 test("un arrondissement inconnu est refusé, pas silencieusement ignoré", async () => {
