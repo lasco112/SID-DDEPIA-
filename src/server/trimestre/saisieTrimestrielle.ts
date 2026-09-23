@@ -346,7 +346,11 @@ export async function grille(db: PrismaClient, periode: Periode, profil: Profil,
     section,
     enteteLigne,
     lignes,
-    avertissements: [...avertissements(bloc, ctx, lignes), ...alertesReprises(numero, ctx, donnees.saisies)],
+    avertissements: [
+      ...lettresDansLesNombres(lignes),
+      ...avertissements(bloc, ctx, lignes),
+      ...alertesReprises(numero, ctx, donnees.saisies),
+    ],
     aide: AIDES[numero] ?? AIDE_PAR_DEFAUT,
   };
 }
@@ -383,6 +387,23 @@ function avertissements(bloc: BlocTableau, ctx: ContexteCanevas, lignes: GrilleS
       sortie.push(
         `${l.libelle} : la somme des catégories (${somme.toLocaleString("fr-FR")}) ne retombe pas sur le total des rapports mensuels (${attendu.toLocaleString("fr-FR")}).`
       );
+    }
+  }
+  return sortie;
+}
+
+/**
+ * Des lettres enregistrées dans une case qui attend un nombre — avant que la
+ * règle ne les refuse. Elles ne comptent dans aucun total : on les signale
+ * pour qu'elles soient remplacées.
+ */
+function lettresDansLesNombres(lignes: GrilleSaisie["lignes"]): string[] {
+  const sortie: string[] = [];
+  for (const l of lignes) {
+    for (const c of l.cases) {
+      if (c.etat !== "saisie" || c.texte || c.saisi == null) continue;
+      if (versNombre(c.saisi) != null) continue;
+      sortie.push(`${l.libelle || l.cle}, « ${c.colonne} » : « ${c.saisi} » n'est pas un nombre. Remplacez-le par un chiffre.`);
     }
   }
   return sortie;

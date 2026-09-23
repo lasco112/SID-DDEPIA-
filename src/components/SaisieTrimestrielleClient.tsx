@@ -17,7 +17,7 @@
  * est relue : les totaux se recalculent sous les yeux.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type EtatCase = "saisie" | "calculee" | "total" | "lecture";
 
@@ -94,6 +94,12 @@ export default function SaisieTrimestrielleClient({
   const [voirNonClassees, setVoirNonClassees] = useState(false);
   /** Le refus d'une saisie, affiché AU-DESSUS DU TABLEAU, là où l'on saisit. */
   const [refus, setRefus] = useState<string | null>(null);
+  /**
+   * Les cases tapées et pas encore enregistrées. Le rechargement du tableau,
+   * après chaque enregistrement, ne doit pas les écraser : un agent rapide
+   * tape déjà dans la case suivante pendant que la précédente s'enregistre.
+   */
+  const enCoursDeFrappe = useRef(new Set<string>());
 
   const chargerListe = useCallback(async () => {
     setErreur(null);
@@ -120,7 +126,15 @@ export default function SaisieTrimestrielleClient({
         setGrille(g);
         const v: Record<string, string> = {};
         for (const l of g.lignes) for (const c of l.cases) if (c.etat === "saisie") v[cleCase(l.cle, c.colonne)] = c.saisi ?? "";
-        setValeurs(v);
+        // Ce qui est enregistré vient du serveur — y compris ce qu'un collègue
+        // vient de saisir ; ce qu'on est en train de taper reste à l'écran.
+        setValeurs((avant) => {
+          const fusion = { ...v };
+          enCoursDeFrappe.current.forEach((k) => {
+            if (k in avant) fusion[k] = avant[k];
+          });
+          return fusion;
+        });
       } finally {
         setChargementGrille(false);
       }
@@ -134,8 +148,15 @@ export default function SaisieTrimestrielleClient({
     void chargerListe();
   }, [chargerListe]);
 
-  function ouvrir(numero: number) {
+  function ouvrir(numero: number, forcer = false) {
     setRefus(null);
+    enCoursDeFrappe.current.clear();
+    if (forcer && ouvert !== numero) {
+      setOuvert(numero);
+      setGrille(null);
+      void chargerGrille(numero);
+      return;
+    }
     if (ouvert === numero) {
       setOuvert(null);
       setGrille(null);
@@ -150,6 +171,8 @@ export default function SaisieTrimestrielleClient({
     if (!grille) return;
     const k = cleCase(ligne, colonne);
     const valeur = valeurs[k] ?? "";
+    // La case quitte la frappe : c'est désormais le serveur qui fait foi.
+    enCoursDeFrappe.current.delete(k);
     // Rien n'a changé : pas d'aller-retour inutile, précieux sur une connexion lente.
     if ((avant ?? "") === valeur.trim()) return;
     setEnCours(k);
@@ -179,6 +202,29 @@ export default function SaisieTrimestrielleClient({
     }
   }
 
+  /**
+   * Deux écrans, jamais mêlés (demande du Délégué) : la LISTE des tableaux,
+   * puis UN tableau seul, avec « précédent » et « suivant » à son pied. Sur un
+   * téléphone, voir plusieurs tableaux ouverts à la fois égarait les agents.
+   */
+  const dernierOuvert = useRef<number | null>(null);
+  useEffect(() => {
+    if (ouvert != null) {
+      dernierOuvert.current = ouvert;
+      window.scrollTo({ top: 0 });
+    } else if (dernierOuvert.current != null) {
+      // De retour à la liste : on la retrouve là où l'on avait quitté.
+      document.getElementById(`tableau-${dernierOuvert.current}`)?.scrollIntoView({ block: "center" });
+    }
+  }, [ouvert]);
+
+  function retourALaListe() {
+    setOuvert(null);
+    setGrille(null);
+    setRefus(null);
+    enCoursDeFrappe.current.clear();
+  }
+
   if (erreur && !liste) return <p className="rounded-md bg-red-50 p-4 text-sm text-red-800">{erreur}</p>;
   if (!liste) return <p className="text-gray-600">Chargement…</p>;
 
@@ -192,6 +238,67 @@ export default function SaisieTrimestrielleClient({
   const total = liste.tableaux.reduce((n, t) => n + t.saisissables, 0);
   const faites = liste.tableaux.reduce((n, t) => n + t.renseignees, 0);
 
+  // ------------------------------------------------------------ un tableau seul
+  const courant = ouvert == null ? null : liste.tableaux.find((t) => t.numero === ouvert) ?? null;
+  if (courant) {
+    const rang = liste.tableaux.findIndex((t) => t.numero === courant.numero) + 1;
+    return (
+      <div className="max-w-full">
+        <button
+          type="button"
+          onClick={retourALaListe}
+          className="mb-3 rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+        >
+          ← Tous les tableaux
+        </button>
+        <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+          {courant.section} · {liste.periode}
+        </p>
+        <h1 className="mt-1 text-xl font-bold text-primary-dark">{courant.titre}</h1>
+        <p className="mt-1 text-sm text-gray-600">
+          Tableau {rang} sur {liste.tableaux.length} ·{" "}
+          <span className={courant.renseignees === courant.saisissables ? "text-green-700" : ""}>
+            {courant.renseignees}/{courant.saisissables} case(s) renseignée(s)
+          </span>
+        </p>
+
+        {erreur && <p className="mt-3 rounded-md bg-red-50 p-3 text-sm text-red-800">{erreur}</p>}
+
+        <div className="mt-4 rounded-md border border-gray-200 bg-white p-3">
+          {chargementGrille && !grille && <p className="text-sm text-gray-600">Chargement…</p>}
+          {grille && grille.numero === courant.numero && (
+            <TableauSaisie
+              refus={refus}
+              grille={grille}
+              valeurs={valeurs}
+              enCours={enCours}
+              onChange={(k, v) => {
+                enCoursDeFrappe.current.add(k);
+                setValeurs((x) => ({ ...x, [k]: v }));
+              }}
+              onQuitter={enregistrer}
+            />
+          )}
+          <Enchainement
+            liste={liste.tableaux}
+            numero={courant.numero}
+            occupe={chargementGrille}
+            onAller={(n) => ouvrir(n, true)}
+          />
+        </div>
+
+        <button
+          type="button"
+          onClick={retourALaListe}
+          className="mt-3 w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 sm:w-auto"
+        >
+          ← Retour à la liste des tableaux
+        </button>
+      </div>
+    );
+  }
+
+  // ------------------------------------------------------------ la liste
   return (
     <div className="max-w-full">
       <h1 className="text-2xl font-bold text-primary-dark">{titre}</h1>
@@ -200,7 +307,7 @@ export default function SaisieTrimestrielleClient({
           (liste.arrondissement
             ? `Ce que les rapports mensuels ne collectent pas, pour l'arrondissement de ${liste.arrondissement}. Vous ne remplissez que sa ligne ; les cases grises se calculent seules.`
             : "Ce que les rapports mensuels ne collectent pas. Les cases grises se calculent seules : à partir du mensuel, ou comme totaux.")}{" "}
-        Chaque case s&apos;enregistre dès que vous la quittez.
+        Touchez un tableau pour le remplir ; chaque case s&apos;enregistre dès que vous la quittez.
       </p>
 
       <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -265,48 +372,85 @@ export default function SaisieTrimestrielleClient({
             <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-gray-500">{s.titre}</h2>
             <div className="space-y-2">
               {s.tableaux.map((t) => (
-                <section key={t.numero} className="rounded-md border border-gray-200 bg-white">
-                  <button
-                    type="button"
-                    onClick={() => ouvrir(t.numero)}
-                    className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-gray-50"
+                <button
+                  key={t.numero}
+                  id={`tableau-${t.numero}`}
+                  type="button"
+                  onClick={() => ouvrir(t.numero, true)}
+                  className="flex w-full items-center justify-between gap-3 rounded-md border border-gray-200 bg-white px-4 py-3 text-left hover:bg-gray-50"
+                >
+                  <span className="font-medium text-gray-900">
+                    {t.titre}
+                    {t.automatique && (
+                      <span className="ml-2 rounded bg-gray-100 px-1.5 py-0.5 text-xs font-normal text-gray-600">
+                        en partie calculé
+                      </span>
+                    )}
+                  </span>
+                  <span
+                    className={`shrink-0 text-sm ${t.renseignees === t.saisissables ? "text-green-700" : "text-gray-600"}`}
                   >
-                    <span className="font-medium text-gray-900">
-                      {t.titre}
-                      {t.automatique && (
-                        <span className="ml-2 rounded bg-gray-100 px-1.5 py-0.5 text-xs font-normal text-gray-600">
-                          en partie calculé
-                        </span>
-                      )}
-                    </span>
-                    <span
-                      className={`shrink-0 text-sm ${t.renseignees === t.saisissables ? "text-green-700" : "text-gray-600"}`}
-                    >
-                      {t.renseignees}/{t.saisissables}
-                    </span>
-                  </button>
-
-                  {ouvert === t.numero && (
-                    <div className="border-t border-gray-200 p-3">
-                      {chargementGrille && !grille && <p className="text-sm text-gray-600">Chargement…</p>}
-                      {grille && grille.numero === t.numero && (
-                        <TableauSaisie
-                          refus={refus}
-                          grille={grille}
-                          valeurs={valeurs}
-                          enCours={enCours}
-                          onChange={(k, v) => setValeurs((x) => ({ ...x, [k]: v }))}
-                          onQuitter={enregistrer}
-                        />
-                      )}
-                    </div>
-                  )}
-                </section>
+                    {t.renseignees}/{t.saisissables}
+                  </span>
+                </button>
               ))}
             </div>
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Au bas de chaque tableau, le suivant est annoncé : on remplit les tableaux
+ * l'un après l'autre sans remonter chercher dans la liste. Le précédent aussi,
+ * pour revenir corriger.
+ */
+function Enchainement({
+  liste,
+  numero,
+  occupe,
+  onAller,
+}: {
+  liste: ResumeTableau[];
+  numero: number;
+  /** Pendant le chargement, les boutons attendent : un double appui sauterait un tableau. */
+  occupe: boolean;
+  onAller: (numero: number) => void;
+}) {
+  const i = liste.findIndex((t) => t.numero === numero);
+  const precedent = i > 0 ? liste[i - 1] : null;
+  const suivant = i >= 0 && i < liste.length - 1 ? liste[i + 1] : null;
+  return (
+    <div className="mt-4 flex flex-col gap-2 border-t border-gray-200 pt-3 sm:flex-row sm:justify-between">
+      {precedent ? (
+        <button
+          type="button"
+          onClick={() => onAller(precedent.numero)}
+          disabled={occupe}
+          className="rounded-md border disabled:opacity-50 border-gray-300 px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+        >
+          ← Précédent : {precedent.titre}
+        </button>
+      ) : (
+        <span />
+      )}
+      {suivant ? (
+        <button
+          type="button"
+          onClick={() => onAller(suivant.numero)}
+          disabled={occupe}
+          className="rounded-md bg-primary disabled:opacity-50 px-3 py-2 text-left text-sm font-semibold text-white hover:bg-primary-hover"
+        >
+          Tableau suivant : {suivant.titre} →
+          <span className="block text-xs font-normal opacity-90">
+            {suivant.renseignees}/{suivant.saisissables} case(s) déjà renseignée(s)
+          </span>
+        </button>
+      ) : (
+        <p className="text-sm text-green-700">C&apos;était le dernier tableau à remplir.</p>
+      )}
     </div>
   );
 }
@@ -328,6 +472,11 @@ function TableauSaisie({
 }) {
   const colonnes = grille.lignes[0]?.cases.map((c) => c.colonne) ?? [];
   const lignesSaisies = grille.lignes.filter((l) => l.cases.some((c) => c.etat === "saisie"));
+  // Les colonnes où ce profil saisit : une seule pour un DA quand les
+  // arrondissements sont en colonnes (personnel, infrastructures…).
+  const colonnesSaisies = Array.from(
+    new Set(grille.lignes.flatMap((l) => l.cases.filter((c) => c.etat === "saisie").map((c) => c.colonne)))
+  );
 
   const champ = (l: Grille["lignes"][number], c: CaseGrille, large = false) => {
     const k = cleCase(l.cle, c.colonne);
@@ -387,7 +536,23 @@ function TableauSaisie({
         arrondissement : un formulaire vertical se lit mieux sur un téléphone
         qu'un tableau de dix colonnes.
       */}
-      {lignesSaisies.length === 1 ? (
+      {lignesSaisies.length > 1 && colonnesSaisies.length === 1 ? (
+        // Une seule colonne à remplir : chaque ligne du tableau devient une
+        // question, et les totaux de la colonne s'affichent en fin de liste.
+        <div className="grid max-w-xl gap-2">
+          <p className="text-sm font-semibold text-gray-800">{colonnesSaisies[0]}</p>
+          {grille.lignes.map((l) => {
+            const c = l.cases.find((x) => x.colonne === colonnesSaisies[0]);
+            if (!c) return null;
+            return (
+              <label key={l.cle} className="grid grid-cols-[1fr,8rem] items-center gap-3 text-sm">
+                <span className={c.etat === "saisie" ? "text-gray-800" : "font-medium text-gray-600"}>{l.libelle || l.cle}</span>
+                {champ(l, c, true)}
+              </label>
+            );
+          })}
+        </div>
+      ) : lignesSaisies.length === 1 ? (
         <div className="grid max-w-xl gap-2">
           {lignesSaisies[0].cases.map((c) => (
             <label key={c.colonne} className="grid grid-cols-[1fr,10rem] items-center gap-3 text-sm">
