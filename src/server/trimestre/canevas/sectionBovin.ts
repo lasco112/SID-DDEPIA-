@@ -64,6 +64,33 @@ export const SECTION_II_BOVIN: SectionCanevas = {
 
     // ---- II-1-1. Les infrastructures ----
     { type: "titre", niveau: 3, texte: "II-1-1. Les infrastructures d'exploitation" },
+    // Ordre du régional : la phrase sur les BIP de l'exercice et leur tableau
+    // viennent d'abord ; le tableau général des infrastructures suit le texte
+    // sur les abattoirs.
+    {
+      type: "zoneTexte",
+      cle: "II1.bip",
+      consigne: "Nombre et montant des BIP de l'exercice consacrés aux infrastructures d'élevage, niveau d'exécution.",
+    },
+    {
+      // Le régional y liste les ouvrages financés sur le budget
+      // d'investissement public de l'exercice, sans légende : il en reçoit une.
+      type: "tableau",
+      kind: "libre",
+      numero: null,
+      titre: "Infrastructures d’élevage financées sur le budget d’investissement public",
+      entetes: [
+        "N°",
+        "Arrondissement/ Commune",
+        "Infrastructure d’élevage de base",
+        "Equipement ou infrastructure annexe à l’infrastructure de base",
+        "Montant alloué (FCFA)",
+        "Niveau d’exécution physique (construit, non construit, En cours, Arrêté)",
+      ],
+      lignes: ["1", "2", "3", "TOTAL"],
+    },
+    { type: "titre", niveau: 4, texte: "a) Abattoirs" },
+    { type: "zoneTexte", cle: "II1.abattoirs", consigne: "Abattoirs et aires d'abattage : état, fonctionnement." },
     {
       type: "tableau",
       kind: "arrondissements",
@@ -92,25 +119,6 @@ export const SECTION_II_BOVIN: SectionCanevas = {
         "TOTAL",
       ],
     },
-    {
-      // Le régional y liste les ouvrages financés sur le budget
-      // d'investissement public de l'exercice, sans légende : il en reçoit une.
-      type: "tableau",
-      kind: "libre",
-      numero: null,
-      titre: "Infrastructures d’élevage financées sur le budget d’investissement public",
-      entetes: [
-        "N°",
-        "Arrondissement/ Commune",
-        "Infrastructure d’élevage de base",
-        "Equipement ou infrastructure annexe à l’infrastructure de base",
-        "Montant alloué (FCFA)",
-        "Niveau d’exécution physique (construit, non construit, En cours, Arrêté)",
-      ],
-      lignes: ["1", "2", "3", "TOTAL"],
-    },
-    { type: "titre", niveau: 4, texte: "a) Abattoirs" },
-    { type: "zoneTexte", cle: "II1.abattoirs", consigne: "Abattoirs et aires d'abattage : état, fonctionnement." },
     { type: "titre", niveau: 4, texte: "b) Les pâturages" },
     { type: "zoneTexte", cle: "II1.paturages", consigne: "Zones de pâturage, état, conflits agropastoraux." },
     { type: "titre", niveau: 4, texte: "c) Hydraulique pastorale" },

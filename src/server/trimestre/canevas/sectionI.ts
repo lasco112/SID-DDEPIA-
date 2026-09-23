@@ -54,11 +54,12 @@ export const SECTION_I: SectionCanevas = {
     {
       // Tableau des structures, sans légende dans le régional, où il liste pour
       // chaque département ses DAEPIA, ses CZV et ses postes de contrôle. Ramené
-      // au département : une ligne par arrondissement.
+      // au département : une ligne par arrondissement. Il reçoit une légende :
+      // tout tableau du rapport est numéroté (décision du Délégué).
       type: "tableau",
       kind: "libre",
       numero: null,
-      titre: "",
+      titre: "Structures administratives par arrondissement",
       entetes: ["Arrondissement", "DAEPIA", "CZV", "CCP/SA"],
       lignes: ["{ARRONDISSEMENTS}", "TOTAL"],
     },

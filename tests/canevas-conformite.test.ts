@@ -434,16 +434,30 @@ test("les clés des zones de texte sont uniques dans chaque section", () => {
   }
 });
 
-test("le budget-programme décrit ses quatre programmes, sans légende", () => {
+test("tout tableau du rapport porte une légende, donc un numéro", () => {
+  // Décision du Délégué : aucun tableau sans numéro. Une légende vide
+  // produisait un tableau hors de la numérotation et de la liste des tableaux.
+  const sansLegende: string[] = [];
+  for (const section of SECTIONS) {
+    for (const b of tableauxDe(section)) if (!b.titre.trim()) sansLegende.push(idTableau(section, b));
+  }
+  assert.deepEqual(sansLegende, []);
+});
+
+test("le budget-programme décrit ses quatre programmes, un tableau légendé chacun", () => {
   const titres = SECTION_BUDGET.blocs.filter((b) => b.type === "titre" && b.niveau === 2).map((b) => (b as { texte: string }).texte);
   assert.equal(titres.length, 4);
   for (const code of ["053", "055", "057", "059"]) {
     assert.ok(titres.some((t) => t.startsWith(`PROGRAMME ${code} :`)), `programme ${code} manquant`);
   }
-  for (const b of tableauxDe(SECTION_BUDGET)) {
-    assert.equal(b.titre, "");
-    assert.equal(b.numero, null);
-  }
+  const tableaux = tableauxDe(SECTION_BUDGET);
+  assert.deepEqual(
+    tableaux.map((b) => b.titre),
+    ["053", "055", "057", "059"].map((c) => `Activités menées au titre du programme ${c}`)
+  );
+  // Pas de numéro INTERNE : aucune donnée n'y est reliée. Le numéro affiché,
+  // lui, vient de la légende.
+  for (const b of tableaux) assert.equal(b.numero, null);
 });
 
 test("l'inventaire des sections est cohérent", () => {

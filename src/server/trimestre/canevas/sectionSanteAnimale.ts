@@ -53,7 +53,7 @@ export const SECTION_IV_SANTE: SectionCanevas = {
       type: "tableau",
       kind: "libre",
       numero: null,
-      titre: "",
+      titre: "Promptitude et complétude de la transmission des données zoosanitaires",
       entetes: ["Arrondissement", "Situations attendues", "Situations transmises", "Complétude (%)", "Promptitude (%)"],
       lignes: ["{ARRONDISSEMENTS}"],
     },

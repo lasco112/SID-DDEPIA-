@@ -2,8 +2,9 @@
  * PREMIÈRE PARTIE du canevas trimestriel — mise en œuvre du budget-programme.
  *
  * Quatre programmes, et pour chacun le même enchaînement : présentation,
- * activités menées, un tableau. Le canevas ne donne pas de légende à ces
- * quatre tableaux, qui n'apparaissent donc pas dans la liste des tableaux.
+ * activités menées, un tableau. Le régional ne donne pas de légende à ces
+ * quatre tableaux ; ils en reçoivent une ici, car tout tableau du rapport est
+ * numéroté et figure dans la liste des tableaux (décision du Délégué).
  *
  * DÉCISION D4 DU DÉLÉGUÉ : les colonnes sont celles du régional, et les lignes
  * — code, action, activités — sont PRÉ-REMPLIES d'après lui : ce sont les
@@ -40,7 +41,7 @@ const RAPPEL_PRESENTATION = "Rappel de l'objet du programme et des actions reten
  */
 type Action = { code: string; action: string; activites: string[][] };
 
-function tableauActivites(colonnes: string[], actions: Action[]): Extract<Bloc, { type: "tableau" }> {
+function tableauActivites(code: string, colonnes: string[], actions: Action[]): Extract<Bloc, { type: "tableau" }> {
   const lignes: string[] = [];
   const prerempli: string[][] = [];
   for (const a of actions) {
@@ -49,7 +50,8 @@ function tableauActivites(colonnes: string[], actions: Action[]): Extract<Bloc, 
       prerempli.push([i === 0 ? a.action : "", ...cases]);
     });
   }
-  return { type: "tableau", kind: "libre", numero: null, titre: "", entetes: colonnes, lignes, prerempli };
+  const titre = `Activités menées au titre du programme ${code}`;
+  return { type: "tableau", kind: "libre", numero: null, titre, entetes: colonnes, lignes, prerempli };
 }
 
 function programme(code: string, intitule: string, tableau: Extract<Bloc, { type: "tableau" }>): Bloc[] {
@@ -68,7 +70,7 @@ function programme(code: string, intitule: string, tableau: Extract<Bloc, { type
   ];
 }
 
-const P053 = tableauActivites(COLONNES_ACTIVITES, [
+const P053 = tableauActivites("053", COLONNES_ACTIVITES, [
   {
     code: "053.01",
     action: "Développement des industries animales",
@@ -129,7 +131,7 @@ const P053 = tableauActivites(COLONNES_ACTIVITES, [
   },
 ]);
 
-const P055 = tableauActivites(COLONNES_ACTIVITES, [
+const P055 = tableauActivites("055", COLONNES_ACTIVITES, [
   {
     code: "055.01",
     action: "Contrôle des maladies animales",
@@ -156,7 +158,7 @@ const P055 = tableauActivites(COLONNES_ACTIVITES, [
  * plusieurs activités dans le régional : il n'est écrit qu'à sa première
  * activité.
  */
-const P057 = tableauActivites(COLONNES_ACTIVITES_057, [
+const P057 = tableauActivites("057", COLONNES_ACTIVITES_057, [
   {
     code: "057.01",
     action: "Développement de l’Aquaculture commerciale",
@@ -193,7 +195,7 @@ const P057 = tableauActivites(COLONNES_ACTIVITES_057, [
   },
 ]);
 
-const P059 = tableauActivites(COLONNES_ACTIVITES, [
+const P059 = tableauActivites("059", COLONNES_ACTIVITES, [
   {
     code: "059.01",
     action: "Coordination et suivi des activités des services de la {STRUCTURE}",
