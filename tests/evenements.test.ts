@@ -98,7 +98,7 @@ test("chaque case visée existe au canevas, au caractère près", () => {
       const c = l.categorie(e, s);
       if (c) produites.add(c);
     }
-    for (const c of produites) if (!cases.has(c)) ecarts.push(`${l.titre} : « ${c} » absent du tableau`);
+    for (const c of Array.from(produites)) if (!cases.has(c)) ecarts.push(`${l.titre} : « ${c} » absent du tableau`);
     for (const t of Object.keys(l.textes ?? {})) if (!cases.has(t)) ecarts.push(`${l.titre} : colonne « ${t} » absente`);
   }
   assert.deepEqual(ecarts, []);
