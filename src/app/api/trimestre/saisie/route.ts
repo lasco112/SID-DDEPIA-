@@ -16,7 +16,8 @@ import { trimestrielle, libelleOfficiel } from "@/server/periodes/calendrier";
 import { periodeTrimestrielle } from "@/server/trimestre/rubriques";
 import { ecrireSaisieCanevas, cleCellule } from "@/server/trimestre/saisieCanevas";
 import {
-  ROLES_SAISIE, resumer, grille, refusDeSaisie, nomArrondissement, attendUnNombre, incoherenceCategories, type Profil,
+  ROLES_SAISIE, resumer, grille, refusDeSaisie, nomArrondissement, attendUnNombre, incoherenceCategories, porteeDeSaisie,
+  type Profil,
 } from "@/server/trimestre/saisieTrimestrielle";
 import { preparerEvenements } from "@/server/trimestre/evenements";
 
@@ -127,7 +128,9 @@ export async function PUT(req: Request) {
       periodeId,
       cellule,
       estNombre ? { valeur: nombre } : { texte: brut == null ? null : String(brut) },
-      user.id
+      user.id,
+      // Un DA qui remplit le budget-programme remplit le SIEN.
+      await porteeDeSaisie(user.db, profil, body.numeroTableau)
     );
 
     await user.db.auditLog.create({

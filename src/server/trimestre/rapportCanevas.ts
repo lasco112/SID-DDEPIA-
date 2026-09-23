@@ -13,13 +13,7 @@
  */
 import { Document, Packer, Paragraph, TextRun, AlignmentType, HeadingLevel, Header, PageBreak } from "docx";
 import type { PrismaClient } from "@prisma/client";
-import { SECTION_I } from "./canevas/sectionI";
-import { SECTION_BUDGET } from "./canevas/sectionBudget";
-import { SECTION_II_BOVIN } from "./canevas/sectionBovin";
-import { SECTION_II_OVIN, SECTION_II_CAPRIN, SECTION_II_EQUIDES } from "./canevas/sectionElevages";
-import { SECTION_II_PORCIN, SECTION_II_AVICOLE } from "./canevas/sectionPorcinAvicole";
-import { SECTION_II_AUTRES, SECTION_III_PECHE } from "./canevas/sectionPecheEtDivers";
-import { SECTION_IV_SANTE } from "./canevas/sectionSanteAnimale";
+import { SECTIONS_CANEVAS } from "./canevas/sections";
 import { rendreSection, champsAutomatiques } from "./canevas/rendu";
 import { pageDeGarde, tableauAcronymes } from "./canevas/pageDeGarde";
 import { TEXTES_FIXES } from "./canevas/textesFixes";
@@ -46,12 +40,8 @@ const MOIS_MAJ = [
   "JUILLET", "AOÛT", "SEPTEMBRE", "OCTOBRE", "NOVEMBRE", "DÉCEMBRE",
 ];
 
-/** Les onze sections décrites, dans l'ordre du canevas. */
-export const SECTIONS_CANEVAS: SectionCanevas[] = [
-  SECTION_I, SECTION_BUDGET, SECTION_II_BOVIN, SECTION_II_OVIN, SECTION_II_CAPRIN,
-  SECTION_II_EQUIDES, SECTION_II_PORCIN, SECTION_II_AVICOLE, SECTION_II_AUTRES,
-  SECTION_III_PECHE, SECTION_IV_SANTE,
-];
+/** Les onze sections décrites, dans l'ordre du canevas (canevas/sections.ts). */
+export { SECTIONS_CANEVAS };
 
 /** Une zone de texte analytique du canevas, repérée dans sa section. */
 export interface ZoneTexte {

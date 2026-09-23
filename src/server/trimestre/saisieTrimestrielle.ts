@@ -27,7 +27,8 @@ import { SECTIONS_CANEVAS } from "./rapportCanevas";
 import { colonnesDe, lignesDe } from "./canevas/rendu";
 import { axeTerritorial, clesLignes, estTotal } from "./canevas/structure";
 import type { Bloc, ContexteCanevas } from "./canevas/types";
-import { cleCellule, lireSaisiesCanevas, type ValeurCellule } from "./saisieCanevas";
+import { cleCellule, saisiesVues, type ValeurCellule } from "./saisieCanevas";
+import { numerosSansMaille, TABLEAUX_BAC } from "./canevas/sections";
 import { preparer, fournisseur, estCaseCalculee, valeurReprise, versNombre } from "./remplissage";
 import { REPRISES, repriseDe } from "./canevas/reprises";
 import { champsMobilises, liaisonDe, estLiee } from "./liaison";
@@ -50,7 +51,7 @@ const MOIS_MAJ = [
  * matériel, équipements, budget, recettes, et les deux qui les complètent —
  * structures administratives (101) et crédits d'investissement (102).
  */
-export const TABLEAUX_BAC = new Set([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 101, 102]);
+export { TABLEAUX_BAC };
 
 /** Qui saisit : son rôle, et pour un DA ou un agent, son arrondissement. */
 export interface Profil {
@@ -105,11 +106,14 @@ function autorise(bloc: BlocTableau, profil: Profil, ligne: string, colonne: str
   if (profil.role === "DD") return true;
   if (profil.role === "CHEF_BAC") return TABLEAUX_BAC.has(bloc.numero!);
   if (!estArrondissement(profil) || !profil.arrondissement) return false;
-  // Un DA ou un agent ne saisit que dans la maille de SON arrondissement.
+  // Un DA ou un agent ne saisit que dans la maille de SON arrondissement…
   const axe = axeTerritorial(bloc);
   if (axe === "lignes") return ligne === profil.arrondissement;
   if (axe === "colonnes") return colonne === profil.arrondissement;
-  return false;
+  // … et, dans un tableau sans maille, SA version, enregistrée sous sa portée
+  // (budget-programme, BIP, vétérinaires de son arrondissement…). Le BAC,
+  // lui, reste départemental.
+  return !TABLEAUX_BAC.has(bloc.numero!);
 }
 
 export type EtatCase = "saisie" | "calculee" | "total" | "lecture";
@@ -239,7 +243,7 @@ export interface ResumeTableau {
 /** Les tableaux où ce profil a quelque chose à saisir, avec leur avancement. */
 export async function resumer(db: PrismaClient, periode: Periode, profil: Profil): Promise<ResumeTableau[]> {
   const ctx = await contextePour(db, periode, profil);
-  const saisies = await saisiesDe(db, periode);
+  const saisies = await saisiesDe(db, periode, await arrondissementIdDe(db, profil));
   const resultat: ResumeTableau[] = [];
   for (const { bloc, section } of tableaux()) {
     const { colonnes, cles } = coordonnees(bloc, ctx);
@@ -265,12 +269,29 @@ export async function resumer(db: PrismaClient, periode: Periode, profil: Profil
   return resultat;
 }
 
-async function saisiesDe(db: PrismaClient, periode: Periode): Promise<Map<string, ValeurCellule>> {
+async function saisiesDe(db: PrismaClient, periode: Periode, arrondissementId?: string): Promise<Map<string, ValeurCellule>> {
   const trimestre = await db.periodeReporting.findFirst({
     where: { type: "TRIMESTRIEL", annee: periode.annee, trimestre: periode.rang },
     select: { id: true },
   });
-  return trimestre ? lireSaisiesCanevas(db, trimestre.id) : new Map();
+  return trimestre ? saisiesVues(db, trimestre.id, arrondissementId, numerosSansMaille()) : new Map();
+}
+
+/** L'identifiant de l'arrondissement d'un DA ou d'un agent ; undefined pour le département. */
+async function arrondissementIdDe(db: PrismaClient, profil: Profil): Promise<string | undefined> {
+  if (!estArrondissement(profil)) return undefined;
+  return (await listerArrondissements(db)).find((a) => a.nom === profil.arrondissement)?.id;
+}
+
+/**
+ * La portée sous laquelle une saisie s'enregistre : celle de l'arrondissement
+ * pour un DA ou un agent dans un tableau sans maille, celle du département
+ * sinon — sa ligne d'un tableau à maille territoriale est une case partagée
+ * par son rapport et le rapport départemental.
+ */
+export async function porteeDeSaisie(db: PrismaClient, profil: Profil, numero: number): Promise<string> {
+  if (!numerosSansMaille().has(numero)) return "";
+  return (await arrondissementIdDe(db, profil)) ?? "";
 }
 
 // ------------------------------------------------------------------ grille
@@ -306,9 +327,7 @@ export async function grille(db: PrismaClient, periode: Periode, profil: Profil,
   if (!t) return null;
   const { bloc, section } = t;
   const ctx = await contextePour(db, periode, profil);
-  const arrondissementId = estArrondissement(profil)
-    ? (await listerArrondissements(db)).find((a) => a.nom === profil.arrondissement)?.id
-    : undefined;
+  const arrondissementId = await arrondissementIdDe(db, profil);
 
   // La consolidation du trimestre n'est utile qu'aux tableaux alimentés par le
   // mensuel : un tableau purement saisi se contente de ses saisies.

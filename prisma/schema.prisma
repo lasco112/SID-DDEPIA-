@@ -698,7 +698,8 @@ model SaisieCanevas {
 
   id            String   @id @default(cuid())
   periodeId     String
-  /// Numéro du tableau au canevas officiel (1 à 72). Ne jamais renuméroter.
+  /// Numéro du tableau : 1 à 72 au canevas régional, 101 et plus pour les
+  /// tableaux ajoutés au canevas départemental. Ne jamais renuméroter.
   numeroTableau Int
   /// Libellé de ligne, tel que le canevas le nomme.
   ligne         String
@@ -707,6 +708,11 @@ model SaisieCanevas {
   valeur        Decimal? @db.Decimal(14, 3)
   /// Cellules non numériques du canevas (observations, noms, dates).
   valeurTexte   String?
+  /// À qui appartient la saisie : "" pour le département, l'identifiant de
+  /// l'arrondissement pour la version d'un DA d'un tableau sans maille
+  /// territoriale (budget-programme, BIP, vétérinaires…). Jamais null : un
+  /// index unique ne protège pas du doublon entre deux NULL.
+  portee        String   @default("")
   auteurId      String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -717,7 +723,7 @@ model SaisieCanevas {
   /// Les quatre parties de la clé sont obligatoires : contrairement aux
   /// rubriques narratives, aucune n'est nullable, et cet index unique suffit
   /// donc réellement — pas besoin d'index partiel.
-  @@unique([periodeId, numeroTableau, ligne, colonne])
+  @@unique([periodeId, numeroTableau, ligne, colonne, portee])
   @@index([periodeId, numeroTableau])
 }
 

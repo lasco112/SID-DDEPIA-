@@ -18,7 +18,9 @@ import { base, transaction } from "../src/lib/baseDeTravail";
 import { trimestrielle } from "../src/server/periodes/calendrier";
 import { periodeTrimestrielle } from "../src/server/trimestre/rubriques";
 import { ecrireSaisieCanevas } from "../src/server/trimestre/saisieCanevas";
-import { refusDeSaisie, grille, resumer, attendUnNombre, incoherenceCategories } from "../src/server/trimestre/saisieTrimestrielle";
+import {
+  refusDeSaisie, grille, resumer, attendUnNombre, incoherenceCategories, porteeDeSaisie,
+} from "../src/server/trimestre/saisieTrimestrielle";
 import { genererRapportCanevas } from "../src/server/trimestre/rapportCanevas";
 
 const P = trimestrielle(2031, 1);
@@ -111,6 +113,40 @@ test("un total est la somme de ses cases saisies, dans l'écran comme dans le ra
   const rapport = await genererRapportCanevas(base, P, { autoriserIncomplet: true });
   const texte = new PizZip(rapport.buffer).file("word/document.xml")!.asText().replace(/<[^>]+>/g, "|");
   assert.ok(/\|15\|/.test(texte), "le total 15 doit figurer dans le rapport départemental");
+});
+
+test("budget-programme : chaque DA remplit SA version, le DD la sienne", async () => {
+  periodeId = periodeId ?? (await periodeTrimestrielle(base, P));
+  const dd = await base.user.findFirstOrThrow({ where: { role: "DD", actif: true }, select: { id: true } });
+  const COL = "Description du niveau de réalisation";
+  const cle = (await grille(base, P, DD, 104))!.lignes[0].cle;
+
+  // Un DA peut écrire dans un tableau sans maille : c'est sa version.
+  assert.equal(await refusDeSaisie(base, P, DA_DSCHANG, 104, cle, COL), null);
+  assert.equal(await porteeDeSaisie(base, DD, 104), "");
+  const porteeDschang = await porteeDeSaisie(base, DA_DSCHANG, 104);
+  assert.notEqual(porteeDschang, "");
+  // Sa ligne d'un tableau à maille reste la case partagée avec le département.
+  assert.equal(await porteeDeSaisie(base, DA_DSCHANG, 14), "");
+
+  const ecrire = (texte: string, portee: string) =>
+    ecrireSaisieCanevas(base, transaction, periodeId!, { numeroTableau: 104, ligne: cle, colonne: COL }, { texte }, dd.id, portee);
+  await ecrire("REALISATION-DEPARTEMENT", "");
+  await ecrire("REALISATION-DSCHANG", porteeDschang);
+
+  const affiche = async (profil: { role: string; arrondissement?: string }) =>
+    (await grille(base, P, profil, 104))!.lignes[0].cases.find((c) => c.colonne === COL)!.affiche;
+  assert.equal(await affiche(DD), "REALISATION-DEPARTEMENT");
+  assert.equal(await affiche(DA_DSCHANG), "REALISATION-DSCHANG");
+  assert.equal(await affiche({ role: "DA", arrondissement: "Fokoué" }), null, "Fokoué n'a rien écrit");
+
+  const texte = async (arrondissement?: string) =>
+    new PizZip((await genererRapportCanevas(base, P, { autoriserIncomplet: true, arrondissement })).buffer)
+      .file("word/document.xml")!.asText();
+  const dept = await texte();
+  assert.ok(dept.includes("REALISATION-DEPARTEMENT") && !dept.includes("REALISATION-DSCHANG"));
+  const dschang = await texte("Dschang");
+  assert.ok(dschang.includes("REALISATION-DSCHANG") && !dschang.includes("REALISATION-DEPARTEMENT"));
 });
 
 test("des chiffres partout, sauf dans les colonnes de texte", () => {

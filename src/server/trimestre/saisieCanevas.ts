@@ -49,10 +49,12 @@ export interface ValeurCellule {
  */
 export async function lireSaisiesCanevas(
   db: PrismaClient,
-  periodeId: string
+  periodeId: string,
+  /** "" : le département ; l'identifiant d'un arrondissement : sa version. */
+  portee = ""
 ): Promise<Map<string, ValeurCellule>> {
   const lignes = await db.saisieCanevas.findMany({
-    where: { periodeId },
+    where: { periodeId, portee },
     select: { numeroTableau: true, ligne: true, colonne: true, valeur: true, valeurTexte: true },
   });
 
@@ -82,7 +84,9 @@ export async function ecrireSaisieCanevas(
   periodeId: string,
   cellule: CelluleCanevas,
   saisie: { valeur?: number | null; texte?: string | null },
-  auteurId: string
+  auteurId: string,
+  /** "" : le département ; l'identifiant d'un arrondissement : sa version. */
+  portee = ""
 ): Promise<{ enregistre: boolean }> {
 
   const texte = saisie.texte?.trim() || null;
@@ -96,6 +100,7 @@ export async function ecrireSaisieCanevas(
         numeroTableau: cellule.numeroTableau,
         ligne: cellule.ligne,
         colonne: cellule.colonne,
+        portee,
       },
       select: { id: true },
     });
@@ -120,6 +125,7 @@ export async function ecrireSaisieCanevas(
           valeur,
           valeurTexte: texte,
           auteurId,
+          portee,
         },
       });
     }
@@ -134,8 +140,35 @@ export async function compterSaisiesParTableau(
 ): Promise<Map<number, number>> {
   const groupes = await db.saisieCanevas.groupBy({
     by: ["numeroTableau"],
-    where: { periodeId },
+    where: { periodeId, portee: "" },
     _count: true,
   });
   return new Map(groupes.map((g) => [g.numeroTableau, g._count]));
+}
+
+/**
+ * Les saisies telles qu'un rapport les voit.
+ *
+ * Le rapport départemental voit la version du département. Le rapport d'un
+ * arrondissement voit la même chose pour les tableaux à maille territoriale —
+ * sa ligne y est la même case que dans le rapport départemental — mais SA
+ * version des tableaux sans maille (budget-programme, BIP, vétérinaires…).
+ */
+export async function saisiesVues(
+  db: PrismaClient,
+  periodeId: string,
+  arrondissementId: string | null | undefined,
+  sansMaille: Set<number>
+): Promise<Map<string, ValeurCellule>> {
+  const departement = await lireSaisiesCanevas(db, periodeId, "");
+  if (!arrondissementId) return departement;
+  const siennes = await lireSaisiesCanevas(db, periodeId, arrondissementId);
+  const vues = new Map<string, ValeurCellule>();
+  departement.forEach((v, cle) => {
+    if (!sansMaille.has(Number(cle.split(" | ")[0]))) vues.set(cle, v);
+  });
+  siennes.forEach((v, cle) => {
+    if (sansMaille.has(Number(cle.split(" | ")[0]))) vues.set(cle, v);
+  });
+  return vues;
 }

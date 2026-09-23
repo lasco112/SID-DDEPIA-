@@ -20,7 +20,8 @@ import { clesLignes, estTotal, estEcart } from "./canevas/structure";
 import { repriseDe } from "./canevas/reprises";
 import type { Bloc, ContexteCanevas } from "./canevas/types";
 import { listerArrondissements, graphieCanevas } from "../../lib/arrondissements";
-import { lireSaisiesCanevas, cleCellule, type ValeurCellule } from "./saisieCanevas";
+import { saisiesVues, cleCellule, type ValeurCellule } from "./saisieCanevas";
+import { numerosSansMaille } from "./canevas/sections";
 import { preparerEvenements, liaisonEvenementDe, type DonneesEvenements } from "./evenements";
 
 const nf = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 3 });
@@ -103,13 +104,19 @@ export async function preparer(
     where: { type: "TRIMESTRIEL", annee: periode.annee, trimestre: periode.rang },
     select: { id: true },
   });
-  const saisies = trimestre ? await lireSaisiesCanevas(db, trimestre.id) : new Map<string, ValeurCellule>();
+  // Le rapport d'un arrondissement lit SA version des tableaux sans maille.
+  const sansMaille = numerosSansMaille();
+  const saisies = trimestre
+    ? await saisiesVues(db, trimestre.id, options.arrondissementId, sansMaille)
+    : new Map<string, ValeurCellule>();
   const n1 = memePeriodeAnneePrecedente(periode);
   const trimestreN1 = await db.periodeReporting.findFirst({
     where: { type: "TRIMESTRIEL", annee: n1.annee, trimestre: n1.rang },
     select: { id: true },
   });
-  const saisiesN1 = trimestreN1 ? await lireSaisiesCanevas(db, trimestreN1.id) : new Map<string, ValeurCellule>();
+  const saisiesN1 = trimestreN1
+    ? await saisiesVues(db, trimestreN1.id, options.arrondissementId, sansMaille)
+    : new Map<string, ValeurCellule>();
 
   if (options.sansAgregation) {
     const aucun: DonneesEvenements = { courant: new Map(), precedent: new Map(), nonClassees: [] };
