@@ -62,6 +62,14 @@ export const VACCINS = [
   ["VAC_RAGE", "Vaccin antirabique"],
   ["VAC_GUMBORO", "Vaccin Gumboro"],
   ["VAC_CLAVELEE", "Vaccin clavelée"],
+  // Vaccins des sept maladies ajoutées le 24 septembre 2026 (migration 20260924140000).
+  ["VAC_PPCB", "Vaccin PPCB"],
+  ["VAC_ROUGET", "Vaccin rouget"],
+  ["VAC_VARIOLE_AVIAIRE", "Vaccin variole aviaire"],
+  ["VAC_BRONCHITE_INFECTIEUSE", "Vaccin bronchite infectieuse"],
+  ["VAC_CHARBON_SYMPTOMATIQUE", "Vaccin charbon symptomatique"],
+  ["VAC_CHOLERA", "Vaccin choléra"],
+  ["VAC_PARVOVIROSE", "Vaccin parvovirose"],
 ] as const;
 
 export const ACTES_VETERINAIRES = [
