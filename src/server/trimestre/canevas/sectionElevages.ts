@@ -1,31 +1,34 @@
 /**
- * DEUXIÈME PARTIE, II-2 à II-4 — ovins, caprins, asins et équidés.
+ * DEUXIÈME PARTIE, CHAPITRE II, II-2 à II-4 — ovins, caprins, asins et équidés.
  *
- * Transcription littérale des tableaux #30 à #43 de
- * docs/CANEVAS_TRIMESTRIEL.md, soit les tableaux n° 23 à 36 du canevas.
+ * Tableaux n° 23 à 36 du canevas.
  *
- * Ces trois sections suivent la même trame que l'élevage bovin, en plus court :
- * cheptel, animation pastorale, exploitation (abattages, viande, commerce),
- * mouvements. Les arrondissements sont en lignes, suivis des trois lignes de
- * pied imposées.
+ * Ces trois sections suivent le découpage commun du régional, repris pour
+ * toutes les espèces : le cheptel présente l'espèce, sans numéro ; puis
+ * infrastructures, animation, exploitation du bétail (abattages, viande,
+ * commerce), produits dérivés, mouvements, exportation, importation. Les
+ * arrondissements sont en lignes, suivis des trois lignes de pied imposées.
  *
  * LE CANEVAS EST IRRÉGULIER, ET ON NE LE CORRIGE PAS :
- *   - « Castrés » chez les ovins, « Castrés » chez les porcins, mais
- *     « Castre » chez les bovins du tableau n° 16 ;
- *   - « ANES / CHEVAUX / CHAMEAUX » en majuscules au tableau n° 34, en
- *     minuscules au n° 33 ;
- *   - « Prix moyen(en FCFA) » sans espace avant la parenthèse au n° 31 ;
- *   - le tableau n° 36 n'a ni colonne de total ni ligne d'arrondissement : il
- *     porte « RAS » et « TOTAL », et sa première colonne s'intitule
- *     « Départements ».
+ *   - « ANES / CHEVAUX / CHAMEAUX » en majuscules aux abattages, en
+ *     minuscules au cheptel ;
+ *   - « Prix moyen(en FCFA) » sans espace avant la parenthèse au n° 31.
  * Chacune de ces particularités est vérifiée caractère par caractère par
  * tests/canevas-conformite.test.ts.
  */
-import type { SectionCanevas } from "./types";
+import type { Bloc, SectionCanevas } from "./types";
 
 const PIED = ["TOTAL {P}", "TOTAL {P-1}", "ÉCART"];
 const TOTAUX = ["TOTAL {P}", "TOTAL {P-1}"];
 const LIGNES_ARRONDISSEMENTS = ["{ARRONDISSEMENTS}", ...PIED];
+
+const NEANT = "Néant si aucune activité enregistrée.";
+
+/** Une sous-partie sans tableau : un titre et sa zone de texte. */
+const rubrique = (texte: string, cle: string, consigne = NEANT): Bloc[] => [
+  { type: "titre", niveau: 3, texte },
+  { type: "zoneTexte", cle, consigne },
+];
 
 // ============================================================================
 // II-2. L'ÉLEVAGE OVIN — tableaux n° 23 à 27
@@ -36,8 +39,7 @@ export const SECTION_II_OVIN: SectionCanevas = {
   titre: "Deuxième partie, II-2 — L'élevage ovin",
   blocs: [
     { type: "titre", niveau: 2, texte: "II-2. L'ÉLEVAGE OVIN" },
-
-    { type: "titre", niveau: 3, texte: "II-2-1. Le cheptel" },
+    { type: "zoneTexte", cle: "II2.cheptel", consigne: "Présentation de l'élevage ovin et de son cheptel." },
     {
       type: "tableau",
       kind: "libre",
@@ -46,6 +48,8 @@ export const SECTION_II_OVIN: SectionCanevas = {
       entetes: ["Arrondissement", "Béliers", "Brebis", "Castrés", "Agneaux", ...TOTAUX],
       lignes: LIGNES_ARRONDISSEMENTS,
     },
+
+    ...rubrique("II-2-1. Infrastructures d'exploitation", "II2.infrastructures"),
 
     { type: "titre", niveau: 3, texte: "II-2-2. Animation pastorale et vulgarisation" },
     { type: "zoneTexte", cle: "II2.animation", consigne: "a) Encadrement — b) Initiatives paysannes." },
@@ -81,7 +85,9 @@ export const SECTION_II_OVIN: SectionCanevas = {
       lignes: LIGNES_ARRONDISSEMENTS,
     },
 
-    { type: "titre", niveau: 3, texte: "II-2-4. Mouvements de bétail" },
+    ...rubrique("II-2-4. Exploitation des produits dérivés", "II2.produitsDerives"),
+
+    { type: "titre", niveau: 3, texte: "II-2-5. Mouvements de bétail" },
     {
       type: "tableau",
       kind: "libre",
@@ -90,6 +96,9 @@ export const SECTION_II_OVIN: SectionCanevas = {
       entetes: ["Arrondissement", "Nombre de têtes", "Provenance", "Destination", ...TOTAUX],
       lignes: LIGNES_ARRONDISSEMENTS,
     },
+
+    ...rubrique("II-2-6. Exportation d'animaux et produits dérivés", "II2.exportation"),
+    ...rubrique("II-2-7. Importation d'animaux et produits dérivés", "II2.importation"),
   ],
 };
 
@@ -102,8 +111,7 @@ export const SECTION_II_CAPRIN: SectionCanevas = {
   titre: "Deuxième partie, II-3 — L'élevage caprin",
   blocs: [
     { type: "titre", niveau: 2, texte: "II-3. L'ÉLEVAGE CAPRIN" },
-
-    { type: "titre", niveau: 3, texte: "II-3-1. Le cheptel" },
+    { type: "zoneTexte", cle: "II3.cheptel", consigne: "Présentation de l'élevage caprin et de son cheptel." },
     {
       type: "tableau",
       kind: "libre",
@@ -112,6 +120,8 @@ export const SECTION_II_CAPRIN: SectionCanevas = {
       entetes: ["Arrondissement", "Catégorie", ...TOTAUX],
       lignes: LIGNES_ARRONDISSEMENTS,
     },
+
+    ...rubrique("II-3-1. Infrastructures d'exploitation", "II3.infrastructures"),
 
     { type: "titre", niveau: 3, texte: "II-3-2. Animation pastorale et vulgarisation" },
     { type: "zoneTexte", cle: "II3.animation", consigne: "a) Encadrement — b) Initiatives paysannes." },
@@ -154,7 +164,9 @@ export const SECTION_II_CAPRIN: SectionCanevas = {
       lignes: LIGNES_ARRONDISSEMENTS,
     },
 
-    { type: "titre", niveau: 3, texte: "II-3-4. Mouvements de bétail" },
+    ...rubrique("II-3-4. Exploitation des produits dérivés", "II3.produitsDerives"),
+
+    { type: "titre", niveau: 3, texte: "II-3-5. Mouvements de bétail" },
     {
       type: "tableau",
       kind: "libre",
@@ -163,6 +175,9 @@ export const SECTION_II_CAPRIN: SectionCanevas = {
       entetes: ["Arrondissement", "Nombre de têtes", "Provenance", "Destination", ...TOTAUX],
       lignes: LIGNES_ARRONDISSEMENTS,
     },
+
+    ...rubrique("II-3-6. Exportation d'animaux et produits dérivés", "II3.exportation"),
+    ...rubrique("II-3-7. Importation d'animaux et produits dérivés", "II3.importation"),
   ],
 };
 
@@ -175,8 +190,7 @@ export const SECTION_II_EQUIDES: SectionCanevas = {
   titre: "Deuxième partie, II-4 — Les élevages d'asins et d'équidés",
   blocs: [
     { type: "titre", niveau: 2, texte: "II-4. LES ÉLEVAGES D'ASINS ET D'ÉQUIDÉS" },
-
-    { type: "titre", niveau: 3, texte: "II-4-1. Le cheptel" },
+    { type: "zoneTexte", cle: "II4.cheptel", consigne: "Présentation des élevages d'asins et d'équidés." },
     {
       type: "tableau",
       kind: "libre",
@@ -186,7 +200,10 @@ export const SECTION_II_EQUIDES: SectionCanevas = {
       lignes: LIGNES_ARRONDISSEMENTS,
     },
 
-    { type: "titre", niveau: 3, texte: "II-4-2. Exploitation du bétail" },
+    ...rubrique("II-4-1. Infrastructures d'exploitation", "II4.infrastructures"),
+    ...rubrique("II-4-2. Animation pastorale et vulgarisation", "II4.animation", "a) Encadrement — b) Initiatives paysannes."),
+
+    { type: "titre", niveau: 3, texte: "II-4-3. Exploitation du bétail" },
     { type: "titre", niveau: 4, texte: "a) Abattages contrôlés" },
     {
       type: "tableau",
@@ -203,7 +220,8 @@ export const SECTION_II_EQUIDES: SectionCanevas = {
       kind: "libre",
       numero: 35,
       titre: "Etat de la production de viande dans les élevages d’équidés",
-      entetes: ["Arrondissement/Espèces", "ANES", "CHEVAUX", "CHAMEAUX", ...TOTAUX],
+      // Deux espèces seulement au régional : ni chameaux ni mulets.
+      entetes: ["Arrondissement/Espèces", "Anes", "Chevaux", ...TOTAUX],
       lignes: LIGNES_ARRONDISSEMENTS,
     },
     { type: "titre", niveau: 4, texte: "c) Commercialisation des animaux" },
@@ -212,14 +230,15 @@ export const SECTION_II_EQUIDES: SectionCanevas = {
       kind: "libre",
       numero: 36,
       titre: "Situation de la commercialisation d’animaux sur pied dans les élevages d’équidés",
-      // RÉTABLI d'après le régional. L'adaptation départementale avait réduit ce
-      // tableau à trois colonnes et deux lignes « RAS / TOTAL » — sans doute
-      // parce qu'aucune activité n'était enregistrée au moment de sa rédaction.
-      // Le canevas régional lui donne quatre espèces et la maille territoriale
-      // ordinaire ; c'est cette forme qui fait foi.
-      entetes: ["Arrondissement", "Anes", "Chameaux", "Chevaux", "Mulets", ...TOTAUX],
+      // Les deux espèces du régional, sur la maille territoriale ordinaire.
+      entetes: ["Arrondissement", "Anes", "Chevaux", ...TOTAUX],
       lignes: LIGNES_ARRONDISSEMENTS,
     },
+
+    ...rubrique("II-4-4. Exploitation des produits dérivés", "II4.produitsDerives"),
+    ...rubrique("II-4-5. Mouvements de bétail", "II4.mouvements", "a) Circulation intérieure — b) Circulation internationale."),
+    ...rubrique("II-4-6. Exportation d'animaux et produits dérivés", "II4.exportation"),
+    ...rubrique("II-4-7. Importation d'animaux et produits dérivés", "II4.importation"),
   ],
 };
 

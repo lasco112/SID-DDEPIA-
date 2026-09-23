@@ -3,7 +3,7 @@
  *
  * Remplace le premier générateur, qui dessinait ses propres tableaux à partir
  * des champs du SID et produisait un document que le canevas ne reconnaissait
- * pas. Ici, c'est le canevas qui commande : les 78 tableaux sont rendus dans
+ * pas. Ici, c'est le canevas qui commande : les 87 tableaux sont rendus dans
  * leur forme officielle, et les valeurs consolidées viennent remplir les cases
  * pour lesquelles une liaison a été écrite.
  *
@@ -64,7 +64,7 @@ export interface ZoneTexte {
 }
 
 /**
- * Les 41 zones de texte du canevas, dans l'ordre où le rédacteur les rencontre.
+ * Les zones de texte du canevas, dans l'ordre où le rédacteur les rencontre.
  *
  * L'inventaire est déduit de la description du canevas, jamais tenu à jour à la
  * main : décrire une nouvelle zone dans une section la fait apparaître à
@@ -262,8 +262,9 @@ export async function genererRapportCanevas(
 
   options.textes?.forEach((t, cle) => textes.set(cle, t));
 
+  const compteur = { tableaux: 0 };
   for (const section of SECTIONS_CANEVAS) {
-    enfants.push(...rendreSection(section, { ctx, valeur, textes }));
+    enfants.push(...rendreSection(section, { ctx, valeur, textes, compteur }));
   }
 
   enfants.push(

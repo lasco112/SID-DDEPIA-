@@ -52,6 +52,17 @@ export const SECTION_I: SectionCanevas = {
         "Une DDEPIA, six DAEPIA (Dschang, Fokoué, Fongo-Tongo, Nkong-Ni, Penka-Michel, Santchou) et onze CZV.",
     },
     {
+      // Tableau des structures, sans légende dans le régional, où il liste pour
+      // chaque département ses DAEPIA, ses CZV et ses postes de contrôle. Ramené
+      // au département : une ligne par arrondissement.
+      type: "tableau",
+      kind: "libre",
+      numero: null,
+      titre: "",
+      entetes: ["Arrondissement", "DAEPIA", "CZV", "CCP/SA"],
+      lignes: ["{ARRONDISSEMENTS}", "TOTAL"],
+    },
+    {
       type: "tableau",
       kind: "arrondissements",
       numero: 1,
@@ -84,11 +95,35 @@ export const SECTION_I: SectionCanevas = {
     { type: "titre", niveau: 2, texte: "I-2-1. Situation du personnel" },
     {
       type: "tableau",
-      kind: "arrondissements",
+      kind: "libre",
       numero: 3,
       titre: "Répartition du personnel par grade et par arrondissement",
-      enteteLibelle: "Structures",
-      lignes: ["CZV", "DAEPIA", "Centre de Contrôle de Pêche", "Station d'Elevage", "CSDPAIH", "DDEPIA", "TOTAL"],
+      // Aligné sur le régional : les GRADES en lignes, les structures en
+      // colonnes — le siège, puis chaque territoire. La colonne « DDEPIA » est
+      // celle du siège départemental ; elle sort du rapport d'un arrondissement.
+      // Deux fautes de frappe du régional sont corrigées : « Technicien
+      // Supérieurs » et « aquacuture ».
+      entetes: ["Grade", "DDEPIA", "{ARRONDISSEMENTS}", "TOTAL {P}", "TOTAL {P-1}"],
+      lignes: [
+        "Docteur Vétérinaire",
+        "Technicien Supérieur d’élevage",
+        "Infirmier Vétérinaire principal",
+        "Infirmier Vétérinaire",
+        "Infirmier vétérinaire adjoint",
+        "Ingénieur agronome",
+        "Ingénieur des Industries animales",
+        "Ingénieur principal des travaux des industries animales",
+        "Ingénieur des travaux des industries animales",
+        "Technicien principal des industries animales",
+        "Technicien des industries animales",
+        "Technicien d’aquaculture",
+        "Agent technique des industries animales",
+        "Cadre contrac. Admi.",
+        "Agent contractuel",
+        "Agent de l’Etat",
+        "Secrétaire",
+        "TOTAL",
+      ],
     },
     {
       type: "tableau",
@@ -146,7 +181,7 @@ export const SECTION_I: SectionCanevas = {
         "Cessation de fonctions",
         "Décès",
         "Départ en retraite effectif",
-        "Départ en retraite imminent (année 2025)",
+        "Départ en retraite imminent (année {A})",
         "Départs",
         "Formation/Recyclage",
         "Nominations",
@@ -310,6 +345,17 @@ export const SECTION_I: SectionCanevas = {
       // un autre département, la liste viendra de la base.
       lignes: ["{ARRONDISSEMENTS}", "TOTAL {P}", "TOTAL {P-1}", "ÉCART"],
     },
+    {
+      // Pendant du tableau n° 12 pour l'investissement. Le régional le titre en
+      // texte simple, sans numéro : il reçoit ici une légende, pour entrer dans
+      // la liste des tableaux comme son pendant.
+      type: "tableau",
+      kind: "libre",
+      numero: null,
+      titre: "Synthèse des crédits d’investissement par arrondissement",
+      entetes: ["Arrondissement", "Investissement", "Total", "TOTAL {P}", "TOTAL {P-1}"],
+      lignes: ["{ARRONDISSEMENTS}", "TOTAL {P}", "TOTAL {P-1}", "ÉCART"],
+    },
 
     { type: "titre", niveau: 2, texte: "I-4-1. État des recettes" },
     {
@@ -341,8 +387,11 @@ export const SECTION_I: SectionCanevas = {
     {
       type: "titre",
       niveau: 1,
-      texte: "I-5. PROJETS, PROGRAMMES, ORGANISMES SOUS TUTELLE ET PARTENAIRES AU DÉVELOPPEMENT",
+      texte: "I-5. PROJETS, PROGRAMMES, ORGANISMES SOUS TUTELLE DU MINEPIA ET PARTENAIRES AU DÉVELOPPEMENT",
     },
+    // « I.3 » dans le régional, qui la place après I-4 : numérotée I-5 ici.
+    // La station de Kounden (I.3.3 du régional), structure régionale, n'a pas
+    // sa place dans un rapport départemental (décision D1).
     { type: "titre", niveau: 2, texte: "I-5-1. C2D-PCP-AFOP / SECAL" },
     {
       type: "zoneTexte",
@@ -355,9 +404,21 @@ export const SECTION_I: SectionCanevas = {
       cle: "I5.acefa",
       consigne: "Activités par composante, résultats, difficultés et perspectives.",
     },
-    { type: "titre", niveau: 2, texte: "I-5-3. Autres activités et commentaires" },
+    {
+      type: "titre",
+      niveau: 2,
+      texte: "I-5-3. PROJET DE DÉVELOPPEMENT DES CHAÎNES DE VALEUR DE L’ÉLEVAGE ET DE LA PISCICULTURE (PDCVEP)",
+    },
+    {
+      type: "zoneTexte",
+      cle: "I5.pdcvep",
+      consigne: "État d’avancement des principales activités du projet dans le département, par composante.",
+    },
+    // Les rubriques B, C et D sont celles du compte rendu du PDCVEP dans le
+    // régional : elles suivent donc le projet, au niveau inférieur.
+    { type: "titre", niveau: 4, texte: "B. Autres activités et commentaires" },
     { type: "zoneTexte", cle: "I5.autres", consigne: "Rubrique B du canevas régional." },
-    { type: "titre", niveau: 2, texte: "I-5-4. Résumé des contraintes stratégiques et solutions proposées" },
+    { type: "titre", niveau: 4, texte: "C. Résumé des contraintes stratégiques et solutions proposées (maximum 03)" },
     {
       type: "zoneTexte",
       cle: "I5.contraintes.preambule",
@@ -371,7 +432,7 @@ export const SECTION_I: SectionCanevas = {
       entetes: ["N°", "Contrainte stratégique", "Solution proposée"],
       lignes: ["1", "2", "3"],
     },
-    { type: "titre", niveau: 2, texte: "I-5-5. Autres points d'attention d'importance stratégique" },
+    { type: "titre", niveau: 4, texte: "D. Autres points d’attention d’importance stratégique (s’il en existe)" },
     {
       type: "zoneTexte",
       cle: "I5.attention",

@@ -135,10 +135,29 @@ export function lignesDe(bloc: Extract<Bloc, { type: "tableau" }>, ctx: Contexte
   ).map((l) => resoudre(l, ctx));
 }
 
+/** Compte les légendes rendues, d'une section à l'autre. */
+export interface CompteurLegendes {
+  tableaux: number;
+}
+
+/**
+ * Le numéro affiché avant que Word ne recalcule ses champs. Le numéro interne
+ * d'un tableau (`numero`) est une CLÉ de liaison figée, pas un rang : des
+ * tableaux sans numéro interne s'intercalent désormais. Avec un compteur, le
+ * rang affiché est donc celui du document ; sans compteur (une section rendue
+ * seule), on retombe sur la clé.
+ */
+function numeroAffiche(numero: number | null, compteur?: CompteurLegendes): number | null {
+  if (!compteur) return numero;
+  compteur.tableaux += 1;
+  return compteur.tableaux;
+}
+
 function rendreTableau(
   bloc: Extract<Bloc, { type: "tableau" }>,
   ctx: ContexteCanevas,
-  valeur: FournisseurValeur
+  valeur: FournisseurValeur,
+  compteur?: CompteurLegendes
 ): (Paragraph | Table)[] {
   const colonnes = colonnesDe(bloc, ctx);
   const lignes = lignesDe(bloc, ctx);
@@ -148,11 +167,16 @@ function rendreTableau(
     children: colonnes.map((c) => cellule(c, { gras: true, fond: "E8E8E8" })),
   });
 
-  const corps = lignes.map((lib) => {
+  const prerempli = bloc.kind === "libre" ? bloc.prerempli : undefined;
+  const corps = lignes.map((lib, r) => {
     const estTotal = /^TOTAL|^ÉCART/i.test(lib);
     return new TableRow({
       children: colonnes.map((col, i) => {
         if (i === 0) return cellule(lib, { gras: estTotal });
+        // Case imposée par le canevas (action, activité du budget-programme) :
+        // elle ne vient pas des données et n'est pas à ressaisir.
+        const fixe = prerempli?.[r]?.[i - 1];
+        if (fixe) return cellule(resoudre(fixe, ctx));
         const v = valeur({ numeroTableau: bloc.numero, ligne: lib, colonne: col, indexColonne: i });
         return cellule(v ?? "", { gras: estTotal, droite: true });
       }),
@@ -169,7 +193,7 @@ function rendreTableau(
   // budget-programme, par exemple. Leur en inventer une les ferait apparaître
   // dans la liste des tableaux, où le canevas ne les met pas.
   return bloc.titre
-    ? [legendeTableau(bloc.titre, bloc.numero), tableau, new Paragraph({ text: "" })]
+    ? [legendeTableau(bloc.titre, numeroAffiche(bloc.numero, compteur)), tableau, new Paragraph({ text: "" })]
     : [tableau, new Paragraph({ text: "" })];
 }
 
@@ -180,9 +204,14 @@ function rendreTableau(
  */
 function rendreZoneTexte(
   bloc: Extract<Bloc, { type: "zoneTexte" }>,
-  textes: Map<string, string>
+  textes: Map<string, string>,
+  ctx: ContexteCanevas
 ): Paragraph[] {
-  const saisi = textes.get(bloc.cle);
+  // Les textes repris d'une période à l'autre portent des jetons — « couvre la
+  // période allant de {MOIS_DEBUT} à {MOIS_FIN} {A} » — pour ne jamais annoncer
+  // les mois d'un autre rapport.
+  const brut = textes.get(bloc.cle);
+  const saisi = brut === undefined ? undefined : resoudre(brut, ctx);
   if (saisi && saisi.trim()) {
     // Un texte de plusieurs paragraphes arrive séparé par des lignes vides.
     // Le rendre d'un bloc collerait l'introduction en un seul pavé illisible.
@@ -214,6 +243,8 @@ export interface OptionsRendu {
   ctx: ContexteCanevas;
   /** Valeurs des cases. Par défaut : aucune. */
   valeur?: FournisseurValeur;
+  /** Partagé entre les sections d'un même document, pour numéroter en continu. */
+  compteur?: CompteurLegendes;
   /** Textes analytiques déjà validés, par clé de zone. */
   textes?: Map<string, string>;
 }
@@ -233,9 +264,9 @@ export function rendreSection(section: SectionCanevas, o: OptionsRendu): (Paragr
         })
       );
     } else if (bloc.type === "zoneTexte") {
-      sortie.push(...rendreZoneTexte(bloc, textes));
+      sortie.push(...rendreZoneTexte(bloc, textes, o.ctx));
     } else {
-      sortie.push(...rendreTableau(bloc, o.ctx, valeur));
+      sortie.push(...rendreTableau(bloc, o.ctx, valeur, o.compteur));
     }
   }
   return sortie;

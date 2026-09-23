@@ -105,11 +105,46 @@ export function sansNiveauDepartemental(libelles: string[], ctx: ContexteCanevas
   return libelles.filter((l) => !LIBELLES_DEPARTEMENTAUX.has(l.trim()));
 }
 
-/** Remplace les jetons de période dans un libellé du canevas. */
+/** « JUILLET » → « Juillet » : les textes courants n'écrivent pas les mois en capitales. */
+const enNomPropre = (m: string) => (m ? m.charAt(0) + m.slice(1).toLowerCase() : "");
+
+/**
+ * La nature de la période, déduite du nombre de mois qu'elle couvre. Elle sert
+ * aux textes : « le présent rapport trimestriel… », « au cours de ce semestre ».
+ */
+function naturePeriode(ctx: ContexteCanevas): { adjectif: string; demonstratif: string } {
+  if (ctx.mois.length >= 12) return { adjectif: "annuel", demonstratif: "cette année" };
+  if (ctx.mois.length >= 6) return { adjectif: "semestriel", demonstratif: "ce semestre" };
+  if (ctx.mois.length >= 3) return { adjectif: "trimestriel", demonstratif: "ce trimestre" };
+  return { adjectif: "mensuel", demonstratif: "ce mois" };
+}
+
+/**
+ * Remplace les jetons de période dans un libellé du canevas.
+ *
+ * Jetons de texte courant, en plus de ceux des tableaux :
+ *   {NATURE}       « trimestriel », « semestriel »…
+ *   {CETTE_PERIODE} « ce trimestre », « ce semestre »…
+ *   {MOIS_DEBUT}   premier mois de la période — « Juillet »
+ *   {MOIS_FIN}     dernier mois de la période — « Septembre »
+ *   {STRUCTURE}    « DDEPIA-MENOUA », ou « DAEPIA de Dschang » dans le rapport d'un DA
+ */
 export function resoudre(libelle: string, ctx: ContexteCanevas): string {
+  const nature = naturePeriode(ctx);
+  // La structure qui rend compte : la DDEPIA du département, ou la DAEPIA de
+  // l'arrondissement dont on produit le rapport.
+  const structure = ctx.arrondissement
+    ? `DAEPIA de ${ctx.arrondissement}`
+    : (ctx.departement?.sigle ?? REFERENCE_SIGLE);
   return libelle
+    .replace(/\{STRUCTURE\}/g, structure)
+    .replace(/\{NATURE\}/g, nature.adjectif)
+    .replace(/\{CETTE_PERIODE\}/g, nature.demonstratif)
+    .replace(/\{MOIS_DEBUT\}/g, enNomPropre(ctx.mois[0] ?? ""))
+    .replace(/\{MOIS_FIN\}/g, enNomPropre(ctx.mois[ctx.mois.length - 1] ?? ""))
     .replace(/\{P-1\}/g, ctx.periodeCourtN1)
     .replace(/\{P\}/g, ctx.periodeCourt)
+    .replace(/\{A-2\}/g, String(ctx.annee - 2))
     .replace(/\{A-1\}/g, String(ctx.annee - 1))
     .replace(/\{A\}/g, String(ctx.annee))
     .replace(/\{M1\}/g, ctx.mois[0] ?? "")
@@ -140,6 +175,14 @@ export interface TableauLibre {
   titre: string;
   entetes: string[];
   lignes: string[];
+  /**
+   * Cases FIXES des colonnes qui suivent la première, ligne par ligne, dans
+   * l'ordre de `lignes`. Sert aux tableaux d'activités du budget-programme, dont
+   * le régional impose les actions et les activités : seule la réalisation
+   * change d'une période à l'autre. Une chaîne vide laisse la case à remplir.
+   * Réservé aux tableaux sans jeton {ARRONDISSEMENTS} en ligne.
+   */
+  prerempli?: string[][];
 }
 
 export type Tableau = TableauArrondissements | TableauLibre;

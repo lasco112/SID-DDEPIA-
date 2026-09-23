@@ -16,7 +16,7 @@
  *
  * Tout le reste — libellés, accents, casse, ordre — doit suivre le régional.
  *
- * SIX ÉCARTS SONT ASSUMÉS, listés dans ECARTS_ASSUMES avec leur justification :
+ * LES ÉCARTS ASSUMÉS sont listés dans ECARTS_ASSUMES avec leur justification :
  * le canevas régional a des défauts de mise en forme — une colonne sans nom, un
  * intitulé resté en première ligne de données, un espace manquant — que
  * l'adaptation départementale a corrigés. Les « rétablir » rendrait le document
@@ -81,6 +81,31 @@ const ECARTS_ASSUMES = new Set([
   // données alors que c'est un intitulé de colonne.
   "II-6 n° 42",
   "II-6 n° 44",
+  // Personnel par grade : le régional laisse l'en-tête de la première colonne
+  // vide (le département l'intitule « Grade ») et écrit « Technicien
+  // Supérieurs d’élevage » et « Technicien d’aquacuture » : fautes de frappe
+  // corrigées.
+  "I n° 3",
+  // Pendant du n° 12 pour l'investissement : il en a la forme, et le test
+  // l'apparie au n° 12 par son titre, dont il ne diffère que d'un mot.
+  "I « Synthèse des crédits d’investissement par arrondissement »",
+  // Le régional étage l'en-tête sur deux lignes : « STRUCTURES » au-dessus
+  // des territoires, « MOIS » au-dessus des mois. Sur une ligne d'en-tête, la
+  // première colonne — celle des mois — s'intitule « MOIS ».
+  "I n° 13",
+  // En-tête du régional sur deux lignes (« Types d’infrastructures d’élevage »
+  // coiffant trois colonnes) : mis à plat, chaque colonne garde son intitulé.
+  "II-1 « Infrastructures d’élevage financées sur le budget d’investissement public »",
+  // Le régional écrit « Castre », sans accent, aux abattages et à la viande.
+  "II-1 n° 16",
+  "II-1 n° 18",
+  // Le régional colle « récolté(en litres) » et « Cire(enkg) » : espaces
+  // rétablis.
+  "II-7-9 n° 52",
+  // En-tête du régional sur trois lignes (« Nombre de / Pisciculteurs »,
+  // « Etangs / Nbre / Superficie (m2) »…) : mis à plat, chaque colonne portant
+  // son intitulé complet.
+  "III « Les nouvelles structures et perspectives de production »",
 ]);
 
 // ------------------------------------------------------------ lecture du canevas
@@ -90,14 +115,50 @@ const texteDe = (f: string) =>
    .replace(/&apos;/g, "'").replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">")
    .replace(/\s+/g, " ").trim();
 
-interface TableauOfficiel { entetes: string[]; lignes: string[] }
+interface TableauOfficiel {
+  entetes: string[];
+  lignes: string[];
+  /** Titre de la légende régionale, sans « Tableau n° X : ». Vide si le tableau n'en a pas. */
+  titre?: string;
+}
 const region: TableauOfficiel[] = [];
+
+/**
+ * Les légendes de tableau contenues dans un fragment du document, dans l'ordre.
+ */
+function legendesDans(fragment: string): string[] {
+  return fragment
+    .split("</w:p>").map(texteDe).filter(Boolean)
+    .filter((p) => /^(le\s+)?tableau\s*(n\s*[°o0]?\s*)?\d+/i.test(p))
+    .map((p) => p.replace(/^(le\s+)?tableau\s*(n\s*[°o0]?\s*)?\d+\s*[:.]?\s*/i, "").trim())
+    .filter(Boolean);
+}
+
+/**
+ * La légende d'un tableau régional, déduite du texte qui l'entoure.
+ *
+ * Le régional place presque toujours la légende AVANT le tableau : c'est la
+ * dernière légende qui le précède. Il arrive qu'elle vienne APRÈS — celle des
+ * produits de la ruche, « Le tableau 53 : … ». Mais une légende qui suit un
+ * tableau appartient en général au tableau SUIVANT : l'attribuer au précédent
+ * faisait « voler » à un organigramme sans légende celle du tableau n° 1. On
+ * ne retient donc une légende suivante que si une autre légende vient encore
+ * après elle, avant le tableau suivant — la seconde étant alors celle du
+ * suivant.
+ */
+function legendeDe(avant: string, apres: string): string | undefined {
+  const precedentes = legendesDans(avant);
+  if (precedentes.length) return precedentes[precedentes.length - 1];
+  const suivantes = legendesDans(apres);
+  return suivantes.length >= 2 ? suivantes[0] : undefined;
+}
 
 before(() => {
   if (!existsSync(REGIONAL)) return;
   const xml = new PizZip(readFileSync(REGIONAL)).file("word/document.xml")!.asText();
   const corps = xml.slice(xml.indexOf("<w:body>"), xml.lastIndexOf("</w:body>"));
   let i = 0;
+  const bornes: { d: number; f: number }[] = [];
   while (i < corps.length) {
     const d = corps.indexOf("<w:tbl>", i);
     if (d < 0) break;
@@ -107,21 +168,35 @@ before(() => {
       if (f < 0) break;
       if (o >= 0 && o < f) { prof++; j = o + 7; } else { prof--; j = f + 8; if (prof === 0) break; }
     }
-    const tbl = corps.slice(d, j);
+    bornes.push({ d, f: j });
+    i = j;
+  }
+  bornes.forEach(({ d, f }, k) => {
+    const tbl = corps.slice(d, f);
     const trs = Array.from(tbl.slice(7, -8).matchAll(/<w:tr[ >][\s\S]*?<\/w:tr>/g))
       .map((m) => m[0]).filter((t) => !t.includes("<w:tbl>"));
     const cel = (tr: string) => Array.from(tr.matchAll(/<w:tc>[\s\S]*?<\/w:tc>/g)).map((c) => texteDe(c[0]));
+    const avant = corps.slice(k > 0 ? bornes[k - 1].f : 0, d);
+    const apres = corps.slice(f, k + 1 < bornes.length ? bornes[k + 1].d : corps.length);
     region.push({
       entetes: trs.length ? cel(trs[0]) : [],
       lignes: trs.slice(1).map((tr) => cel(tr)[0] ?? "").filter(Boolean),
+      titre: legendeDe(avant, apres),
     });
-    i = j;
-  }
+  });
 });
 
 // -------------------------------------------------------------- neutralisation
 
-const cle = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
+/**
+ * Un millésime dépend de la période : « ANNEE 2025 » au régional du premier
+ * semestre 2026 devient « ANNEE 2026 » l'année suivante. On compare donc les
+ * libellés sans leurs millésimes.
+ */
+const sansAnnee = (s: string) => s.replace(/\b(19|20)\d{2}\b/g, "{A}");
+
+const cle = (s: string) =>
+  sansAnnee(s).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
 
 /** Libellés relevant de la maille ou de la période : ils DOIVENT différer. */
 const TERRITOIRES = new Set([
@@ -140,6 +215,18 @@ const TERRITOIRES = new Set([
   "produitsarrondissement", "produitsdepartement", "produitsdepartements",
   "arrondissementespeces", "departementespeces",
   "arrondissementaffections", "departementsaffections", "departementaffections",
+  // Le siège : « DREPIA siège » au régional, « DDEPIA » au département.
+  "ddepia", "ddepiasiege",
+  "hautsnkam", "hnkam", "hplateaux", "kkhi",
+  "departementsespeces",
+  // Structures RÉGIONALES, sans équivalent dans un département : le centre de
+  // formation zootechnique et la station de Kounden (décision D1).
+  "cnfzvh", "cnfzv", "kounden",
+  // « RAS » (rien à signaler) tient lieu de ligne quand un territoire n'a rien.
+  "ras",
+  // Les mois de la période : ceux du semestre au régional, du trimestre ici.
+  "janvier", "fevrier", "mars", "avril", "mai", "juin",
+  "juillet", "aout", "septembre", "octobre", "novembre", "decembre",
 ]);
 
 const estNeutre = (s: string) => {
@@ -148,8 +235,9 @@ const estNeutre = (s: string) => {
   // contenu d'un tableau. Le compter appariait le tableau des contraintes
   // stratégiques à celui des centres d'alevinage, qui numérotent tous deux
   // leurs lignes.
-  if (/^\d+$/.test(k)) return true;
-  return !k || k.startsWith("total") || TERRITOIRES.has(k);
+  if (/^\d+$/.test(k) || /^\s*\d+\s*$/.test(s)) return true;
+  // « Bamboutos(6) » : le régional suffixe parfois le territoire d'un effectif.
+  return !k || k.startsWith("total") || TERRITOIRES.has(k) || TERRITOIRES.has(k.replace(/\d+$/, ""));
 };
 
 const significatifs = (t: TableauOfficiel) => [...t.entetes, ...t.lignes].filter((l) => l && !estNeutre(l));
@@ -163,6 +251,71 @@ function ressemblance(a: TableauOfficiel, b: TableauOfficiel): number {
   return c / Math.max(A.size, B.size);
 }
 
+/**
+ * Mots porteurs d'un titre de tableau. Les mots vides et ceux de la maille
+ * (« par département », « par arrondissement ») sont écartés : le titre
+ * départemental les transpose légitimement.
+ */
+const MOTS_VIDES = new Set([
+  "de", "la", "le", "les", "des", "du", "d", "l", "par", "et", "en", "a", "au", "aux", "dans", "sur", "un", "une",
+  "departement", "departements", "arrondissement", "arrondissements", "region", "tableau", "n",
+]);
+const motsTitre = (t: string) =>
+  new Set(
+    t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase()
+      .split(/[^a-z0-9]+/).filter((m) => m && !/^\d+$/.test(m) && !MOTS_VIDES.has(m))
+      // Pluriel et singulier désignent le même tableau : « structure » et
+      // « structures » ne sont pas deux titres.
+      .map((m) => m.replace(/s$/, ""))
+  );
+
+function ressemblanceTitre(a: string, b: string): number {
+  const A = motsTitre(a), B = motsTitre(b);
+  if (!A.size || !B.size) return 0;
+  let c = 0;
+  A.forEach((x) => { if (B.has(x)) c++; });
+  return c / Math.max(A.size, B.size);
+}
+
+/**
+ * L'original régional d'un tableau décrit.
+ *
+ * On apparie D'ABORD PAR LE TITRE de la légende. L'appariement par simple
+ * ressemblance du contenu avait un angle mort : un tableau décrit avec les
+ * MAUVAISES colonnes ressemblait au tableau régional qui porte ces colonnes-là,
+ * et passait pour conforme. C'est ainsi que le tableau de l'apiculture, doté
+ * des colonnes de la pisciculture, était apparié au tableau de l'aquaculture —
+ * et jugé sans défaut.
+ *
+ * La ressemblance du contenu ne sert plus que de repli, pour les tableaux sans
+ * titre (budget-programme) ou dont le régional n'a pas de légende.
+ */
+function originalRegional(b: Extract<Bloc, { type: "tableau" }>, mien: TableauOfficiel) {
+  if (b.titre) {
+    let meilleur: TableauOfficiel | null = null, score = 0;
+    for (const r of region) {
+      if (!r.titre) continue;
+      const s = ressemblanceTitre(b.titre, r.titre);
+      if (s > score) { score = s; meilleur = r; }
+    }
+    if (meilleur && score >= 0.6) return { original: meilleur, parTitre: true };
+  }
+  let meilleur: TableauOfficiel | null = null, score = 0;
+  for (const r of region) {
+    const s = ressemblance(mien, r);
+    if (s > score) { score = s; meilleur = r; }
+  }
+  return { original: meilleur && score >= 0.5 ? meilleur : null, parTitre: false };
+}
+
+/**
+ * Identifiant d'un tableau dans les messages et dans ECARTS_ASSUMES. Un tableau
+ * sans numéro est désigné par son titre : une même section en compte plusieurs,
+ * et « I n° — » les confondrait.
+ */
+const idTableau = (s: SectionCanevas, b: Extract<Bloc, { type: "tableau" }>) =>
+  b.numero != null ? `${s.cle} n° ${b.numero}` : `${s.cle} « ${b.titre} »`;
+
 const tableauxDe = (s: SectionCanevas) =>
   s.blocs.filter((b): b is Extract<Bloc, { type: "tableau" }> => b.type === "tableau");
 
@@ -175,12 +328,8 @@ function analyser() {
     for (const b of tableauxDe(section)) {
       total++;
       const mien: TableauOfficiel = { entetes: colonnesDe(b, CTX), lignes: lignesDe(b, CTX) };
-      let meilleur: TableauOfficiel | null = null, score = 0;
-      for (const r of region) {
-        const s = ressemblance(mien, r);
-        if (s > score) { score = s; meilleur = r; }
-      }
-      if (!meilleur || score < 0.5) { sansOriginal++; continue; }
+      const { original: meilleur } = originalRegional(b, mien);
+      if (!meilleur) { sansOriginal++; continue; }
 
       const a = significatifs(mien);
       const b2 = significatifs(meilleur);
@@ -189,13 +338,13 @@ function analyser() {
       for (const l of a) {
         const orig = parCle.get(cle(l));
         if (orig === undefined) ecarts.push(`« ${l} » absent du régional`);
-        else if (orig !== l) ecarts.push(`« ${l} » au lieu de « ${orig} »`);
+        else if (sansAnnee(orig) !== sansAnnee(l)) ecarts.push(`« ${l} » au lieu de « ${orig} »`);
       }
       const miens = new Set(a.map(cle));
       for (const l of b2) if (!miens.has(cle(l))) ecarts.push(`« ${l} » manquant chez nous`);
 
       if (ecarts.length === 0) conformes++;
-      else divergents.push({ id: `${section.cle} n° ${b.numero ?? "—"}`, titre: b.titre, ecarts });
+      else divergents.push({ id: idTableau(section, b), titre: b.titre, ecarts });
     }
   }
   return { divergents, conformes, sansOriginal, total };
@@ -231,19 +380,42 @@ test("les écarts assumés se produisent tous encore", () => {
 test("la conformité progresse", () => {
   const { conformes, total, sansOriginal } = analyser();
   console.log(`      ${conformes} conformes · ${total - conformes - sansOriginal} divergents · ${sansOriginal} sans original régional`);
-  assert.ok(conformes >= 47, `régression : ${conformes} tableaux conformes au lieu de 47 au minimum`);
+  assert.ok(conformes >= 69, `régression : ${conformes} tableaux conformes au lieu de 69 au minimum`);
 });
 
 // -------------------------------------------------- contrôles de structure
 
-test("un SEUL tableau porte une colonne « Écart », et c'est le n° 62", () => {
+test("aucun tableau ne porte de colonne « Écart » : l'écart est une ligne de pied", () => {
+  // Le tableau des alevins en portait une, sans aucune ligne. Il suit
+  // désormais le régional, où l'écart est une ligne.
   const porteurs: string[] = [];
   for (const section of SECTIONS) {
     for (const b of tableauxDe(section)) {
-      if (colonnesDe(b, CTX).some((c) => /^écart$/i.test(c))) porteurs.push(`${section.cle} n° ${b.numero}`);
+      if (colonnesDe(b, CTX).some((c) => /^écart$/i.test(c))) porteurs.push(idTableau(section, b));
     }
   }
-  assert.deepEqual(porteurs, ["III n° 62"]);
+  assert.deepEqual(porteurs, []);
+});
+
+test("aucune période n'est écrite en dur dans la description du canevas", () => {
+  /*
+   * « TOTAL 1er S1 2026 », « Production semestrielle d'alevins », « Bilan
+   * épidémiologique du trimestre » : recopiés du régional, ils sortaient tels
+   * quels dans un rapport du troisième trimestre. Une période s'écrit par
+   * jeton — {P}, {A}, {M1}… — jamais en clair.
+   */
+  const fige = (t: string) => /\b(19|20)\d{2}\b|semest|trimest|\bS[12]\b|\bT[1-4]\b/i.test(t);
+  const figes: string[] = [];
+  for (const section of SECTIONS) {
+    for (const b of section.blocs) {
+      const textes =
+        b.type === "titre" ? [b.texte]
+        : b.type === "tableau" ? [b.titre, ...(b.kind === "arrondissements" ? [b.enteteLibelle] : b.entetes), ...b.lignes]
+        : [];
+      for (const t of textes) if (fige(t)) figes.push(`${section.cle} : « ${t} »`);
+    }
+  }
+  assert.deepEqual(figes, []);
 });
 
 test("les jetons de période sont tous substitués", () => {
@@ -281,5 +453,5 @@ test("l'inventaire des sections est cohérent", () => {
     assert.ok(inv.titres > 0, `${section.cle} : aucun titre`);
     tableaux += inv.tableaux;
   }
-  assert.equal(tableaux, 78, "78 tableaux décrits à ce jour");
+  assert.equal(tableaux, 87, "87 tableaux décrits à ce jour");
 });

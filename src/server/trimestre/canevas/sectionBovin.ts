@@ -1,18 +1,24 @@
 /**
- * DEUXIÈME PARTIE, II-1 — l'élevage bovin.
+ * DEUXIÈME PARTIE, CHAPITRE II, II-1 — l'élevage bovin.
  *
- * Transcription littérale des tableaux #21 à #29 de
- * docs/CANEVAS_TRIMESTRIEL.md, soit les tableaux n° 14 à 22 du canevas.
+ * Tableaux n° 14 à 22 du canevas, plus le tableau des infrastructures
+ * financées sur le budget d'investissement public, que le régional porte sans
+ * légende.
  *
- * DIFFÉRENCE MAJEURE AVEC LA SECTION I : ici, les arrondissements sont le plus
- * souvent en LIGNES, et les colonnes portent les catégories d'animaux ou les
- * produits. Les tableaux se terminent par trois lignes imposées — total de la
- * période, total de la même période l'an passé, et écart.
+ * DÉCOUPAGE COMMUN À TOUTES LES ESPÈCES, repris du régional : le cheptel
+ * présente l'espèce, sans numéro ; puis II-x-1 infrastructures, II-x-2
+ * animation, II-x-3 exploitation du bétail, II-x-4 produits dérivés, II-x-5
+ * mouvements, II-x-6 exportation, II-x-7 importation. Le régional numérote
+ * « II-1-2 » deux fois et saute « II-1-4 » : la numérotation est ici continue.
  *
- * Le canevas n'est pas homogène et il ne faut pas l'uniformiser : le tableau
- * n° 16 écrit « Castre » là où le n° 14 écrit « Castré », et leurs premières
- * colonnes s'intitulent différemment. Ces différences sont reproduites telles
- * quelles ; le test de conformité les vérifie caractère par caractère.
+ * Ici, les arrondissements sont le plus souvent en LIGNES, et les colonnes
+ * portent les catégories d'animaux ou les produits. Les tableaux se terminent
+ * par trois lignes imposées — total de la période, total de la même période
+ * l'an passé, et écart.
+ *
+ * Le régional écrit « Castre » aux tableaux des abattages et de la viande, et
+ * « CASTRE » au rendement carcasse. Faute d'accent : le SID écrit « Castré »,
+ * écart assumé dans tests/canevas-conformite.test.ts.
  */
 import type { SectionCanevas } from "./types";
 
@@ -30,10 +36,17 @@ export const SECTION_II_BOVIN: SectionCanevas = {
   titre: "Deuxième partie, II-1 — L'élevage bovin",
   blocs: [
     { type: "titre", niveau: 1, texte: "DEUXIÈME PARTIE : MISE EN ŒUVRE DES ACTIVITÉS AU NIVEAU DÉPARTEMENTAL" },
+    // Le régional ouvre ici son chapitre II. La pêche et la santé animale sont
+    // ses chapitres III et IV, dans cette même Deuxième partie.
+    { type: "titre", niveau: 1, texte: "CHAPITRE II : PRODUCTIONS ET INDUSTRIES ANIMALES" },
+    {
+      type: "zoneTexte",
+      cle: "II.introduction",
+      consigne: "Introduction du chapitre : place de l'élevage dans le département, faits marquants de la période.",
+    },
     { type: "titre", niveau: 2, texte: "II-1. L'ÉLEVAGE BOVIN" },
 
-    // ---- II-1-1. Le cheptel ----
-    { type: "titre", niveau: 3, texte: "II-1-1. Le cheptel" },
+    // ---- Le cheptel : présentation de l'espèce, sans numéro ----
     {
       type: "zoneTexte",
       cle: "II1.cheptel.preambule",
@@ -49,8 +62,8 @@ export const SECTION_II_BOVIN: SectionCanevas = {
       lignes: LIGNES_ARRONDISSEMENTS,
     },
 
-    // ---- II-1-2. Les infrastructures ----
-    { type: "titre", niveau: 3, texte: "II-1-2. Les infrastructures d'exploitation" },
+    // ---- II-1-1. Les infrastructures ----
+    { type: "titre", niveau: 3, texte: "II-1-1. Les infrastructures d'exploitation" },
     {
       type: "tableau",
       kind: "arrondissements",
@@ -79,13 +92,40 @@ export const SECTION_II_BOVIN: SectionCanevas = {
         "TOTAL",
       ],
     },
+    {
+      // Le régional y liste les ouvrages financés sur le budget
+      // d'investissement public de l'exercice, sans légende : il en reçoit une.
+      type: "tableau",
+      kind: "libre",
+      numero: null,
+      titre: "Infrastructures d’élevage financées sur le budget d’investissement public",
+      entetes: [
+        "N°",
+        "Arrondissement/ Commune",
+        "Infrastructure d’élevage de base",
+        "Equipement ou infrastructure annexe à l’infrastructure de base",
+        "Montant alloué (FCFA)",
+        "Niveau d’exécution physique (construit, non construit, En cours, Arrêté)",
+      ],
+      lignes: ["1", "2", "3", "TOTAL"],
+    },
+    { type: "titre", niveau: 4, texte: "a) Abattoirs" },
+    { type: "zoneTexte", cle: "II1.abattoirs", consigne: "Abattoirs et aires d'abattage : état, fonctionnement." },
+    { type: "titre", niveau: 4, texte: "b) Les pâturages" },
+    { type: "zoneTexte", cle: "II1.paturages", consigne: "Zones de pâturage, état, conflits agropastoraux." },
+    { type: "titre", niveau: 4, texte: "c) Hydraulique pastorale" },
+    { type: "zoneTexte", cle: "II1.hydraulique", consigne: "Points d'eau, forages, barrages." },
+    { type: "titre", niveau: 4, texte: "d) Infrastructures communautaires" },
+    { type: "zoneTexte", cle: "II1.infraCommunautaires", consigne: "Marchés à bétail, parcs vaccinogènes, bains détiqueurs…" },
+    { type: "titre", niveau: 4, texte: "e) Infrastructures privées" },
+    { type: "zoneTexte", cle: "II1.infraPrivees", consigne: "Ranchs, fermes, unités de transformation." },
 
-    // ---- II-1-3. Animation pastorale ----
-    { type: "titre", niveau: 3, texte: "II-1-3. Animation pastorale et vulgarisation" },
+    // ---- II-1-2. Animation pastorale ----
+    { type: "titre", niveau: 3, texte: "II-1-2. Animation pastorale et vulgarisation" },
     { type: "zoneTexte", cle: "II1.animation", consigne: "a) Encadrement — b) Initiatives paysannes." },
 
-    // ---- II-1-4. Exploitation du bétail ----
-    { type: "titre", niveau: 3, texte: "II-1-4. Exploitation du bétail" },
+    // ---- II-1-3. Exploitation du bétail ----
+    { type: "titre", niveau: 3, texte: "II-1-3. Exploitation du bétail" },
     { type: "titre", niveau: 4, texte: "a) Les abattages contrôlés" },
     {
       type: "tableau",
@@ -125,8 +165,8 @@ export const SECTION_II_BOVIN: SectionCanevas = {
       lignes: LIGNES_ARRONDISSEMENTS,
     },
 
-    // ---- II-1-5. Produits dérivés ----
-    { type: "titre", niveau: 3, texte: "II-1-5. Exploitation des produits dérivés" },
+    // ---- II-1-4. Produits dérivés ----
+    { type: "titre", niveau: 3, texte: "II-1-4. Exploitation des produits dérivés" },
     { type: "titre", niveau: 4, texte: "a) Lait et produits dérivés" },
     {
       type: "tableau",
@@ -160,8 +200,8 @@ export const SECTION_II_BOVIN: SectionCanevas = {
       lignes: LIGNES_ARRONDISSEMENTS,
     },
 
-    // ---- II-1-6. Mouvements de bétail ----
-    { type: "titre", niveau: 3, texte: "II-1-6. Mouvements de bétail" },
+    // ---- II-1-5. Mouvements de bétail ----
+    { type: "titre", niveau: 3, texte: "II-1-5. Mouvements de bétail" },
     {
       type: "tableau",
       kind: "libre",
@@ -171,10 +211,10 @@ export const SECTION_II_BOVIN: SectionCanevas = {
       lignes: LIGNES_ARRONDISSEMENTS,
     },
 
-    // ---- II-1-7 et II-1-8 ----
-    { type: "titre", niveau: 3, texte: "II-1-7. Exportation d'animaux et produits dérivés" },
+    // ---- II-1-6 et II-1-7 ----
+    { type: "titre", niveau: 3, texte: "II-1-6. Exportation d'animaux et produits dérivés" },
     { type: "zoneTexte", cle: "II1.exportation", consigne: "Néant si aucune activité enregistrée." },
-    { type: "titre", niveau: 3, texte: "II-1-8. Importation d'animaux et produits dérivés" },
+    { type: "titre", niveau: 3, texte: "II-1-7. Importation d'animaux et produits dérivés" },
     { type: "zoneTexte", cle: "II1.importation", consigne: "Néant si aucune activité enregistrée." },
   ],
 };

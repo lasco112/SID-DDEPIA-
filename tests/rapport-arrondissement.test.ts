@@ -15,7 +15,7 @@ import PizZip from "pizzip";
 import { base } from "../src/lib/baseDeTravail";
 import { trimestrielle } from "../src/server/periodes/calendrier";
 import { genererRapportCanevas, SECTIONS_CANEVAS } from "../src/server/trimestre/rapportCanevas";
-import { adapterTitre } from "../src/server/trimestre/canevas/types";
+import { adapterTitre, resoudre } from "../src/server/trimestre/canevas/types";
 import { TEXTES_FIXES } from "../src/server/trimestre/canevas/textesFixes";
 import { TEXTES_ARRONDISSEMENTS } from "../src/server/trimestre/canevas/textesArrondissements";
 
@@ -133,7 +133,21 @@ test("le rapport départemental garde ses six colonnes et ses textes", async () 
     assert.ok(texte.includes(a), `« ${a} » doit figurer en colonne du rapport départemental.`);
   }
   const intro = TEXTES_FIXES.get("I.introduction");
-  assert.ok(intro && texte.includes(nu(intro).slice(0, 80)), "L'introduction du DD doit rester dans SON rapport.");
+  const ctx = {
+    periodeCourt: "T3 2026", periodeCourtN1: "T3 2025", annee: 2026,
+    mois: ["JUILLET", "AOÛT", "SEPTEMBRE"], arrondissements: [],
+  };
+  assert.ok(intro && texte.includes(nu(resoudre(intro, ctx)).slice(0, 80)), "L'introduction du DD doit rester dans SON rapport.");
+});
+
+test("l'introduction annonce les mois de SA période, jamais ceux d'une autre", async () => {
+  const { texte } = await produire();
+  assert.ok(
+    texte.includes("Le présent rapport trimestriel d’activités de la DDEPIA/MENOUA couvre la période allant de Juillet à Septembre 2026."),
+    "La première phrase de l'introduction doit être calculée pour le troisième trimestre."
+  );
+  assert.ok(!texte.includes("Janvier à Mars"), "L'introduction annonce encore les mois du premier trimestre.");
+  assert.ok(!/\{[A-Z_0-9-]+\}/.test(texte), "Un jeton de période est resté tel quel dans le document.");
 });
 
 test("un arrondissement inconnu est refusé, pas silencieusement ignoré", async () => {

@@ -1,5 +1,5 @@
 /**
- * QUATRIÈME PARTIE — santé animale, inspection et contrôle sanitaire.
+ * CHAPITRE IV — protection sanitaire et santé publique.
  *
  * Tableaux n° 64 à 72 du canevas, plus le tableau de promptitude et de
  * complétude, qui est propre au niveau départemental.
@@ -33,9 +33,9 @@ const LIGNES_ARRONDISSEMENTS = ["{ARRONDISSEMENTS}", ...PIED];
 
 export const SECTION_IV_SANTE: SectionCanevas = {
   cle: "IV",
-  titre: "Quatrième partie — Santé animale, inspection et contrôle sanitaire",
+  titre: "Chapitre IV — Protection sanitaire et santé publique",
   blocs: [
-    { type: "titre", niveau: 1, texte: "QUATRIÈME PARTIE : SANTÉ ANIMALE, INSPECTION ET CONTRÔLE SANITAIRE" },
+    { type: "titre", niveau: 1, texte: "CHAPITRE IV : PROTECTION SANITAIRE ET SANTÉ PUBLIQUE" },
 
     // ---- IV-1. Promptitude et complétude ----
     {
@@ -71,8 +71,26 @@ export const SECTION_IV_SANTE: SectionCanevas = {
     },
     { type: "titre", niveau: 3, texte: "IV-2-2. Surveillance sentinelle de l'influenza aviaire hautement pathogène" },
     { type: "zoneTexte", cle: "IV2.influenza", consigne: "Rubrique imposée." },
-    { type: "titre", niveau: 3, texte: "IV-2-3. Bilan épidémiologique du trimestre" },
+    {
+      // Sans légende dans le régional, qui compare les prélèvements des trois
+      // dernières années, territoire par territoire.
+      type: "tableau",
+      kind: "libre",
+      numero: null,
+      titre: "Prélèvements effectués dans les fermes avicoles",
+      entetes: ["ARRONDISSEMENTS", "{ARRONDISSEMENTS}", "TOTAL"],
+      lignes: ["ANNEE {A-2}", "ANNEE {A-1}", "ANNEE {A}", "TOTAL CUMULE"],
+    },
+    { type: "titre", niveau: 3, texte: "IV-2-3. Bilan épidémiologique" },
     { type: "zoneTexte", cle: "IV2.bilan", consigne: "Foyers déclarés, espèces touchées, mesures prises, dates." },
+    {
+      type: "tableau",
+      kind: "libre",
+      numero: null,
+      titre: "Bilan de la surveillance des maladies animales",
+      entetes: ["Semaine épidémiologique (SE)", "Maladie suspectée", "Confirmé", "Négatif"],
+      lignes: ["", "", "", "TOTAL"],
+    },
 
     // ---- IV-3. Dispensaires et cliniques ----
     { type: "titre", niveau: 2, texte: "IV-3. ACTIVITÉS DES DISPENSAIRES ET CLINIQUES" },
@@ -168,6 +186,14 @@ export const SECTION_IV_SANTE: SectionCanevas = {
     { type: "zoneTexte", cle: "IV7.autres", consigne: "Rubrique imposée." },
     { type: "titre", niveau: 2, texte: "IV-8. CARTOGRAPHIE DES VÉTÉRINAIRES INSTALLÉS EN CLIENTÈLE PRIVÉE" },
     { type: "zoneTexte", cle: "IV8.cartographie", consigne: "Rubrique imposée." },
+    {
+      type: "tableau",
+      kind: "libre",
+      numero: null,
+      titre: "Vétérinaires installés en clientèle privée",
+      entetes: ["N°", "ARRONDISSEMENT", "LOCALISATION", "NOMS ET PRENOMS", "TELEPHONE", "STRUCTURE", "STATUT"],
+      lignes: ["01", "02", "03"],
+    },
     { type: "titre", niveau: 2, texte: "IV-9. CARTE ÉPIDÉMIOLOGIQUE ACTUALISÉE DU DÉPARTEMENT" },
     { type: "zoneTexte", cle: "IV9.carte", consigne: "Rubrique imposée." },
 

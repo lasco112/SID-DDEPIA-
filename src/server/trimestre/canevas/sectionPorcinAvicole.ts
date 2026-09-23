@@ -15,17 +15,27 @@
  *     sans majuscule ;
  *   - la première colonne des n° 49 et 50 s'intitule « Produits \Arrondissement »,
  *     avec une barre oblique inverse ;
- *   - le tableau n° 37 des porcins porte QUATRE colonnes de total, dont deux
- *     semestrielles — d'où les jetons {A} et {A-1}.
+ *   - les sous-filières avicoles (poule locale, chair, pondeuses, parentaux)
+ *     présentent l'aviculture en a) b) c) d) ; le régional les numérote
+ *     « II-6-1… » puis reprend une seconde série « II-6-1… » : la numérotation
+ *     est ici continue.
  *
  * Chacune de ces particularités est vérifiée caractère par caractère par
  * tests/canevas-conformite.test.ts.
  */
-import type { SectionCanevas } from "./types";
+import type { Bloc, SectionCanevas } from "./types";
 
 const PIED = ["TOTAL {P}", "TOTAL {P-1}", "ÉCART"];
 const TOTAUX = ["TOTAL {P}", "TOTAL {P-1}"];
 const LIGNES_ARRONDISSEMENTS = ["{ARRONDISSEMENTS}", ...PIED];
+
+const NEANT = "Néant si aucune activité enregistrée.";
+
+/** Une sous-partie sans tableau : un titre et sa zone de texte. */
+const rubrique = (texte: string, cle: string, consigne = NEANT): Bloc[] => [
+  { type: "titre", niveau: 3, texte },
+  { type: "zoneTexte", cle, consigne },
+];
 
 /**
  * Les dix-neuf produits connexes de l'aviculture, identiques aux tableaux
@@ -64,28 +74,26 @@ export const SECTION_II_PORCIN: SectionCanevas = {
   blocs: [
     { type: "titre", niveau: 2, texte: "II-5. L'ÉLEVAGE PORCIN" },
 
-    { type: "titre", niveau: 3, texte: "II-5-1. Le cheptel" },
+    { type: "zoneTexte", cle: "II5.cheptel", consigne: "Présentation de l'élevage porcin et de son cheptel." },
     {
       type: "tableau",
       kind: "libre",
       numero: 37,
       titre: "Situation du cheptel porcin par arrondissement",
-      // Quatre colonnes de total, dont deux semestrielles : particularité du
-      // canevas, reproduite telle quelle.
-      entetes: [
-        "Arrondissement",
-        "Verrats",
-        "Truies",
-        "Castrés",
-        "Porcelets",
-        "TOTAL 1er S1 {A}",
-        "TOTAL 1er S1 {A-1}",
-        ...TOTAUX,
-      ],
+      // Le régional porte des totaux « 1er S1 » : ce sont les totaux de SA
+      // période. Ils suivent ici la période du rapport, comme partout.
+      entetes: ["Arrondissement", "Verrats", "Truies", "Castrés", "Porcelets", ...TOTAUX],
       lignes: LIGNES_ARRONDISSEMENTS,
     },
 
+    ...rubrique(
+      "II-5-1. Infrastructures d'exploitation",
+      "II5.infrastructures",
+      "a) Les fermes — b) Les équipements des fermes — c) Infrastructures communautaires (abattoirs, marchés…) — d) Infrastructures privées."
+    ),
+
     { type: "titre", niveau: 3, texte: "II-5-2. Animation pastorale et vulgarisation" },
+    { type: "zoneTexte", cle: "II5.animation", consigne: "a) Encadrement — b) Initiatives paysannes." },
     {
       type: "tableau",
       kind: "libre",
@@ -132,6 +140,21 @@ export const SECTION_II_PORCIN: SectionCanevas = {
       entetes: ["Arrondissement", "Animaux sur pied", "Viande", ...TOTAUX],
       lignes: LIGNES_ARRONDISSEMENTS,
     },
+
+    ...rubrique("II-5-4. Exploitation des produits dérivés", "II5.produitsDerives"),
+
+    { type: "titre", niveau: 3, texte: "II-5-5. Mouvements des animaux" },
+    {
+      type: "tableau",
+      kind: "libre",
+      numero: null,
+      titre: "Situation de la circulation intérieure des porcins sur pied",
+      entetes: ["Arrondissement", "Nombre de têtes", "Provenance", "Destination", ...TOTAUX],
+      lignes: LIGNES_ARRONDISSEMENTS,
+    },
+
+    ...rubrique("II-5-6. Exportation d'animaux et produits dérivés", "II5.exportation"),
+    ...rubrique("II-5-7. Importation d'animaux et produits dérivés", "II5.importation"),
   ],
 };
 
@@ -145,16 +168,16 @@ export const SECTION_II_AVICOLE: SectionCanevas = {
   blocs: [
     { type: "titre", niveau: 2, texte: "II-6. LES ÉLEVAGES AVICOLES" },
 
-    { type: "titre", niveau: 3, texte: "II-6-1. La poule locale" },
+    { type: "titre", niveau: 4, texte: "a) La poule locale" },
     { type: "zoneTexte", cle: "II6.pouleLocale", consigne: "Sous-découpage imposé par le canevas régional." },
-    { type: "titre", niveau: 3, texte: "II-6-2. L'élevage des poulets de chair" },
+    { type: "titre", niveau: 4, texte: "b) L'élevage des poulets de chair" },
     { type: "zoneTexte", cle: "II6.pouletsChair", consigne: "Sous-découpage imposé par le canevas régional." },
-    { type: "titre", niveau: 3, texte: "II-6-3. L'élevage des pondeuses" },
+    { type: "titre", niveau: 4, texte: "c) L'élevage des pondeuses" },
     { type: "zoneTexte", cle: "II6.pondeuses", consigne: "Sous-découpage imposé par le canevas régional." },
-    { type: "titre", niveau: 3, texte: "II-6-4. L'élevage des parentaux (production de poussins d'un jour)" },
+    { type: "titre", niveau: 4, texte: "d) L'élevage des parentaux (production de poussins d'un jour)" },
     { type: "zoneTexte", cle: "II6.parentaux", consigne: "Sous-découpage imposé par le canevas régional." },
 
-    { type: "titre", niveau: 3, texte: "II-6-5. Situation des bandes" },
+    // Situation des bandes : le « cheptel » de l'aviculture, sans numéro.
     {
       type: "zoneTexte",
       cle: "II6.bandes.preambule",
@@ -190,7 +213,10 @@ export const SECTION_II_AVICOLE: SectionCanevas = {
       ],
     },
 
-    { type: "titre", niveau: 3, texte: "II-6-6. Exploitation des bandes" },
+    ...rubrique("II-6-1. Infrastructures d'exploitation", "II6.infrastructures", "a) Les infrastructures communautaires — b) Les infrastructures privées."),
+    ...rubrique("II-6-2. Animation et vulgarisation", "II6.animation", "Encadrement ; initiatives paysannes."),
+
+    { type: "titre", niveau: 3, texte: "II-6-3. Exploitation des bandes" },
     { type: "titre", niveau: 4, texte: "a) Commercialisation des oiseaux sur pied" },
     {
       type: "tableau",
@@ -277,7 +303,7 @@ export const SECTION_II_AVICOLE: SectionCanevas = {
       lignes: LIGNES_ARRONDISSEMENTS,
     },
 
-    { type: "titre", niveau: 3, texte: "II-6-7. Exploitation des produits dérivés" },
+    { type: "titre", niveau: 3, texte: "II-6-4. Exploitation des produits dérivés" },
     { type: "titre", niveau: 4, texte: "a) Production des œufs" },
     {
       type: "tableau",
@@ -306,7 +332,7 @@ export const SECTION_II_AVICOLE: SectionCanevas = {
       lignes: PRODUITS_CONNEXES,
     },
 
-    { type: "titre", niveau: 3, texte: "II-6-8. Mouvement des bandes et des produits" },
+    { type: "titre", niveau: 3, texte: "II-6-5. Mouvement des bandes, des produits dérivés et produits connexes" },
     {
       type: "tableau",
       kind: "arrondissements",
@@ -315,5 +341,8 @@ export const SECTION_II_AVICOLE: SectionCanevas = {
       enteteLibelle: "Produits \\Arrondissement",
       lignes: PRODUITS_CONNEXES,
     },
+
+    ...rubrique("II-6-6. Exportation de la volaille et de ses produits dérivés", "II6.exportation"),
+    ...rubrique("II-6-7. Importation de volailles, de produits dérivés et de produits connexes", "II6.importation"),
   ],
 };
