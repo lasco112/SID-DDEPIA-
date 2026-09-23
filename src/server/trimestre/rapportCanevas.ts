@@ -35,6 +35,7 @@ export class ControlesCroisesError extends Error {
 import { champsMobilises, bilanLiaisons } from "./liaison";
 import { lireRubriques } from "./rubriques";
 import { preparer, fournisseur } from "./remplissage";
+import type { LigneNonClassee } from "./evenements";
 import { inspecterPeriode, type EtatPeriode } from "./agregation";
 import {
   type Periode, libelleOfficiel, libelleCourt, memePeriodeAnneePrecedente, moisDeLaPeriode,
@@ -109,6 +110,11 @@ export interface RapportProduit {
   rubriquesAlimentees: number;
   /** Nombre de valeurs effectivement consolidées. */
   valeursConsolidees: number;
+  /**
+   * Lignes des listes mensuelles (vaccinations, cliniques, circulation) qui ne
+   * correspondent à aucune case du canevas : le Délégué décide de leur sort.
+   */
+  lignesNonClassees: LigneNonClassee[];
 }
 
 export async function genererRapportCanevas(
@@ -291,5 +297,6 @@ export async function genererRapportCanevas(
     etat,
     rubriquesAlimentees: bilan.casesLiees,
     valeursConsolidees: donnees.renseignees,
+    lignesNonClassees: donnees.evenements.nonClassees,
   };
 }

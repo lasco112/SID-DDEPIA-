@@ -35,7 +35,7 @@ import {
 } from "./reglesChamps";
 
 /** Statuts d'un rapport d'arrondissement qui valent « donnée transmise ». */
-const STATUTS_TRANSMIS = ["SOUMIS", "CLOTURE"] as const;
+export const STATUTS_TRANSMIS = ["SOUMIS", "CLOTURE"] as const;
 
 /**
  * Les valeurs sont stockées en `Decimal(14,3)`. Additionnées en virgule

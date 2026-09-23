@@ -22,7 +22,7 @@ async function principal() {
   const db = base;
   const p = trimestrielle(annee, trimestre);
 
-  const { buffer, nomFichier, etat, rubriquesAlimentees, valeursConsolidees } =
+  const { buffer, nomFichier, etat, rubriquesAlimentees, valeursConsolidees, lignesNonClassees } =
     await genererRapportCanevas(db, p, { autoriserIncomplet: brouillon });
 
   mkdirSync("storage/exports", { recursive: true });
@@ -32,6 +32,8 @@ async function principal() {
   console.log(`  période  : ${libelleOfficiel(p)} · ${etat.calculable ? "complète" : "INCOMPLÈTE"}`);
   console.log(`  rubriques alimentées : ${rubriquesAlimentees}`);
   console.log(`  valeurs consolidées  : ${valeursConsolidees}`);
+  console.log(`  lignes non classées  : ${lignesNonClassees.length}`);
+  for (const l of lignesNonClassees) console.log(`    - ${l.arrondissement} · ${l.ligne} · ${l.quantite ?? "—"} → ${l.tableau}`);
 
   await db.$disconnect();
 }

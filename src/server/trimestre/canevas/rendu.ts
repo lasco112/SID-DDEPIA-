@@ -26,6 +26,8 @@ import {
  */
 export type FournisseurValeur = (params: {
   numeroTableau: number | null;
+  /** Le titre repère les tableaux qui n'ont pas de numéro interne. */
+  titreTableau: string;
   ligne: string;
   colonne: string;
   indexColonne: number;
@@ -184,7 +186,7 @@ function rendreTableau(
         // elle ne vient pas des données et n'est pas à ressaisir.
         const fixe = prerempli?.[r]?.[i - 1];
         if (fixe) return cellule(resoudre(fixe, ctx));
-        const v = valeur({ numeroTableau: bloc.numero, ligne: lib, colonne: col, indexColonne: i });
+        const v = valeur({ numeroTableau: bloc.numero, titreTableau: bloc.titre, ligne: lib, colonne: col, indexColonne: i });
         return cellule(v ?? "", { gras: estTotal, droite: true });
       }),
     });

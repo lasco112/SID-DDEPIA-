@@ -19,6 +19,7 @@ import type { FournisseurValeur } from "./canevas/rendu";
 import type { ContexteCanevas } from "./canevas/types";
 import { listerArrondissements, graphieCanevas } from "../../lib/arrondissements";
 import { lireSaisiesCanevas, cleCellule, type ValeurCellule } from "./saisieCanevas";
+import { preparerEvenements, liaisonEvenementDe, type DonneesEvenements } from "./evenements";
 
 const nf = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 3 });
 
@@ -52,6 +53,8 @@ export interface DonneesRemplissage {
    * la période trimestrielle n'existe pas encore en base.
    */
   saisies: Map<string, ValeurCellule>;
+  /** Les listes du mensuel additionnées : vaccinations, cliniques, circulation. */
+  evenements: DonneesEvenements;
 }
 
 /**
@@ -83,8 +86,10 @@ export async function preparer(
   });
   const saisies = trimestre ? await lireSaisiesCanevas(db, trimestre.id) : new Map<string, ValeurCellule>();
 
+  const evenements = await preparerEvenements(db, periode, { arrondissementId: options.arrondissementId });
+
   if (champs.length === 0) {
-    return { valeurs: vide(), valeursN1: vide(), renseignees: 0, codeParNom, saisies };
+    return { valeurs: vide(), valeursN1: vide(), renseignees: 0, codeParNom, saisies, evenements };
   }
 
   const ranger = (agregees: ValeurAgregee[]) => {
@@ -116,7 +121,7 @@ export async function preparer(
 
   const a = ranger(courant.valeurs);
   const b = ranger(precedent);
-  return { valeurs: a.m, valeursN1: b.m, renseignees: a.n, codeParNom, saisies };
+  return { valeurs: a.m, valeursN1: b.m, renseignees: a.n, codeParNom, saisies, evenements };
 }
 
 /**
@@ -143,6 +148,45 @@ export function fournisseur(donnees: DonneesRemplissage, ctx: ContexteCanevas): 
   const lire = (champ: string, arr: string | null, n1: boolean): number | null =>
     (n1 ? donnees.valeursN1 : donnees.valeurs).get(champ)?.get(arr) ?? null;
 
+  /**
+   * Une case d'un tableau alimenté par les listes du mensuel (evenements.ts).
+   * Même logique de territoires, de totaux et d'écart que les autres tableaux.
+   */
+  const valeurEvenement = (
+    numero: number,
+    orientation: "lignes" | "colonnes",
+    ligne: string,
+    colonne: string
+  ): string | null => {
+    const territoire = orientation === "lignes" ? ligne : colonne;
+    const categorie = orientation === "lignes" ? colonne : ligne;
+    const cases = (n1: boolean) => (n1 ? donnees.evenements.precedent : donnees.evenements.courant).get(numero);
+    const total = (arr: string | null, n1: boolean) => cases(n1)?.totaux.get(arr) ?? null;
+    const nombre = (cat: string, arr: string | null, n1: boolean) => cases(n1)?.nombres.get(cat)?.get(arr) ?? null;
+    const format = (v: number | null) => (v == null ? null : nf.format(v));
+
+    // Le territoire : un arrondissement, le département (lignes TOTAL), ou l'écart.
+    const estEcart = /^ÉCART/i.test(territoire);
+    const n1Ligne = territoire === totalN1;
+    const arr = /^TOTAL/i.test(territoire) || estEcart ? null : (codeDe.get(territoire) ?? undefined);
+    if (arr === undefined) return null;
+
+    // Colonne (ou ligne) TOTAL : toutes les lignes de la source.
+    if (/^TOTAL/i.test(categorie)) {
+      if (estEcart) return categorie === totalN1 ? null : ecartEnPourcentage(total(null, false), total(null, true));
+      return format(total(arr, categorie === totalN1 || n1Ligne));
+    }
+    // Case de texte : les valeurs distinctes, dans l'ordre alphabétique.
+    const textes = cases(false)?.textes.get(categorie);
+    if (textes) {
+      if (arr === null) return null;
+      const s = textes.get(arr);
+      return s && s.size ? Array.from(s).sort((a, b) => a.localeCompare(b, "fr")).join(" ; ") : null;
+    }
+    if (estEcart) return ecartEnPourcentage(nombre(categorie, null, false), nombre(categorie, null, true));
+    return format(nombre(categorie, arr, n1Ligne));
+  };
+
   /** La valeur d'une formule pour un territoire. */
   const calculer = (f: Formule, arr: string | null, n1: boolean) => evaluer(f, (champ) => lire(champ, arr, n1));
 
@@ -150,7 +194,7 @@ export function fournisseur(donnees: DonneesRemplissage, ctx: ContexteCanevas): 
   const valeurDe = (c: Correspondance, arr: string | null, n1: boolean): number | null =>
     c.formule ? calculer(c.formule, arr, n1) : c.champ ? lire(c.champ, arr, n1) : null;
 
-  return ({ numeroTableau, ligne, colonne }) => {
+  return ({ numeroTableau, titreTableau, ligne, colonne }) => {
     // Les tableaux du BAC sont saisis à la main : ils ne viennent d'aucun mois,
     // et rien ne les alimenterait autrement. On les sert AVANT la liaison —
     // sans conflit possible, puisqu'un tableau saisi à la main n'en a pas.
@@ -163,6 +207,9 @@ export function fournisseur(donnees: DonneesRemplissage, ctx: ContexteCanevas): 
         if (saisie.texte) return saisie.texte;
       }
     }
+
+    const evenement = liaisonEvenementDe(numeroTableau, titreTableau);
+    if (evenement) return valeurEvenement(evenement.numero, evenement.orientation, ligne, colonne);
 
     const liaison = liaisonDe(numeroTableau);
     if (!liaison) return null;
