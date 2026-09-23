@@ -73,8 +73,10 @@ export interface ZoneTexte {
  * l'écran de rédaction sans autre intervention.
  */
 export function zonesTexte(options: { arrondissement?: boolean } = {}): ZoneTexte[] {
+  // Les zones qui ont un texte de référence : celles du département, ou
+  // celles que chaque arrondissement reçoit toutes rédigées.
   const fixes = options.arrondissement
-    ? new Set(["I.introduction", "I1.organisation"])
+    ? new Set(Array.from(TEXTES_ARRONDISSEMENTS.values()).flatMap((t) => Object.keys(t)))
     : new Set(Array.from(TEXTES_FIXES.keys()));
 
   const zones: ZoneTexte[] = [];
@@ -238,9 +240,11 @@ export async function genererRapportCanevas(
   const textes = options.arrondissement ? new Map<string, string>() : new Map(TEXTES_FIXES);
 
   if (options.arrondissement) {
-    const sienTexte = TEXTES_ARRONDISSEMENTS.get(options.arrondissement);
-    if (sienTexte?.introduction) textes.set("I.introduction", sienTexte.introduction);
-    if (sienTexte?.presentation) textes.set("I1.organisation", sienTexte.presentation);
+    // Ses textes à LUI : présentation, pédologie, démographie, missions,
+    // vision, organisation, introduction, bibliographie de ses sources.
+    for (const [cle, texte] of Object.entries(TEXTES_ARRONDISSEMENTS.get(options.arrondissement) ?? {})) {
+      if (texte?.trim()) textes.set(cle, texte);
+    }
   }
 
   // Ce que le rédacteur a écrit pour CETTE période l'emporte sur le texte fixe :

@@ -14,11 +14,16 @@ const ARR = ["Dschang", "Fokoué", "Fongo-Tongo", "Nkong-Ni", "Penka-Michel", "S
 const SIENS = new Map(
   [...readFileSync("src/server/trimestre/canevas/textesArrondissements.ts", "utf8")
     .matchAll(
-      /\[\s*"([^"]+)",\s*\{\s*introduction:\s*("(?:[^"\\]|\\.)*"|null),\s*presentation:\s*("(?:[^"\\]|\\.)*"|null)/g
+      /\[\s*"([^"]+)",\s*\{\s*"I\.introduction":\s*("(?:[^"\\]|\\.)*"),[\s\S]*?"I1\.organisation":\s*("(?:[^"\\]|\\.)*")/g
     )]
     .map(([, nom, i, p]) => [
       nom,
-      { introduction: i === "null" ? null : JSON.parse(i), presentation: p === "null" ? null : JSON.parse(p) },
+      {
+        // La première phrase de l'introduction est CALCULÉE (jetons de période) :
+        // on compare à partir de la deuxième, écrite par la DAEPIA.
+        introduction: JSON.parse(i).split("\n\n").slice(1).join("\n\n") || null,
+        presentation: JSON.parse(p),
+      },
     ])
 );
 
@@ -27,7 +32,18 @@ const SIENS = new Map(
  * paragraphes séparés. Comparer sans normaliser ferait crier au manque un texte
  * pourtant présent.
  */
-const nu = (t) => t.replace(/'/g, "’").replace(/\s+/g, " ").trim();
+const nu = (t) =>
+  t
+    // Les jetons de période sont résolus au rendu du troisième trimestre.
+    .replace(/\{CETTE_PERIODE\}/g, "ce trimestre")
+    .replace(/\{NATURE\}/g, "trimestriel")
+    .replace(/'/g, "’").replace(/\s+/g, " ").trim();
+
+/** Le texte des seuls tableaux : leurs en-têtes portent les territoires. */
+const tableaux = (f) => {
+  const xml = new PizZip(readFileSync(`${D}/${f}`)).file("word/document.xml").asText();
+  return (xml.match(/<w:tbl>[\s\S]*?<\/w:tbl>/g) || []).join(" ").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+};
 
 const texte = (f) => {
   const xml = new PizZip(readFileSync(`${D}/${f}`)).file("word/document.xml").asText();
@@ -62,13 +78,14 @@ for (const a of ARR) {
     t.includes(`DE L’ARRONDISSEMENT DE ${MAJ}`) || t.includes(`DE L'ARRONDISSEMENT DE ${MAJ}`);
   const resteDept = t.includes("DU DÉPARTEMENT DE LA MENOUA");
   // Une seule colonne territoriale : le nom des cinq autres ne doit pas figurer
-  // dans les en-têtes de tableau.
-  const autres = ARR.filter((x) => x !== a && t.includes(` ${x} `)).length;
+  // dans les TABLEAUX. Les textes, eux, peuvent nommer un voisin.
+  const tab = tableaux(`Rapport_T32026_DAEPIA-${a}.docx`);
+  const autres = ARR.filter((x) => x !== a && tab.includes(` ${x} `)).length;
   console.log(
     `${a.padEnd(18)} ${(fuite.length ? "FUITE:" + fuite.join(",") : "ok  ").padEnd(4)} ` +
       `${porteSien} ${t.includes("XE ") ? "XE!" : "ok "} ` +
       `${titres && !resteDept ? "ok    " : resteDept ? "RESTE " : "MANQUE"} ` +
-      `${t.includes("Le Délégué d’Arrondissement") ? "ok       " : "FAUTE    "} ` +
+      `${t.includes("LE DÉLÉGUÉ D’ARRONDISSEMENT,") ? "ok       " : "FAUTE    "} ` +
       `${autres === 0 ? "1 seule" : `${autres} autres arrond. cités`}`
   );
 }
@@ -86,5 +103,5 @@ console.log(
 );
 console.log(
   `département : signature départementale : ` +
-    `${dept.includes("Le Délégué Départemental") ? "ok" : "FAUTE"}`
+    `${dept.includes("LE DÉLÉGUÉ DÉPARTEMENTAL,") ? "ok" : "FAUTE"}`
 );

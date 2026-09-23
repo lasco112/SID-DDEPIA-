@@ -22,6 +22,12 @@ import { TEXTES_ARRONDISSEMENTS } from "../src/server/trimestre/canevas/textesAr
 const db = base;
 const P = trimestrielle(2026, 3);
 
+/** Le texte des seuls TABLEAUX du document : leurs en-têtes portent les territoires. */
+function texteDesTableaux(buffer: Buffer): string {
+  const xml = new PizZip(buffer).file("word/document.xml")!.asText();
+  return (xml.match(/<w:tbl>[\s\S]*?<\/w:tbl>/g) ?? []).join(" ").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+}
+
 /** Le texte visible du document, apostrophes et espaces normalisés. */
 function texteDu(buffer: Buffer): string {
   const xml = new PizZip(buffer).file("word/document.xml")!.asText();
@@ -38,6 +44,9 @@ async function produire(arrondissement?: string) {
 test("un rapport d'arrondissement ne porte AUCUN texte du Délégué départemental", async () => {
   const { texte } = await produire("Dschang");
   for (const [cle, fixe] of Array.from(TEXTES_FIXES)) {
+    // La bibliographie cite des publications que les deux niveaux partagent :
+    // une référence commune n'est pas le texte du Délégué recopié.
+    if (cle === "bibliographie") continue;
     const debut = nu(fixe).slice(0, 80);
     assert.ok(
       !texte.includes(debut),
@@ -50,11 +59,15 @@ test("un rapport d'arrondissement ne porte AUCUN texte du Délégué départemen
 test("il porte ses propres textes fixes", async () => {
   const { texte } = await produire("Dschang");
   const siens = TEXTES_ARRONDISSEMENTS.get("Dschang");
-  assert.ok(siens?.presentation, "La présentation de Dschang doit être extraite de son rapport réel.");
-  assert.ok(
-    texte.includes(nu(siens!.presentation!).slice(0, 80)),
-    "Sa présentation, extraite de son propre rapport, doit ressortir dans le document."
-  );
+  assert.ok(siens?.["I1.organisation"], "L'organisation de la DAEPIA de Dschang doit avoir un texte.");
+  for (const cle of ["I1.organisation", "I.geo.relief", "I.geo.pedologie", "I.geo.demographie", "I1.missions"] as const) {
+    assert.ok(
+      texte.includes(nu(siens![cle]).slice(0, 60)),
+      `Son texte « ${cle} » doit ressortir dans son document.`
+    );
+  }
+  // Démographie : le recensement de 2005, comme au rapport départemental.
+  assert.ok(texte.includes("101 385"), "La population de Dschang est celle du recensement de 2005.");
 });
 
 test("les titres sont transposés au niveau de l'arrondissement", async () => {
@@ -110,7 +123,9 @@ test("le rapport départemental garde ses lignes DDEPIA", async () => {
 });
 
 test("il ne porte qu'une seule colonne territoriale — la sienne", async () => {
-  const { texte } = await produire("Fokoué");
+  // Les TABLEAUX seulement : un texte peut nommer un arrondissement voisin
+  // (« limitée au sud par l'arrondissement de Santchou »), un tableau non.
+  const texte = texteDesTableaux((await produire("Fokoué")).buffer);
   for (const autre of ["Dschang", "Fongo-Tongo", "Nkong-Ni", "Penka-Michel", "Santchou"]) {
     assert.ok(
       !texte.includes(` ${autre} `),

@@ -23,6 +23,10 @@ interface Zone {
   contexte: string;
   fixe: boolean;
   contenu: string;
+  /** Le texte de référence, déjà mis à la période ; null s'il n'y en a pas. */
+  reference: string | null;
+  /** Ce qui a été écrit au trimestre précédent. */
+  precedent: string | null;
 }
 
 interface Etat {
@@ -61,8 +65,16 @@ export default function RubriquesTrimestreClient({ annee, trimestre }: { annee: 
 
   useEffect(() => { charger(choix); }, [choix, charger]);
 
-  async function enregistrer(cle: string) {
-    const contenu = saisie[cle] ?? "";
+  /** Reprend un texte dans la zone, pour le corriger ; il est enregistré aussitôt. */
+  function reprendre(cle: string, texte: string) {
+    const actuel = (saisie[cle] ?? "").trim();
+    if (actuel && !window.confirm("Remplacer ce qui est déjà écrit dans cette zone ?")) return;
+    setSaisie((x) => ({ ...x, [cle]: texte }));
+    void enregistrer(cle, texte);
+  }
+
+  async function enregistrer(cle: string, force?: string) {
+    const contenu = force ?? saisie[cle] ?? "";
     // Rien n'a changé depuis le dernier enregistrement : ne pas écrire pour rien.
     if (contenu === (dernierEnregistre.current[cle] ?? "")) return;
     setEnCours(cle);
@@ -171,13 +183,39 @@ export default function RubriquesTrimestreClient({ annee, trimestre }: { annee: 
                       )}
                     </div>
                     <p className="mb-1 text-xs italic text-ink-muted">{z.consigne}</p>
+                    {(z.reference || z.precedent) && (
+                      <div className="mb-1 flex flex-wrap gap-2">
+                        {z.reference && (
+                          <button
+                            type="button"
+                            onClick={() => reprendre(z.cle, z.reference!)}
+                            className="rounded border border-primary px-2 py-1 text-xs text-primary hover:bg-primary hover:text-white"
+                          >
+                            Reprendre le texte de référence
+                          </button>
+                        )}
+                        {z.precedent && (
+                          <button
+                            type="button"
+                            onClick={() => reprendre(z.cle, z.precedent!)}
+                            className="rounded border border-gray-400 px-2 py-1 text-xs text-gray-700 hover:bg-gray-100"
+                          >
+                            Reprendre le texte du trimestre précédent
+                          </button>
+                        )}
+                      </div>
+                    )}
                     <textarea
                       className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
                       rows={Math.min(12, Math.max(3, Math.ceil((saisie[z.cle] ?? "").length / 90) + 2))}
                       value={saisie[z.cle] ?? ""}
                       onChange={(e) => setSaisie({ ...saisie, [z.cle]: e.target.value })}
                       onBlur={() => enregistrer(z.cle)}
-                      placeholder="Laissez vide pour conserver la consigne dans le document."
+                      placeholder={
+                        z.reference
+                          ? "Vide : le texte de référence figurera dans le document. Pour le corriger, cliquez sur « Reprendre le texte de référence »."
+                          : "Laissez vide pour conserver la consigne dans le document."
+                      }
                     />
                     <p className="mt-0.5 text-[11px] text-ink-muted">
                       {enCours === z.cle

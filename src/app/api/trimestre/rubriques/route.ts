@@ -16,7 +16,11 @@
  */
 import { NextResponse } from "next/server";
 import { requireUser, assertRole, permissionErrorResponse } from "@/lib/permissions";
-import { trimestrielle, libelleOfficiel } from "@/server/periodes/calendrier";
+import { trimestrielle, libelleOfficiel, periodePrecedente } from "@/server/periodes/calendrier";
+import { TEXTES_FIXES } from "@/server/trimestre/canevas/textesFixes";
+import { TEXTES_ARRONDISSEMENTS } from "@/server/trimestre/canevas/textesArrondissements";
+import { resoudre } from "@/server/trimestre/canevas/types";
+import { contextePour, nomArrondissement } from "@/server/trimestre/saisieTrimestrielle";
 import { zonesTexte } from "@/server/trimestre/rapportCanevas";
 import { lireRubriques, ecrireRubrique } from "@/server/trimestre/rubriques";
 import type { PrismaClient } from "@prisma/client";
@@ -59,10 +63,22 @@ export async function GET(req: Request) {
     if (!p) return NextResponse.json({ message: "Période demandée invalide." }, { status: 400 });
 
     const ecrits = await lireRubriques(db, p, arrondissementId);
-    const zones = zonesTexte({ arrondissement: user.role === "DA" }).map((z) => ({
-      ...z,
-      contenu: ecrits.get(z.cle) ?? "",
-    }));
+    // Deux points de départ, que le rédacteur reprend d'un clic puis corrige :
+    // le texte de référence, déjà mis à la période (« de Juillet à
+    // Septembre 2026 »), et ce qu'il a écrit au trimestre précédent.
+    const nom = await nomArrondissement(db, arrondissementId);
+    const references = nom ? TEXTES_ARRONDISSEMENTS.get(nom) ?? {} : Object.fromEntries(TEXTES_FIXES);
+    const ctx = await contextePour(db, p, { role: user.role, arrondissement: nom });
+    const precedents = await lireRubriques(db, periodePrecedente(p), arrondissementId).catch(() => new Map<string, string>());
+    const zones = zonesTexte({ arrondissement: user.role === "DA" }).map((z) => {
+      const reference = (references as Record<string, string | undefined>)[z.cle];
+      return {
+        ...z,
+        contenu: ecrits.get(z.cle) ?? "",
+        reference: reference ? resoudre(reference, ctx) : null,
+        precedent: precedents.get(z.cle) ?? null,
+      };
+    });
 
     return NextResponse.json({
       periode: { annee: p.annee, trimestre: Number(trimestreBrut), libelle: libelleOfficiel(p) },
