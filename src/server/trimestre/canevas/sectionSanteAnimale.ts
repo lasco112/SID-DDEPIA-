@@ -37,30 +37,13 @@ export const SECTION_IV_SANTE: SectionCanevas = {
   blocs: [
     { type: "titre", niveau: 1, texte: "CHAPITRE IV : PROTECTION SANITAIRE ET SANTÉ PUBLIQUE" },
 
-    // ---- IV-1. Promptitude et complétude ----
-    {
-      type: "titre",
-      niveau: 2,
-      texte: "IV-1. ÉVALUATION DE LA PROMPTITUDE ET DE LA COMPLÉTUDE DANS LA TRANSMISSION DES DONNÉES ZOO-SANITAIRES",
-    },
-    {
-      type: "zoneTexte",
-      cle: "IV1.preambule",
-      consigne:
-        "Rubrique imposée. Elle est calculable automatiquement à partir des transmissions hebdomadaires enregistrées.",
-    },
-    {
-      type: "tableau",
-      kind: "libre",
-      numero: 112,
-      titre: "Promptitude et complétude de la transmission des données zoosanitaires",
-      entetes: ["Arrondissement", "Situations attendues", "Situations transmises", "Complétude (%)", "Promptitude (%)"],
-      lignes: ["{ARRONDISSEMENTS}"],
-    },
+    // La partie « Évaluation de la promptitude et de la complétude » du régional
+    // est RETIRÉE des rapports du DD et du DA (décision du Délégué, 23 septembre
+    // 2026) : les parties suivantes sont renumérotées à partir de IV-1.
 
-    // ---- IV-2. Grandes épizooties ----
-    { type: "titre", niveau: 2, texte: "IV-2. LUTTE CONTRE LES GRANDES ÉPIZOOTIES" },
-    { type: "titre", niveau: 3, texte: "IV-2-1. Situation générale de la vaccination" },
+    // ---- IV-1. Grandes épizooties ----
+    { type: "titre", niveau: 2, texte: "IV-1. LUTTE CONTRE LES GRANDES ÉPIZOOTIES" },
+    { type: "titre", niveau: 3, texte: "IV-1-1. Situation générale de la vaccination" },
     {
       type: "tableau",
       kind: "libre",
@@ -69,7 +52,7 @@ export const SECTION_IV_SANTE: SectionCanevas = {
       entetes: ["Arrondissement", ...VACCINATION_AFFECTIONS, ...TOTAUX],
       lignes: LIGNES_ARRONDISSEMENTS,
     },
-    { type: "titre", niveau: 3, texte: "IV-2-2. Surveillance sentinelle de l'influenza aviaire hautement pathogène" },
+    { type: "titre", niveau: 3, texte: "IV-1-2. Surveillance sentinelle de l'influenza aviaire hautement pathogène" },
     { type: "zoneTexte", cle: "IV2.influenza", consigne: "Rubrique imposée." },
     {
       // Sans légende dans le régional, qui compare les prélèvements des trois
@@ -81,7 +64,7 @@ export const SECTION_IV_SANTE: SectionCanevas = {
       entetes: ["ARRONDISSEMENTS", "{ARRONDISSEMENTS}", "TOTAL"],
       lignes: ["ANNEE {A-2}", "ANNEE {A-1}", "ANNEE {A}", "TOTAL CUMULE"],
     },
-    { type: "titre", niveau: 3, texte: "IV-2-3. Bilan épidémiologique" },
+    { type: "titre", niveau: 3, texte: "IV-1-3. Bilan épidémiologique" },
     { type: "zoneTexte", cle: "IV2.bilan", consigne: "Foyers déclarés, espèces touchées, mesures prises, dates." },
     {
       type: "tableau",
@@ -95,9 +78,9 @@ export const SECTION_IV_SANTE: SectionCanevas = {
       lignes: ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"],
     },
 
-    // ---- IV-3. Dispensaires et cliniques ----
-    { type: "titre", niveau: 2, texte: "IV-3. ACTIVITÉS DES DISPENSAIRES ET CLINIQUES" },
-    { type: "titre", niveau: 3, texte: "IV-3-1. Consultations par espèce" },
+    // ---- IV-2. Dispensaires et cliniques ----
+    { type: "titre", niveau: 2, texte: "IV-2. ACTIVITÉS DES DISPENSAIRES ET CLINIQUES" },
+    { type: "titre", niveau: 3, texte: "IV-2-1. Consultations par espèce" },
     {
       type: "tableau",
       kind: "libre",
@@ -106,7 +89,7 @@ export const SECTION_IV_SANTE: SectionCanevas = {
       entetes: ["Arrondissement", ...ESPECES_CONSULTATIONS, ...TOTAUX],
       lignes: LIGNES_ARRONDISSEMENTS,
     },
-    { type: "titre", niveau: 3, texte: "IV-3-2. Déparasitage des animaux" },
+    { type: "titre", niveau: 3, texte: "IV-2-2. Déparasitage des animaux" },
     {
       type: "tableau",
       kind: "libre",
@@ -116,7 +99,7 @@ export const SECTION_IV_SANTE: SectionCanevas = {
       entetes: ["Arrondissement", ...ESPECES_DEPARASITAGES, ...TOTAUX],
       lignes: LIGNES_ARRONDISSEMENTS,
     },
-    { type: "titre", niveau: 3, texte: "IV-3-3. Castrations d'animaux" },
+    { type: "titre", niveau: 3, texte: "IV-2-3. Castrations d'animaux" },
     {
       type: "tableau",
       kind: "libre",
@@ -126,8 +109,8 @@ export const SECTION_IV_SANTE: SectionCanevas = {
       lignes: LIGNES_ARRONDISSEMENTS,
     },
 
-    // ---- IV-4. Affections récurrentes ----
-    { type: "titre", niveau: 2, texte: "IV-4. RÉCAPITULATIF DES AFFECTIONS RÉCURRENTES" },
+    // ---- IV-3. Affections récurrentes ----
+    { type: "titre", niveau: 2, texte: "IV-3. RÉCAPITULATIF DES AFFECTIONS RÉCURRENTES" },
     {
       type: "tableau",
       kind: "arrondissements",
@@ -137,9 +120,9 @@ export const SECTION_IV_SANTE: SectionCanevas = {
       lignes: [...AFFECTIONS_RECURRENTES, "TOTAL"],
     },
 
-    // ---- IV-5. Inspection en abattoir ----
-    { type: "titre", niveau: 2, texte: "IV-5. INSPECTION SANITAIRE DANS LES ABATTOIRS" },
-    { type: "titre", niveau: 3, texte: "IV-5-1. Les abattages contrôlés" },
+    // ---- IV-4. Inspection en abattoir ----
+    { type: "titre", niveau: 2, texte: "IV-4. INSPECTION SANITAIRE DANS LES ABATTOIRS" },
+    { type: "titre", niveau: 3, texte: "IV-4-1. Les abattages contrôlés" },
     {
       type: "tableau",
       kind: "libre",
@@ -154,7 +137,7 @@ export const SECTION_IV_SANTE: SectionCanevas = {
       consigne:
         "Contrôle obligatoire : ce tableau doit être égal à la somme des tableaux des abattages par espèce (bovins, ovins, caprins, porcins, volaille).",
     },
-    { type: "titre", niveau: 3, texte: "IV-5-2. Lésions décelées en inspection" },
+    { type: "titre", niveau: 3, texte: "IV-4-2. Lésions décelées en inspection" },
     {
       type: "tableau",
       kind: "arrondissements",
@@ -163,7 +146,7 @@ export const SECTION_IV_SANTE: SectionCanevas = {
       enteteLibelle: "Arrondissement",
       lignes: [...LESIONS_DECELEES, "TOTAL"],
     },
-    { type: "titre", niveau: 3, texte: "IV-5-3. Saisies effectuées" },
+    { type: "titre", niveau: 3, texte: "IV-4-3. Saisies effectuées" },
     {
       type: "tableau",
       kind: "arrondissements",
@@ -173,8 +156,8 @@ export const SECTION_IV_SANTE: SectionCanevas = {
       lignes: [...PRODUITS_SAISIS, "TOTAL"],
     },
 
-    // ---- IV-6. Contrôle sur les marchés ----
-    { type: "titre", niveau: 2, texte: "IV-6. CONTRÔLE SANITAIRE SUR LES MARCHÉS" },
+    // ---- IV-5. Contrôle sur les marchés ----
+    { type: "titre", niveau: 2, texte: "IV-5. CONTRÔLE SANITAIRE SUR LES MARCHÉS" },
     {
       type: "tableau",
       kind: "arrondissements",
@@ -184,10 +167,10 @@ export const SECTION_IV_SANTE: SectionCanevas = {
       lignes: [...PRODUITS_INSPECTES_MARCHES, "TOTAL"],
     },
 
-    // ---- IV-7 à IV-9 ----
-    { type: "titre", niveau: 2, texte: "IV-7. AUTRES ACTIVITÉS DU SERVICE" },
+    // ---- IV-6 à IV-8 ----
+    { type: "titre", niveau: 2, texte: "IV-6. AUTRES ACTIVITÉS DU SERVICE" },
     { type: "zoneTexte", cle: "IV7.autres", consigne: "Rubrique imposée." },
-    { type: "titre", niveau: 2, texte: "IV-8. CARTOGRAPHIE DES VÉTÉRINAIRES INSTALLÉS EN CLIENTÈLE PRIVÉE" },
+    { type: "titre", niveau: 2, texte: "IV-7. CARTOGRAPHIE DES VÉTÉRINAIRES INSTALLÉS EN CLIENTÈLE PRIVÉE" },
     { type: "zoneTexte", cle: "IV8.cartographie", consigne: "Rubrique imposée." },
     {
       type: "tableau",
@@ -197,7 +180,7 @@ export const SECTION_IV_SANTE: SectionCanevas = {
       entetes: ["N°", "ARRONDISSEMENT", "LOCALISATION", "NOMS ET PRENOMS", "TELEPHONE", "STRUCTURE", "STATUT"],
       lignes: ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10"],
     },
-    { type: "titre", niveau: 2, texte: "IV-9. CARTE ÉPIDÉMIOLOGIQUE ACTUALISÉE DU DÉPARTEMENT" },
+    { type: "titre", niveau: 2, texte: "IV-8. CARTE ÉPIDÉMIOLOGIQUE ACTUALISÉE DU DÉPARTEMENT" },
     { type: "zoneTexte", cle: "IV9.carte", consigne: "Rubrique imposée." },
 
     // ---- Conclusion ----

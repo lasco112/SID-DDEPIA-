@@ -16,7 +16,7 @@ import { trimestrielle, libelleOfficiel } from "@/server/periodes/calendrier";
 import { periodeTrimestrielle } from "@/server/trimestre/rubriques";
 import { ecrireSaisieCanevas, cleCellule } from "@/server/trimestre/saisieCanevas";
 import {
-  ROLES_SAISIE, resumer, grille, refusDeSaisie, nomArrondissement, type Profil,
+  ROLES_SAISIE, resumer, grille, refusDeSaisie, nomArrondissement, attendUnNombre, incoherenceCategories, type Profil,
 } from "@/server/trimestre/saisieTrimestrielle";
 import { preparerEvenements } from "@/server/trimestre/evenements";
 
@@ -105,6 +105,20 @@ export async function PUT(req: Request) {
     const nombre =
       brut === "" || brut == null ? null : Number(String(brut).replace(/[\s ]/g, "").replace(",", "."));
     const estNombre = nombre != null && Number.isFinite(nombre);
+
+    // Un effectif, un montant, une quantité : des chiffres, jamais des lettres.
+    if (attendUnNombre(body.colonne) && brut !== "" && brut != null && !estNombre) {
+      return NextResponse.json(
+        { message: `« ${body.colonne} » attend un nombre : « ${brut} » n'en est pas un. Chiffres uniquement, virgule pour les décimales.` },
+        { status: 400 }
+      );
+    }
+
+    // La somme des catégories doit retomber sur le total des rapports mensuels.
+    const incoherence = await incoherenceCategories(
+      user.db, periode, profil, body.numeroTableau, body.ligne, body.colonne, estNombre ? nombre : null
+    );
+    if (incoherence) return NextResponse.json({ message: incoherence }, { status: 409 });
 
     const periodeId = await periodeTrimestrielle(user.db, periode);
     const { enregistre } = await ecrireSaisieCanevas(

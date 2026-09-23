@@ -468,7 +468,8 @@ test("l'inventaire des sections est cohérent", () => {
     assert.ok(inv.titres > 0, `${section.cle} : aucun titre`);
     tableaux += inv.tableaux;
   }
-  assert.equal(tableaux, 87, "87 tableaux décrits à ce jour");
+  // 86 : le tableau de promptitude et de complétude est retiré (décision du Délégué).
+  assert.equal(tableaux, 86, "86 tableaux décrits à ce jour");
 });
 
 test("les numéros internes sont uniques : ils adressent les saisies", () => {

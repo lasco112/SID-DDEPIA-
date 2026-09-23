@@ -38,6 +38,13 @@ export interface Correspondance {
    * `champ`, qui vaut alors null.
    */
   formule?: Formule;
+  /**
+   * La case se calcule à partir d'une SAISIE TRIMESTRIELLE d'un autre tableau
+   * — la viande d'une catégorie, à partir de ses abattages saisis. Même
+   * territoire, colonne `colonne` du tableau `tableau`, multipliée par
+   * `facteur`.
+   */
+  depuisSaisie?: { tableau: number; colonne: string; facteur: number; explication: string };
   /** Pourquoi il n'y a pas de champ, le cas échéant. */
   motif?: string;
 }
@@ -65,7 +72,7 @@ export function champsDe(c: Correspondance): string[] {
 }
 
 /** Une correspondance est liée si au moins un champ l'alimente. */
-export const estLiee = (c: Correspondance) => champsDe(c).length > 0;
+export const estLiee = (c: Correspondance) => champsDe(c).length > 0 || Boolean(c.depuisSaisie);
 
 /** La valeur d'une formule, à partir d'un lecteur de champs agrégés. */
 export function evaluer(f: Formule, lire: (champ: string) => number | null): number | null {
@@ -179,6 +186,20 @@ function prixMoyen(prefixe: string, categories: string[]): Formule {
   };
 }
 
+/** Viande d'une catégorie : ses abattages saisis au trimestre × poids de carcasse. */
+function viandeDeLaCategorie(libelle: string, tableauAbattages: number, colonneAbattages: string, kgParTete: number): Correspondance {
+  return {
+    libelle,
+    champ: null,
+    depuisSaisie: {
+      tableau: tableauAbattages,
+      colonne: colonneAbattages,
+      facteur: kgParTete / 1000,
+      explication: `abattages de la catégorie (tableau n° ${tableauAbattages}) × ${kgParTete} kg de carcasse, en tonnes`,
+    },
+  };
+}
+
 /** Correspondance non collectée par le mensuel. */
 const nonCollecte = (libelle: string, motif: string): Correspondance => ({ libelle, champ: null, motif });
 const PAR_CATEGORIE = "Le mensuel ne détaille pas par catégorie : saisie trimestrielle.";
@@ -202,6 +223,12 @@ export interface LiaisonTableau {
    * calcule que si TOUTES les catégories sont liées.
    */
   total?: Formule;
+  /**
+   * Aucune case du tableau ne se saisit, même celles qu'aucune source
+   * n'alimente : c'est le cas de la viande, que le Délégué veut uniquement
+   * CALCULÉE à partir des abattages.
+   */
+  entierementCalcule?: boolean;
 }
 
 /**
@@ -445,8 +472,12 @@ const VIANDE_BOVINE: LiaisonTableau = {
   numero: 18,
   titre: "Production de viande en tonnes",
   orientation: "lignes",
-  correspondances: CATEGORIES_BOVINES,
+  // Chaque catégorie : ses abattages saisis au tableau n° 16 × 150 kg.
+  correspondances: ["Taurillon", "Génisse", "Castré", "Taureau", "Vache", "Veau"].map((l) =>
+    viandeDeLaCategorie(l, 16, l, CARCASSE_KG.bovin)
+  ),
   total: viande("T21_ABAT_BOVIN", CARCASSE_KG.bovin),
+  entierementCalcule: true,
 };
 
 /** Tableau n° 19 — Commercialisation bovine : animaux vendus, tableau 5.1. */
@@ -538,8 +569,10 @@ const VIANDE_PORCINE: LiaisonTableau = {
   numero: 40,
   titre: "Situation de la production de viande de porcins en tonnes",
   orientation: "lignes",
-  correspondances: CATEGORIES_ABATTAGE_PORCINES,
+  // Chaque catégorie : ses abattages saisis au tableau n° 39 × 70 kg.
+  correspondances: ["Verrats", "Truies", "Castrés"].map((l) => viandeDeLaCategorie(l, 39, l, CARCASSE_KG.porc)),
   total: viande("T21_ABAT_PORCIN", CARCASSE_KG.porc),
+  entierementCalcule: true,
 };
 
 /** Tableau n° 41 — Commercialisation porcine : animaux vendus, tableau 5.4. */
@@ -655,14 +688,18 @@ const VIANDE_VOLAILLE: LiaisonTableau = {
   numero: 46,
   titre: "Etat de production de la viande de volaille par arrondissement",
   orientation: "lignes",
+  // Chaque catégorie : ses abattages saisis au tableau n° 45 × 2 kg. Le
+  // tableau des abattages n'a pas de colonne « Canards » : leur viande reste
+  // vide, et ne se saisit pas.
   correspondances: [
-    "Poulet de chair",
-    "Poulets villageois",
-    "Canards",
-    "Coquelets",
-    "Autres (poules de réforme etc.)",
-  ].map((l) => nonCollecte(l, PAR_CATEGORIE_VOLAILLE)),
+    viandeDeLaCategorie("Poulet de chair", 45, "Poulets de chair", CARCASSE_KG.volaille),
+    viandeDeLaCategorie("Poulets villageois", 45, "Poulets villageois", CARCASSE_KG.volaille),
+    nonCollecte("Canards", "Le tableau des abattages de volaille ne porte pas de canards."),
+    viandeDeLaCategorie("Coquelets", 45, "Coquelets", CARCASSE_KG.volaille),
+    viandeDeLaCategorie("Autres (poules de réforme etc.)", 45, "Autres(Poules de réforme etc.)", CARCASSE_KG.volaille),
+  ],
   total: viande("T21_ABAT_VOLAILLE", CARCASSE_KG.volaille),
+  entierementCalcule: true,
 };
 
 /** Tableau n° 47 — Œufs : ceux des fermes de ponte, tableau 1.4. */
@@ -798,6 +835,43 @@ const INSPECTION_MARCHES: LiaisonTableau = {
     { libelle: "Provende porc(tonne)", champ: null, formule: inspecte("PROVENDE_PORC") },
     { libelle: "Provende ponte(tonne)", champ: null, formule: inspecte("PROVENDE_PONTE") },
     { libelle: "Aliment poisson (tonne)", champ: null, formule: inspecte("ALIMENT_POISSON") },
+    // Unités proches, acceptées par le Délégué : le pot vaut la boîte, le
+    // paquet vaut le sachet.
+    { libelle: "Yaourts (boites)", champ: null, formule: inspecte("YAOURT", 1, ", pots comptés comme boîtes") },
+    { libelle: "Biscuits au lait((sachet)", champ: null, formule: inspecte("BISCUITS_LAIT", 1, ", paquets comptés comme sachets") },
+  ],
+};
+
+/**
+ * Tableau n° 71 — Saisies effectuées après inspection : quantités SAISIES du
+ * tableau 3.4 (marchés et établissements), unités converties. Les saisies en
+ * abattoir (tableau 3.5) s'y ajoutent, par evenements.ts.
+ */
+const saisi = (produit: string, facteur = 1, conversion = "") =>
+  somme([`T34_SAISIE_${produit}`], `quantité saisie, tableau 3.4${conversion}`, facteur);
+const SAISIES_EFFECTUEES: LiaisonTableau = {
+  numero: 71,
+  titre: "Récapitulatif des saisies effectuées après inspection",
+  orientation: "colonnes",
+  correspondances: [
+    { libelle: "Abats bovins (Kg)", champ: null, formule: saisi("ABATS_BOVINS", 1000, T_EN_KG) },
+    { libelle: "Chair de bovins (kg)", champ: null, formule: saisi("VIANDE_BOVINE_FRAICHE", 1000, T_EN_KG) },
+    { libelle: "Viande porcine (kg)", champ: null, formule: saisi("VIANDE_PORCINE", 1000, T_EN_KG) },
+    { libelle: "Viande de PR (kg)", champ: null, formule: saisi("VIANDE_PETITS_RUM", 1000, T_EN_KG) },
+    { libelle: "Volailles (kg)", champ: null, formule: saisi("VIANDE_VOLAILLE", 1000, T_EN_KG) },
+    { libelle: "Poisson frais (Kg)", champ: null, formule: saisi("POISSON_FRAIS", 1000, T_EN_KG) },
+    { libelle: "Poisson fume (kg)", champ: null, formule: saisi("POISSON_FUME", 1000, T_EN_KG) },
+    { libelle: "Poissons congelés (Kg)", champ: null, formule: saisi("POISSON_CONGELE", 1000, T_EN_KG) },
+    { libelle: "Poisson en conserve (boite)", champ: null, formule: saisi("CONSERVES_POISSON") },
+    { libelle: "Lait concentré sucré (boîte)", champ: null, formule: saisi("LAIT_CONCENTRE") },
+    { libelle: "Lait en poudre (kg)", champ: null, formule: saisi("LAIT_POUDRE", 1000, T_EN_KG) },
+    { libelle: "Lait liquide (L)", champ: null, formule: saisi("LAIT_FRAIS") },
+    { libelle: "Beurre (boites)", champ: null, formule: saisi("BEURRE") },
+    { libelle: "Œufs de table (unité)", champ: null, formule: saisi("OEUFS", 30, ", alvéoles de 30 œufs") },
+    { libelle: "Gibier frais (kg)", champ: null, formule: saisi("GIBIER_FRAIS", 1000, T_EN_KG) },
+    { libelle: "Gibier fumé (kg)", champ: null, formule: saisi("GIBIER_FUME") },
+    { libelle: "Fromage (kg)", champ: null, formule: saisi("FROMAGES") },
+    { libelle: "Yaourts (boites)", champ: null, formule: saisi("YAOURT", 1, ", pots comptés comme boîtes") },
   ],
 };
 
@@ -837,6 +911,7 @@ export const LIAISONS: LiaisonTableau[] = [
   ALEVINS,
   POISSONS_DE_TABLE,
   ABATTAGES_CONTROLES,
+  SAISIES_EFFECTUEES,
   INSPECTION_MARCHES,
 ];
 

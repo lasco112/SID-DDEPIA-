@@ -10,7 +10,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  LIAISONS_EVENEMENTS, especeCirculation, liaisonEvenementDe,
+  LIAISONS_EVENEMENTS, especeCirculation, liaisonEvenementDe, produitSaisiEnAbattoir,
 } from "../src/server/trimestre/evenements";
 import { SECTION_IV_SANTE } from "../src/server/trimestre/canevas/sectionSanteAnimale";
 import { SECTION_II_OVIN, SECTION_II_CAPRIN } from "../src/server/trimestre/canevas/sectionElevages";
@@ -103,4 +103,26 @@ test("chaque case visée existe au canevas, au caractère près", () => {
   }
   assert.deepEqual(ecarts, []);
   assert.ok(liaisonEvenementDe(109), "la circulation des porcins doit être reliée");
+});
+
+test("saisies en abattoir : la pièce nommée à sa ligne, l'espèce seule sous « Chair de… »", () => {
+  assert.equal(produitSaisiEnAbattoir("Abats de bovins"), "Abats bovins (Kg)");
+  assert.equal(produitSaisiEnAbattoir("Carcasse de porc"), "Carcasse porc (Kg)");
+  assert.equal(produitSaisiEnAbattoir("Foie"), "Foie (Kg)");
+  assert.equal(produitSaisiEnAbattoir("Bovins"), "Chair de bovins (kg)");
+  assert.equal(produitSaisiEnAbattoir("Porcins"), "Chair de porcins (Kg)");
+  assert.equal(produitSaisiEnAbattoir("Chèvres"), "Chair de caprins (Kg)");
+  // « bœufs de boucherie » : la boucherie n'est pas un bouc.
+  assert.equal(produitSaisiEnAbattoir("bœufs de boucherie"), "Chair de bovins (kg)");
+  assert.equal(produitSaisiEnAbattoir("Bovins et porcins"), null);
+});
+
+test("lésions : chaque saisie en abattoir compte un cas de la lésion qui l'a motivée", () => {
+  const l = liaison(70);
+  assert.equal(l.categorie({ affection: "MOTIF_CYSTICERCOSE" }, "T35"), "Cysticercose");
+  assert.equal(l.categorie({ affection: "MOTIF_DISTOMATOSE" }, "T35"), "Douves (Distomatose)");
+  // Décision du Délégué : la tuberculose va en « partielle ».
+  assert.equal(l.categorie({ affection: "MOTIF_TUBERCULOSE" }, "T35"), "Tuberculose partielle");
+  assert.equal(l.categorie({ affection: "MOTIF_PUTREFACTION" }, "T35"), null);
+  assert.equal(l.quantite({ quantiteKg: 300 }), 1);
 });

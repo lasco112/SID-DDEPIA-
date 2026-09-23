@@ -64,6 +64,18 @@ export interface LiaisonEvenement {
    * grossir le total des ovins.
    */
   totalClasseesSeulement?: boolean;
+  /**
+   * Le tableau n'est alimenté qu'EN PARTIE par la liste : seules ces cases se
+   * calculent, les autres se saisissent au trimestre. Absent : tout le
+   * tableau se calcule.
+   */
+  categoriesProduites?: string[];
+  /**
+   * Les totaux additionnent les cases calculées ET saisies (des nombres de cas,
+   * tous de même nature). Faux par défaut : on n'additionne pas des kg et des
+   * boîtes.
+   */
+  totauxMixtes?: boolean;
 }
 
 // ------------------------------------------------------------------ référentiels
@@ -146,6 +158,50 @@ export function especeCirculation(libre: string): string | "ambigu" | null {
   const trouvees = MOTS_ESPECES.filter(([, re]) => re.test(libre)).map(([e]) => e);
   if (trouvees.length > 1 || /petits? ruminants?/i.test(libre)) return "ambigu";
   return trouvees[0] ?? null;
+}
+
+// ------------------------------------------------------------------ abattoirs (tableau 3.5)
+
+/**
+ * Motif d'une saisie en abattoir → ligne du tableau des lésions décelées.
+ * La tuberculose est rangée en « partielle » (décision du Délégué) : le
+ * mensuel ne distingue pas généralisée et partielle. Putréfaction et cachexie
+ * n'ont pas de ligne au canevas : elles restent non classées.
+ */
+const LESION_DU_MOTIF: Record<string, string> = {
+  MOTIF_CYSTICERCOSE: "Cysticercose",
+  MOTIF_DISTOMATOSE: "Douves (Distomatose)",
+  MOTIF_ABCES_GENERALISE: "Abcès divers",
+  MOTIF_TUBERCULOSE: "Tuberculose partielle",
+};
+
+/**
+ * Produit saisi en abattoir, écrit en TEXTE LIBRE au mensuel → ligne du
+ * tableau des saisies. Une pièce nommée (abats, carcasse, foie…) est rangée à
+ * sa ligne ; une espèce seule (« Bovins ») l'est sous « Chair de … »
+ * (décision du Délégué). Le reste est non classé.
+ */
+export function produitSaisiEnAbattoir(libre: string): string | null {
+  const t = libre.toLowerCase();
+  const bovin = /bovin|b(œ|oe)uf|vache|taureau/.test(t);
+  const porc = /porc/.test(t);
+  if (/abat/.test(t)) return bovin ? "Abats bovins (Kg)" : porc ? "Abats porc (kg)" : null;
+  if (/carcasse/.test(t)) return bovin ? "Carcasses bovines kg" : porc ? "Carcasse porc (Kg)" : null;
+  if (/foie/.test(t)) return "Foie (Kg)";
+  if (/poumon/.test(t)) return bovin ? "Poumons bovins" : "Poumons";
+  if (/mamelle/.test(t)) return "Mamelle bovine";
+  if (/\brein/.test(t)) return "Reins";
+  if (/t[êe]te/.test(t)) return "Têtes";
+  if (/patte/.test(t)) return "Pattes";
+  // L'espèce seule, sans pièce : la chair.
+  const especes: [RegExp, string][] = [
+    [/bovin|b(œ|oe)uf|vache|taureau/, "Chair de bovins (kg)"],
+    [/porc/, "Chair de porcins (Kg)"],
+    [/caprin|ch[eè]vre|\bboucs?\b/, "Chair de caprins (Kg)"],
+    [/\bovin|mouton|brebis/, "Chair d'ovins (Kg)"],
+  ];
+  const trouvees = especes.filter(([re]) => re.test(t));
+  return trouvees.length === 1 ? trouvees[0][1] : null;
 }
 
 // ------------------------------------------------------------------ liaisons
@@ -232,6 +288,36 @@ export const LIAISONS_EVENEMENTS: LiaisonEvenement[] = [
     false,
     ["Bovine", "Ovine", "Caprine", "Porcine", "Equine", "Canine"]
   ),
+  {
+    numero: 70,
+    titre: "Récapitulatif des lésions décelées en inspection",
+    // Les lésions en lignes, les arrondissements en colonnes.
+    orientation: "colonnes",
+    sources: ["T35"],
+    // Une saisie en abattoir = un cas de la lésion qui l'a motivée. Les autres
+    // lésions, que le mensuel ne relève pas, se saisissent au trimestre.
+    categorie: (l) => LESION_DU_MOTIF[texte(l.affection)] ?? null,
+    quantite: () => 1,
+    categoriesProduites: Object.values(LESION_DU_MOTIF),
+    totauxMixtes: true,
+    decrire: (l) => `saisie en abattoir, motif ${texte(l.affection)} (${texte(l.produitSaisi)})`,
+  },
+  {
+    numero: 71,
+    titre: "Récapitulatif des saisies effectuées après inspection",
+    orientation: "colonnes",
+    // Les saisies en ABATTOIR (tableau 3.5), en kg. Celles des marchés
+    // (tableau 3.4) viennent de liaison.ts ; les deux s'additionnent.
+    sources: ["T35"],
+    categorie: (l) => produitSaisiEnAbattoir(texte(l.produitSaisi)),
+    quantite: (l) => nombre(l.quantiteKg),
+    categoriesProduites: [
+      "Abats bovins (Kg)", "Abats porc (kg)", "Carcasses bovines kg", "Carcasse porc (Kg)", "Foie (Kg)",
+      "Poumons", "Poumons bovins", "Mamelle bovine", "Reins", "Têtes", "Pattes",
+      "Chair de bovins (kg)", "Chair de porcins (Kg)", "Chair de caprins (Kg)", "Chair d'ovins (Kg)",
+    ],
+    decrire: (l) => `saisie en abattoir « ${texte(l.produitSaisi)} »`,
+  },
   {
     numero: 68,
     titre: "Récapitulation des affections récurrentes",

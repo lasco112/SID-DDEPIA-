@@ -26,6 +26,10 @@ interface CaseGrille {
   etat: EtatCase;
   affiche: string | null;
   saisi: string | null;
+  /** La case attend du texte ; sinon, un nombre. */
+  texte: boolean;
+  /** Valeur reprise d'un autre tableau, proposée tant que rien n'est saisi. */
+  propose: string | null;
 }
 
 interface Grille {
@@ -35,6 +39,7 @@ interface Grille {
   enteteLigne: string;
   lignes: { cle: string; libelle: string; cases: CaseGrille[] }[];
   avertissements: string[];
+  aide: string;
 }
 
 interface ResumeTableau {
@@ -87,6 +92,8 @@ export default function SaisieTrimestrielleClient({
   const [enCours, setEnCours] = useState<string | null>(null);
   const [chargementGrille, setChargementGrille] = useState(false);
   const [voirNonClassees, setVoirNonClassees] = useState(false);
+  /** Le refus d'une saisie, affiché AU-DESSUS DU TABLEAU, là où l'on saisit. */
+  const [refus, setRefus] = useState<string | null>(null);
 
   const chargerListe = useCallback(async () => {
     setErreur(null);
@@ -128,6 +135,7 @@ export default function SaisieTrimestrielleClient({
   }, [chargerListe]);
 
   function ouvrir(numero: number) {
+    setRefus(null);
     if (ouvert === numero) {
       setOuvert(null);
       setGrille(null);
@@ -146,6 +154,13 @@ export default function SaisieTrimestrielleClient({
     if ((avant ?? "") === valeur.trim()) return;
     setEnCours(k);
     setErreur(null);
+    setRefus(null);
+    // Refusée, la case reprend sa valeur enregistrée : un chiffre resté à
+    // l'écran laisserait croire qu'il est enregistré.
+    const annuler = (message: string) => {
+      setRefus(message);
+      setValeurs((x) => ({ ...x, [k]: avant ?? "" }));
+    };
     try {
       const r = await fetch("/api/trimestre/saisie", {
         method: "PUT",
@@ -153,12 +168,12 @@ export default function SaisieTrimestrielleClient({
         body: JSON.stringify({ annee, trimestre, numeroTableau: grille.numero, ligne, colonne, valeur }),
       });
       if (!r.ok) {
-        setErreur((await r.json().catch(() => ({}))).message ?? "Enregistrement impossible.");
+        annuler((await r.json().catch(() => ({}))).message ?? "Enregistrement impossible.");
         return;
       }
       await Promise.all([chargerGrille(grille.numero), chargerListe()]);
     } catch {
-      setErreur("Pas de connexion : la case n'a pas été enregistrée. Réessayez quand le réseau revient.");
+      annuler("Pas de connexion : la case n'a pas été enregistrée. Réessayez quand le réseau revient.");
     } finally {
       setEnCours(null);
     }
@@ -276,6 +291,7 @@ export default function SaisieTrimestrielleClient({
                       {chargementGrille && !grille && <p className="text-sm text-gray-600">Chargement…</p>}
                       {grille && grille.numero === t.numero && (
                         <TableauSaisie
+                          refus={refus}
                           grille={grille}
                           valeurs={valeurs}
                           enCours={enCours}
@@ -296,12 +312,14 @@ export default function SaisieTrimestrielleClient({
 }
 
 function TableauSaisie({
+  refus,
   grille,
   valeurs,
   enCours,
   onChange,
   onQuitter,
 }: {
+  refus: string | null;
   grille: Grille;
   valeurs: Record<string, string>;
   enCours: string | null;
@@ -317,9 +335,13 @@ function TableauSaisie({
       return (
         <input
           value={valeurs[k] ?? ""}
+          // Un nombre : le clavier numérique du téléphone s'ouvre directement.
+          inputMode={c.texte ? "text" : "decimal"}
+          placeholder={c.propose ?? (c.texte ? "texte" : "")}
+          title={c.propose ? "Valeur reprise du tableau du BAC : saisissez-en une autre si elle est fausse." : undefined}
           onChange={(e) => onChange(k, e.target.value)}
           onBlur={() => onQuitter(l.cle, c.colonne, c.saisi)}
-          className={`${large ? "w-full" : "w-28"} rounded-sm border border-gray-300 bg-white px-2 py-1 outline-none focus:border-primary focus:bg-amber-50 ${
+          className={`${large ? "w-full" : c.texte ? "w-48" : "w-28"} ${c.propose ? "placeholder:text-gray-500" : "placeholder:text-gray-300"} rounded-sm border border-gray-300 bg-white px-2 py-1 outline-none focus:border-primary focus:bg-amber-50 ${
             enCours === k ? "bg-amber-100" : ""
           }`}
           aria-label={`${l.libelle}, ${c.colonne}`}
@@ -346,6 +368,12 @@ function TableauSaisie({
 
   return (
     <div>
+      <p className="mb-3 text-sm text-gray-700">{grille.aide}</p>
+      {refus && (
+        <p role="alert" className="mb-3 rounded-md border border-red-300 bg-red-50 p-3 text-sm font-medium text-red-800">
+          {refus}
+        </p>
+      )}
       {grille.avertissements.length > 0 && (
         <ul className="mb-3 list-disc rounded-md bg-amber-50 p-3 pl-7 text-sm text-amber-900">
           {grille.avertissements.map((a, i) => (
@@ -402,6 +430,7 @@ function TableauSaisie({
       )}
       <p className="mt-2 text-xs text-gray-500">
         Cases grises : calculées automatiquement — à partir des rapports mensuels, ou comme totaux. Elles ne se saisissent pas.
+        Une valeur pâle dans une case vide est reprise d&apos;un autre tableau : elle compte telle quelle tant que vous ne la changez pas.
       </p>
     </div>
   );

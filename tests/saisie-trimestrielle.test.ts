@@ -18,7 +18,7 @@ import { base, transaction } from "../src/lib/baseDeTravail";
 import { trimestrielle } from "../src/server/periodes/calendrier";
 import { periodeTrimestrielle } from "../src/server/trimestre/rubriques";
 import { ecrireSaisieCanevas } from "../src/server/trimestre/saisieCanevas";
-import { refusDeSaisie, grille, resumer } from "../src/server/trimestre/saisieTrimestrielle";
+import { refusDeSaisie, grille, resumer, attendUnNombre, incoherenceCategories } from "../src/server/trimestre/saisieTrimestrielle";
 import { genererRapportCanevas } from "../src/server/trimestre/rapportCanevas";
 
 const P = trimestrielle(2031, 1);
@@ -111,4 +111,89 @@ test("un total est la somme de ses cases saisies, dans l'écran comme dans le ra
   const rapport = await genererRapportCanevas(base, P, { autoriserIncomplet: true });
   const texte = new PizZip(rapport.buffer).file("word/document.xml")!.asText().replace(/<[^>]+>/g, "|");
   assert.ok(/\|15\|/.test(texte), "le total 15 doit figurer dans le rapport départemental");
+});
+
+test("des chiffres partout, sauf dans les colonnes de texte", () => {
+  assert.ok(attendUnNombre("DAEPIA"), "structures administratives : un nombre");
+  assert.ok(attendUnNombre("Taurillon"));
+  assert.ok(!attendUnNombre("Provenance"));
+  assert.ok(!attendUnNombre("NOMS ET PRENOMS"));
+  assert.ok(!attendUnNombre("Description du niveau de réalisation"));
+});
+
+test("la viande ne se saisit jamais : elle se calcule à partir des abattages", async () => {
+  assert.match((await refusDeSaisie(base, P, DD, 18, "Dschang", "Taurillon")) ?? "", /rapports mensuels/);
+  assert.match((await refusDeSaisie(base, P, DD, 46, "Dschang", "Canards")) ?? "", /rapports mensuels/);
+  // Aucun abattage de taurillon n'est saisi (le tableau 14 est le CHEPTEL) :
+  // la case de viande reste vide, sans zéro inventé.
+  const g = await grille(base, P, DD, 18);
+  const dschang = g!.lignes.find((l) => l.cle === "Dschang")!;
+  assert.equal(dschang.cases.find((c) => c.colonne === "Taurillon")!.affiche, null, "aucun abattage de taurillon saisi au tableau 16");
+});
+
+test("la viande d'une catégorie = ses abattages saisis × poids de carcasse", async () => {
+  const dd = await base.user.findFirstOrThrow({ where: { role: "DD", actif: true }, select: { id: true } });
+  periodeId = periodeId ?? (await periodeTrimestrielle(base, P));
+  await ecrireSaisieCanevas(base, transaction, periodeId, { numeroTableau: 16, ligne: "Dschang", colonne: "Vache" }, { valeur: 20 }, dd.id);
+  await ecrireSaisieCanevas(base, transaction, periodeId, { numeroTableau: 39, ligne: "Dschang", colonne: "Truies" }, { valeur: 10 }, dd.id);
+  const viandeBovine = (await grille(base, P, DD, 18))!.lignes.find((l) => l.cle === "Dschang")!;
+  assert.equal(viandeBovine.cases.find((c) => c.colonne === "Vache")!.affiche, "3", "20 vaches × 150 kg = 3 tonnes");
+  const viandePorcine = (await grille(base, P, DD, 40))!.lignes.find((l) => l.cle === "Dschang")!;
+  assert.equal(viandePorcine.cases.find((c) => c.colonne === "Truies")!.affiche, "0,7", "10 truies × 70 kg = 0,7 tonne");
+});
+
+test("infrastructures : le BAC se recopie, et une divergence est signalée", async () => {
+  const dd = await base.user.findFirstOrThrow({ where: { role: "DD", actif: true }, select: { id: true } });
+  periodeId = periodeId ?? (await periodeTrimestrielle(base, P));
+  const ecrire = (t: number, ligne: string, valeur: number) =>
+    ecrireSaisieCanevas(base, transaction, periodeId!, { numeroTableau: t, ligne, colonne: "Fokoué" }, { valeur }, dd.id);
+  await ecrire(7, "Abattoir", 1);
+  await ecrire(7, "Aire d'abattage", 2);
+  let g = await grille(base, P, DD, 15);
+  const ligne = () => g!.lignes.find((l) => l.cle === "Infrastructures d'abattages")!.cases.find((c) => c.colonne === "Fokoué")!;
+  assert.equal(ligne().affiche, "3", "abattoir + aire d'abattage, repris du BAC");
+  assert.equal(ligne().propose, "3");
+  assert.equal(ligne().etat, "saisie", "la valeur reprise reste modifiable");
+  await ecrire(15, "Infrastructures d'abattages", 4);
+  g = await grille(base, P, DD, 15);
+  assert.equal(ligne().affiche, "4", "la valeur saisie l'emporte");
+  assert.ok(g!.avertissements.some((a) => /Fokoué.*4.*3/.test(a)), "la divergence avec le BAC est signalée");
+});
+
+test("sans total mensuel, la somme des catégories ne peut pas être contrôlée : la saisie passe", async () => {
+  // T1 2031 : aucun rapport mensuel, donc aucun total à comparer.
+  assert.equal(await incoherenceCategories(base, P, DD, 14, "Dschang", "Veau", 3), null);
+});
+
+test("catégories ≠ total mensuel : la saisie est refusée, avec l'écart", async () => {
+  // Le troisième trimestre 2026 porte des rapports mensuels (données de test).
+  // On travaille sur un arrondissement dont les catégories sont encore vides,
+  // pour ne jamais toucher à ce que quelqu'un a saisi.
+  const T3 = trimestrielle(2026, 3);
+  const g = await grille(base, T3, DD, 14);
+  const categories = ["Taurillon", "Génisse", "Castré", "Taureau", "Vache"];
+  const nombre = (s: string | null) => Number((s ?? "").replace(/[\s\u202f]/g, "").replace(",", "."));
+  const libre = g!.lignes.find(
+    (l) =>
+      !/^TOTAL|^ÉCART/.test(l.cle) &&
+      l.cases.every((c) => !["Veau", ...categories].includes(c.colonne) || c.saisi == null) &&
+      Number.isFinite(nombre(l.cases.find((c) => c.colonne === "TOTAL T3 2026")!.affiche))
+  );
+  assert.ok(libre, "aucun arrondissement libre avec un total mensuel : le contrôle n'a pas pu être éprouvé");
+  const arr = libre!.cle;
+  const total = nombre(libre!.cases.find((c) => c.colonne === "TOTAL T3 2026")!.affiche);
+
+  const dd = await base.user.findFirstOrThrow({ where: { role: "DD", actif: true }, select: { id: true } });
+  const id = await periodeTrimestrielle(base, T3);
+  try {
+    for (const c of categories) {
+      await ecrireSaisieCanevas(base, transaction, id, { numeroTableau: 14, ligne: arr, colonne: c }, { valeur: 1 }, dd.id);
+    }
+    // Cinq catégories à 1 : le veau doit valoir total − 5.
+    assert.equal(await incoherenceCategories(base, T3, DD, 14, arr, "Veau", total - 5), null, "la somme égale au total passe");
+    const faux = await incoherenceCategories(base, T3, DD, 14, arr, "Veau", total - 4);
+    assert.match(faux ?? "", new RegExp(`^${arr} : la somme des catégories .* doit être égale au cheptel bovin des rapports mensuels .* écart de 1\\.`));
+  } finally {
+    await base.saisieCanevas.deleteMany({ where: { periodeId: id, numeroTableau: 14, ligne: arr, colonne: { in: categories } } });
+  }
 });

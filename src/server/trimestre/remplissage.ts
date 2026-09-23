@@ -17,12 +17,20 @@ import { agreger, type ValeurAgregee } from "./agregation";
 import { liaisonDe, evaluer, estLiee, type Correspondance, type Formule } from "./liaison";
 import { colonnesDe, type FournisseurValeur } from "./canevas/rendu";
 import { clesLignes, estTotal, estEcart } from "./canevas/structure";
+import { repriseDe } from "./canevas/reprises";
 import type { Bloc, ContexteCanevas } from "./canevas/types";
 import { listerArrondissements, graphieCanevas } from "../../lib/arrondissements";
 import { lireSaisiesCanevas, cleCellule, type ValeurCellule } from "./saisieCanevas";
 import { preparerEvenements, liaisonEvenementDe, type DonneesEvenements } from "./evenements";
 
 const nf = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 3 });
+
+/** Une case formatée à la française redevient un nombre ; un pourcentage n'en est pas un. */
+export function versNombre(s: string | null | undefined): number | null {
+  if (s == null || /%/.test(s)) return null;
+  const n = Number(s.replace(/[\s\u202f\u00a0]/g, "").replace(",", "."));
+  return Number.isFinite(n) ? n : null;
+}
 
 /** Écart relatif à l'an passé, en pourcentage signé. Vide si l'an passé manque ou vaut zéro. */
 function ecartEnPourcentage(a: number | null, b: number | null): string | null {
@@ -212,17 +220,43 @@ export function fournisseur(donnees: DonneesRemplissage, ctx: ContexteCanevas): 
   /** La valeur d'une formule pour un territoire. */
   const calculer = (f: Formule, arr: string | null, n1: boolean) => evaluer(f, (champ) => lire(champ, arr, n1));
 
-  /** La valeur d'une case liée : son champ, ou sa formule. */
-  const valeurDe = (c: Correspondance, arr: string | null, n1: boolean): number | null =>
-    c.formule ? calculer(c.formule, arr, n1) : c.champ ? lire(c.champ, arr, n1) : null;
+  /** Code d'arrondissement → nom, pour relire une saisie (repérée par le nom). */
+  const nomDe = new Map(Array.from(codeDe.entries()).map(([nom, code]) => [code, nom] as const));
 
-  /** Une case saisie, telle qu'elle s'affiche. */
+  /**
+   * Une case tirée d'une SAISIE d'un autre tableau — la viande d'une catégorie,
+   * à partir de ses abattages. Au département, la somme des arrondissements.
+   */
+  const depuisSaisie = (d: NonNullable<Correspondance["depuisSaisie"]>, arr: string | null, n1: boolean): number | null => {
+    const source = n1 ? donnees.saisiesN1 : donnees.saisies;
+    const noms = arr == null ? ctx.arrondissements : [nomDe.get(arr) ?? arr];
+    let somme: number | null = null;
+    for (const nom of noms) {
+      const v = source.get(cleCellule({ numeroTableau: d.tableau, ligne: nom, colonne: d.colonne }))?.valeur;
+      if (v != null) somme = (somme ?? 0) + v;
+    }
+    return somme == null ? null : Math.round(somme * d.facteur * 1e9) / 1e9;
+  };
+
+  /** La valeur d'une case liée : son champ, sa formule, ou une saisie d'un autre tableau. */
+  const valeurDe = (c: Correspondance, arr: string | null, n1: boolean): number | null =>
+    c.depuisSaisie
+      ? depuisSaisie(c.depuisSaisie, arr, n1)
+      : c.formule
+        ? calculer(c.formule, arr, n1)
+        : c.champ
+          ? lire(c.champ, arr, n1)
+          : null;
+
+  /** Une case saisie, telle qu'elle s'affiche — ou, à défaut, reprise d'un autre tableau. */
   const saisieAffichee = (numeroTableau: number, ligne: string, colonne: string): string | null => {
     const saisie = donnees.saisies.get(cleCellule({ numeroTableau, ligne, colonne }));
     // Même format que les valeurs consolidées : le lecteur ne doit pas voir
     // à l'œil quelles cases ont été saisies et lesquelles sont calculées.
     if (saisie?.valeur != null) return nf.format(saisie.valeur);
-    return saisie?.texte || null;
+    if (saisie?.texte) return saisie.texte;
+    const r = valeurReprise(donnees.saisies, numeroTableau, ligne, colonne);
+    return r == null ? null : nf.format(r);
   };
 
   /**
@@ -245,12 +279,20 @@ export function fournisseur(donnees: DonneesRemplissage, ctx: ContexteCanevas): 
     const IMPUR = "impur" as const;
     type Resultat = number | null | typeof IMPUR;
 
-    const saisi = (l: string, c: string, n1: boolean): Resultat =>
-      (n1 ? donnees.saisiesN1 : donnees.saisies).get(cleCellule({ numeroTableau: numero, ligne: l, colonne: c }))?.valeur ?? null;
+    const saisi = (l: string, c: string, n1: boolean): Resultat => {
+      const source = n1 ? donnees.saisiesN1 : donnees.saisies;
+      return source.get(cleCellule({ numeroTableau: numero, ligne: l, colonne: c }))?.valeur ?? valeurReprise(source, numero, l, c);
+    };
+    const mixtes = Boolean(liaisonEvenementDe(numero)?.totauxMixtes);
 
     const cellule = (l: string, c: string, n1: boolean): Resultat => {
       if (estTotal(l) || estTotal(c)) return total(l, c, n1);
-      if (estCaseCalculee(numero, l, c, ctx)) return IMPUR;
+      if (estCaseCalculee(numero, l, c, ctx)) {
+        // Des cas comptés et des cas saisis sont de même nature : ils
+        // s'additionnent. Des animaux et des tonnes, non.
+        if (!mixtes || n1) return IMPUR;
+        return versNombre(valeurCalculee(numero, l, c));
+      }
       return saisi(l, c, n1);
     };
 
@@ -280,11 +322,26 @@ export function fournisseur(donnees: DonneesRemplissage, ctx: ContexteCanevas): 
     return v == null ? null : nf.format(v);
   };
 
-  /** Une case que le SID calcule à partir du mensuel (liaisons et listes). */
-  const valeurCalculee = (numeroTableau: number, ligne: string, colonne: string): string | null => {
+  /**
+   * Une case que le SID calcule à partir du mensuel. Un tableau peut tirer une
+   * même case de DEUX sources — les saisies des marchés (champs du tableau
+   * 3.4) et celles des abattoirs (liste du tableau 3.5) : elles s'additionnent.
+   */
+  function valeurCalculee(numeroTableau: number, ligne: string, colonne: string): string | null {
     const evenement = liaisonEvenementDe(numeroTableau);
-    if (evenement) return valeurEvenement(evenement.numero, evenement.orientation, ligne, colonne);
+    const deLaListe = evenement && couvreEvenement(evenement, ligne, colonne)
+      ? valeurEvenement(evenement.numero, evenement.orientation, ligne, colonne)
+      : null;
+    const liaison = liaisonDe(numeroTableau);
+    const desChamps = liaison && couvreLiaison(liaison, ligne, colonne, ctx) ? valeurLiee(numeroTableau, ligne, colonne) : null;
+    if (deLaListe == null) return desChamps;
+    if (desChamps == null) return deLaListe;
+    const a = versNombre(deLaListe), b = versNombre(desChamps);
+    return a == null || b == null ? deLaListe : nf.format(Math.round((a + b) * 1e9) / 1e9);
+  }
 
+  /** Une case d'un tableau lié à des champs du mensuel. */
+  function valeurLiee(numeroTableau: number, ligne: string, colonne: string): string | null {
     const liaison = liaisonDe(numeroTableau);
     if (!liaison) return null;
 
@@ -379,12 +436,45 @@ export function fournisseur(donnees: DonneesRemplissage, ctx: ContexteCanevas): 
  *    mensuel porte le total ou si toutes les catégories sont liées.
  */
 export function estCaseCalculee(numeroTableau: number, ligne: string, colonne: string, ctx: ContexteCanevas): boolean {
-  if (liaisonEvenementDe(numeroTableau)) return true;
+  const evenement = liaisonEvenementDe(numeroTableau);
+  if (evenement && couvreEvenement(evenement, ligne, colonne)) return true;
   const liaison = liaisonDe(numeroTableau);
   if (!liaison) return false;
+  if (liaison.entierementCalcule) return true;
+  return couvreLiaison(liaison, ligne, colonne, ctx);
+}
+
+/** La liste du mensuel alimente-t-elle cette case ? Toutes, sauf si elle n'en alimente qu'une partie. */
+function couvreEvenement(e: NonNullable<ReturnType<typeof liaisonEvenementDe>>, ligne: string, colonne: string): boolean {
+  if (!e.categoriesProduites) return true;
+  return e.categoriesProduites.includes(e.orientation === "lignes" ? colonne : ligne);
+}
+
+/** Les champs du mensuel alimentent-ils cette case ? */
+function couvreLiaison(liaison: NonNullable<ReturnType<typeof liaisonDe>>, ligne: string, colonne: string, ctx: ContexteCanevas): boolean {
   const categorie = liaison.orientation === "lignes" ? colonne : ligne;
   const totaux = [`TOTAL ${ctx.periodeCourt}`, `TOTAL ${ctx.periodeCourtN1}`];
   if (totaux.includes(categorie)) return Boolean(liaison.total) || liaison.correspondances.every(estLiee);
   const corr = liaison.correspondances.find((c) => c.libelle === categorie);
   return Boolean(corr && estLiee(corr));
+}
+
+/**
+ * La valeur REPRISE d'un autre tableau (reprises.ts) : les infrastructures du
+ * BAC, recopiées dans celles de l'élevage bovin. Null si rien n'y est saisi.
+ */
+export function valeurReprise(
+  saisies: Map<string, ValeurCellule>,
+  numeroTableau: number,
+  ligne: string,
+  colonne: string
+): number | null {
+  const r = repriseDe(numeroTableau, ligne);
+  if (!r) return null;
+  let somme: number | null = null;
+  for (const l of r.lignesSource) {
+    const v = saisies.get(cleCellule({ numeroTableau: r.source, ligne: l, colonne }))?.valeur;
+    if (v != null) somme = (somme ?? 0) + v;
+  }
+  return somme;
 }

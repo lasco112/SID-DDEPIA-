@@ -28,7 +28,8 @@ import { colonnesDe, lignesDe } from "./canevas/rendu";
 import { axeTerritorial, clesLignes, estTotal } from "./canevas/structure";
 import type { Bloc, ContexteCanevas } from "./canevas/types";
 import { cleCellule, lireSaisiesCanevas, type ValeurCellule } from "./saisieCanevas";
-import { preparer, fournisseur, estCaseCalculee } from "./remplissage";
+import { preparer, fournisseur, estCaseCalculee, valeurReprise, versNombre } from "./remplissage";
+import { REPRISES, repriseDe } from "./canevas/reprises";
 import { champsMobilises, liaisonDe, estLiee } from "./liaison";
 import { liaisonEvenementDe } from "./evenements";
 import { listerArrondissements } from "@/lib/arrondissements";
@@ -112,6 +113,81 @@ function autorise(bloc: BlocTableau, profil: Profil, ligne: string, colonne: str
 }
 
 export type EtatCase = "saisie" | "calculee" | "total" | "lecture";
+
+/**
+ * Les colonnes de TEXTE. Toutes les autres n'acceptent que des nombres
+ * (décision du Délégué) : une lettre dans un effectif fausserait les totaux
+ * sans que personne ne s'en aperçoive.
+ */
+const COLONNES_TEXTE = new Set([
+  "Provenance",
+  "Destination",
+  "Groupes d’Initiative Commune (GIC)",
+  "Activités",
+  "Activités menées",
+  "LOCALISATION",
+  "NOMS ET PRENOMS",
+  "TELEPHONE",
+  "STRUCTURE",
+  "STATUT",
+  "ARRONDISSEMENT",
+  "Arrondissement/ Commune",
+  "Infrastructure d’élevage de base",
+  "Equipement ou infrastructure annexe à l’infrastructure de base",
+  "Niveau d’exécution physique (construit, non construit, En cours, Arrêté)",
+  "Maladie suspectée",
+  "Contrainte stratégique",
+  "Solution proposée",
+  "Description du niveau de réalisation",
+  "Principales destinations",
+]);
+
+/** La case attend-elle un nombre ? */
+export const attendUnNombre = (colonne: string) => !COLONNES_TEXTE.has(colonne);
+
+/** Ce qu'il faut saisir, dit en clair en tête de chaque tableau. */
+const AIDES: Record<number, string> = {
+  101: "Nombre de structures dans l'arrondissement : DAEPIA, centres zootechniques et vétérinaires (CZV), centres ou postes de contrôle (CCP/SA).",
+  1: "Nombre de structures à créer, par type.",
+  2: "Nombre de postes de responsabilité à pourvoir.",
+  3: "Nombre d'agents en poste, par grade.",
+  4: "Nombre d'agents manquants, par grade.",
+  5: "Nombre d'agents concernés par chaque mouvement au cours du trimestre.",
+  6: "Nombre d'agents concernés au cours du trimestre.",
+  7: "Nombre d'infrastructures, par type. Le déficit est le nombre qui manque.",
+  8: "Nombre d'engins en service, par type.",
+  9: "Nombre d'engins manquants, par type.",
+  10: "Nombre d'équipements, par type.",
+  11: "Montants en francs CFA.",
+  12: "Montants en francs CFA.",
+  102: "Montants en francs CFA.",
+  13: "Recettes encaissées, en francs CFA, mois par mois.",
+  14: "Nombre de têtes par catégorie. La somme des catégories doit être égale au cheptel bovin des rapports mensuels (colonne grise).",
+  16: "Nombre de bovins abattus par catégorie. La somme doit être égale au total des rapports mensuels (colonne grise). La viande en découle automatiquement.",
+  23: "Nombre de têtes par catégorie. La somme doit être égale au cheptel ovin des rapports mensuels (colonne grise).",
+  37: "Nombre de têtes par catégorie. La somme doit être égale au cheptel porcin des rapports mensuels (colonne grise).",
+  39: "Nombre de porcins abattus par catégorie. La somme doit être égale au total des rapports mensuels (colonne grise). La viande en découle automatiquement.",
+  45: "Nombre de volailles abattues par catégorie. La somme doit être égale au total des rapports mensuels (colonne grise). La viande en découle automatiquement.",
+  15: "Nombre d'infrastructures (pâturages et champs fourragers en hectares, pistes en km). Les valeurs grisées en attente sont reprises du tableau « Situation des infrastructures » du BAC : corrigez-les si nécessaire.",
+  108: "Une ligne par ouvrage : commune, nature, montant en francs CFA, niveau d'exécution.",
+  115: "Une ligne par vétérinaire installé en clientèle privée.",
+  114: "Une ligne par suspicion : semaine épidémiologique, maladie, nombre de résultats confirmés et négatifs.",
+};
+const AIDE_PAR_DEFAUT = "Des nombres uniquement, sauf dans les colonnes de texte (signalées).";
+
+/**
+ * Les tableaux dont les CATÉGORIES se saisissent et dont le TOTAL vient du
+ * mensuel. La somme des catégories doit retomber sur le total : sinon la
+ * saisie est refusée (décision du Délégué).
+ */
+const TOTAL_MENSUEL: Record<number, string> = {
+  14: "cheptel bovin",
+  16: "nombre de bovins abattus",
+  23: "cheptel ovin",
+  37: "cheptel porcin",
+  39: "nombre de porcins abattus",
+  45: "nombre de volailles abattues",
+};
 
 /**
  * Le texte FIXE d'une case, imposé par le canevas — l'action et l'activité
@@ -206,6 +282,10 @@ export interface CaseGrille {
   affiche: string | null;
   /** La valeur brute saisie, pour l'édition. */
   saisi: string | null;
+  /** Vrai si la case attend du texte ; sinon, un nombre. */
+  texte: boolean;
+  /** La valeur reprise d'un autre tableau, proposée tant que rien n'est saisi. */
+  propose: string | null;
 }
 
 export interface GrilleSaisie {
@@ -214,8 +294,10 @@ export interface GrilleSaisie {
   section: string;
   enteteLigne: string;
   lignes: { cle: string; libelle: string; cases: CaseGrille[] }[];
-  /** Incohérences à signaler — somme des catégories ≠ total mensuel. */
+  /** Incohérences à signaler — somme des catégories ≠ total mensuel, reprise contredite. */
   avertissements: string[];
+  /** Ce qu'il faut saisir. */
+  aide: string;
 }
 
 /** La grille d'un tableau, telle que ce profil la voit et la remplit. */
@@ -244,8 +326,11 @@ export async function grille(db: PrismaClient, periode: Periode, profil: Profil,
     libelle: libelles[r],
     cases: colonnes.map((colonne, i) => {
       const s = donnees.saisies.get(cleCellule({ numeroTableau: numero, ligne: cle, colonne }));
+      const reprise = s ? null : valeurReprise(donnees.saisies, numero, cle, colonne);
       return {
         colonne,
+        texte: !attendUnNombre(colonne),
+        propose: reprise == null ? null : String(reprise),
         etat: etatCase(bloc, ctx, profil, cle, colonne),
         affiche:
           texteFixe(bloc, ctx, cle, colonne) ??
@@ -255,7 +340,15 @@ export async function grille(db: PrismaClient, periode: Periode, profil: Profil,
     }),
   }));
 
-  return { numero, titre: bloc.titre, section, enteteLigne, lignes, avertissements: avertissements(bloc, ctx, lignes) };
+  return {
+    numero,
+    titre: bloc.titre,
+    section,
+    enteteLigne,
+    lignes,
+    avertissements: [...avertissements(bloc, ctx, lignes), ...alertesReprises(numero, ctx, donnees.saisies)],
+    aide: AIDES[numero] ?? AIDE_PAR_DEFAUT,
+  };
 }
 
 /**
@@ -293,6 +386,68 @@ function avertissements(bloc: BlocTableau, ctx: ContexteCanevas, lignes: GrilleS
     }
   }
   return sortie;
+}
+
+/**
+ * Les reprises CONTREDITES : une valeur saisie dans le tableau qui reçoit,
+ * différente de ce que porte le tableau d'origine. Affichées des deux côtés.
+ */
+function alertesReprises(numero: number, ctx: ContexteCanevas, saisies: Map<string, ValeurCellule>): string[] {
+  const concernees = REPRISES.filter((r) => r.tableau === numero || r.source === numero);
+  const sortie: string[] = [];
+  for (const r of concernees) {
+    for (const arr of ctx.arrondissements) {
+      const ici = saisies.get(cleCellule({ numeroTableau: r.tableau, ligne: r.ligne, colonne: arr }))?.valeur;
+      const la = valeurReprise(saisies, r.tableau, r.ligne, arr);
+      if (ici == null || la == null || ici === la) continue;
+      sortie.push(
+        `${arr}, « ${r.ligne} » : ${ici} au tableau des infrastructures d'exploitation, ${la} au tableau « Situation des infrastructures » du BAC (${r.lignesSource.join(" + ")}). Vérifiez lequel est juste.`
+      );
+    }
+  }
+  return sortie;
+}
+
+/**
+ * Refuse une saisie qui rendrait la somme des catégories DIFFÉRENTE du total
+ * des rapports mensuels (décision du Délégué). Le contrôle ne joue que lorsque
+ * toutes les catégories de l'arrondissement sont remplies, et que le total
+ * mensuel existe ; sinon il n'y a rien à comparer.
+ */
+export async function incoherenceCategories(
+  db: PrismaClient,
+  periode: Periode,
+  profil: Profil,
+  numero: number,
+  ligne: string,
+  colonne: string,
+  nouvelle: number | null
+): Promise<string | null> {
+  const nature = TOTAL_MENSUEL[numero];
+  const liaison = liaisonDe(numero);
+  if (!nature || !liaison?.total || liaison.orientation !== "lignes") return null;
+  const categories = liaison.correspondances.filter((c) => !estLiee(c)).map((c) => c.libelle);
+  if (!categories.includes(colonne)) return null;
+
+  const g = await grille(db, periode, profil, numero);
+  const l = g?.lignes.find((x) => x.cle === ligne);
+  if (!g || !l) return null;
+  let somme = 0;
+  for (const c of l.cases) {
+    if (!categories.includes(c.colonne)) continue;
+    const v = c.colonne === colonne ? nouvelle : versNombre(c.saisi);
+    if (v == null) return null; // une catégorie manque encore : on attend
+    somme += v;
+  }
+  const ctx = await contextePour(db, periode, profil);
+  const total = versNombre(l.cases.find((c) => c.colonne === `TOTAL ${ctx.periodeCourt}`)?.affiche);
+  if (total == null || Math.abs(somme - total) < 0.5) return null;
+  const f = (n: number) => n.toLocaleString("fr-FR");
+  return (
+    `${l.libelle} : la somme des catégories (${f(somme)}) doit être égale au ${nature} des rapports mensuels (${f(total)}), ` +
+    `soit un écart de ${f(Math.abs(somme - total))}. La saisie n'est pas enregistrée : corrigez les catégories, ` +
+    `ou faites corriger le rapport mensuel.`
+  );
 }
 
 /**
