@@ -115,12 +115,21 @@ const MALADIE_VACCINATION: Record<string, string> = {
   MAL_DERMATOSE_NODULAIRE: "Maladie nodulaire",
   MAL_PASTEURELLOSE: "Pasteurellose",
   MAL_COLIBACILLOSE_AVIAIRE: "Colibacillose",
+  // Ajoutées à la liste du mensuel le 24 septembre 2026.
+  MAL_PPCB: "PPCB",
+  MAL_ROUGET: "Rouget",
+  MAL_VARIOLE_AVIAIRE: "Variole aviaire",
+  MAL_BRONCHITE_INFECTIEUSE: "Bronchite infectieuse",
+  MAL_CHARBON_SYMPTOMATIQUE: "CharbonSymptomatique",
+  MAL_CHOLERA: "Cholera",
+  MAL_PARVOVIROSE: "Parvovirose",
 };
 
 /**
- * Les maladies du canevas que la liste déroulante du mensuel ne propose pas
- * (PPCB, rouget, variole aviaire…). L'agent les déclare en choisissant
- * « Autre maladie » et en TAPANT le nom : c'est ce texte qu'on lit ici.
+ * Les maladies déclarées en « Autre maladie » avec leur nom TAPÉ. C'était la
+ * seule façon de déclarer PPCB, rouget, variole aviaire… avant leur ajout à la
+ * liste du mensuel : les rapports antérieurs, et une saisie faite par habitude,
+ * se lisent ainsi.
  * Le charbon BACTÉRIDIEN n'est pas le charbon symptomatique : il n'y est pas rangé.
  */
 const VACCINATION_PAR_NOM: [RegExp, string][] = [

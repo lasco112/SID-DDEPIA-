@@ -76,6 +76,16 @@ test("vaccination : une maladie absente de la liste du mensuel se lit dans « Au
   assert.equal(v.categorie({ activite: "ACTE_VACCINATION_PRIVEE", maladie: "MAL_AUTRE", maladie__PRECISION: "rouget" }, "T33"), "Rouget");
 });
 
+test("vaccination : les sept maladies ajoutées à la liste du mensuel ont chacune leur colonne", () => {
+  const v = liaison(64);
+  const colonnes = new Set(colonnesDe(SECTION_IV_SANTE.blocs.find((b) => b.type === "tableau" && b.numero === 64) as never, CTX));
+  for (const code of ["MAL_PPCB", "MAL_ROUGET", "MAL_VARIOLE_AVIAIRE", "MAL_BRONCHITE_INFECTIEUSE",
+    "MAL_CHARBON_SYMPTOMATIQUE", "MAL_CHOLERA", "MAL_PARVOVIROSE"]) {
+    const c = v.categorie({ maladie: code, espece: "ESP_BOVIN" }, "T32");
+    assert.ok(c && colonnes.has(c), `${code} → ${c}`);
+  }
+});
+
 test("cliniques : chaque acte va à son tableau, chaque espèce à sa colonne", () => {
   assert.equal(liaison(65).categorie({ activite: "ACTE_CONSULTATION", espece: "ESP_LAPIN" }, "T33"), "Lapin");
   assert.equal(liaison(66).categorie({ activite: "ACTE_DEPARASITAGE", espece: "ESP_LAPIN" }, "T33"), "Lapine");

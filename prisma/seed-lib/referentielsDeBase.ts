@@ -41,6 +41,16 @@ export const MALADIES = [
   ["MAL_COLIBACILLOSE_AVIAIRE", "Colibacillose aviaire"],
   ["MAL_COCCIDIOSE", "Coccidiose"],
   ["MAL_GUMBORO", "Maladie de Gumboro"],
+  // Les sept maladies de la vaccination du canevas régional (migration
+  // 20260924120000). Seule exception à l'ajout en fin de liste : « Autre
+  // maladie » reste la dernière — la migration lui donne le rang 20, comme ici.
+  ["MAL_PPCB", "Péripneumonie contagieuse bovine (PPCB)"],
+  ["MAL_ROUGET", "Rouget du porc"],
+  ["MAL_VARIOLE_AVIAIRE", "Variole aviaire"],
+  ["MAL_BRONCHITE_INFECTIEUSE", "Bronchite infectieuse"],
+  ["MAL_CHARBON_SYMPTOMATIQUE", "Charbon symptomatique"],
+  ["MAL_CHOLERA", "Choléra"],
+  ["MAL_PARVOVIROSE", "Parvovirose"],
   ["MAL_AUTRE", "Autre maladie"],
 ] as const;
 
