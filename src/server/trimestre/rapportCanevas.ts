@@ -11,7 +11,7 @@
  * script en ligne de commande : un seul chemin de production, donc un seul
  * comportement à vérifier.
  */
-import { Document, Packer, Paragraph, TextRun, AlignmentType, HeadingLevel, Header } from "docx";
+import { Document, Packer, Paragraph, TextRun, AlignmentType, HeadingLevel, Header, PageBreak } from "docx";
 import type { PrismaClient } from "@prisma/client";
 import { SECTION_I } from "./canevas/sectionI";
 import { SECTION_BUDGET } from "./canevas/sectionBudget";
@@ -21,6 +21,7 @@ import { SECTION_II_PORCIN, SECTION_II_AVICOLE } from "./canevas/sectionPorcinAv
 import { SECTION_II_AUTRES, SECTION_III_PECHE } from "./canevas/sectionPecheEtDivers";
 import { SECTION_IV_SANTE } from "./canevas/sectionSanteAnimale";
 import { rendreSection, champsAutomatiques } from "./canevas/rendu";
+import { pageDeGarde, tableauAcronymes } from "./canevas/pageDeGarde";
 import { TEXTES_FIXES } from "./canevas/textesFixes";
 import { TEXTES_ARRONDISSEMENTS } from "./canevas/textesArrondissements";
 import type { ContexteCanevas, SectionCanevas } from "./canevas/types";
@@ -180,31 +181,17 @@ export async function genererRapportCanevas(
   const bilan = bilanLiaisons();
   const provisoire = !etat.calculable;
 
-  const centre = (texte: string, taille: number, gras = false) =>
-    new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: texte, bold: gras, size: taille })] });
-
-  const enfants: unknown[] = [
-    centre("RÉPUBLIQUE DU CAMEROUN", 22, true),
-    centre("Paix – Travail – Patrie", 18),
-    centre("RÉGION DE L’OUEST", 18),
-    centre(
-      options.arrondissement
-        ? `DÉLÉGATION D’ARRONDISSEMENT DE L’ÉLEVAGE, DES PÊCHES ET DES INDUSTRIES ANIMALES DE ${options.arrondissement.toUpperCase()}`
-        : identite.intituleOfficiel,
-      18
-    ),
-    new Paragraph({ text: "" }),
-    new Paragraph({
-      alignment: AlignmentType.CENTER,
-      heading: HeadingLevel.HEADING_1,
-      children: [new TextRun({ text: `RAPPORT DU ${libelleOfficiel(periode)}`, bold: true })],
-    }),
-    new Paragraph({ text: "" }),
-  ];
-
+  // Page de garde du rapport départemental (décisions D5, D8), puis les pièces
+  // liminaires du régional. La note technique qui annonçait « N rubriques
+  // renseignées automatiquement » a disparu : elle n'a pas sa place dans un
+  // document officiel.
+  const garde = pageDeGarde({ identite, periode, arrondissement: options.arrondissement });
   if (provisoire) {
     const raisons = [...etat.moisAbsents, ...etat.moisIncomplets];
-    enfants.push(
+    garde.splice(
+      garde.length - 1,
+      0,
+      new Paragraph({ text: "" }),
       new Paragraph({
         alignment: AlignmentType.CENTER,
         children: [
@@ -213,26 +200,20 @@ export async function genererRapportCanevas(
             bold: true, color: "B00020", size: 20,
           }),
         ],
-      }),
-      new Paragraph({ text: "" })
+      })
     );
   }
 
-  enfants.push(
+  const enfants: unknown[] = [
+    ...garde,
+    ...champsAutomatiques(),
     new Paragraph({
-      children: [
-        new TextRun({
-          text:
-            `${bilan.casesLiees} rubriques sont renseignées automatiquement par le SID. ` +
-            `Les cases laissées vides correspondent à des données que la collecte mensuelle ne recueille pas : ` +
-            `elles sont à compléter à la main.`,
-          italics: true, size: 18,
-        }),
-      ],
+      heading: HeadingLevel.HEADING_1,
+      children: [new TextRun({ text: "LISTE DES ACRONYMES, SIGLES ET ABRÉVIATIONS", bold: true })],
     }),
-    new Paragraph({ text: "" }),
-    ...champsAutomatiques()
-  );
+    tableauAcronymes(),
+    new Paragraph({ children: [new PageBreak()] }),
+  ];
 
   /**
    * Les textes qui ne changent pas d'une période à l'autre sont repris
@@ -267,22 +248,16 @@ export async function genererRapportCanevas(
     enfants.push(...rendreSection(section, { ctx, valeur, textes, compteur }));
   }
 
-  enfants.push(
-    new Paragraph({ text: "" }),
-    // Un rapport d'arrondissement ne se signe pas « Le Délégué Départemental » :
-    // il est signé par le DA, et transmis à son chef.
-    new Paragraph({
-      alignment: AlignmentType.RIGHT,
-      children: [
-        new TextRun({
-          text: options.arrondissement ? "Le Délégué d’Arrondissement" : "Le Délégué Départemental",
-          size: 20,
-        }),
-      ],
-    })
-  );
+  // La signature est portée par la page de garde, comme au rapport
+  // départemental et au régional : c'est elle que le cachet vient compléter.
 
   const document = new Document({
+    // Word propose à l'ouverture de mettre à jour la table des matières et les
+    // listes : le Délégué n'a plus à les reconstruire à la main.
+    features: { updateFields: true },
+    styles: {
+      default: { document: { run: { font: "Times New Roman" } } },
+    },
     sections: [
       {
         headers: provisoire

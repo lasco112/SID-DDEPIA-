@@ -77,7 +77,13 @@ test("les titres sont transposés au niveau de l'arrondissement", async () => {
 });
 
 test("le rapport d'un DA porte les lignes DA, jamais les lignes DD", async () => {
-  const { texte } = await produire("Dschang");
+  const complet = (await produire("Dschang")).texte;
+  // La liste des acronymes DÉFINIT « DDEPIA » : c'est un glossaire, pas une
+  // ligne de tableau. On la met de côté pour ce contrôle.
+  const debutGlossaire = complet.indexOf("LISTE DES ACRONYMES, SIGLES ET ABRÉVIATIONS");
+  const finGlossaire = complet.indexOf("INTRODUCTION", debutGlossaire);
+  assert.ok(debutGlossaire > 0 && finGlossaire > debutGlossaire, "Liste des acronymes introuvable.");
+  const texte = complet.slice(0, debutGlossaire) + complet.slice(finGlossaire);
 
   /*
    * Un arrondissement ne possède pas de DDEPIA. La ligne « DDEPIA » des
@@ -115,9 +121,33 @@ test("il ne porte qu'une seule colonne territoriale — la sienne", async () => 
 
 test("il est signé par le DA, le rapport départemental par le DD", async () => {
   const [arr, dept] = [await produire("Dschang"), await produire()];
-  assert.ok(arr.texte.includes("Le Délégué d’Arrondissement"));
-  assert.ok(!arr.texte.includes("Le Délégué Départemental"));
-  assert.ok(dept.texte.includes("Le Délégué Départemental"));
+  // Signature de la page de garde, sans nom (décision D5) : le cachet la complète.
+  assert.ok(arr.texte.includes("LE DÉLÉGUÉ D’ARRONDISSEMENT,"));
+  assert.ok(!arr.texte.includes("LE DÉLÉGUÉ DÉPARTEMENTAL"));
+  assert.ok(dept.texte.includes("LE DÉLÉGUÉ DÉPARTEMENTAL,"));
+});
+
+test("la page de garde est celle du rapport départemental, calculée pour la période", async () => {
+  const [arr, dept] = [await produire("Dschang"), await produire()];
+  for (const attendu of [
+    "RÉPUBLIQUE DU CAMEROUN",
+    "REPUBLIC OF CAMEROON",
+    "DÉLÉGATION DÉPARTEMENTALE DE LA MENOUA",
+    "BP : 55 DSCHANG",
+    "RAPPORT TRIMESTRIEL DES ACTIVITÉS DE LA DÉLÉGATION DÉPARTEMENTALE",
+    "(JUILLET – SEPTEMBRE 2026)",
+    "RAPPORT DU TROISIÈME TRIMESTRE 2026",
+    "TABLE DES MATIÈRES",
+    "LISTE DES ACRONYMES, SIGLES ET ABRÉVIATIONS",
+  ]) {
+    assert.ok(dept.texte.includes(attendu), `« ${attendu} » manque au rapport départemental.`);
+  }
+  assert.ok(arr.texte.includes("SUBDIVISIONAL DELEGATION OF DSCHANG"));
+  // L'adresse est celle de la délégation départementale, pas celle du DA.
+  assert.ok(!arr.texte.includes("BP : 55 DSCHANG"));
+  // La note technique « N rubriques sont renseignées automatiquement » n'a pas
+  // sa place dans un document officiel.
+  assert.ok(!dept.texte.includes("rubriques sont renseignées"));
 });
 
 test("les chiffres d'un arrondissement sont les siens, pas ceux du département", async () => {

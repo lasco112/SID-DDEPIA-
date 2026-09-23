@@ -202,7 +202,12 @@ export const SECTION_IV_SANTE: SectionCanevas = {
     {
       type: "zoneTexte",
       cle: "conclusion",
-      consigne: "Synthèse du trimestre, difficultés majeures et perspectives.",
+      consigne: "Synthèse de la période, difficultés majeures et perspectives.",
     },
+
+    // Les sources des textes de référence (décision D10). Le régional n'en a
+    // pas ; le rapport en a besoin dès lors qu'il cite ses sources.
+    { type: "titre", niveau: 1, texte: "RÉFÉRENCES BIBLIOGRAPHIQUES" },
+    { type: "zoneTexte", cle: "bibliographie", consigne: "Références des sources citées dans le rapport." },
   ],
 };

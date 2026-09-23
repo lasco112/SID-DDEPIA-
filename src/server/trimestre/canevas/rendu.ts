@@ -13,7 +13,7 @@
  */
 import {
   Paragraph, TextRun, Table, TableRow, TableCell, HeadingLevel,
-  WidthType, BorderStyle, AlignmentType, SimpleField, TableOfContents,
+  WidthType, BorderStyle, AlignmentType, SimpleField, TableOfContents, PageBreak,
 } from "docx";
 import {
   type Bloc, type ContexteCanevas, type SectionCanevas,
@@ -71,15 +71,22 @@ export function legendeTableau(titre: string, numeroAttendu: number | null): Par
 }
 
 /**
- * Les trois champs automatiques du canevas, dans son ordre :
- * sommaire, liste des tableaux, liste des graphiques.
- * Word les remplit à l'ouverture du document (Ctrl+A puis F9).
+ * Les trois champs automatiques du canevas, dans son ordre : table des
+ * matières, liste des tableaux, liste des graphiques. Le document les déclare
+ * à mettre à jour (`updateFields`) : Word propose de les remplir à
+ * l'ouverture ; à défaut, Ctrl+A puis F9.
+ *
+ * « TABLE DES MATIÈRES » n'est pas un titre : elle figurerait sinon dans sa
+ * propre table. Les deux listes, elles, y figurent, comme au régional.
  */
 export function champsAutomatiques(): (Paragraph | TableOfContents)[] {
   return [
-    new Paragraph({ heading: HeadingLevel.HEADING_1, children: [new TextRun({ text: "SOMMAIRE", bold: true })] }),
-    new TableOfContents("Sommaire", { hyperlink: true, headingStyleRange: "1-4" }),
-    new Paragraph({ text: "" }),
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      children: [new TextRun({ text: "TABLE DES MATIÈRES", bold: true, size: 28 })],
+    }),
+    new TableOfContents("Table des matières", { hyperlink: true, headingStyleRange: "1-4" }),
+    new Paragraph({ children: [new PageBreak()] }),
     new Paragraph({ heading: HeadingLevel.HEADING_1, children: [new TextRun({ text: "LISTE DES TABLEAUX", bold: true })] }),
     new TableOfContents("Liste des tableaux", { hyperlink: true, captionLabel: "Tableau" }),
     new Paragraph({ text: "" }),
@@ -220,7 +227,16 @@ function rendreZoneTexte(
         .trim()
         .split(/\n\s*\n/)
         .filter((p) => p.trim())
-        .map((p) => new Paragraph({ children: [new TextRun({ text: p.trim(), size: 20 })] })),
+        // Texte courant JUSTIFIÉ, comme les 2 792 paragraphes de texte du
+        // régional ; les titres et les tableaux gardent leur alignement.
+        .map(
+          (p) =>
+            new Paragraph({
+              alignment: AlignmentType.JUSTIFIED,
+              spacing: { after: 120 },
+              children: [new TextRun({ text: p.trim(), size: 24 })],
+            })
+        ),
       new Paragraph({ text: "" }),
     ];
   }
