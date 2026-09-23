@@ -118,6 +118,36 @@ const MALADIE_VACCINATION: Record<string, string> = {
 };
 
 /**
+ * Les maladies du canevas que la liste déroulante du mensuel ne propose pas
+ * (PPCB, rouget, variole aviaire…). L'agent les déclare en choisissant
+ * « Autre maladie » et en TAPANT le nom : c'est ce texte qu'on lit ici.
+ * Le charbon BACTÉRIDIEN n'est pas le charbon symptomatique : il n'y est pas rangé.
+ */
+const VACCINATION_PAR_NOM: [RegExp, string][] = [
+  [/\bppcb\b|peri\s*pneumonie/, "PPCB"],
+  [/\bppr\b|peste\s+des\s+petits/, "PPR"],
+  [/rouget/, "Rouget"],
+  [/\bmnc\b|new\s*castle/, "MNC"],
+  [/variole/, "Variole aviaire"],
+  [/gumboro/, "Maladie de Gumboro"],
+  [/bronchite/, "Bronchite infectieuse"],
+  [/charbon\s+symptomatique/, "CharbonSymptomatique"],
+  [/nodulaire/, "Maladie nodulaire"],
+  [/pasteurell/, "Pasteurellose"],
+  [/cholera/, "Cholera"],
+  [/colibacill/, "Colibacillose"],
+  [/parvo/, "Parvovirose"],
+];
+
+/** Colonne de vaccination d'une maladie déclarée en clair (« Autre maladie »). */
+export function vaccinationParNom(nom: string, espece: string): string | null {
+  // Sans accents ni majuscules : « Péripneumonie », « CHOLÉRA » se lisent comme les autres.
+  const n = nom.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  if (/\brage\b|antirabique/.test(n)) return espece === "ESP_CANIN" ? "Rage canine" : null;
+  return VACCINATION_PAR_NOM.find(([motif]) => motif.test(n))?.[1] ?? null;
+}
+
+/**
  * Maladie du référentiel → ligne du tableau des affections récurrentes.
  * La coccidiose n'y est rangée que chez la volaille : la ligne s'intitule
  * « Coccidiose aviaire ».
@@ -273,10 +303,12 @@ export const LIAISONS_EVENEMENTS: LiaisonEvenement[] = [
       const maladie = texte(l.maladie);
       // La rage ne se range sous « Rage canine » que pour un chien vacciné.
       if (maladie === "MAL_RAGE") return texte(l.espece) === "ESP_CANIN" ? "Rage canine" : null;
+      if (maladie === "MAL_AUTRE") return vaccinationParNom(texte(l.maladie__PRECISION), texte(l.espece));
       return MALADIE_VACCINATION[maladie] ?? null;
     },
     quantite: (l) => nombre(l.effectifVaccine ?? l.effectif),
-    decrire: (l) => `vaccination ${texte(l.maladie)} · ${texte(l.espece)}`,
+    decrire: (l) =>
+      `vaccination ${texte(l.maladie)}${texte(l.maladie__PRECISION) ? ` (« ${texte(l.maladie__PRECISION)} »)` : ""} · ${texte(l.espece)}`,
   },
   clinique(65, "Situation générale des consultations par espèces et par arrondissement", "ACTE_CONSULTATION", "Lapin", true),
   clinique(66, "Situation générale des déparasitages par espèces et par arrondissement", "ACTE_DEPARASITAGE", "Lapine", true),

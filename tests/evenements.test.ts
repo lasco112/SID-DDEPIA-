@@ -58,6 +58,24 @@ test("vaccination : la rage n'est « canine » que pour un chien", () => {
   assert.equal(v.categorie({ activite: "ACTE_CONSULTATION", maladie: "MAL_NEWCASTLE" }, "T33"), undefined);
 });
 
+test("vaccination : une maladie absente de la liste du mensuel se lit dans « Autre maladie »", () => {
+  const v = liaison(64);
+  const autre = (nom: string, espece = "ESP_BOVIN") => v.categorie({ maladie: "MAL_AUTRE", maladie__PRECISION: nom, espece }, "T32");
+  assert.equal(autre("PPCB"), "PPCB");
+  assert.equal(autre("Péripneumonie contagieuse bovine"), "PPCB");
+  assert.equal(autre("rouget", "ESP_PORCIN"), "Rouget");
+  assert.equal(autre("Variole aviaire", "ESP_VOLAILLE"), "Variole aviaire");
+  assert.equal(autre("bronchite infectieuse", "ESP_VOLAILLE"), "Bronchite infectieuse");
+  assert.equal(autre("Charbon symptomatique"), "CharbonSymptomatique");
+  assert.equal(autre("Choléra aviaire", "ESP_VOLAILLE"), "Cholera");
+  assert.equal(autre("parvovirose", "ESP_CANIN"), "Parvovirose");
+  assert.equal(autre("rage", "ESP_CANIN"), "Rage canine");
+  // Ni deviné, ni inventé : un nom inconnu ou vide reste « non classé ».
+  assert.equal(autre("Charbon bactéridien"), null);
+  assert.equal(autre(""), null);
+  assert.equal(v.categorie({ activite: "ACTE_VACCINATION_PRIVEE", maladie: "MAL_AUTRE", maladie__PRECISION: "rouget" }, "T33"), "Rouget");
+});
+
 test("cliniques : chaque acte va à son tableau, chaque espèce à sa colonne", () => {
   assert.equal(liaison(65).categorie({ activite: "ACTE_CONSULTATION", espece: "ESP_LAPIN" }, "T33"), "Lapin");
   assert.equal(liaison(66).categorie({ activite: "ACTE_DEPARASITAGE", espece: "ESP_LAPIN" }, "T33"), "Lapine");
