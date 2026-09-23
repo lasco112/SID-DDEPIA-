@@ -117,6 +117,16 @@ export const authOptions: NextAuthOptions = {
         const emisLe = typeof token.iat === "number" ? token.iat * 1000 : 0;
         if (!fresh || !fresh.actif || (fresh.sessionRevoqueeLe && emisLe < fresh.sessionRevoqueeLe.getTime())) {
           token.revoque = true;
+        } else {
+          // Le rôle et le rattachement suivent la BASE, pas la connexion. Figés
+          // dans le jeton, ils survivaient 30 jours à une correction : un compte
+          // créé en DA puis corrigé en agent de saisie continuait d'être traité
+          // en DA — et son bouton « Envoyer au Délégué Départemental » court-
+          // circuitait le Délégué d'Arrondissement. Le compte est déjà relu ici
+          // à chaque requête : le reprendre ne coûte rien.
+          token.role = fresh.role;
+          token.arrondissementId = fresh.arrondissementId;
+          token.sectionId = fresh.sectionId;
         }
       }
       return token;

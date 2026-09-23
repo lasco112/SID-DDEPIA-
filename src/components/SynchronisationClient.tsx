@@ -14,7 +14,14 @@ import { offlineDB } from "@/lib/dexie";
 import { etatSynchronisation, envoyerSaisiesEnAttente, type EtatSynchronisation } from "@/lib/synchronisation";
 import { synchroniserEtablissements } from "@/lib/etablissementsLocal";
 
-export default function SynchronisationClient({ username }: { username: string }) {
+export default function SynchronisationClient({
+  username,
+  destinataire,
+}: {
+  username: string;
+  /** Le supérieur direct qui reçoit le rapport, ou null si le rôle n'en transmet pas. */
+  destinataire: string | null;
+}) {
   const [etat, setEtat] = useState<EtatSynchronisation | null>(null);
   const [enLigne, setEnLigne] = useState(true);
   const [enCours, setEnCours] = useState(false);
@@ -126,9 +133,13 @@ export default function SynchronisationClient({ username }: { username: string }
         {totalEnAttente > 0
           ? "Les éléments en attente sont conservés sur cet appareil et repartent tout seuls dès que le réseau revient. Vous pouvez fermer l'application sans rien perdre."
           : "Tout votre travail est enregistré sur le serveur."}
-        <br />
-        Cet envoi met vos données à l'abri ; il ne remplace pas le bouton
-        « Envoyer au Délégué Départemental », qui transmet officiellement le rapport.
+        {destinataire && (
+          <>
+            <br />
+            Cet envoi met vos données à l'abri ; il ne remplace pas le bouton
+            « Envoyer au {destinataire} », qui transmet officiellement votre travail.
+          </>
+        )}
       </p>
     </div>
   );
