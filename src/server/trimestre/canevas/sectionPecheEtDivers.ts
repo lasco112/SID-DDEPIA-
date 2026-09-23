@@ -240,7 +240,7 @@ export const SECTION_III_PECHE: SectionCanevas = {
     {
       type: "tableau",
       kind: "libre",
-      numero: null,
+      numero: 110,
       titre: "Organisations de producteurs impliquées dans l’activité aquacole",
       entetes: ["Arrondissement", "Groupes d’Initiative Commune (GIC)", "Activités menées"],
       lignes: ["{ARRONDISSEMENTS}", "TOTAL"],
@@ -292,7 +292,7 @@ export const SECTION_III_PECHE: SectionCanevas = {
     {
       type: "tableau",
       kind: "libre",
-      numero: null,
+      numero: 111,
       titre: "Les nouvelles structures et perspectives de production",
       // L'en-tête du régional tient sur trois lignes (« Nombre de /
       // Pisciculteurs », « Etangs / Nbre / Superficie (m2) »…). Il est mis à

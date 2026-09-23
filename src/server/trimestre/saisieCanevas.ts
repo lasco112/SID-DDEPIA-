@@ -3,20 +3,17 @@
  *
  * À quoi cela sert
  * ----------------
- * Les treize tableaux du Bureau des Affaires Communes — personnel,
- * infrastructures, matériel de transport, équipements, budget, recettes — ne
- * sont collectés NULLE PART : la section BAC ne porte aucun formulaire mensuel.
- * Le chef BAC n'avait rien à saisir, et ces tableaux sortaient vides du rapport
- * trimestriel, sans que rien ne le signale.
+ * Ce qu'aucun mois ne collecte — les tableaux du BAC, le détail des cheptels
+ * par catégorie, les infrastructures, la pêche, les listes du BIP ou des
+ * vétérinaires — se saisit une fois par trimestre (décision D9 du Délégué).
  *
  * Pourquoi cela n'enfreint pas « une donnée est saisie une seule fois »
  * --------------------------------------------------------------------
- * L'invariant interdit une table trimestrielle PARALLÈLE qui redemanderait ce
- * que les mois portent déjà — un cheptel, des abattages. Les données du BAC ne
- * se déduisent d'aucun mois : elles n'existent nulle part ailleurs. C'est ici
- * leur seule et unique saisie, et c'est pourquoi la liste ci-dessous est
- * FERMÉE : y ajouter un tableau alimenté par le mensuel créerait la double
- * saisie que l'invariant proscrit.
+ * L'invariant interdit de redemander ce que les mois portent déjà — un
+ * cheptel, des abattages. La règle n'est plus une liste de tableaux mais une
+ * règle de CASE, dans saisieTrimestrielle.ts : une case que le SID calcule à
+ * partir du mensuel, ou un total, ne se saisit jamais. Les routes vérifient
+ * cette règle AVANT d'appeler ecrireSaisieCanevas.
  *
  * Le repérage
  * -----------
@@ -29,18 +26,6 @@
 import type { PrismaClient } from "@prisma/client";
 import type { Transactionnelle } from "@/lib/dbCloisonne";
 
-/**
- * Les tableaux saisis à la main, et eux seuls.
- *
- * Ce sont les n° 1 à 13 du canevas officiel — la section BAC. Vérifié en base :
- * cette section ne porte AUCUN formulaire mensuel, là où PSA en porte 21, SSV 5
- * et SPAIH 2. Rien de ce qui est saisi ici n'est donc redemandé.
- */
-export const TABLEAUX_SAISIS_A_LA_MAIN = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13] as const;
-
-export function estSaisiALaMain(numeroTableau: number): boolean {
-  return (TABLEAUX_SAISIS_A_LA_MAIN as readonly number[]).includes(numeroTableau);
-}
 
 export interface CelluleCanevas {
   numeroTableau: number;
@@ -99,12 +84,6 @@ export async function ecrireSaisieCanevas(
   saisie: { valeur?: number | null; texte?: string | null },
   auteurId: string
 ): Promise<{ enregistre: boolean }> {
-  if (!estSaisiALaMain(cellule.numeroTableau)) {
-    throw new Error(
-      `Le tableau n° ${cellule.numeroTableau} n'est pas saisi à la main : ses valeurs viennent des rapports mensuels. ` +
-        "Les saisir ici créerait une double saisie."
-    );
-  }
 
   const texte = saisie.texte?.trim() || null;
   const valeur = saisie.valeur ?? null;

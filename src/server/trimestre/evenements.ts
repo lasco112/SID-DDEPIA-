@@ -201,15 +201,10 @@ function circulation(numero: number, titre: string, espece: string, signaleAmbig
   };
 }
 
-/** Titre du tableau de circulation des porcins, qui n'a pas de numéro interne. */
-export const TITRE_CIRCULATION_PORCINS = "Situation de la circulation intérieure des porcins sur pied";
-
 export const LIAISONS_EVENEMENTS: LiaisonEvenement[] = [
   circulation(27, "Etat de la circulation intérieure des ovins par arrondissement", "ovin", true),
   circulation(32, "Situation de la circulation intérieure des animaux sur pied", "caprin"),
-  // Sans numéro interne : repéré par son titre (voir liaisonEvenementDe), sous
-  // la clé -1 qui ne peut désigner aucun tableau numéroté.
-  circulation(-1, TITRE_CIRCULATION_PORCINS, "porcin"),
+  circulation(109, "Situation de la circulation intérieure des porcins sur pied", "porcin"),
   {
     numero: 64,
     titre: "Situation générale de la vaccination par affection et par arrondissement",
@@ -254,9 +249,9 @@ export const LIAISONS_EVENEMENTS: LiaisonEvenement[] = [
   },
 ];
 
-/** La liaison d'un tableau : par numéro, ou par titre pour un tableau sans numéro. */
-export function liaisonEvenementDe(numero: number | null, titre: string): LiaisonEvenement | undefined {
-  if (numero == null) return titre === TITRE_CIRCULATION_PORCINS ? LIAISONS_EVENEMENTS.find((l) => l.numero === -1) : undefined;
+/** La liaison d'un tableau alimenté par les listes du mensuel, s'il en a une. */
+export function liaisonEvenementDe(numero: number | null): LiaisonEvenement | undefined {
+  if (numero == null) return undefined;
   return LIAISONS_EVENEMENTS.find((l) => l.numero === numero);
 }
 

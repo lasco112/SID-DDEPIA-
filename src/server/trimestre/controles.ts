@@ -51,10 +51,11 @@ const nf = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 0 });
 /**
  * Tableau n° 13 — la somme des lignes doit égaler la somme des colonnes.
  *
- * Le seul contrôle qui porte sur une saisie MANUELLE, et donc le seul qui peut
- * réellement échouer : le chef BAC saisit aussi les cases de total, et rien ne
- * l'empêche de se tromper. Les tableaux calculés par le SID, eux, ne peuvent
- * pas diverger d'eux-mêmes.
+ * Il vérifiait les cases de TOTAL que le chef BAC saisissait à la main. Depuis
+ * la saisie trimestrielle (étape c3), les totaux sont CALCULÉS par le SID à
+ * partir des régies : ils ne peuvent plus contredire leurs composantes, et un
+ * ancien total saisi à la main n'est plus imprimé. Le contrôle constate donc
+ * que le tableau est renseigné, sans plus pouvoir échouer.
  */
 async function controleRecettes(
   db: PrismaClient,
@@ -103,20 +104,9 @@ async function controleRecettes(
     };
   }
 
-  // Les cases de TOTAL saisies à la main, si elles l'ont été : c'est là que
-  // l'erreur de frappe se loge.
-  const ecarts: string[] = [];
-  for (const mois of moisDuTrimestre) {
-    const totalSaisi = valeur(mois, "TOTAL");
-    if (totalSaisi == null) continue;
-    const somme = regies.reduce((s, r) => s + (valeur(mois, r) ?? 0), 0);
-    if (!egaux(totalSaisi, somme)) {
-      ecarts.push(`${mois} : total saisi ${nf.format(totalSaisi)}, somme des régies ${nf.format(somme)}`);
-    }
-  }
-
-  if (ecarts.length) {
-    return { intitule, etat: "viole", explication: ecarts.join(" ; "), bloquant };
+  // Les totaux sont calculés : les deux sens concordent par construction.
+  if (!egaux(parLignes, parColonnes)) {
+    return { intitule, etat: "viole", explication: "Les sommes par lignes et par colonnes diffèrent.", bloquant };
   }
 
   return {

@@ -15,8 +15,9 @@ import type { PrismaClient } from "@prisma/client";
 import { type Periode, memePeriodeAnneePrecedente } from "../periodes/calendrier";
 import { agreger, type ValeurAgregee } from "./agregation";
 import { liaisonDe, evaluer, estLiee, type Correspondance, type Formule } from "./liaison";
-import type { FournisseurValeur } from "./canevas/rendu";
-import type { ContexteCanevas } from "./canevas/types";
+import { colonnesDe, type FournisseurValeur } from "./canevas/rendu";
+import { clesLignes, estTotal, estEcart } from "./canevas/structure";
+import type { Bloc, ContexteCanevas } from "./canevas/types";
 import { listerArrondissements, graphieCanevas } from "../../lib/arrondissements";
 import { lireSaisiesCanevas, cleCellule, type ValeurCellule } from "./saisieCanevas";
 import { preparerEvenements, liaisonEvenementDe, type DonneesEvenements } from "./evenements";
@@ -53,6 +54,8 @@ export interface DonneesRemplissage {
    * la période trimestrielle n'existe pas encore en base.
    */
   saisies: Map<string, ValeurCellule>;
+  /** Les mêmes, pour le même trimestre de l'an passé : elles nourrissent les totaux N-1. */
+  saisiesN1: Map<string, ValeurCellule>;
   /** Les listes du mensuel additionnées : vaccinations, cliniques, circulation. */
   evenements: DonneesEvenements;
 }
@@ -66,7 +69,15 @@ export async function preparer(
   db: PrismaClient,
   periode: Periode,
   champs: string[],
-  options: { autoriserIncomplet?: boolean; arrondissementId?: string } = {}
+  options: {
+    autoriserIncomplet?: boolean;
+    arrondissementId?: string;
+    /**
+     * Ne pas consolider les mois. L'écran de saisie d'un tableau purement
+     * saisi n'a besoin que des saisies : inutile d'agréger tout le trimestre.
+     */
+    sansAgregation?: boolean;
+  } = {}
 ): Promise<DonneesRemplissage> {
   const vide = () => new Map<string, Map<string | null, number | null>>();
 
@@ -85,11 +96,22 @@ export async function preparer(
     select: { id: true },
   });
   const saisies = trimestre ? await lireSaisiesCanevas(db, trimestre.id) : new Map<string, ValeurCellule>();
+  const n1 = memePeriodeAnneePrecedente(periode);
+  const trimestreN1 = await db.periodeReporting.findFirst({
+    where: { type: "TRIMESTRIEL", annee: n1.annee, trimestre: n1.rang },
+    select: { id: true },
+  });
+  const saisiesN1 = trimestreN1 ? await lireSaisiesCanevas(db, trimestreN1.id) : new Map<string, ValeurCellule>();
+
+  if (options.sansAgregation) {
+    const aucun: DonneesEvenements = { courant: new Map(), precedent: new Map(), nonClassees: [] };
+    return { valeurs: vide(), valeursN1: vide(), renseignees: 0, codeParNom, saisies, saisiesN1, evenements: aucun };
+  }
 
   const evenements = await preparerEvenements(db, periode, { arrondissementId: options.arrondissementId });
 
   if (champs.length === 0) {
-    return { valeurs: vide(), valeursN1: vide(), renseignees: 0, codeParNom, saisies, evenements };
+    return { valeurs: vide(), valeursN1: vide(), renseignees: 0, codeParNom, saisies, saisiesN1, evenements };
   }
 
   const ranger = (agregees: ValeurAgregee[]) => {
@@ -121,7 +143,7 @@ export async function preparer(
 
   const a = ranger(courant.valeurs);
   const b = ranger(precedent);
-  return { valeurs: a.m, valeursN1: b.m, renseignees: a.n, codeParNom, saisies, evenements };
+  return { valeurs: a.m, valeursN1: b.m, renseignees: a.n, codeParNom, saisies, saisiesN1, evenements };
 }
 
 /**
@@ -194,21 +216,73 @@ export function fournisseur(donnees: DonneesRemplissage, ctx: ContexteCanevas): 
   const valeurDe = (c: Correspondance, arr: string | null, n1: boolean): number | null =>
     c.formule ? calculer(c.formule, arr, n1) : c.champ ? lire(c.champ, arr, n1) : null;
 
-  return ({ numeroTableau, titreTableau, ligne, colonne }) => {
-    // Les tableaux du BAC sont saisis à la main : ils ne viennent d'aucun mois,
-    // et rien ne les alimenterait autrement. On les sert AVANT la liaison —
-    // sans conflit possible, puisqu'un tableau saisi à la main n'en a pas.
-    if (numeroTableau != null) {
-      const saisie = donnees.saisies.get(cleCellule({ numeroTableau, ligne, colonne }));
-      if (saisie) {
-        // Même format que les valeurs consolidées : le lecteur ne doit pas voir
-        // à l'œil quelles cases ont été saisies et lesquelles sont calculées.
-        if (saisie.valeur != null) return nf.format(saisie.valeur);
-        if (saisie.texte) return saisie.texte;
+  /** Une case saisie, telle qu'elle s'affiche. */
+  const saisieAffichee = (numeroTableau: number, ligne: string, colonne: string): string | null => {
+    const saisie = donnees.saisies.get(cleCellule({ numeroTableau, ligne, colonne }));
+    // Même format que les valeurs consolidées : le lecteur ne doit pas voir
+    // à l'œil quelles cases ont été saisies et lesquelles sont calculées.
+    if (saisie?.valeur != null) return nf.format(saisie.valeur);
+    return saisie?.texte || null;
+  };
+
+  /**
+   * Les TOTAUX d'un tableau saisi : la somme des cases qui les précèdent sur
+   * leur axe (les régies avant la colonne TOTAL, les arrondissements avant la
+   * ligne TOTAL), et l'écart entre les deux années. Un total n'est jamais saisi.
+   *
+   * Rend `undefined` si le total mêle des cases saisies et des cases
+   * calculées : additionner des animaux vendus et des tonnes de viande, au
+   * motif qu'elles partagent une ligne, ne donnerait rien de juste.
+   */
+  const totalDesSaisies = (
+    bloc: Extract<Bloc, { type: "tableau" }>,
+    ligne: string,
+    colonne: string
+  ): string | null | undefined => {
+    const numero = bloc.numero!;
+    const lignes = clesLignes(bloc, ctx);
+    const colonnes = colonnesDe(bloc, ctx).slice(1);
+    const IMPUR = "impur" as const;
+    type Resultat = number | null | typeof IMPUR;
+
+    const saisi = (l: string, c: string, n1: boolean): Resultat =>
+      (n1 ? donnees.saisiesN1 : donnees.saisies).get(cleCellule({ numeroTableau: numero, ligne: l, colonne: c }))?.valeur ?? null;
+
+    const cellule = (l: string, c: string, n1: boolean): Resultat => {
+      if (estTotal(l) || estTotal(c)) return total(l, c, n1);
+      if (estCaseCalculee(numero, l, c, ctx)) return IMPUR;
+      return saisi(l, c, n1);
+    };
+
+    function total(l: string, c: string, n1: boolean): Resultat {
+      if (estEcart(l) || estEcart(c)) return null;
+      const surLigne = estTotal(l);
+      const axe = surLigne ? lignes : colonnes;
+      const repere = surLigne ? l : c;
+      const composantes = axe.slice(0, Math.max(0, axe.indexOf(repere))).filter((x) => !estTotal(x));
+      const annee = n1 || repere === totalN1;
+      let somme: number | null = null;
+      for (const x of composantes) {
+        const v = surLigne ? cellule(x, c, annee) : cellule(l, x, annee);
+        if (v === IMPUR) return IMPUR;
+        if (v != null) somme = (somme ?? 0) + v;
       }
+      return somme;
     }
 
-    const evenement = liaisonEvenementDe(numeroTableau, titreTableau);
+    // L'écart compare les deux lignes (ou colonnes) de total de la période.
+    const ecart = (a: Resultat, b: Resultat) => (a === IMPUR || b === IMPUR ? undefined : ecartEnPourcentage(a, b));
+    if (estEcart(ligne)) return ecart(total(totalCourant, colonne, false), total(totalN1, colonne, true));
+    if (estEcart(colonne)) return ecart(total(ligne, totalCourant, false), total(ligne, totalN1, true));
+
+    const v = total(ligne, colonne, false);
+    if (v === IMPUR) return undefined;
+    return v == null ? null : nf.format(v);
+  };
+
+  /** Une case que le SID calcule à partir du mensuel (liaisons et listes). */
+  const valeurCalculee = (numeroTableau: number, ligne: string, colonne: string): string | null => {
+    const evenement = liaisonEvenementDe(numeroTableau);
     if (evenement) return valeurEvenement(evenement.numero, evenement.orientation, ligne, colonne);
 
     const liaison = liaisonDe(numeroTableau);
@@ -280,4 +354,37 @@ export function fournisseur(donnees: DonneesRemplissage, ctx: ContexteCanevas): 
     const v = valeurDe(corr, code, false);
     return v == null ? null : nf.format(v);
   };
+
+  return ({ numeroTableau, ligne, colonne, bloc }) => {
+    if (numeroTableau == null) return null;
+    // 1. Ce que le SID calcule à partir du mensuel ne se saisit pas.
+    if (estCaseCalculee(numeroTableau, ligne, colonne, ctx)) return valeurCalculee(numeroTableau, ligne, colonne);
+    // 2. Les totaux et écarts des cases saisies se calculent.
+    if (bloc && (estTotal(ligne) || estTotal(colonne))) {
+      const t = totalDesSaisies(bloc, ligne, colonne);
+      if (t !== undefined && t !== null) return t;
+    }
+    // 3. Le reste est saisi — y compris, faute de mieux, un total saisi à la
+    //    main avant que les totaux ne soient calculés.
+    return saisieAffichee(numeroTableau, ligne, colonne);
+  };
+}
+
+/**
+ * La case est-elle calculée par le SID à partir du mensuel ? Elle ne se
+ * saisit alors pas : la saisir créerait deux sources pour un même chiffre.
+ *
+ *  - un tableau alimenté par les listes du mensuel l'est entièrement ;
+ *  - dans un tableau lié, la catégorie liée l'est, et sa colonne TOTAL si le
+ *    mensuel porte le total ou si toutes les catégories sont liées.
+ */
+export function estCaseCalculee(numeroTableau: number, ligne: string, colonne: string, ctx: ContexteCanevas): boolean {
+  if (liaisonEvenementDe(numeroTableau)) return true;
+  const liaison = liaisonDe(numeroTableau);
+  if (!liaison) return false;
+  const categorie = liaison.orientation === "lignes" ? colonne : ligne;
+  const totaux = [`TOTAL ${ctx.periodeCourt}`, `TOTAL ${ctx.periodeCourtN1}`];
+  if (totaux.includes(categorie)) return Boolean(liaison.total) || liaison.correspondances.every(estLiee);
+  const corr = liaison.correspondances.find((c) => c.libelle === categorie);
+  return Boolean(corr && estLiee(corr));
 }

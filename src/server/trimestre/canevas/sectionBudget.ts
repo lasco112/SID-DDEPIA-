@@ -41,7 +41,7 @@ const RAPPEL_PRESENTATION = "Rappel de l'objet du programme et des actions reten
  */
 type Action = { code: string; action: string; activites: string[][] };
 
-function tableauActivites(code: string, colonnes: string[], actions: Action[]): Extract<Bloc, { type: "tableau" }> {
+function tableauActivites(numero: number, code: string, colonnes: string[], actions: Action[]): Extract<Bloc, { type: "tableau" }> {
   const lignes: string[] = [];
   const prerempli: string[][] = [];
   for (const a of actions) {
@@ -51,7 +51,7 @@ function tableauActivites(code: string, colonnes: string[], actions: Action[]): 
     });
   }
   const titre = `Activités menées au titre du programme ${code}`;
-  return { type: "tableau", kind: "libre", numero: null, titre, entetes: colonnes, lignes, prerempli };
+  return { type: "tableau", kind: "libre", numero, titre, entetes: colonnes, lignes, prerempli };
 }
 
 function programme(code: string, intitule: string, tableau: Extract<Bloc, { type: "tableau" }>): Bloc[] {
@@ -70,7 +70,7 @@ function programme(code: string, intitule: string, tableau: Extract<Bloc, { type
   ];
 }
 
-const P053 = tableauActivites("053", COLONNES_ACTIVITES, [
+const P053 = tableauActivites(104, "053", COLONNES_ACTIVITES, [
   {
     code: "053.01",
     action: "Développement des industries animales",
@@ -131,7 +131,7 @@ const P053 = tableauActivites("053", COLONNES_ACTIVITES, [
   },
 ]);
 
-const P055 = tableauActivites("055", COLONNES_ACTIVITES, [
+const P055 = tableauActivites(105, "055", COLONNES_ACTIVITES, [
   {
     code: "055.01",
     action: "Contrôle des maladies animales",
@@ -158,7 +158,7 @@ const P055 = tableauActivites("055", COLONNES_ACTIVITES, [
  * plusieurs activités dans le régional : il n'est écrit qu'à sa première
  * activité.
  */
-const P057 = tableauActivites("057", COLONNES_ACTIVITES_057, [
+const P057 = tableauActivites(106, "057", COLONNES_ACTIVITES_057, [
   {
     code: "057.01",
     action: "Développement de l’Aquaculture commerciale",
@@ -195,7 +195,7 @@ const P057 = tableauActivites("057", COLONNES_ACTIVITES_057, [
   },
 ]);
 
-const P059 = tableauActivites("059", COLONNES_ACTIVITES, [
+const P059 = tableauActivites(107, "059", COLONNES_ACTIVITES, [
   {
     code: "059.01",
     action: "Coordination et suivi des activités des services de la {STRUCTURE}",

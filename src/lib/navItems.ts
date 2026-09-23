@@ -13,6 +13,7 @@ export const NAV_PAR_ROLE: Record<string, NavItem[]> = {
   DA: [
     { href: "/dashboard", label: "Tableau de bord" },
     { href: "/da/saisie", label: "Saisie de données" },
+    { href: "/trimestre/saisie", label: "Saisie trimestrielle" },
     { href: "/da/trimestre", label: "Mon rapport trimestriel" },
     { href: "/da/trimestre/rubriques", label: "Textes de mon rapport" },
     { href: "/etablissements", label: "Établissements" },
@@ -23,6 +24,7 @@ export const NAV_PAR_ROLE: Record<string, NavItem[]> = {
   AGENT_SAISIE: [
     { href: "/dashboard", label: "Tableau de bord" },
     { href: "/da/saisie", label: "Saisie de données" },
+    { href: "/trimestre/saisie", label: "Saisie trimestrielle" },
     { href: "/etablissements", label: "Établissements" },
     { href: "/mon-compte/synchronisation", label: "Synchronisation" },
   ],
@@ -31,6 +33,7 @@ export const NAV_PAR_ROLE: Record<string, NavItem[]> = {
     { href: "/dd/supervision", label: "Supervision" },
     { href: "/dd/donnees", label: "Données par arrondissement" },
     { href: "/dd/periodes", label: "Gestion des périodes" },
+    { href: "/trimestre/saisie", label: "Saisie trimestrielle" },
     { href: "/dd/trimestre", label: "Rapport trimestriel" },
     { href: "/dd/trimestre/rubriques", label: "Textes du rapport trimestriel" },
     { href: "/dd/rapports-thematiques", label: "Rapports thématiques" },
@@ -42,6 +45,7 @@ export const NAV_PAR_ROLE: Record<string, NavItem[]> = {
   ],
   CHEF_BAC: [
     { href: "/dashboard", label: "Tableau de bord" },
+    { href: "/section/bac", label: "Tableaux du BAC" },
     { href: "/section/controle", label: "Vue croisée de contrôle" },
     { href: "/section/analyse", label: "Synthèse d'analyse" },
   ],

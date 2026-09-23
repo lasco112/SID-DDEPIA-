@@ -10,7 +10,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  LIAISONS_EVENEMENTS, especeCirculation, liaisonEvenementDe, TITRE_CIRCULATION_PORCINS,
+  LIAISONS_EVENEMENTS, especeCirculation, liaisonEvenementDe,
 } from "../src/server/trimestre/evenements";
 import { SECTION_IV_SANTE } from "../src/server/trimestre/canevas/sectionSanteAnimale";
 import { SECTION_II_OVIN, SECTION_II_CAPRIN } from "../src/server/trimestre/canevas/sectionElevages";
@@ -81,7 +81,7 @@ test("chaque case visée existe au canevas, au caractère près", () => {
     .filter((b): b is Extract<Bloc, { type: "tableau" }> => b.type === "tableau");
   const ecarts: string[] = [];
   for (const l of LIAISONS_EVENEMENTS) {
-    const bloc = blocs.find((b) => liaisonEvenementDe(b.numero, b.titre) === l);
+    const bloc = blocs.find((b) => liaisonEvenementDe(b.numero) === l);
     if (!bloc) { ecarts.push(`${l.titre} : tableau introuvable`); continue; }
     const cases = new Set(l.orientation === "lignes" ? colonnesDe(bloc, CTX) : lignesDe(bloc, CTX));
     // Toutes les catégories que les règles peuvent produire.
@@ -102,5 +102,5 @@ test("chaque case visée existe au canevas, au caractère près", () => {
     for (const t of Object.keys(l.textes ?? {})) if (!cases.has(t)) ecarts.push(`${l.titre} : colonne « ${t} » absente`);
   }
   assert.deepEqual(ecarts, []);
-  assert.ok(liaisonEvenementDe(null, TITRE_CIRCULATION_PORCINS), "la circulation des porcins doit être reconnue par son titre");
+  assert.ok(liaisonEvenementDe(109), "la circulation des porcins doit être reliée");
 });

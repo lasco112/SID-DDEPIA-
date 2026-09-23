@@ -52,7 +52,7 @@ export const SECTION_IV_SANTE: SectionCanevas = {
     {
       type: "tableau",
       kind: "libre",
-      numero: null,
+      numero: 112,
       titre: "Promptitude et complétude de la transmission des données zoosanitaires",
       entetes: ["Arrondissement", "Situations attendues", "Situations transmises", "Complétude (%)", "Promptitude (%)"],
       lignes: ["{ARRONDISSEMENTS}"],
@@ -76,7 +76,7 @@ export const SECTION_IV_SANTE: SectionCanevas = {
       // dernières années, territoire par territoire.
       type: "tableau",
       kind: "libre",
-      numero: null,
+      numero: 113,
       titre: "Prélèvements effectués dans les fermes avicoles",
       entetes: ["ARRONDISSEMENTS", "{ARRONDISSEMENTS}", "TOTAL"],
       lignes: ["ANNEE {A-2}", "ANNEE {A-1}", "ANNEE {A}", "TOTAL CUMULE"],
@@ -86,10 +86,13 @@ export const SECTION_IV_SANTE: SectionCanevas = {
     {
       type: "tableau",
       kind: "libre",
-      numero: null,
+      numero: 114,
       titre: "Bilan de la surveillance des maladies animales",
-      entetes: ["Semaine épidémiologique (SE)", "Maladie suspectée", "Confirmé", "Négatif"],
-      lignes: ["", "", "", "TOTAL"],
+      // Une ligne par suspicion, numérotée : la semaine épidémiologique est une
+      // donnée à saisir, pas un libellé de ligne. Pas de ligne TOTAL : elle
+      // additionnerait des numéros de semaine.
+      entetes: ["N°", "Semaine épidémiologique (SE)", "Maladie suspectée", "Confirmé", "Négatif"],
+      lignes: ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"],
     },
 
     // ---- IV-3. Dispensaires et cliniques ----
@@ -189,10 +192,10 @@ export const SECTION_IV_SANTE: SectionCanevas = {
     {
       type: "tableau",
       kind: "libre",
-      numero: null,
+      numero: 115,
       titre: "Vétérinaires installés en clientèle privée",
       entetes: ["N°", "ARRONDISSEMENT", "LOCALISATION", "NOMS ET PRENOMS", "TELEPHONE", "STRUCTURE", "STATUT"],
-      lignes: ["01", "02", "03"],
+      lignes: ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10"],
     },
     { type: "titre", niveau: 2, texte: "IV-9. CARTE ÉPIDÉMIOLOGIQUE ACTUALISÉE DU DÉPARTEMENT" },
     { type: "zoneTexte", cle: "IV9.carte", consigne: "Rubrique imposée." },

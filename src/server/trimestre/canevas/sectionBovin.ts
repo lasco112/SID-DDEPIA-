@@ -77,7 +77,7 @@ export const SECTION_II_BOVIN: SectionCanevas = {
       // d'investissement public de l'exercice, sans légende : il en reçoit une.
       type: "tableau",
       kind: "libre",
-      numero: null,
+      numero: 108,
       titre: "Infrastructures d’élevage financées sur le budget d’investissement public",
       entetes: [
         "N°",
@@ -87,7 +87,7 @@ export const SECTION_II_BOVIN: SectionCanevas = {
         "Montant alloué (FCFA)",
         "Niveau d’exécution physique (construit, non construit, En cours, Arrêté)",
       ],
-      lignes: ["1", "2", "3", "TOTAL"],
+      lignes: ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "TOTAL"],
     },
     { type: "titre", niveau: 4, texte: "a) Abattoirs" },
     { type: "zoneTexte", cle: "II1.abattoirs", consigne: "Abattoirs et aires d'abattage : état, fonctionnement." },

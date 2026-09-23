@@ -171,6 +171,12 @@ export interface TableauArrondissements {
 /** Un tableau dont les colonnes ne sont pas les arrondissements. */
 export interface TableauLibre {
   kind: "libre";
+  /**
+   * Clé STABLE du tableau : elle adresse ses saisies et ses liaisons, et ne se
+   * renumérote jamais. De 1 à 72, c'est le numéro du canevas régional ; à
+   * partir de 101, un tableau ajouté au canevas départemental. Le numéro
+   * AFFICHÉ, lui, est calculé au rendu.
+   */
   numero: number | null;
   titre: string;
   entetes: string[];

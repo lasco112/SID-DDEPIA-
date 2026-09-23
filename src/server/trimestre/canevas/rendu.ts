@@ -19,6 +19,7 @@ import {
   type Bloc, type ContexteCanevas, type SectionCanevas,
   resoudre, adapterTitre, sansNiveauDepartemental,
 } from "./types";
+import { clesLignes } from "./structure";
 
 /**
  * Fournit la valeur d'une case. Renvoie `null` quand le SID ne porte pas la
@@ -26,8 +27,9 @@ import {
  */
 export type FournisseurValeur = (params: {
   numeroTableau: number | null;
-  /** Le titre repère les tableaux qui n'ont pas de numéro interne. */
   titreTableau: string;
+  /** Le tableau entier : les totaux calculés ont besoin de sa structure. */
+  bloc?: Extract<Bloc, { type: "tableau" }>;
   ligne: string;
   colonne: string;
   indexColonne: number;
@@ -177,6 +179,8 @@ function rendreTableau(
   });
 
   const prerempli = bloc.kind === "libre" ? bloc.prerempli : undefined;
+  // Le repère sous lequel les cases de chaque ligne sont enregistrées.
+  const cles = clesLignes(bloc, ctx);
   const corps = lignes.map((lib, r) => {
     const estTotal = /^TOTAL|^ÉCART/i.test(lib);
     return new TableRow({
@@ -186,7 +190,7 @@ function rendreTableau(
         // elle ne vient pas des données et n'est pas à ressaisir.
         const fixe = prerempli?.[r]?.[i - 1];
         if (fixe) return cellule(resoudre(fixe, ctx));
-        const v = valeur({ numeroTableau: bloc.numero, titreTableau: bloc.titre, ligne: lib, colonne: col, indexColonne: i });
+        const v = valeur({ numeroTableau: bloc.numero, titreTableau: bloc.titre, bloc, ligne: cles[r], colonne: col, indexColonne: i });
         return cellule(v ?? "", { gras: estTotal, droite: true });
       }),
     });

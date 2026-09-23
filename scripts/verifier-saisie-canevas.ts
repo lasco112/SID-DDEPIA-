@@ -17,11 +17,10 @@ import {
   ecrireSaisieCanevas,
   lireSaisiesCanevas,
   compterSaisiesParTableau,
-  estSaisiALaMain,
   cleCellule,
 } from "../src/server/trimestre/saisieCanevas";
 import { periodeTrimestrielle } from "../src/server/trimestre/rubriques";
-import { grillesBac } from "../src/server/trimestre/grilleBac";
+import { refusDeSaisie, resumer } from "../src/server/trimestre/saisieTrimestrielle";
 import { genererRapportCanevas } from "../src/server/trimestre/rapportCanevas";
 import { trimestrielle } from "../src/server/periodes/calendrier";
 
@@ -56,16 +55,12 @@ async function principal() {
 
     // --- Ce qui est saisissable, et ce qui ne l'est pas -----------------------
     console.log("\nCe que le chef BAC peut saisir");
-    dire("les treize tableaux du BAC le sont", [1, 5, 11, 13].every(estSaisiALaMain));
-    dire("le tableau 69 (abattages), alimenté par les mois, ne l'est PAS", !estSaisiALaMain(69));
-
-    let refus = false;
-    try {
-      await ecrireSaisieCanevas(base, transaction, periodeId, { numeroTableau: 69, ligne: "Bovins", colonne: "Dschang" }, { valeur: 1 }, dd.id);
-    } catch (e) {
-      refus = e instanceof Error && /double saisie/i.test(e.message);
-    }
-    dire("le saisir est refusé, au motif de la double saisie", refus);
+    const bac = { role: "CHEF_BAC" };
+    dire("une case du tableau 13 (recettes) se saisit", (await refusDeSaisie(base, periode, bac, 13, "JANVIER", "DDEPIA")) === null);
+    const refus = await refusDeSaisie(base, periode, { role: "DD" }, 69, "Dschang", "Bovins");
+    dire("le tableau 69 (abattages), alimenté par les mois, ne se saisit PAS", /rapports mensuels/.test(refus ?? ""));
+    const total = await refusDeSaisie(base, periode, bac, 13, "JANVIER", "TOTAL");
+    dire("un total ne se saisit pas : il se calcule", /calculés/.test(total ?? ""));
 
     // --- L'écriture d'une cellule --------------------------------------------
     console.log("\nUne cellule saisie");
@@ -93,8 +88,7 @@ async function principal() {
       !/[\u0000-\u001f]/.test(cle)
     );
 
-    const grilles = await grillesBac(base, periode, await lireSaisiesCanevas(base, periodeId));
-    const g13 = grilles.find((g) => g.numero === 13);
+    const g13 = (await resumer(base, periode, { role: "CHEF_BAC" })).find((g) => g.numero === 13);
     dire("le compteur de la grille voit la cellule saisie", g13?.renseignees === 1);
 
     // --- Elle ressort dans le document ---------------------------------------

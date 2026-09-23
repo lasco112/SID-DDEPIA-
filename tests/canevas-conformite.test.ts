@@ -88,14 +88,14 @@ const ECARTS_ASSUMES = new Set([
   "I n° 3",
   // Pendant du n° 12 pour l'investissement : il en a la forme, et le test
   // l'apparie au n° 12 par son titre, dont il ne diffère que d'un mot.
-  "I « Synthèse des crédits d’investissement par arrondissement »",
+  "I n° 102",
   // Le régional étage l'en-tête sur deux lignes : « STRUCTURES » au-dessus
   // des territoires, « MOIS » au-dessus des mois. Sur une ligne d'en-tête, la
   // première colonne — celle des mois — s'intitule « MOIS ».
   "I n° 13",
   // En-tête du régional sur deux lignes (« Types d’infrastructures d’élevage »
   // coiffant trois colonnes) : mis à plat, chaque colonne garde son intitulé.
-  "II-1 « Infrastructures d’élevage financées sur le budget d’investissement public »",
+  "II-1 n° 108",
   // Le régional écrit « Castre », sans accent, aux abattages et à la viande.
   "II-1 n° 16",
   "II-1 n° 18",
@@ -105,7 +105,7 @@ const ECARTS_ASSUMES = new Set([
   // En-tête du régional sur trois lignes (« Nombre de / Pisciculteurs »,
   // « Etangs / Nbre / Superficie (m2) »…) : mis à plat, chaque colonne portant
   // son intitulé complet.
-  "III « Les nouvelles structures et perspectives de production »",
+  "III n° 111",
 ]);
 
 // ------------------------------------------------------------ lecture du canevas
@@ -455,9 +455,10 @@ test("le budget-programme décrit ses quatre programmes, un tableau légendé ch
     tableaux.map((b) => b.titre),
     ["053", "055", "057", "059"].map((c) => `Activités menées au titre du programme ${c}`)
   );
-  // Pas de numéro INTERNE : aucune donnée n'y est reliée. Le numéro affiché,
-  // lui, vient de la légende.
-  for (const b of tableaux) assert.equal(b.numero, null);
+  // Numéros INTERNES 104 à 107 : ils adressent les saisies de la colonne
+  // « Description du niveau de réalisation ». Le numéro affiché, lui, vient de
+  // la légende.
+  assert.deepEqual(tableaux.map((b) => b.numero), [104, 105, 106, 107]);
 });
 
 test("l'inventaire des sections est cohérent", () => {
@@ -468,4 +469,17 @@ test("l'inventaire des sections est cohérent", () => {
     tableaux += inv.tableaux;
   }
   assert.equal(tableaux, 87, "87 tableaux décrits à ce jour");
+});
+
+test("les numéros internes sont uniques : ils adressent les saisies", () => {
+  const vus = new Map<number, string>();
+  const doublons: string[] = [];
+  for (const section of SECTIONS) {
+    for (const b of tableauxDe(section)) {
+      assert.ok(b.numero != null, `${section.cle} « ${b.titre} » : numéro interne manquant`);
+      if (vus.has(b.numero!)) doublons.push(`n° ${b.numero} : « ${vus.get(b.numero!)} » et « ${b.titre} »`);
+      vus.set(b.numero!, b.titre);
+    }
+  }
+  assert.deepEqual(doublons, []);
 });

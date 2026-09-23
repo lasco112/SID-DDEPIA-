@@ -58,7 +58,7 @@ export const SECTION_I: SectionCanevas = {
       // tout tableau du rapport est numéroté (décision du Délégué).
       type: "tableau",
       kind: "libre",
-      numero: null,
+      numero: 101,
       titre: "Structures administratives par arrondissement",
       entetes: ["Arrondissement", "DAEPIA", "CZV", "CCP/SA"],
       lignes: ["{ARRONDISSEMENTS}", "TOTAL"],
@@ -352,7 +352,7 @@ export const SECTION_I: SectionCanevas = {
       // la liste des tableaux comme son pendant.
       type: "tableau",
       kind: "libre",
-      numero: null,
+      numero: 102,
       titre: "Synthèse des crédits d’investissement par arrondissement",
       entetes: ["Arrondissement", "Investissement", "Total", "TOTAL {P}", "TOTAL {P-1}"],
       lignes: ["{ARRONDISSEMENTS}", "TOTAL {P}", "TOTAL {P-1}", "ÉCART"],
@@ -428,7 +428,7 @@ export const SECTION_I: SectionCanevas = {
     {
       type: "tableau",
       kind: "libre",
-      numero: null,
+      numero: 103,
       titre: "Contraintes stratégiques et solutions proposées",
       entetes: ["N°", "Contrainte stratégique", "Solution proposée"],
       lignes: ["1", "2", "3"],

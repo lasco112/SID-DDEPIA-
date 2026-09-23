@@ -65,38 +65,23 @@ async function principal() {
       vierge.resultats.filter((r) => r.etat === "respecte").every((r) => !/lésion|œufs commercial|ventes de poisson/i.test(r.intitule))
     );
 
-    // --- Une incohérence saisie doit bloquer ---------------------------------
-    console.log("\nUne incohérence de saisie");
+    // --- Un total saisi à la main ne compte plus ----------------------------
+    // Depuis la saisie trimestrielle, les totaux sont CALCULÉS à partir des
+    // régies. Un ancien total mal saisi (500 pour 100 + 100) ne doit ni bloquer
+    // la génération, ni s'imprimer.
+    console.log("\nUn ancien total saisi à la main, et faux");
 
-    // Deux régies à 100, et un total saisi à 500 : l'erreur de frappe type.
     await ecrireSaisieCanevas(base, transaction, periodeId, { numeroTableau: 13, ligne: "JANVIER", colonne: "DDEPIA" }, { valeur: 100 }, dd.id);
     await ecrireSaisieCanevas(base, transaction, periodeId, { numeroTableau: 13, ligne: "JANVIER", colonne: arrondissements[0].nom }, { valeur: 100 }, dd.id);
     await ecrireSaisieCanevas(base, transaction, periodeId, { numeroTableau: 13, ligne: "JANVIER", colonne: "TOTAL" }, { valeur: 500 }, dd.id);
 
-    const faux = await passerControles(base, periode, periodeId, MOIS, regies);
-    dire("le contrôle des recettes la détecte", faux.violations.length === 1);
-    if (faux.violations.length) console.log(`        « ${faux.violations[0].explication.slice(0, 84)} »`);
-
-    let bloque = false;
-    let message = "";
-    try {
-      await genererRapportCanevas(base, periode, { autoriserIncomplet: true });
-    } catch (e) {
-      bloque = e instanceof ControlesCroisesError;
-      message = e instanceof Error ? e.message : "";
-    }
-    dire("la GÉNÉRATION du document est refusée", bloque);
-    dire("le refus dit quoi corriger", /Corrigez la saisie/.test(message));
-
-    // --- Corrigée, elle laisse passer ----------------------------------------
-    console.log("\nUne fois corrigée");
-
-    await ecrireSaisieCanevas(base, transaction, periodeId, { numeroTableau: 13, ligne: "JANVIER", colonne: "TOTAL" }, { valeur: 200 }, dd.id);
-    const juste = await passerControles(base, periode, periodeId, MOIS, regies);
-    dire("le contrôle des recettes passe", juste.violations.length === 0);
+    const apres = await passerControles(base, periode, periodeId, MOIS, regies);
+    dire("le contrôle des recettes passe : les totaux sont calculés", apres.violations.length === 0);
 
     const rapport = await genererRapportCanevas(base, periode, { autoriserIncomplet: true });
-    dire("le document se produit de nouveau", rapport.buffer.length > 0);
+    const texte = rapport.buffer.length ? new (require("pizzip"))(rapport.buffer).file("word/document.xml").asText().replace(/<[^>]+>/g, "|") : "";
+    dire("le document se produit", rapport.buffer.length > 0);
+    dire("il imprime le total CALCULÉ (200), pas le total saisi (500)", /\|200\|/.test(texte) && !/\|500\|/.test(texte));
 
     // --- Le rapport d'un arrondissement n'est pas concerné --------------------
     console.log("\nLe rapport d'un arrondissement");

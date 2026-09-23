@@ -147,7 +147,7 @@ export const SECTION_II_PORCIN: SectionCanevas = {
     {
       type: "tableau",
       kind: "libre",
-      numero: null,
+      numero: 109,
       titre: "Situation de la circulation intérieure des porcins sur pied",
       entetes: ["Arrondissement", "Nombre de têtes", "Provenance", "Destination", ...TOTAUX],
       lignes: LIGNES_ARRONDISSEMENTS,

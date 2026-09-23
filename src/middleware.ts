@@ -35,6 +35,11 @@ const PROTECTED_PREFIXES: Array<{ prefix: string; roles: string[] }> = [
   // le middleware ne connaissant que le rôle. L'agent de saisie en est exclu :
   // il ne signe aucun rapport.
   { prefix: "/api/trimestre/rubriques", roles: ["DD", "DA"] },
+  // Saisie trimestrielle (décision D9) : les droits fins — son arrondissement
+  // pour un DA ou un agent, les tableaux du BAC pour le chef BAC — sont
+  // vérifiés case par case dans la route.
+  { prefix: "/api/trimestre/saisie", roles: ["DD", "CHEF_BAC", "DA", "AGENT_SAISIE"] },
+  { prefix: "/trimestre", roles: ["DD", "CHEF_BAC", "DA", "AGENT_SAISIE"] },
   { prefix: "/api/technique/audit", roles: ["DD", "ADMIN_TECH"] }, // AVANT la règle générale : Array.find prend la première correspondance
   { prefix: "/api/technique", roles: ["ADMIN_TECH"] },
   { prefix: "/api/sync", roles: ["DA", "AGENT_SAISIE"] },
