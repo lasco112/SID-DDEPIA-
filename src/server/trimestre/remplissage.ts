@@ -14,13 +14,21 @@
 import type { PrismaClient } from "@prisma/client";
 import { type Periode, memePeriodeAnneePrecedente } from "../periodes/calendrier";
 import { agreger, type ValeurAgregee } from "./agregation";
-import { liaisonDe } from "./liaison";
+import { liaisonDe, evaluer, estLiee, type Correspondance, type Formule } from "./liaison";
 import type { FournisseurValeur } from "./canevas/rendu";
 import type { ContexteCanevas } from "./canevas/types";
 import { listerArrondissements, graphieCanevas } from "../../lib/arrondissements";
 import { lireSaisiesCanevas, cleCellule, type ValeurCellule } from "./saisieCanevas";
 
 const nf = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 3 });
+
+/** Écart relatif à l'an passé, en pourcentage signé. Vide si l'an passé manque ou vaut zéro. */
+function ecartEnPourcentage(a: number | null, b: number | null): string | null {
+  if (a == null || b == null || b === 0) return null;
+  const ecart = ((a - b) / b) * 100;
+  const signe = ecart > 0 ? "+" : ecart < 0 ? "−" : "";
+  return `${signe}${nf.format(Math.round(Math.abs(ecart) * 10) / 10)} %`;
+}
 
 export interface DonneesRemplissage {
   /** champ → arrondissement (ou null pour le département) → valeur */
@@ -135,6 +143,13 @@ export function fournisseur(donnees: DonneesRemplissage, ctx: ContexteCanevas): 
   const lire = (champ: string, arr: string | null, n1: boolean): number | null =>
     (n1 ? donnees.valeursN1 : donnees.valeurs).get(champ)?.get(arr) ?? null;
 
+  /** La valeur d'une formule pour un territoire. */
+  const calculer = (f: Formule, arr: string | null, n1: boolean) => evaluer(f, (champ) => lire(champ, arr, n1));
+
+  /** La valeur d'une case liée : son champ, ou sa formule. */
+  const valeurDe = (c: Correspondance, arr: string | null, n1: boolean): number | null =>
+    c.formule ? calculer(c.formule, arr, n1) : c.champ ? lire(c.champ, arr, n1) : null;
+
   return ({ numeroTableau, ligne, colonne }) => {
     // Les tableaux du BAC sont saisis à la main : ils ne viennent d'aucun mois,
     // et rien ne les alimenterait autrement. On les sert AVANT la liaison —
@@ -160,47 +175,62 @@ export function fournisseur(donnees: DonneesRemplissage, ctx: ContexteCanevas): 
     // catégorie : c'est la somme de celles de la ligne. La sommer sur les seules
     // catégories LIÉES serait trompeur si d'autres ne le sont pas encore ; on ne
     // la calcule donc que si TOUTES les catégories du tableau ont un champ.
-    const toutesLiees = liaison.correspondances.every((c) => c.champ);
+    // Quand le mensuel porte le TOTAL sans le détail (cheptel bovin : l'effectif,
+    // pas les catégories), la liaison le dit par `total` et c'est lui qui sert.
+    const toutesLiees = liaison.correspondances.every(estLiee);
     if (categorie === totalCourant || categorie === totalN1) {
-      if (!toutesLiees) return null;
+      if (!liaison.total && !toutesLiees) return null;
+      // Le total, au département, d'une année donnée.
+      const totalDepartement = (n1: boolean): number | null => {
+        if (liaison.total) return calculer(liaison.total, null, n1);
+        let s: number | null = null;
+        for (const c of liaison.correspondances) {
+          const v = valeurDe(c, null, n1);
+          if (v != null) s = (s ?? 0) + v;
+        }
+        return s;
+      };
+      // Croisement de la colonne TOTAL et de la ligne ÉCART.
+      if (/^ÉCART/i.test(territoire)) {
+        return categorie === totalCourant ? ecartEnPourcentage(totalDepartement(false), totalDepartement(true)) : null;
+      }
       // L'année de référence peut venir de la COLONNE (« TOTAL {P-1} » en bout
       // de ligne) comme de la LIGNE (le pied « TOTAL {P-1} »). Croiser les deux
       // doit donner l'an passé, pas l'année courante.
       const n1 = categorie === totalN1 || territoire === totalN1;
       const arr = /^TOTAL/i.test(territoire) ? null : (codeDe.get(territoire) ?? null);
       if (!arr && !/^TOTAL/i.test(territoire)) return null;
+      if (liaison.total) {
+        const v = calculer(liaison.total, arr, n1);
+        return v == null ? null : nf.format(v);
+      }
       let somme: number | null = null;
       for (const c of liaison.correspondances) {
-        const v = lire(c.champ!, arr, n1);
+        const v = valeurDe(c, arr, n1);
         if (v != null) somme = (somme ?? 0) + v;
       }
       return somme == null ? null : nf.format(somme);
     }
 
     const corr = liaison.correspondances.find((c) => c.libelle === categorie);
-    if (!corr?.champ) return null;
+    if (!corr || !estLiee(corr)) return null;
 
     // --- Lignes de total, d'écart, et de comparaison N-1 --------------------
     if (territoire === totalN1) {
-      const v = lire(corr.champ, null, true);
+      const v = valeurDe(corr, null, true);
       return v == null ? null : nf.format(v);
     }
     if (territoire === totalCourant || /^TOTAL/i.test(territoire)) {
-      const v = lire(corr.champ, null, false);
+      const v = valeurDe(corr, null, false);
       return v == null ? null : nf.format(v);
     }
     if (/^ÉCART/i.test(territoire)) {
-      const a = lire(corr.champ, null, false);
-      const b = lire(corr.champ, null, true);
-      if (a == null || b == null || b === 0) return null;
-      const ecart = ((a - b) / b) * 100;
-      const signe = ecart > 0 ? "+" : ecart < 0 ? "−" : "";
-      return `${signe}${nf.format(Math.round(Math.abs(ecart) * 10) / 10)} %`;
+      return ecartEnPourcentage(valeurDe(corr, null, false), valeurDe(corr, null, true));
     }
 
     const code = codeDe.get(territoire);
     if (!code) return null;
-    const v = lire(corr.champ, code, false);
+    const v = valeurDe(corr, code, false);
     return v == null ? null : nf.format(v);
   };
 }

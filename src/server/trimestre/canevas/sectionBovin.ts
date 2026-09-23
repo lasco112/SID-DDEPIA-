@@ -151,6 +151,11 @@ export const SECTION_II_BOVIN: SectionCanevas = {
       titre: "Rendement moyen viande /carcasse par catégorie",
       entetes: ["CATEGORIE", "POIDS MOYEN", "RENDEMENT EN CARCASSE"],
       lignes: ["TAURILLON", "GENISSE", "CASTRE", "TAUREAU", "VACHE", "VEAU", "TOTAL"],
+      // Norme du Délégué (23 septembre 2026) : « un bovin, c'est 60 % de
+      // 250 kg ». C'est elle qui calcule la production de viande (tableau n° 18,
+      // voir CARCASSE_KG dans liaison.ts). Les catégories restent à renseigner
+      // si le département dispose de pesées plus fines.
+      prerempli: [[], [], [], [], [], [], ["250 kg", "60 %"]],
     },
     { type: "titre", niveau: 4, texte: "c) Production de viande en tonnes" },
     {
