@@ -24,12 +24,12 @@
  */
 import type { PrismaClient } from "@prisma/client";
 import { SECTIONS_CANEVAS } from "./rapportCanevas";
-import { colonnesDe, lignesDe } from "./canevas/rendu";
+import { colonnesDe, lignesDe, type FournisseurValeur } from "./canevas/rendu";
 import { axeTerritorial, clesLignes, estTotal } from "./canevas/structure";
 import type { Bloc, ContexteCanevas } from "./canevas/types";
 import { cleCellule, saisiesVues, type ValeurCellule } from "./saisieCanevas";
 import { numerosSansMaille, TABLEAUX_BAC } from "./canevas/sections";
-import { preparer, fournisseur, estCaseCalculee, valeurReprise, versNombre } from "./remplissage";
+import { preparer, fournisseur, estCaseCalculee, estCaseHistorique, valeurReprise, versNombre } from "./remplissage";
 import { REPRISES, repriseDe } from "./canevas/reprises";
 import { champsMobilises, liaisonDe, estLiee } from "./liaison";
 import { liaisonEvenementDe } from "./evenements";
@@ -206,15 +206,27 @@ function texteFixe(bloc: BlocTableau, ctx: ContexteCanevas, ligne: string, colon
   return cases[c - 1];
 }
 
-/** L'état d'une case pour ce profil. */
+/**
+ * L'état d'une case pour ce profil.
+ *
+ * `sid` : ce que le SID sait seul de la case. Une case « TOTAL {P-1} » d'un
+ * arrondissement que le SID ne sait pas calculer — il n'a pas encore l'an
+ * passé dans sa base — se saisit : c'est la reprise d'historique. Sans `sid`,
+ * elle reste calculée.
+ */
 export function etatCase(
   bloc: BlocTableau,
   ctx: ContexteCanevas,
   profil: Profil,
   ligne: string,
-  colonne: string
+  colonne: string,
+  sid?: FournisseurValeur
 ): EtatCase {
   if (texteFixe(bloc, ctx, ligne, colonne) !== undefined) return "lecture";
+  if (sid && estCaseHistorique(bloc, ctx, ligne, colonne)) {
+    const connu = sid({ numeroTableau: bloc.numero, titreTableau: bloc.titre, bloc, ligne, colonne, indexColonne: 0 });
+    if (connu == null) return autorise(bloc, profil, ligne, colonne) ? "saisie" : "lecture";
+  }
   if (estCaseCalculee(bloc.numero!, ligne, colonne, ctx)) return "calculee";
   if (estTotal(ligne) || estTotal(colonne)) return "total";
   return autorise(bloc, profil, ligne, colonne) ? "saisie" : "lecture";
@@ -243,7 +255,13 @@ export interface ResumeTableau {
 /** Les tableaux où ce profil a quelque chose à saisir, avec leur avancement. */
 export async function resumer(db: PrismaClient, periode: Periode, profil: Profil): Promise<ResumeTableau[]> {
   const ctx = await contextePour(db, periode, profil);
-  const saisies = await saisiesDe(db, periode, await arrondissementIdDe(db, profil));
+  const arrondissementId = await arrondissementIdDe(db, profil);
+  const saisies = await saisiesDe(db, periode, arrondissementId);
+  // Ce que le SID sait de l’an passé : les cases qu’il ignore sont à reprendre.
+  const sid = fournisseur(
+    await preparer(db, periode, champsMobilises(), { autoriserIncomplet: true, arrondissementId }),
+    ctx
+  ).sid;
   const resultat: ResumeTableau[] = [];
   for (const { bloc, section } of tableaux()) {
     const { colonnes, cles } = coordonnees(bloc, ctx);
@@ -251,7 +269,7 @@ export async function resumer(db: PrismaClient, periode: Periode, profil: Profil
     let renseignees = 0;
     for (const l of cles) {
       for (const c of colonnes) {
-        if (etatCase(bloc, ctx, profil, l, c) !== "saisie") continue;
+        if (etatCase(bloc, ctx, profil, l, c, sid) !== "saisie") continue;
         saisissables++;
         if (saisies.has(cleCellule({ numeroTableau: bloc.numero!, ligne: l, colonne: c }))) renseignees++;
       }
@@ -335,6 +353,7 @@ export async function grille(db: PrismaClient, periode: Periode, profil: Profil,
   const donnees = await preparer(db, periode, automatique ? champsMobilises() : [], {
     autoriserIncomplet: true,
     arrondissementId,
+    // Même un tableau purement saisi consolide ses saisies de l’an passé.
     sansAgregation: !automatique,
   });
   const valeur = fournisseur(donnees, ctx);
@@ -350,7 +369,7 @@ export async function grille(db: PrismaClient, periode: Periode, profil: Profil,
         colonne,
         texte: !attendUnNombre(colonne),
         propose: reprise == null ? null : String(reprise),
-        etat: etatCase(bloc, ctx, profil, cle, colonne),
+        etat: etatCase(bloc, ctx, profil, cle, colonne, valeur.sid),
         affiche:
           texteFixe(bloc, ctx, cle, colonne) ??
           valeur({ numeroTableau: numero, titreTableau: bloc.titre, bloc, ligne: cle, colonne, indexColonne: i + 1 }),
@@ -370,8 +389,22 @@ export async function grille(db: PrismaClient, periode: Periode, profil: Profil,
       ...avertissements(bloc, ctx, lignes),
       ...alertesReprises(numero, ctx, donnees.saisies),
     ],
-    aide: AIDES[numero] ?? AIDE_PAR_DEFAUT,
+    aide: [AIDES[numero] ?? AIDE_PAR_DEFAUT, ...aideHistorique(bloc, ctx, lignes)].join(" "),
   };
+}
+
+/**
+ * La consigne de la reprise d’historique, quand l’écran en porte une case à
+ * saisir : que mettre, et pourquoi on ne le demandera plus.
+ */
+function aideHistorique(bloc: BlocTableau, ctx: ContexteCanevas, lignes: GrilleSaisie["lignes"]): string[] {
+  const aSaisir = lignes.some((l) => l.cases.some((c) => c.etat === "saisie" && estCaseHistorique(bloc, ctx, l.cle, c.colonne)));
+  if (!aSaisir) return [];
+  return [
+    `« TOTAL ${ctx.periodeCourtN1} » : le total de votre arrondissement au même trimestre de l’année dernière, ` +
+      `repris de vos rapports de l’époque. Le SID n’a pas encore ces chiffres : il vous les demande cette fois-ci, ` +
+      `et les calculera lui-même dès qu’il les aura.`,
+  ];
 }
 
 /**
@@ -508,7 +541,20 @@ export async function refusDeSaisie(
   const { colonnes, cles } = coordonnees(t.bloc, ctx);
   // Une coordonnée fantaisiste créerait une valeur invisible à l'écran comme au document.
   if (!cles.includes(ligne) || !colonnes.includes(colonne)) return "Cette case n'existe pas dans ce tableau.";
-  switch (etatCase(t.bloc, ctx, profil, ligne, colonne)) {
+  // L’an passé d’un arrondissement ne se saisit que si le SID l’ignore.
+  let sid: FournisseurValeur | undefined;
+  if (estCaseHistorique(t.bloc, ctx, ligne, colonne)) {
+    const automatique = Boolean(liaisonDe(numero) || liaisonEvenementDe(numero));
+    sid = fournisseur(
+      await preparer(db, periode, automatique ? champsMobilises() : [], {
+        autoriserIncomplet: true,
+        arrondissementId: await arrondissementIdDe(db, profil),
+        sansAgregation: !automatique,
+      }),
+      ctx
+    ).sid;
+  }
+  switch (etatCase(t.bloc, ctx, profil, ligne, colonne, sid)) {
     case "calculee":
       return "Cette case se remplit à partir des rapports mensuels : elle ne se saisit pas.";
     case "total":

@@ -15,8 +15,8 @@ import type { PrismaClient } from "@prisma/client";
 import { type Periode, memePeriodeAnneePrecedente } from "../periodes/calendrier";
 import { agreger, type ValeurAgregee } from "./agregation";
 import { liaisonDe, evaluer, estLiee, type Correspondance, type Formule } from "./liaison";
-import { colonnesDe, type FournisseurValeur } from "./canevas/rendu";
-import { clesLignes, estTotal, estEcart } from "./canevas/structure";
+import { colonnesDe, lignesDe, type FournisseurValeur } from "./canevas/rendu";
+import { axeTerritorial, clesLignes, estTotal, estEcart } from "./canevas/structure";
 import { repriseDe } from "./canevas/reprises";
 import type { Bloc, ContexteCanevas } from "./canevas/types";
 import { listerArrondissements, graphieCanevas } from "../../lib/arrondissements";
@@ -181,7 +181,10 @@ export async function preparer(
  * selon que les arrondissements sont en lignes ou en colonnes, c'est la ligne
  * ou la colonne qui porte le territoire, et l'autre qui porte la catégorie.
  */
-export function fournisseur(donnees: DonneesRemplissage, ctx: ContexteCanevas): FournisseurValeur {
+export function fournisseur(
+  donnees: DonneesRemplissage,
+  ctx: ContexteCanevas
+): FournisseurValeur & { /** Sans la reprise d’historique. */ sid: FournisseurValeur } {
   /** Nom d'arrondissement → code, pour retrouver la valeur consolidée. */
   const codeDe = new Map<string, string>();
   // Appariement par le NOM, ramené à la graphie du canevas de part et d'autre.
@@ -431,7 +434,8 @@ export function fournisseur(donnees: DonneesRemplissage, ctx: ContexteCanevas): 
     return v == null ? null : nf.format(v);
   };
 
-  return ({ numeroTableau, ligne, colonne, bloc }) => {
+  /** Ce que le SID sait seul : le mensuel, les saisies — sans la reprise d'historique. */
+  const valeurSID: FournisseurValeur = ({ numeroTableau, ligne, colonne, bloc }) => {
     if (numeroTableau == null) return null;
     // 1. Ce que le SID calcule à partir du mensuel ne se saisit pas.
     if (estCaseCalculee(numeroTableau, ligne, colonne, ctx)) return valeurCalculee(numeroTableau, ligne, colonne);
@@ -439,11 +443,100 @@ export function fournisseur(donnees: DonneesRemplissage, ctx: ContexteCanevas): 
     if (bloc && (estTotal(ligne) || estTotal(colonne))) {
       const t = totalDesSaisies(bloc, ligne, colonne);
       if (t !== undefined && t !== null) return t;
+      // L'an passé d'un arrondissement relève de la reprise d'historique.
+      if (estCaseHistorique(bloc, ctx, ligne, colonne)) return null;
     }
     // 3. Le reste est saisi — y compris, faute de mieux, un total saisi à la
     //    main avant que les totaux ne soient calculés.
     return saisieAffichee(numeroTableau, ligne, colonne);
   };
+
+  /**
+   * La REPRISE D'HISTORIQUE (décision du Délégué, 24 septembre 2026).
+   *
+   * Tant que le SID n'a pas dans sa base la même période de l'an passé, les
+   * agents saisissent eux-mêmes le total de leur arrondissement pour cette
+   * période : la case « TOTAL {P-1} » de leur ligne (ou de leur colonne). Le
+   * département et les écarts s'en déduisent. Dès que le SID a ses propres
+   * données, elles priment : la saisie n'est plus lue.
+   */
+  const valeurComplete: FournisseurValeur = (q) => {
+    const v = valeurSID(q);
+    if (v != null || !q.bloc || q.numeroTableau == null) return v;
+    return historique(q.bloc, q.ligne, q.colonne);
+  };
+
+  function historique(bloc: Extract<Bloc, { type: "tableau" }>, ligne: string, colonne: string): string | null {
+    const axe = axeTerritorial(bloc);
+    if (!axe) return null;
+    const numero = bloc.numero!;
+    const surAxe = axe === "lignes" ? lignesDe(bloc, ctx) : colonnesDe(bloc, ctx).slice(1);
+    const autres = axe === "lignes" ? colonnesDe(bloc, ctx).slice(1) : lignesDe(bloc, ctx);
+    if (!autres.includes(totalN1)) return null;
+    const [terr, autre] = axe === "lignes" ? [ligne, colonne] : [colonne, ligne];
+
+    const estTotalCourant = (x: string) => x === totalCourant || /^\s*TOTAL\s*$/i.test(x);
+    const totalAxe = surAxe.find(estTotalCourant);
+    const totalAutre = autres.find(estTotalCourant);
+    const territoires = surAxe.filter((x) => !estTotal(x));
+    const lire = (t: string, a: string) => {
+      const [l, c] = axe === "lignes" ? [t, a] : [a, t];
+      return versNombre(valeurComplete({ numeroTableau: numero, titreTableau: bloc.titre, bloc, ligne: l, colonne: c, indexColonne: 0 }));
+    };
+    const format = (v: number | null) => (v == null ? null : nf.format(v));
+
+    // L'an passé d'un arrondissement : ce que son agent a saisi.
+    if (territoires.includes(terr) && autre === totalN1) return saisieAffichee(numero, ligne, colonne);
+
+    // L'an passé du département : la somme des arrondissements — à condition
+    // que chacun de ceux qui ont un chiffre cette année ait aussi le sien,
+    // sinon l'évolution comparerait six arrondissements à cinq.
+    const departementN1 = (): number | null => {
+      if (!totalAutre) return null;
+      let somme: number | null = null;
+      for (const t of territoires) {
+        const passe = lire(t, totalN1);
+        if (passe == null) {
+          if (lire(t, totalAutre) != null) return null;
+          continue;
+        }
+        somme = (somme ?? 0) + passe;
+      }
+      return somme;
+    };
+    const estTotalAxe = (x: string) => x === totalAxe || x === totalN1;
+    if (estTotalAxe(terr) && (autre === totalN1 || (terr === totalN1 && autre === totalAutre))) return format(departementN1());
+
+    // Les écarts.
+    if (estEcart(terr) && totalAutre && autre === totalAutre && totalAxe) {
+      return ecartEnPourcentage(lire(totalAxe, totalAutre), departementN1());
+    }
+    if (estEcart(autre) && totalAutre) {
+      if (terr === totalAxe) return ecartEnPourcentage(lire(terr, totalAutre), departementN1());
+      if (territoires.includes(terr)) return ecartEnPourcentage(lire(terr, totalAutre), lire(terr, totalN1));
+    }
+    return null;
+  }
+
+  return Object.assign(valeurComplete, { sid: valeurSID });
+}
+
+/**
+ * La case « TOTAL {P-1} » d'un arrondissement (ou d'une structure) : ce qu'il
+ * a fait à la même période de l'an passé. Le SID la calcule s'il a ces
+ * données ; sinon l'agent la saisit — c'est la reprise d'historique.
+ */
+export function estCaseHistorique(
+  bloc: Extract<Bloc, { type: "tableau" }>,
+  ctx: ContexteCanevas,
+  ligne: string,
+  colonne: string
+): boolean {
+  const axe = axeTerritorial(bloc);
+  if (!axe) return false;
+  const n1 = `TOTAL ${ctx.periodeCourtN1}`;
+  const [terr, autre] = axe === "lignes" ? [ligne, colonne] : [colonne, ligne];
+  return autre === n1 && !estTotal(terr);
 }
 
 /**

@@ -88,7 +88,9 @@ test("la grille d'un DA ne montre que son arrondissement", async () => {
   const territoires = g!.lignes.map((l) => l.libelle).filter((l) => !/^TOTAL|^ÉCART/.test(l));
   assert.deepEqual(territoires, ["Dschang"]);
   const saisissables = (await resumer(base, P, DA_DSCHANG)).find((t) => t.numero === 14)?.saisissables;
-  assert.equal(saisissables, 6, "les six catégories bovines de Dschang");
+  // Les six catégories bovines de Dschang, et son total du T1 2030 que le SID
+  // ne connaît pas (reprise d'historique).
+  assert.equal(saisissables, 7, "les six catégories bovines de Dschang et son an passé");
 });
 
 test("un total est la somme de ses cases saisies, dans l'écran comme dans le rapport", async () => {
@@ -147,6 +149,43 @@ test("budget-programme : chaque DA remplit SA version, le DD la sienne", async (
   assert.ok(dept.includes("REALISATION-DEPARTEMENT") && !dept.includes("REALISATION-DSCHANG"));
   const dschang = await texte("Dschang");
   assert.ok(dschang.includes("REALISATION-DSCHANG") && !dschang.includes("REALISATION-DEPARTEMENT"));
+});
+
+test("reprise d'historique : l'agent saisit l'an passé de SON arrondissement quand le SID l'ignore", async () => {
+  // T1 2031 : le SID n'a rien du T1 2030.
+  const N1 = "TOTAL T1 2030";
+  assert.equal(await refusDeSaisie(base, P, AGENT_DSCHANG, 64, "Dschang", N1), null);
+  assert.ok(await refusDeSaisie(base, P, AGENT_DSCHANG, 64, "Fokoué", N1), "pas l'an passé d'un autre");
+  // Les totaux et écarts du département se calculent, ils ne se saisissent pas.
+  assert.ok(await refusDeSaisie(base, P, DD, 64, "TOTAL T1 2031", N1));
+
+  periodeId = periodeId ?? (await periodeTrimestrielle(base, P));
+  const dd = await base.user.findFirstOrThrow({ where: { role: "DD", actif: true }, select: { id: true } });
+  const tous = ["Dschang", "Fokoué", "Fongo-Tongo", "Nkong-Ni", "Penka-Michel", "Santchou"];
+  for (let i = 0; i < tous.length; i++) {
+    await ecrireSaisieCanevas(base, transaction, periodeId, { numeroTableau: 64, ligne: tous[i], colonne: N1 }, { valeur: 100 * (i + 1) }, dd.id);
+  }
+  const case_ = async (profil: { role: string; arrondissement?: string }, ligne: string, colonne: string) =>
+    (await grille(base, P, profil, 64))!.lignes.find((l) => l.cle === ligne)!.cases.find((c) => c.colonne === colonne)!;
+
+  const dschang = await case_(AGENT_DSCHANG, "Dschang", N1);
+  assert.equal(dschang.etat, "saisie");
+  assert.equal(dschang.affiche, "100");
+  // Le département : la somme des six.
+  const chiffre = (s: string | null) => (s ?? "").replace(/\s/g, "");
+  assert.equal(chiffre((await case_(DD, "TOTAL T1 2031", N1)).affiche), "2100");
+  assert.equal(chiffre((await case_(DD, "TOTAL T1 2030", "TOTAL T1 2031")).affiche), "2100");
+  // L'écran dit à l'agent ce qu'on attend de lui.
+  assert.match((await grille(base, P, AGENT_DSCHANG, 64))!.aide, /année dernière/);
+});
+
+test("reprise d'historique : quand le SID connaît l'an passé, c'est lui qui fait foi", async () => {
+  // T3 2026 : le cheptel bovin du T3 2025 est dans la base (données de test).
+  const P3 = trimestrielle(2026, 3);
+  assert.match(
+    (await refusDeSaisie(base, P3, AGENT_DSCHANG, 14, "Dschang", "TOTAL T3 2025")) ?? "",
+    /rapports mensuels/
+  );
 });
 
 test("des chiffres partout, sauf dans les colonnes de texte", () => {
