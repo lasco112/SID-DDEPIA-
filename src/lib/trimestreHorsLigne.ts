@@ -122,6 +122,73 @@ export async function abandonner(id: number): Promise<void> {
   await offlineDB.fileTrimestre.delete(id);
 }
 
+/**
+ * TÉLÉCHARGE EN ARRIÈRE-PLAN tout le trimestre de ce compte — liste et grilles
+ * de saisie, analyses, textes, circuit — au même moment que les tableaux du
+ * mensuel, avec la même barre de progression (demande du Délégué : l'agent ne
+ * doit pas avoir à ouvrir chaque écran une fois en ligne pour le retrouver
+ * hors ligne). Chaque étape est indépendante : un échec n'arrête pas les
+ * autres. Au plus une fois toutes les dix minutes : inutile de recalculer le
+ * trimestre à chaque changement de page, ni d'user le forfait des agents.
+ */
+export const ETAPES_TRIMESTRE = 5;
+const CLE_DERNIER_TELECHARGEMENT = "sid-ddepia-trimestre-telecharge-le";
+
+export async function telechargerTrimestre(
+  username: string,
+  role: string,
+  periode: { annee: number; trimestre: number },
+  surEtape?: (faites: number) => void
+): Promise<void> {
+  const cle = `${CLE_DERNIER_TELECHARGEMENT}|${username}|${periode.annee}-${periode.trimestre}`;
+  try {
+    const dernier = Number(localStorage.getItem(cle) ?? 0);
+    if (Date.now() - dernier < 10 * 60_000) {
+      surEtape?.(ETAPES_TRIMESTRE);
+      return;
+    }
+  } catch {
+    // stockage indisponible : on télécharge
+  }
+
+  const q = `annee=${periode.annee}&trimestre=${periode.trimestre}`;
+  const saisit = ["DD", "CHEF_BAC", "DA", "AGENT_SAISIE"].includes(role);
+  let faites = 0;
+  const etape = async (travail: () => Promise<void>) => {
+    try {
+      await travail();
+    } catch {
+      // une étape manquée n'empêche pas les autres ; l'écran se chargera en ligne
+    } finally {
+      surEtape?.(++faites);
+    }
+  };
+  const garder = async (url: string) => {
+    const r = await fetch(url);
+    if (r.ok) await garderCopie(username, url, await r.json());
+  };
+
+  await etape(async () => {
+    if (saisit) await garder(`/api/trimestre/saisie?${q}`);
+  });
+  await etape(async () => {
+    if (!saisit) return;
+    const r = await fetch(`/api/trimestre/saisie?${q}&toutes=1`);
+    if (!r.ok) return;
+    const d = (await r.json()) as { periode: string; grilles: { numero: number }[] };
+    for (const g of d.grilles) await garderCopie(username, `/api/trimestre/saisie?${q}&tableau=${g.numero}`, { periode: d.periode, grille: g });
+  });
+  await etape(() => garder(`/api/trimestre/analyses?${q}`));
+  await etape(() => garder(`/api/trimestre/rubriques?${q}`));
+  await etape(() => garder(`/api/trimestre/circuit?${q}`));
+
+  try {
+    localStorage.setItem(cle, String(Date.now()));
+  } catch {
+    // sans conséquence
+  }
+}
+
 let rejeuEnCours = false;
 
 /**

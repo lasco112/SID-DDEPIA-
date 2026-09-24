@@ -16,11 +16,40 @@
  * téléchargement des tableaux : sans elle, l'agent ne savait pas s'il pouvait
  * déjà couper le réseau, et risquait de partir en tournée avec une partie
  * seulement des 28 tableaux disponibles.
+ *
+ * Le RAPPORT TRIMESTRIEL se télécharge dans le même mouvement (demande du
+ * Délégué, 24 septembre 2026) : grilles de saisie, analyses, textes et
+ * circuit du trimestre à rapporter. L'agent n'a pas à ouvrir chaque écran une
+ * fois en ligne ; la barre le mentionne, c'est tout.
  */
 
 import { useEffect, useState } from "react";
 import { bootstrapPresent, telechargerBootstrap, precacherPagesRole } from "@/lib/offlineStore";
 import { offlineDB } from "@/lib/dexie";
+import { telechargerTrimestre, ETAPES_TRIMESTRE } from "@/lib/trimestreHorsLigne";
+import { trimestreARapporter } from "@/lib/trimestreEchu";
+
+/** Les rôles qui ont des écrans du trimestre. */
+const ROLES_TRIMESTRE = ["DD", "DA", "AGENT_SAISIE", "CHEF_BAC", "CHEF_PSA", "CHEF_SPAIH", "CHEF_SSV"];
+
+/**
+ * Les pages du rôle, PUIS le trimestre, sur UNE barre : le total annoncé
+ * d'emblée inclut les étapes du trimestre, pour que la barre ne recule jamais.
+ */
+async function toutPrecharger(
+  meta: { role: string; username: string },
+  suivre: (faits: number, total: number) => void
+): Promise<void> {
+  const trimestre = ROLES_TRIMESTRE.includes(meta.role) ? ETAPES_TRIMESTRE : 0;
+  let pages = 0;
+  await precacherPagesRole(meta.role, (faits, total) => {
+    pages = total;
+    suivre(faits, total + trimestre);
+  });
+  if (trimestre) {
+    await telechargerTrimestre(meta.username, meta.role, trimestreARapporter(), (faites) => suivre(pages + faites, pages + trimestre));
+  }
+}
 
 type Etat = "verification" | "telechargement" | "pret_confirmation" | "silencieux" | "erreur_premiere_fois";
 type Progression = { faits: number; total: number } | null;
@@ -44,7 +73,7 @@ export default function BootstrapPreload() {
           telechargerBootstrap()
             .then(async () => {
               const meta = await offlineDB.meta.get("bootstrap");
-              if (meta) await precacherPagesRole(meta.role, suivre);
+              if (meta) await toutPrecharger(meta, suivre);
               if (!annule) setTimeout(() => !annule && setProgression(null), 1500);
             })
             .catch(() => {
@@ -66,7 +95,7 @@ export default function BootstrapPreload() {
       try {
         await telechargerBootstrap();
         const meta = await offlineDB.meta.get("bootstrap");
-        if (meta) await precacherPagesRole(meta.role, suivre);
+        if (meta) await toutPrecharger(meta, suivre);
         if (!annule) {
           setEtat("pret_confirmation");
           setTimeout(() => {
@@ -96,8 +125,8 @@ export default function BootstrapPreload() {
       <div className="fixed inset-x-3 bottom-3 z-[180] mx-auto max-w-sm rounded-lg border border-line bg-surface px-4 py-3 shadow-card">
         <p className="text-xs font-semibold text-ink">
           {termine
-            ? "Tableaux disponibles hors ligne ✓"
-            : `Téléchargement des tableaux… ${progression.faits}/${progression.total}`}
+            ? "Tableaux et rapport trimestriel disponibles hors ligne ✓"
+            : `Téléchargement des tableaux et du rapport trimestriel… ${progression.faits}/${progression.total}`}
         </p>
         <BarreProgression pourcentage={termine ? 100 : pourcentage} />
       </div>
@@ -111,12 +140,14 @@ export default function BootstrapPreload() {
           <>
             <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-4 border-primary-light border-t-primary" />
             <p className="text-sm font-semibold text-gray-800">Préparation de l'utilisation hors ligne…</p>
-            <p className="mt-1 text-xs text-gray-500">Téléchargement des tableaux, établissements et référentiels.</p>
+            <p className="mt-1 text-xs text-gray-500">
+              Téléchargement des tableaux, du rapport trimestriel, des établissements et des référentiels.
+            </p>
             {progression && (
               <div className="mt-4">
                 <BarreProgression pourcentage={pourcentage} />
                 <p className="mt-1.5 text-xs font-semibold text-primary">
-                  {progression.faits} / {progression.total} pages téléchargées
+                  {progression.faits} / {progression.total} éléments téléchargés
                 </p>
               </div>
             )}

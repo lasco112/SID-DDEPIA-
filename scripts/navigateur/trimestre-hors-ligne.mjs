@@ -52,14 +52,13 @@ const cliquer = (motif) =>
   }, motif);
 
 try {
-  console.log("\n1. EN LIGNE : l'agent ouvre ses écrans une fois (le téléphone en garde la copie)");
+  console.log("\n1. EN LIGNE : l'agent se connecte au tableau de bord, et c'est tout");
+  // Il n'ouvre AUCUN écran du trimestre : tout doit se télécharger seul, en
+  // arrière-plan, avec les tableaux du mensuel (demande du Délégué).
   await page.goto(`${BASE}/dashboard`, { waitUntil: "networkidle2", timeout: 120_000 });
-  await pause(15_000);
-  for (const chemin of ["/trimestre/analyses", "/trimestre/textes", "/trimestre/circuit", "/trimestre/saisie"]) {
-    await page.goto(`${BASE}${chemin}`, { waitUntil: "networkidle2", timeout: 120_000 });
-    await pause(4000);
-  }
-  await pause(15_000); // toutes les grilles, gardées en arrière-plan
+  await page.waitForFunction(() => /disponibles hors ligne/.test(document.body.innerText), { timeout: 240_000, polling: 500 }).catch(() => {});
+  const barre = await page.evaluate(() => document.body.innerText.match(/[^\n]*rapport trimestriel[^\n]*/)?.[0] ?? "");
+  controle("la barre de téléchargement mentionne le rapport trimestriel", /rapport trimestriel/.test(barre), barre);
 
   console.log("\n2. LE RÉSEAU TOMBE");
   await page.setOfflineMode(true);
