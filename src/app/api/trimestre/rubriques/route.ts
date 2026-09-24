@@ -25,6 +25,7 @@ import { chefDeSection } from "@/server/trimestre/canevas/sections";
 import { textesCalculesPour } from "@/server/trimestre/analyse/ecranAnalyses";
 import { ZONES_AUTOMATIQUES } from "@/server/trimestre/analyse/conclusion";
 import { motifDeVerrou } from "@/server/trimestre/circuit";
+import { dateAppareil } from "@/server/trimestre/saisieCanevas";
 import { TEXTES_ARRONDISSEMENTS } from "@/server/trimestre/canevas/textesArrondissements";
 import { resoudre } from "@/server/trimestre/canevas/types";
 import { contextePour, nomArrondissement } from "@/server/trimestre/saisieTrimestrielle";
@@ -125,8 +126,8 @@ export async function PUT(req: Request) {
     const db = user.db as PrismaClient;
     const { arrondissementId } = perimetre(user);
 
-    const { annee, trimestre, cle, contenu } = (await req.json()) as {
-      annee?: number; trimestre?: number; cle?: string; contenu?: string;
+    const { annee, trimestre, cle, contenu, modifieLe } = (await req.json()) as {
+      annee?: number; trimestre?: number; cle?: string; contenu?: string; modifieLe?: string;
     };
     const p = periodeDe(annee, trimestre);
     if (!p) return NextResponse.json({ message: "Période demandée invalide." }, { status: 400 });
@@ -143,7 +144,11 @@ export async function PUT(req: Request) {
       return NextResponse.json({ message: `Zone inconnue du canevas, ou hors de votre ressort : « ${cle} ».` }, { status: 400 });
     }
 
-    const { enregistre } = await ecrireRubrique(db, user.transaction, p, arrondissementId, cle, contenu ?? "", user.id);
+    const { enregistre, ignoree } = await ecrireRubrique(
+      db, user.transaction, p, arrondissementId, cle, contenu ?? "", user.id,
+      modifieLe ? dateAppareil(modifieLe) : undefined
+    );
+    if (ignoree) return NextResponse.json({ enregistre: false, ignoree: true });
 
     /*
      * Trace, sans exiger de motif. La règle « jamais de correction silencieuse »

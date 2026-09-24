@@ -159,10 +159,13 @@ export async function validerAnalyse(
   portee: string,
   numeroTableau: number,
   contenu: { texteCalcule: string; texte: string; explication: string | null },
-  auteurId: string
-): Promise<void> {
-  await transaction(async (tx) => {
-    const existante = await tx.analyseCanevas.findFirst({ where: { periodeId, numeroTableau, portee }, select: { id: true } });
+  auteurId: string,
+  /** Validée hors ligne : la date de l'appareil. Une validation plus récente sur le serveur est conservée. */
+  modifieLe?: Date
+): Promise<{ ignoree: boolean }> {
+  return transaction(async (tx) => {
+    const existante = await tx.analyseCanevas.findFirst({ where: { periodeId, numeroTableau, portee }, select: { id: true, updatedAt: true } });
+    if (existante && modifieLe && existante.updatedAt > modifieLe) return { ignoree: true };
     const data = {
       texteCalcule: contenu.texteCalcule,
       texte: contenu.texte.trim() || contenu.texteCalcule,
@@ -172,6 +175,7 @@ export async function validerAnalyse(
     };
     if (existante) await tx.analyseCanevas.update({ where: { id: existante.id }, data });
     else await tx.analyseCanevas.create({ data: { periodeId, numeroTableau, portee, ...data } });
+    return { ignoree: false };
   });
 }
 

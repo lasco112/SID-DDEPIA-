@@ -3,6 +3,7 @@
  *
  *   GET  /api/trimestre/saisie?annee=&trimestre=            → les tableaux à saisir
  *   GET  /api/trimestre/saisie?annee=&trimestre=&tableau=N  → la grille d'un tableau
+ *   GET  /api/trimestre/saisie?annee=&trimestre=&toutes=1   → toutes les grilles (gardées par le téléphone pour le hors-ligne)
  *   PUT  /api/trimestre/saisie                              → une case
  *
  * Délégué départemental, chef BAC, Délégué d'arrondissement et agent de
@@ -14,9 +15,9 @@ import { NextResponse } from "next/server";
 import { requireUser, assertRole, permissionErrorResponse } from "@/lib/permissions";
 import { trimestrielle, libelleOfficiel } from "@/server/periodes/calendrier";
 import { periodeTrimestrielle } from "@/server/trimestre/rubriques";
-import { ecrireSaisieCanevas, cleCellule } from "@/server/trimestre/saisieCanevas";
+import { ecrireSaisieCanevas, cleCellule, dateAppareil } from "@/server/trimestre/saisieCanevas";
 import {
-  ROLES_SAISIE, resumer, grille, refusDeSaisie, nomArrondissement, attendUnNombre, incoherenceCategories, porteeDeSaisie,
+  ROLES_SAISIE, resumer, grille, grilles, refusDeSaisie, nomArrondissement, attendUnNombre, incoherenceCategories, porteeDeSaisie,
   type Profil,
 } from "@/server/trimestre/saisieTrimestrielle";
 import { preparerEvenements } from "@/server/trimestre/evenements";
@@ -53,6 +54,11 @@ export async function GET(req: Request) {
     const profil = await profilDe(user);
     if (!profil) return sansArrondissement();
 
+    // Toutes les grilles d'un coup : le téléphone les garde pour saisir sans réseau.
+    if (params.get("toutes")) {
+      return NextResponse.json({ periode: libelleOfficiel(periode), grilles: await grilles(user.db, periode, profil) });
+    }
+
     const numero = params.get("tableau");
     if (numero) {
       const g = await grille(user.db, periode, profil, Number(numero));
@@ -87,6 +93,8 @@ export async function PUT(req: Request) {
       ligne?: string;
       colonne?: string;
       valeur?: string | number | null;
+      /** Saisie faite hors ligne : quand, sur l'appareil. */
+      modifieLe?: string;
     };
     const periode = periodeDe(body.annee, body.trimestre);
     if (!periode) return NextResponse.json({ message: "Période demandée invalide." }, { status: 400 });
@@ -126,7 +134,7 @@ export async function PUT(req: Request) {
     if (incoherence) return NextResponse.json({ message: incoherence }, { status: 409 });
 
     const periodeId = await periodeTrimestrielle(user.db, periode);
-    const { enregistre } = await ecrireSaisieCanevas(
+    const { enregistre, ignoree } = await ecrireSaisieCanevas(
       user.db,
       user.transaction,
       periodeId,
@@ -134,8 +142,12 @@ export async function PUT(req: Request) {
       estNombre ? { valeur: nombre } : { texte: brut == null ? null : String(brut) },
       user.id,
       // Un DA qui remplit le budget-programme remplit le SIEN.
-      await porteeDeSaisie(user.db, profil, body.numeroTableau)
+      await porteeDeSaisie(user.db, profil, body.numeroTableau),
+      body.modifieLe ? dateAppareil(body.modifieLe) : undefined
     );
+    // Une vieille saisie hors ligne, dépassée par une correction faite depuis :
+    // conservée côté serveur, et dite à l'appareil — qui cesse de la renvoyer.
+    if (ignoree) return NextResponse.json({ enregistre: false, ignoree: true });
 
     await user.db.auditLog.create({
       data: {

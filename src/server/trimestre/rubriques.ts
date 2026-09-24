@@ -95,16 +95,19 @@ export async function ecrireRubrique(
   arrondissementId: string | null,
   cle: string,
   contenu: string,
-  auteurId: string
-): Promise<{ enregistre: boolean }> {
+  auteurId: string,
+  /** Écrit hors ligne : la date de l'appareil. Une version plus récente sur le serveur est conservée. */
+  modifieLe?: Date
+): Promise<{ enregistre: boolean; ignoree?: boolean }> {
   const periodeId = await periodeTrimestrielle(db, p);
   const texte = contenu.trim();
 
   return transaction(async (tx) => {
     const existante = await tx.rubriqueNarrative.findFirst({
       where: { periodeId, arrondissementId, cle },
-      select: { id: true },
+      select: { id: true, updatedAt: true },
     });
+    if (existante && modifieLe && existante.updatedAt > modifieLe) return { enregistre: false, ignoree: true };
 
     if (!texte) {
       if (existante) await tx.rubriqueNarrative.delete({ where: { id: existante.id } });

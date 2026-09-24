@@ -16,6 +16,7 @@ import { nomArrondissement, type Profil } from "@/server/trimestre/saisieTrimest
 import { ecranAnalyses, porteeDe, propositionsPour, ROLES_ANALYSE } from "@/server/trimestre/analyse/ecranAnalyses";
 import { validerAnalyse, retirerAnalyse } from "@/server/trimestre/analyse/analyses";
 import { motifDeVerrou } from "@/server/trimestre/circuit";
+import { dateAppareil } from "@/server/trimestre/saisieCanevas";
 
 function periodeDe(annee: unknown, trimestre: unknown) {
   const a = Number(annee);
@@ -72,11 +73,13 @@ export async function PUT(req: Request) {
     assertRole(user, [...ROLES_ANALYSE]);
     const body = (await req.json()) as {
       annee?: number; trimestre?: number; numeroTableau?: number; texte?: string | null; explication?: string | null;
+      /** Validation faite hors ligne : quand, sur l'appareil. */
+      modifieLe?: string;
     };
     const c = await cible(user, body);
     if ("refus" in c) return c.refus;
     const periodeId = await periodeTrimestrielle(user.db, c.periode);
-    await validerAnalyse(
+    const { ignoree } = await validerAnalyse(
       user.transaction,
       periodeId,
       c.portee,
@@ -86,8 +89,10 @@ export async function PUT(req: Request) {
         texte: (body.texte ?? "").trim() || c.proposition.texte,
         explication: body.explication ?? null,
       },
-      user.id
+      user.id,
+      body.modifieLe ? dateAppareil(body.modifieLe) : undefined
     );
+    if (ignoree) return NextResponse.json({ valide: false, ignoree: true });
     await user.db.auditLog.create({
       data: {
         userId: user.id,

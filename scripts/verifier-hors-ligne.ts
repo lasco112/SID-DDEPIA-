@@ -156,6 +156,35 @@ async function principal() {
     await db.periodeReporting.update({ where: { id: P }, data: { statut: "VERROUILLEE_DA" } });
     const r10 = await sync(agent, P, [{ clientId: randomUUID(), templateCode: "T11", famille: "MATRICE", fieldCode: "T11_CHEPTEL_BOVIN", valeur: 6, nonRenseigne: false, updatedAt: new Date().toISOString() }]);
     controle("période verrouillée : refus clair, rien de confirmé", r10.status === 423 && !r10.confirmedIds, `${r10.status} « ${r10.message} »`);
+    console.log("\n10. TRIMESTRE : L'AGENT QUI REVIENT APRÈS 3 JOURS N'ÉCRASE PAS LE DA");
+    const appelTrimestre = async (u: Compte, chemin: string, corps: object) => {
+      const jeton = await encode({ token: { sub: u.id, id: u.id, name: u.username, role: u.role }, secret: process.env.NEXTAUTH_SECRET! });
+      const r = await fetch(`${BASE}${chemin}`, {
+        method: "PUT",
+        headers: { Cookie: `next-auth.session-token=${jeton}`, "Content-Type": "application/json" },
+        body: JSON.stringify(corps),
+      });
+      return { status: r.status, ...((await r.json().catch(() => ({}))) as { ignoree?: boolean }) };
+    };
+    const T = { annee: 2031, trimestre: 1 };
+    const caseT = { ...T, numeroTableau: 101, ligne: "Nkong-Ni", colonne: "DAEPIA" };
+    await appelTrimestre(da, "/api/trimestre/saisie", { ...caseT, valeur: 5 });
+    const vieille = await appelTrimestre(agent, "/api/trimestre/saisie", { ...caseT, valeur: 9, modifieLe: il(3 * 1440) });
+    const trimestre = await db.periodeReporting.findFirst({ where: { type: "TRIMESTRIEL", ...{ annee: 2031, trimestre: 1 } }, select: { id: true } });
+    const lueT = async () =>
+      Number((await db.saisieCanevas.findFirst({ where: { periodeId: trimestre?.id, numeroTableau: 101, ligne: "Nkong-Ni", colonne: "DAEPIA" } }))?.valeur);
+    controle("saisie trimestrielle : la vieille valeur de l'agent est écartée, celle du DA reste", vieille.ignoree === true && (await lueT()) === 5, `${JSON.stringify(vieille)} → ${await lueT()}`);
+    await appelTrimestre(agent, "/api/trimestre/saisie", { ...caseT, valeur: 9, modifieLe: new Date().toISOString() });
+    controle("…mais une saisie plus récente passe", (await lueT()) === 9);
+    await appelTrimestre(da, "/api/trimestre/rubriques", { ...T, cle: "II2.cheptel", contenu: "Version du DA." });
+    const vieuxTexte = await appelTrimestre(agent, "/api/trimestre/rubriques", { ...T, cle: "II2.cheptel", contenu: "Vieille version.", modifieLe: il(3 * 1440) });
+    const texteT = await db.rubriqueNarrative.findFirst({ where: { periodeId: trimestre?.id, cle: "II2.cheptel" }, select: { contenu: true } });
+    controle("texte : la vieille version écrite hors ligne n'écrase pas celle du DA", vieuxTexte.ignoree === true && texteT?.contenu === "Version du DA.");
+    if (trimestre) {
+      await db.saisieCanevas.deleteMany({ where: { periodeId: trimestre.id } });
+      await db.rubriqueNarrative.deleteMany({ where: { periodeId: trimestre.id } });
+      await db.periodeReporting.delete({ where: { id: trimestre.id } }).catch(() => {});
+    }
   } finally {
     // Remise en état : tout ce qui touche le mois de test disparaît.
     const rapports = await db.rapportArrondissement.findMany({ where: { periodeId: P }, select: { id: true } });

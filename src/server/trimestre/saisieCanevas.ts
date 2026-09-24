@@ -26,6 +26,20 @@
 import type { PrismaClient } from "@prisma/client";
 import type { Transactionnelle } from "@/lib/dbCloisonne";
 
+/**
+ * La date de modification d'une écriture faite HORS LIGNE, telle que
+ * l'appareil l'a notée — plafonnée à l'heure du serveur (une horloge réglée
+ * dans le futur s'arrogerait sinon le dernier mot). Absente : maintenant.
+ * Même règle qu'au mensuel : c'est la modification la plus récente qui gagne.
+ */
+export function dateAppareil(brut: unknown): Date {
+  const maintenant = new Date();
+  if (typeof brut !== "string") return maintenant;
+  const d = new Date(brut);
+  if (Number.isNaN(d.getTime())) return maintenant;
+  return d > maintenant ? maintenant : d;
+}
+
 
 export interface CelluleCanevas {
   numeroTableau: number;
@@ -86,8 +100,15 @@ export async function ecrireSaisieCanevas(
   saisie: { valeur?: number | null; texte?: string | null },
   auteurId: string,
   /** "" : le département ; l'identifiant d'un arrondissement : sa version. */
-  portee = ""
-): Promise<{ enregistre: boolean }> {
+  portee = "",
+  /**
+   * Quand la modification a été faite sur l'appareil — pour une écriture
+   * envoyée après une période hors ligne. Si la case a été modifiée depuis
+   * sur le serveur (la correction du DA), la vieille valeur n'est PAS
+   * appliquée : `ignoree` le dit.
+   */
+  modifieLe?: Date
+): Promise<{ enregistre: boolean; ignoree?: boolean }> {
 
   const texte = saisie.texte?.trim() || null;
   const valeur = saisie.valeur ?? null;
@@ -102,8 +123,9 @@ export async function ecrireSaisieCanevas(
         colonne: cellule.colonne,
         portee,
       },
-      select: { id: true },
+      select: { id: true, updatedAt: true },
     });
+    if (existante && modifieLe && existante.updatedAt > modifieLe) return { enregistre: false, ignoree: true };
 
     if (vide) {
       if (existante) await tx.saisieCanevas.delete({ where: { id: existante.id } });

@@ -14,6 +14,8 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lireAvecCopie, envoyer, enAttente } from "@/lib/trimestreHorsLigne";
+import HorsLigneTrimestre from "@/components/HorsLigneTrimestre";
 
 interface Zone {
   cle: string;
@@ -46,7 +48,7 @@ interface Etat {
 
 const TRIMESTRES = [1, 2, 3, 4];
 
-export default function RubriquesTrimestreClient({ annee, trimestre }: { annee: number; trimestre: number }) {
+export default function RubriquesTrimestreClient({ annee, trimestre, username }: { annee: number; trimestre: number; username: string }) {
   const [choix, setChoix] = useState({ annee, trimestre });
   const [etat, setEtat] = useState<Etat | null>(null);
   const [chargement, setChargement] = useState(true);
@@ -56,18 +58,32 @@ export default function RubriquesTrimestreClient({ annee, trimestre }: { annee: 
   // Ce qui est affiché dans les champs, avant enregistrement.
   const [saisie, setSaisie] = useState<Record<string, string>>({});
   const dernierEnregistre = useRef<Record<string, string>>({});
+  const [copieDu, setCopieDu] = useState<string | null>(null);
 
   const charger = useCallback(async (c: { annee: number; trimestre: number }) => {
     setChargement(true);
-    const res = await fetch(`/api/trimestre/rubriques?annee=${c.annee}&trimestre=${c.trimestre}`);
-    const data: Etat = await res.json();
+    let data: Etat;
+    try {
+      const lu = await lireAvecCopie<Etat>(username, `/api/trimestre/rubriques?annee=${c.annee}&trimestre=${c.trimestre}`);
+      data = lu.donnees;
+      setCopieDu(lu.copieDu);
+    } catch (e) {
+      data = { message: e instanceof Error ? e.message : "Chargement impossible." };
+    }
     setEtat(data);
     const initial: Record<string, string> = {};
     for (const z of data.zones ?? []) initial[z.cle] = z.contenu;
-    setSaisie(initial);
     dernierEnregistre.current = { ...initial };
+    // Ce qui a été écrit hors ligne et attend le réseau : c'est le dernier état.
+    for (const op of await enAttente(username)) {
+      const k = op.corps as { annee?: number; trimestre?: number; cle?: string; contenu?: string };
+      if (op.refusee || !op.cle.startsWith("texte|") || k.annee !== c.annee || k.trimestre !== c.trimestre || !k.cle) continue;
+      initial[k.cle] = k.contenu ?? "";
+      dernierEnregistre.current[k.cle] = k.contenu ?? "";
+    }
+    setSaisie(initial);
     setChargement(false);
-  }, []);
+  }, [username]);
 
   useEffect(() => { charger(choix); }, [choix, charger]);
 
@@ -85,17 +101,26 @@ export default function RubriquesTrimestreClient({ annee, trimestre }: { annee: 
     if (contenu === (dernierEnregistre.current[cle] ?? "")) return;
     setEnCours(cle);
     setMessage(null);
-    const res = await fetch("/api/trimestre/rubriques", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...choix, cle, contenu }),
+    const zone = etat?.zones?.find((z) => z.cle === cle);
+    const resultat = await envoyer(username, {
+      cle: `texte|${choix.annee}|${choix.trimestre}|${cle}`,
+      methode: "PUT",
+      url: "/api/trimestre/rubriques",
+      corps: { ...choix, cle, contenu },
+      libelle: `Texte — ${zone?.contexte ?? cle}`,
     });
-    if (!res.ok) {
-      const d = await res.json().catch(() => ({}));
-      setMessage(d.message ?? "L'enregistrement a échoué.");
+    if (resultat.statut === "refuse") {
+      setMessage(resultat.message);
     } else {
       dernierEnregistre.current[cle] = contenu;
-      setMessage("Enregistré.");
+      setMessage(
+        resultat.statut === "en_file"
+          ? "Pas de réseau : texte gardé sur ce téléphone, envoyé seul au retour du réseau."
+          : resultat.statut === "ignore"
+            ? "Une version plus récente de ce texte existe sur le serveur : elle est conservée."
+            : "Enregistré."
+      );
+      if (resultat.statut === "ignore") void charger(choix);
     }
     setEnCours(null);
   }
@@ -122,6 +147,7 @@ export default function RubriquesTrimestreClient({ annee, trimestre }: { annee: 
 
   return (
     <div className="max-w-4xl">
+      <HorsLigneTrimestre username={username} copieDu={copieDu} onEnvoye={() => void charger(choix)} />
       <div className="flex flex-wrap items-center gap-3">
         <label className="text-sm font-semibold text-gray-700" htmlFor="annee">Période</label>
         <input

@@ -1,9 +1,11 @@
 import AppShell from "@/components/AppShell";
 import RubriquesTrimestreClient from "@/components/RubriquesTrimestreClient";
+import { nomDeCompte } from "@/lib/utilisateurCourant";
 import { trimestreARapporter } from "@/lib/trimestreEchu";
 
-export default function RubriquesDAPage() {
+export default async function RubriquesDAPage() {
   const { annee, trimestre } = trimestreARapporter();
+  const username = await nomDeCompte();
   return (
     <AppShell allowedRoles={["DA"]}>
       <div className="max-w-4xl">
@@ -14,7 +16,7 @@ export default function RubriquesDAPage() {
           marquée « Néant ».
         </p>
         <div className="mt-6">
-          <RubriquesTrimestreClient annee={annee} trimestre={trimestre} />
+          <RubriquesTrimestreClient annee={annee} trimestre={trimestre} username={username} />
         </div>
       </div>
     </AppShell>

@@ -12,6 +12,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { trimestreARapporter } from "@/lib/trimestreEchu";
+import { lireAvecCopie } from "@/lib/trimestreHorsLigne";
+import HorsLigneTrimestre from "@/components/HorsLigneTrimestre";
 
 interface Arrondissement {
   id: string;
@@ -64,7 +66,7 @@ const ETAPES = [
 
 const le = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString("fr-FR") : "");
 
-export default function CircuitTrimestreClient() {
+export default function CircuitTrimestreClient({ username }: { username: string }) {
   const [{ annee, trimestre }, setPeriode] = useState(() => trimestreARapporter());
   const [etat, setEtat] = useState<Etat | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
@@ -74,21 +76,30 @@ export default function CircuitTrimestreClient() {
   /** Le DD prend le relais : quelle étape, et pourquoi. */
   const [relais, setRelais] = useState<{ cle: string; corps: Record<string, unknown>; motif: string } | null>(null);
 
+  const [copieDu, setCopieDu] = useState<string | null>(null);
+
   const charger = useCallback(async () => {
     setErreur(null);
-    const r = await fetch(`/api/trimestre/circuit?annee=${annee}&trimestre=${trimestre}`);
-    if (!r.ok) {
-      setErreur((await r.json().catch(() => ({}))).message ?? "Chargement impossible.");
-      return;
+    try {
+      const lu = await lireAvecCopie<Etat>(username, `/api/trimestre/circuit?annee=${annee}&trimestre=${trimestre}`);
+      setEtat(lu.donnees);
+      setCopieDu(lu.copieDu);
+    } catch (e) {
+      setErreur(e instanceof Error ? e.message : "Chargement impossible.");
     }
-    setEtat((await r.json()) as Etat);
-  }, [annee, trimestre]);
+  }, [annee, trimestre, username]);
 
   useEffect(() => {
     void charger();
   }, [charger]);
 
   async function agir(corps: Record<string, unknown>, confirmation?: string) {
+    // Transmettre, valider, renvoyer engagent le circuit : jamais mis en file,
+    // toujours faits avec le réseau, pour que chacun voie le même état.
+    if (!navigator.onLine) {
+      setErreur("Cette étape demande du réseau : elle engage le circuit de validation. Réessayez une fois connecté.");
+      return;
+    }
     if (confirmation && !window.confirm(confirmation)) return;
     setOccupe(true);
     setErreur(null);
@@ -161,6 +172,7 @@ export default function CircuitTrimestreClient() {
 
   return (
     <div className="max-w-3xl">
+      <HorsLigneTrimestre username={username} copieDu={copieDu} />
       <h1 className="text-2xl font-bold text-primary-dark">Circuit du rapport trimestriel</h1>
       <p className="mt-1 text-sm text-gray-600">{etat.periode}</p>
 

@@ -1,5 +1,6 @@
 import AppShell from "@/components/AppShell";
 import RubriquesTrimestreClient from "@/components/RubriquesTrimestreClient";
+import { nomDeCompte } from "@/lib/utilisateurCourant";
 import { trimestreARapporter } from "@/lib/trimestreEchu";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
@@ -12,6 +13,7 @@ import { authOptions } from "@/lib/auth";
  */
 export default async function TextesTrimestrePage() {
   const { annee, trimestre } = trimestreARapporter();
+  const username = await nomDeCompte();
   const session = await getServerSession(authOptions);
   const role = (session?.user as { role?: string } | undefined)?.role ?? "";
   const presentation =
@@ -24,7 +26,7 @@ export default async function TextesTrimestrePage() {
         <h1 className="text-2xl font-bold text-primary-dark">Textes du rapport trimestriel</h1>
         <p className="mt-1 text-sm text-ink-muted">{presentation}</p>
         <div className="mt-6">
-          <RubriquesTrimestreClient annee={annee} trimestre={trimestre} />
+          <RubriquesTrimestreClient annee={annee} trimestre={trimestre} username={username} />
         </div>
       </div>
     </AppShell>

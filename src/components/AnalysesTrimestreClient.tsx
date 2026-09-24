@@ -14,6 +14,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { trimestreARapporter } from "@/lib/trimestreEchu";
+import { lireAvecCopie, envoyer as envoyerOuGarder, enAttente } from "@/lib/trimestreHorsLigne";
+import HorsLigneTrimestre from "@/components/HorsLigneTrimestre";
 
 type Statut = "vide" | "a_valider" | "valide" | "a_revoir";
 
@@ -35,6 +37,8 @@ interface Analyse {
   valideLe: string | null;
   auRapport: string | null;
   sansComparaison: boolean;
+  /** Validée ou retirée hors ligne : gardée sur le téléphone, pas encore envoyée. */
+  surLeTelephone?: boolean;
 }
 
 interface Ecran {
@@ -49,7 +53,7 @@ const LIBELLE: Record<Statut, { texte: string; classe: string }> = {
   vide: { texte: "Tableau vide", classe: "bg-gray-100 text-gray-600" },
 };
 
-export default function AnalysesTrimestreClient({ presentation }: { presentation: string }) {
+export default function AnalysesTrimestreClient({ presentation, username }: { presentation: string; username: string }) {
   const [{ annee, trimestre }, setPeriode] = useState(() => trimestreARapporter());
   const [ecran, setEcran] = useState<Ecran | null>(null);
   const [ouvert, setOuvert] = useState<number | null>(null);
@@ -58,16 +62,38 @@ export default function AnalysesTrimestreClient({ presentation }: { presentation
   const [correction, setCorrection] = useState<string | null>(null);
   const [explication, setExplication] = useState("");
   const [voirCalcul, setVoirCalcul] = useState(false);
+  const [copieDu, setCopieDu] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
 
   const charger = useCallback(async () => {
     setErreur(null);
-    const r = await fetch(`/api/trimestre/analyses?annee=${annee}&trimestre=${trimestre}`);
-    if (!r.ok) {
-      setErreur((await r.json().catch(() => ({}))).message ?? "Chargement impossible.");
+    let e: Ecran;
+    try {
+      const lu = await lireAvecCopie<Ecran>(username, `/api/trimestre/analyses?annee=${annee}&trimestre=${trimestre}`);
+      e = { ...lu.donnees, analyses: lu.donnees.analyses.map((a) => ({ ...a })) };
+      setCopieDu(lu.copieDu);
+    } catch (x) {
+      setErreur(x instanceof Error ? x.message : "Chargement impossible.");
       return;
     }
-    setEcran((await r.json()) as Ecran);
-  }, [annee, trimestre]);
+    // Ce qui a été validé ou retiré hors ligne, et attend le réseau.
+    for (const op of await enAttente(username)) {
+      const c = op.corps as { annee?: number; trimestre?: number; numeroTableau?: number; texte?: string; explication?: string | null };
+      if (op.refusee || !op.cle.startsWith("analyse|") || c.annee !== annee || c.trimestre !== trimestre) continue;
+      const a = e.analyses.find((x) => x.numero === c.numeroTableau);
+      if (!a) continue;
+      a.surLeTelephone = true;
+      if (op.methode === "DELETE") {
+        a.statut = "a_valider";
+        a.texteValide = null;
+      } else {
+        a.statut = "valide";
+        a.texteValide = c.texte ?? a.propose;
+        a.explication = c.explication ?? null;
+      }
+    }
+    setEcran(e);
+  }, [annee, trimestre, username]);
 
   useEffect(() => {
     setOuvert(null);
@@ -96,19 +122,24 @@ export default function AnalysesTrimestreClient({ presentation }: { presentation
     setOccupe(true);
     setErreur(null);
     try {
-      const r = await fetch("/api/trimestre/analyses", {
-        method: methode,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ annee, trimestre, numeroTableau: courant.numero, ...corps }),
+      setInfo(null);
+      const resultat = await envoyerOuGarder(username, {
+        cle: `analyse|${annee}|${trimestre}|${courant.numero}`,
+        methode,
+        url: "/api/trimestre/analyses",
+        corps: { annee, trimestre, numeroTableau: courant.numero, ...corps },
+        libelle: `Analyse — ${courant.titre}`,
       });
-      if (!r.ok) {
-        setErreur((await r.json().catch(() => ({}))).message ?? "Enregistrement impossible.");
+      if (resultat.statut === "refuse") {
+        setErreur(resultat.message);
         return;
       }
+      if (resultat.statut === "en_file") setInfo("Pas de réseau : gardé sur ce téléphone, envoyé seul au retour du réseau.");
+      if (resultat.statut === "ignore") setInfo("Une validation plus récente existe sur le serveur : elle est conservée.");
       await charger();
       setOuvert(ensuite);
     } catch {
-      setErreur("Pas de connexion : rien n'a été enregistré. Réessayez quand le réseau revient.");
+      setErreur("Enregistrement impossible sur ce téléphone.");
     } finally {
       setOccupe(false);
     }
@@ -150,6 +181,13 @@ export default function AnalysesTrimestreClient({ presentation }: { presentation
         </p>
 
         {erreur && <p className="mt-3 rounded-md bg-red-50 p-3 text-sm text-red-800">{erreur}</p>}
+        {info && <p className="mt-3 rounded-md bg-blue-50 p-3 text-sm text-blue-900">{info}</p>}
+        {courant.surLeTelephone && (
+          <p className="mt-3 rounded-md bg-blue-50 p-3 text-sm text-blue-900">Gardé sur ce téléphone, en attente du réseau.</p>
+        )}
+        <div className="mt-3">
+          <HorsLigneTrimestre username={username} copieDu={copieDu} onEnvoye={() => void charger()} />
+        </div>
 
         {courant.statut === "vide" ? (
           <p className="mt-4 rounded-md border border-gray-200 bg-white p-4 text-sm text-gray-700">
@@ -291,6 +329,8 @@ export default function AnalysesTrimestreClient({ presentation }: { presentation
 
   return (
     <div className="max-w-3xl">
+      <HorsLigneTrimestre username={username} copieDu={copieDu} onEnvoye={() => void charger()} />
+      {info && <p className="mb-3 rounded-md bg-blue-50 p-3 text-sm text-blue-900">{info}</p>}
       <h1 className="text-2xl font-bold text-primary-dark">Analyses du rapport trimestriel</h1>
       <p className="mt-1 text-gray-600">
         {presentation} Rapport de {ecran.portee}.

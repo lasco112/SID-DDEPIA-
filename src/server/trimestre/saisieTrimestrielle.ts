@@ -356,7 +356,38 @@ export async function grille(db: PrismaClient, periode: Periode, profil: Profil,
     // Même un tableau purement saisi consolide ses saisies de l’an passé.
     sansAgregation: !automatique,
   });
+  return construireGrille(bloc, section, ctx, profil, donnees, fournisseur(donnees, ctx));
+}
+
+/**
+ * TOUTES les grilles de ce profil, d'une seule consolidation — pour que le
+ * téléphone de l'agent les garde et puisse saisir sans réseau (décision du
+ * Délégué : le hors-ligne est critique). Une grille par tableau où ce profil a
+ * quelque chose à saisir.
+ */
+export async function grilles(db: PrismaClient, periode: Periode, profil: Profil): Promise<GrilleSaisie[]> {
+  const ctx = await contextePour(db, periode, profil);
+  const arrondissementId = await arrondissementIdDe(db, profil);
+  const donnees = await preparer(db, periode, champsMobilises(), { autoriserIncomplet: true, arrondissementId });
   const valeur = fournisseur(donnees, ctx);
+  const sortie: GrilleSaisie[] = [];
+  for (const { bloc, section } of tableaux()) {
+    const { colonnes, cles } = coordonnees(bloc, ctx);
+    const saisissable = cles.some((l) => colonnes.some((c) => etatCase(bloc, ctx, profil, l, c, valeur.sid) === "saisie"));
+    if (saisissable) sortie.push(construireGrille(bloc, section, ctx, profil, donnees, valeur));
+  }
+  return sortie;
+}
+
+function construireGrille(
+  bloc: BlocTableau,
+  section: string,
+  ctx: ContexteCanevas,
+  profil: Profil,
+  donnees: Awaited<ReturnType<typeof preparer>>,
+  valeur: ReturnType<typeof fournisseur>
+): GrilleSaisie {
+  const numero = bloc.numero!;
   const { enteteLigne, colonnes, cles, libelles } = coordonnees(bloc, ctx);
 
   const lignes = cles.map((cle, r) => ({

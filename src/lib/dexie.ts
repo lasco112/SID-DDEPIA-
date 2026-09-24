@@ -146,6 +146,39 @@ export interface OperationEnAttente {
   derniereErreur?: string | null;
 }
 
+/**
+ * Une écriture du RAPPORT TRIMESTRIEL faite sans réseau — une case de la
+ * saisie trimestrielle, une analyse validée, un texte — en attente d'envoi.
+ * File DISTINCTE de `fileAttente` (établissements) : son rejoueur ne connaît
+ * que les établissements.
+ */
+export interface OperationTrimestre {
+  id?: number;
+  /** Cloisonnement par compte, comme les saisies : plusieurs comptes peuvent se succéder sur un appareil. */
+  username: string;
+  /** Ce que l'écriture vise (« saisie|2026|3|14|Dschang|Vache ») : une nouvelle écriture remplace l'ancienne. */
+  cle: string;
+  methode: "PUT" | "DELETE";
+  url: string;
+  corps: Record<string, unknown>;
+  /** Ce que l'agent lira dans la file : « Cheptel bovin — Vache ». */
+  libelle: string;
+  creeLe: string;
+  /** Refusée par le serveur (rapport transmis entre-temps…) : conservée, visible, jamais jetée en silence. */
+  refusee?: boolean;
+  erreur?: string | null;
+}
+
+/** La dernière copie reçue d'un écran du trimestre, pour l'ouvrir sans réseau. */
+export interface CopieTrimestre {
+  /** « username|url ». */
+  cle: string;
+  username: string;
+  donnees: unknown;
+  /** Quand la copie a été reçue du serveur. */
+  le: string;
+}
+
 export interface ReferentielOffline {
   /** `${categorie}:${code}` — IndexedDB exige une clé simple. */
   id: string;
@@ -173,6 +206,8 @@ export class SIDOfflineDB extends Dexie {
   referentiels!: Table<ReferentielOffline, string>;
   periodes!: Table<PeriodeOffline, string>;
   fileAttente!: Table<OperationEnAttente, number>;
+  fileTrimestre!: Table<OperationTrimestre, number>;
+  copiesTrimestre!: Table<CopieTrimestre, string>;
 
   constructor() {
     super("SID_DDEPIA_MENOUA");
@@ -207,6 +242,13 @@ export class SIDOfflineDB extends Dexie {
     // existante n'est touchée.
     this.version(5).stores({
       fileAttente: "++id, entite, operation, creeLe",
+    });
+    // v6 : le rapport trimestriel hors ligne (décision du Délégué, 24 septembre
+    // 2026) — sa file d'écritures et la copie de ses écrans. Purement additif :
+    // aucune donnée existante n'est touchée.
+    this.version(6).stores({
+      fileTrimestre: "++id, username, cle, creeLe",
+      copiesTrimestre: "cle, username",
     });
   }
 }

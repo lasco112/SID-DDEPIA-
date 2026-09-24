@@ -23,7 +23,10 @@ export default async function AnalysesPage() {
   const role = (session?.user as { role?: string } | undefined)?.role ?? "";
   return (
     <AppShell allowedRoles={["DD", "DA", "AGENT_SAISIE", "CHEF_BAC", "CHEF_PSA", "CHEF_SPAIH", "CHEF_SSV"]}>
-      <AnalysesTrimestreClient presentation={PRESENTATION[role] ?? PRESENTATION_CHEF} />
+      <AnalysesTrimestreClient
+        presentation={PRESENTATION[role] ?? PRESENTATION_CHEF}
+        username={(session?.user as { username?: string } | undefined)?.username ?? ""}
+      />
     </AppShell>
   );
 }

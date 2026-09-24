@@ -19,6 +19,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { trimestreARapporter } from "@/lib/trimestreEchu";
+import { lireAvecCopie, garderCopie, envoyer, enAttente } from "@/lib/trimestreHorsLigne";
+import HorsLigneTrimestre from "@/components/HorsLigneTrimestre";
 
 type EtatCase = "saisie" | "calculee" | "total" | "lecture";
 
@@ -69,10 +71,13 @@ interface Liste {
 const cleCase = (ligne: string, colonne: string) => `${ligne} | ${colonne}`;
 
 export default function SaisieTrimestrielleClient({
+  username,
   titre = "Saisie trimestrielle",
   presentation,
   seulement,
 }: {
+  /** Le compte : la copie des écrans et la file hors ligne lui sont propres. */
+  username: string;
   titre?: string;
   presentation?: string;
   /** Limite l'écran à certains tableaux — ceux du BAC, pour le chef BAC. */
@@ -89,6 +94,12 @@ export default function SaisieTrimestrielleClient({
   const [voirNonClassees, setVoirNonClassees] = useState(false);
   /** Le refus d'une saisie, affiché AU-DESSUS DU TABLEAU, là où l'on saisit. */
   const [refus, setRefus] = useState<string | null>(null);
+  /** Ce qui s'est passé à l'enregistrement, quand ce n'est pas une erreur : gardé hors ligne, dépassé… */
+  const [info, setInfo] = useState<string | null>(null);
+  /** L'écran montre la copie du téléphone (pas de réseau) : de quand elle date. */
+  const [copieDu, setCopieDu] = useState<string | null>(null);
+  /** Les grilles ne sont gardées pour le hors-ligne qu'une fois par période et par ouverture. */
+  const grillesGardees = useRef<string | null>(null);
   /**
    * Les cases tapées et pas encore enregistrées. Le rechargement du tableau,
    * après chaque enregistrement, ne doit pas les écraser : un agent rapide
@@ -96,31 +107,63 @@ export default function SaisieTrimestrielleClient({
    */
   const enCoursDeFrappe = useRef(new Set<string>());
 
+  const urlGrille = useCallback(
+    (numero: number) => `/api/trimestre/saisie?annee=${annee}&trimestre=${trimestre}&tableau=${numero}`,
+    [annee, trimestre]
+  );
+
   const chargerListe = useCallback(async () => {
     setErreur(null);
-    const r = await fetch(`/api/trimestre/saisie?annee=${annee}&trimestre=${trimestre}`);
-    if (!r.ok) {
-      setErreur((await r.json().catch(() => ({}))).message ?? "Chargement impossible.");
+    let j: Liste;
+    try {
+      const lu = await lireAvecCopie<Liste>(username, `/api/trimestre/saisie?annee=${annee}&trimestre=${trimestre}`);
+      j = { ...lu.donnees };
+      setCopieDu(lu.copieDu);
+      // En ligne : toutes les grilles sont gardées sur le téléphone, d'un coup,
+      // pour que l'agent puisse ensuite saisir n'importe quel tableau sans réseau.
+      const periode = `${annee}-${trimestre}`;
+      if (!lu.copieDu && grillesGardees.current !== periode) {
+        grillesGardees.current = periode;
+        void fetch(`/api/trimestre/saisie?annee=${annee}&trimestre=${trimestre}&toutes=1`)
+          .then((r) => (r.ok ? r.json() : null))
+          .then(async (d: { periode: string; grilles: Grille[] } | null) => {
+            for (const g of d?.grilles ?? []) await garderCopie(username, urlGrille(g.numero), { periode: d!.periode, grille: g });
+          })
+          .catch(() => {
+            grillesGardees.current = null;
+          });
+      }
+    } catch (e) {
+      setErreur(e instanceof Error ? e.message : "Chargement impossible.");
       return;
     }
-    const j = (await r.json()) as Liste;
     if (seulement) j.tableaux = j.tableaux.filter((t) => seulement.includes(t.numero));
     setListe(j);
-  }, [annee, trimestre, seulement]);
+  }, [annee, trimestre, seulement, username, urlGrille]);
 
   const chargerGrille = useCallback(
     async (numero: number) => {
       setChargementGrille(true);
       try {
-        const r = await fetch(`/api/trimestre/saisie?annee=${annee}&trimestre=${trimestre}&tableau=${numero}`);
-        if (!r.ok) {
-          setErreur((await r.json().catch(() => ({}))).message ?? "Chargement impossible.");
+        let g: Grille;
+        try {
+          const lu = await lireAvecCopie<{ grille: Grille }>(username, urlGrille(numero));
+          g = lu.donnees.grille;
+          if (lu.copieDu) setCopieDu(lu.copieDu);
+        } catch (e) {
+          setErreur(e instanceof Error ? e.message : "Chargement impossible.");
           return;
         }
-        const g = (await r.json()).grille as Grille;
-        setGrille(g);
         const v: Record<string, string> = {};
         for (const l of g.lignes) for (const c of l.cases) if (c.etat === "saisie") v[cleCase(l.cle, c.colonne)] = c.saisi ?? "";
+        // Ce qui a été saisi hors ligne et attend le réseau : c'est ce que
+        // l'agent a tapé en dernier, c'est donc ce qu'il doit revoir.
+        for (const op of await enAttente(username)) {
+          const c = op.corps as { annee?: number; trimestre?: number; numeroTableau?: number; ligne?: string; colonne?: string; valeur?: unknown };
+          if (op.refusee || !op.cle.startsWith("saisie|") || c.numeroTableau !== numero || c.annee !== annee || c.trimestre !== trimestre) continue;
+          v[cleCase(c.ligne!, c.colonne!)] = c.valeur == null ? "" : String(c.valeur);
+        }
+        setGrille(g);
         // Ce qui est enregistré vient du serveur — y compris ce qu'un collègue
         // vient de saisir ; ce qu'on est en train de taper reste à l'écran.
         setValeurs((avant) => {
@@ -134,7 +177,7 @@ export default function SaisieTrimestrielleClient({
         setChargementGrille(false);
       }
     },
-    [annee, trimestre]
+    [annee, trimestre, username, urlGrille]
   );
 
   useEffect(() => {
@@ -179,19 +222,30 @@ export default function SaisieTrimestrielleClient({
       setRefus(message);
       setValeurs((x) => ({ ...x, [k]: avant ?? "" }));
     };
+    setInfo(null);
     try {
-      const r = await fetch("/api/trimestre/saisie", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ annee, trimestre, numeroTableau: grille.numero, ligne, colonne, valeur }),
+      const resultat = await envoyer(username, {
+        cle: `saisie|${annee}|${trimestre}|${grille.numero}|${ligne}|${colonne}`,
+        methode: "PUT",
+        url: "/api/trimestre/saisie",
+        corps: { annee, trimestre, numeroTableau: grille.numero, ligne, colonne, valeur },
+        libelle: `${grille.titre} — ${ligne} / ${colonne} : ${valeur || "(effacé)"}`,
       });
-      if (!r.ok) {
-        annuler((await r.json().catch(() => ({}))).message ?? "Enregistrement impossible.");
+      if (resultat.statut === "refuse") {
+        annuler(resultat.message);
         return;
+      }
+      if (resultat.statut === "en_file") {
+        // Gardée sur le téléphone : la valeur reste à l'écran, elle partira seule.
+        setInfo("Pas de réseau : la case est gardée sur ce téléphone et partira seule au retour du réseau.");
+        return;
+      }
+      if (resultat.statut === "ignore") {
+        setInfo("Une modification plus récente existe sur le serveur : elle est conservée.");
       }
       await Promise.all([chargerGrille(grille.numero), chargerListe()]);
     } catch {
-      annuler("Pas de connexion : la case n'a pas été enregistrée. Réessayez quand le réseau revient.");
+      annuler("Enregistrement impossible sur ce téléphone.");
     } finally {
       setEnCours(null);
     }
@@ -258,6 +312,14 @@ export default function SaisieTrimestrielleClient({
         </p>
 
         {erreur && <p className="mt-3 rounded-md bg-red-50 p-3 text-sm text-red-800">{erreur}</p>}
+        {info && <p className="mt-3 rounded-md bg-blue-50 p-3 text-sm text-blue-900">{info}</p>}
+        <div className="mt-3">
+          <HorsLigneTrimestre
+            username={username}
+            copieDu={copieDu}
+            onEnvoye={() => void Promise.all([chargerListe(), chargerGrille(courant.numero)])}
+          />
+        </div>
 
         <div className="mt-4 rounded-md border border-gray-200 bg-white p-3">
           {chargementGrille && !grille && <p className="text-sm text-gray-600">Chargement…</p>}
@@ -296,6 +358,7 @@ export default function SaisieTrimestrielleClient({
   // ------------------------------------------------------------ la liste
   return (
     <div className="max-w-full">
+      <HorsLigneTrimestre username={username} copieDu={copieDu} onEnvoye={() => void chargerListe()} />
       <h1 className="text-2xl font-bold text-primary-dark">{titre}</h1>
       <p className="mt-1 max-w-3xl text-gray-600">
         {presentation ??

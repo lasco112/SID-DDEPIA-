@@ -182,6 +182,15 @@ serveur local avant toute livraison. Pour vérifier un écran dans le navigateur
 avec plusieurs rôles à la fois : une adresse locale par rôle (`127.0.0.1`,
 `127.0.0.2`…), chacune a ses propres cookies.
 
+Le HORS-LIGNE est critique (décision du Délégué) et s'éprouve à part :
+- `scripts/verifier-hors-ligne.ts` — la synchronisation jusqu'à ses limites
+  (renvois, conflits entre appareils, horloge déréglée, ligne fautive, gros
+  lot, rapport soumis, cloisonnement, arbitrage du trimestre) ;
+- `scripts/navigateur/` — la saisie réelle, réseau COUPÉ, dans un Chrome isolé
+  piloté par script, mensuel et trimestriel. Le navigateur intégré de l'éditeur
+  refuse les service workers : il ne peut pas servir à cette épreuve.
+  `puppeteer-core` s'installe À PART, jamais dans les dépendances du SID.
+
 Deux pièges pendant la vérification :
 
 - `next build` pendant que `npm run dev` tourne écrase `.next` et casse le
