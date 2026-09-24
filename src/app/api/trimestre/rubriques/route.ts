@@ -23,6 +23,7 @@ import { trimestrielle, libelleOfficiel, periodePrecedente } from "@/server/peri
 import { TEXTES_FIXES, TEXTES_COMMUNS } from "@/server/trimestre/canevas/textesFixes";
 import { chefDeSection } from "@/server/trimestre/canevas/sections";
 import { textesCalculesPour } from "@/server/trimestre/analyse/ecranAnalyses";
+import { ZONES_AUTOMATIQUES } from "@/server/trimestre/analyse/conclusion";
 import { TEXTES_ARRONDISSEMENTS } from "@/server/trimestre/canevas/textesArrondissements";
 import { resoudre } from "@/server/trimestre/canevas/types";
 import { contextePour, nomArrondissement } from "@/server/trimestre/saisieTrimestrielle";
@@ -83,9 +84,10 @@ export async function GET(req: Request) {
     // Septembre 2026 »), et ce qu'il a écrit au trimestre précédent.
     const nom = await nomArrondissement(db, arrondissementId);
     const profil = { role: user.role, arrondissement: nom };
+    // Les conclusions, rédigées automatiquement à partir du rapport : le
+    // relecteur les trouve prêtes (décision du Délégué, 24 septembre 2026).
+    const automatiques = await textesCalculesPour(db, p, profil, ecrits);
     const references = {
-      // La conclusion et la synthèse des productions : un brouillon calculé sur les chiffres.
-      ...Object.fromEntries(await textesCalculesPour(db, p, profil)),
       ...Object.fromEntries(TEXTES_COMMUNS),
       ...(nom ? TEXTES_ARRONDISSEMENTS.get(nom) ?? {} : Object.fromEntries(TEXTES_FIXES)),
     };
@@ -97,6 +99,7 @@ export async function GET(req: Request) {
         ...z,
         contenu: ecrits.get(z.cle) ?? "",
         reference: reference ? resoudre(reference, ctx) : null,
+        automatique: ZONES_AUTOMATIQUES.has(z.cle) && automatiques.get(z.cle) ? resoudre(automatiques.get(z.cle)!, ctx) : null,
         precedent: precedents.get(z.cle) ?? null,
       };
     });

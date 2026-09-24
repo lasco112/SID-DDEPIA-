@@ -99,7 +99,7 @@ test("les tableaux aux unités mêlées ne sont pas analysés", () => {
 
 const proposition = (texte: string, vide = false): Proposition => ({
   numero: 16, titre: "Les abattages contrôlés", section: "II", chef: "CHEF_PSA",
-  phrases: [{ texte, calcul: "" }], texte, vide, sansComparaison: false, evolution: null,
+  phrases: [{ texte, calcul: "" }], texte, vide, sansComparaison: false, evolution: null, total: null,
 });
 const enregistree = (texteCalcule: string, texte: string, explication: string | null = null) => ({
   texteCalcule, texte, explication, valideLe: new Date(), validePar: null,

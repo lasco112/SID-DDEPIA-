@@ -247,15 +247,18 @@ export async function genererRapportCanevas(
     }
   }
 
-  // La conclusion et la synthèse des productions, pré-rédigées à partir des
-  // chiffres (analyse/conclusion.ts), tant que personne ne les a écrites.
-  textesCalcules(ctx, valeur).forEach((t, cle) => {
+  // Ce que le rédacteur a écrit pour CETTE période l'emporte sur le texte fixe :
+  // le fixe n'est qu'un point de départ, pas une contrainte.
+  const ecrits = await lireRubriques(db, periode, sien?.id ?? null);
+
+  // La conclusion générale et celle du chapitre II, rédigées automatiquement à
+  // partir du rapport (analyse/conclusion.ts), tant que personne ne les a
+  // modifiées : le relecteur les trouve prêtes.
+  textesCalcules(ctx, valeur, ecrits).forEach((t, cle) => {
     if (!textes.has(cle)) textes.set(cle, t);
   });
 
-  // Ce que le rédacteur a écrit pour CETTE période l'emporte sur le texte fixe :
-  // le fixe n'est qu'un point de départ, pas une contrainte.
-  (await lireRubriques(db, periode, sien?.id ?? null)).forEach((t, cle) => textes.set(cle, t));
+  ecrits.forEach((t, cle) => textes.set(cle, t));
 
   options.textes?.forEach((t, cle) => textes.set(cle, t));
 

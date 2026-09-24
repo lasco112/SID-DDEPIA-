@@ -56,12 +56,23 @@ export interface AnalyseTableau {
   sansComparaison: boolean;
   /** L'évolution du total sur un an, en %, quand elle est calculable. */
   evolution: number | null;
+  /** Le total de la période (département, ou l'arrondissement du rapport). */
+  total: number | null;
 }
 
 const nf = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1 });
 const nb = (n: number) => nf.format(n).replace(/\u202f/g, " ");
 const pct = (n: number) => `${nf.format(Math.round(Math.abs(n) * 10) / 10)} %`;
 const variation = (a: number, b: number) => ((a - b) / b) * 100;
+
+/** L'unité accordée au nombre : « 1 tête », « 1 animal vacciné », « 2 têtes ». */
+export function uniteAccordee(n: number, unite: string): string {
+  if (!unite || Math.abs(n) >= 2) return unite;
+  return unite
+    .split(" ")
+    .map((m) => (m === "animaux" ? "animal" : m === "cas" || m === "FCFA" || !m.endsWith("s") ? m : m.slice(0, -1)))
+    .join(" ");
+}
 
 export function analyserTableau(
   bloc: BlocTableau,
@@ -113,6 +124,7 @@ export function analyserTableau(
   const phrases: PhraseAnalyse[] = [];
   const { sujet: s, pluriel, unite } = sujet;
   const u = unite ? ` ${unite}` : "";
+  const uDe = (n: number) => (unite ? ` ${uniteAccordee(n, unite)}` : "");
   const verbe = pluriel ? "s’établissent" : "s’établit";
   const unArrondissement = territoires.length === 1;
 
@@ -122,6 +134,7 @@ export function analyserTableau(
       phrases: [{ texte: `Aucune donnée n’a été renseignée pour ce tableau au ${ctx.periodeCourt}.`, calcul: "Toutes les cases sont vides." }],
       sansComparaison: false,
       evolution: null,
+      total: null,
     };
   }
 
@@ -131,23 +144,23 @@ export function analyserTableau(
     sansComparaison = true;
     phrases.push({
       texte:
-        `${s} ${verbe} à ${nb(total)}${u} au ${ctx.periodeCourt}. ` +
+        `${s} ${verbe} à ${nb(total)}${uDe(total)} au ${ctx.periodeCourt}. ` +
         `La comparaison avec le ${ctx.periodeCourtN1} n’est pas possible : les données de cette période n’ont pas été renseignées.`,
       calcul: `Total ${ctx.periodeCourt} = ${nb(total)} ; total ${ctx.periodeCourtN1} non renseigné.`,
     });
   } else if (totalPasse === 0) {
     phrases.push({
-      texte: `${s} ${verbe} à ${nb(total)}${u} au ${ctx.periodeCourt}, contre zéro au ${ctx.periodeCourtN1}.`,
+      texte: `${s} ${verbe} à ${nb(total)}${uDe(total)} au ${ctx.periodeCourt}, contre zéro au ${ctx.periodeCourtN1}.`,
       calcul: `${nb(total)} contre 0.`,
     });
   } else {
     const v = variation(total, totalPasse);
     const sens =
       Math.abs(v) < seuils.stabilite
-        ? `stable par rapport au ${ctx.periodeCourtN1} (${nb(totalPasse)}${u})`
-        : `${Math.abs(v) >= seuils.rupture ? "en forte " : "en "}${v > 0 ? "hausse" : "baisse"} de ${pct(v)} par rapport au ${ctx.periodeCourtN1} (${nb(totalPasse)}${u})`;
+        ? `stable par rapport au ${ctx.periodeCourtN1} (${nb(totalPasse)}${uDe(totalPasse)})`
+        : `${Math.abs(v) >= seuils.rupture ? "en forte " : "en "}${v > 0 ? "hausse" : "baisse"} de ${pct(v)} par rapport au ${ctx.periodeCourtN1} (${nb(totalPasse)}${uDe(totalPasse)})`;
     phrases.push({
-      texte: `${s} ${verbe} à ${nb(total)}${u} au ${ctx.periodeCourt}, ${sens}.`,
+      texte: `${s} ${verbe} à ${nb(total)}${uDe(total)} au ${ctx.periodeCourt}, ${sens}.`,
       calcul: `(${nb(total)} − ${nb(totalPasse)}) ÷ ${nb(totalPasse)} = ${v >= 0 ? "+" : "−"}${pct(v)}.`,
     });
   }
@@ -246,7 +259,7 @@ export function analyserTableau(
   }
 
   const evolution = totalPasse != null && totalPasse !== 0 ? variation(total, totalPasse) : null;
-  return { numero, phrases, sansComparaison, evolution };
+  return { numero, phrases, sansComparaison, evolution, total };
 }
 
 function mediane(xs: number[]): number {

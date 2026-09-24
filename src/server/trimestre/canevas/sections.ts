@@ -26,18 +26,21 @@ export const TABLEAUX_BAC = new Set([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 
 /** Le chef de section qui répond d'une partie du rapport départemental. */
 export type ChefDeSection = "CHEF_BAC" | "CHEF_PSA" | "CHEF_SPAIH" | "CHEF_SSV";
 
-/** Les zones générales du rapport — introduction, conclusion, sources — relèvent du BAC. */
-const ZONES_GENERALES = new Set(["conclusion", "bibliographie"]);
+/** Les références du rapport relèvent du BAC ; la conclusion générale, du chef PSA (décision du Délégué). */
+const ZONES_BAC = new Set(["bibliographie"]);
+const ZONES_PSA = new Set(["conclusion"]);
 
 /**
  * Le chef de section responsable d'une partie du rapport (décision du
  * Délégué, 24 septembre 2026 : les chefs de section valident, le DD relit).
  * Première partie et budget-programme : BAC ; productions animales : PSA ;
- * pêche et aquaculture : SPAIH ; santé animale : SSV. L'introduction, la
- * conclusion générale et les références vont au BAC.
+ * pêche et aquaculture : SPAIH ; santé animale : SSV. L'introduction et les
+ * références vont au BAC ; la conclusion générale, rédigée automatiquement, est
+ * relue par le chef PSA (décision du Délégué, 24 septembre 2026).
  */
 export function chefDeSection(sectionCle: string, zoneCle?: string): ChefDeSection {
-  if (zoneCle && ZONES_GENERALES.has(zoneCle)) return "CHEF_BAC";
+  if (zoneCle && ZONES_BAC.has(zoneCle)) return "CHEF_BAC";
+  if (zoneCle && ZONES_PSA.has(zoneCle)) return "CHEF_PSA";
   if (sectionCle === "I" || sectionCle === "BUDGET") return "CHEF_BAC";
   if (sectionCle === "III") return "CHEF_SPAIH";
   if (sectionCle === "IV") return "CHEF_SSV";

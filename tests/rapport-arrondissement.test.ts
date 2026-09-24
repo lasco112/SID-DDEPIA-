@@ -260,15 +260,19 @@ test("« Néant. » jamais au-dessus d'un tableau, ni sous une présentation d'e
   assert.equal(apres(/^II-5-6\. Exportation/), "Néant.");
 });
 
-test("la conclusion générale est pré-rédigée, domaine par domaine, sans répéter la viande", async () => {
-  const { texte } = await produire();
-  const debut = texte.lastIndexOf("CONCLUSION GÉNÉRALE");
-  const conclusion = texte.slice(debut, texte.indexOf("RÉFÉRENCES BIBLIOGRAPHIQUES", debut));
-  assert.match(conclusion, /Au cours de ce trimestre, qui couvre la période de Juillet à Septembre 2026, la DDEPIA-Menoua/);
-  assert.match(conclusion, /Pour les productions animales, la période est marquée, par rapport au T3 2025, par la hausse/);
-  // La viande se calcule sur les abattages : la citer répéterait leur pourcentage.
-  assert.doesNotMatch(conclusion, /production de viande/);
-  assert.doesNotMatch(conclusion, /Néant/);
+test("la conclusion générale est rédigée automatiquement, domaine par domaine, sans répéter la viande", async () => {
+  for (const [arrondissement, structure] of [[undefined, "la DDEPIA-Menoua"], ["Santchou", "la DAEPIA de Santchou"]] as const) {
+    const { texte } = await produire(arrondissement);
+    const debut = texte.lastIndexOf("CONCLUSION GÉNÉRALE");
+    const conclusion = texte.slice(debut, texte.indexOf("RÉFÉRENCES BIBLIOGRAPHIQUES", debut));
+    assert.ok(conclusion.includes(`Au cours de ce trimestre, qui couvre la période de Juillet à Septembre 2026, ${structure}`));
+    // Les chiffres clés de chaque domaine, avec leur évolution sur un an.
+    assert.match(conclusion, /Pour les productions animales, le cheptel bovin s’établit à [\d  ]+ têtes \(\+[\d,]+ % sur un an\)/);
+    assert.match(conclusion, /les vaccinations s’établissent à [\d  ]+ animaux vaccinés/);
+    // La viande se calcule sur les abattages : la citer répéterait leur pourcentage.
+    assert.doesNotMatch(conclusion, /production de viande/);
+    assert.doesNotMatch(conclusion, /Néant|\{[A-Z_]+\}/);
+  }
 });
 
 test("la présentation des programmes est la même dans tous les rapports", async () => {
@@ -287,8 +291,9 @@ test("chaque zone du rapport départemental a son chef de section", () => {
   assert.equal(chefDeSection("II-6", "II6.pondeuses"), "CHEF_PSA");
   assert.equal(chefDeSection("III", "III2.difficultes"), "CHEF_SPAIH");
   assert.equal(chefDeSection("IV", "IV2.bilan"), "CHEF_SSV");
-  // La conclusion générale est décrite dans la dernière section, mais elle est générale.
-  assert.equal(chefDeSection("IV", "conclusion"), "CHEF_BAC");
+  // La conclusion générale, décrite dans la dernière section, est relue par le chef PSA.
+  assert.equal(chefDeSection("IV", "conclusion"), "CHEF_PSA");
+  assert.equal(chefDeSection("IV", "bibliographie"), "CHEF_BAC");
 });
 
 test("un arrondissement inconnu est refusé, pas silencieusement ignoré", async () => {

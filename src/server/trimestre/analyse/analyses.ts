@@ -38,6 +38,8 @@ export interface Proposition {
   sansComparaison: boolean;
   /** L'évolution du total sur un an, en % — pour la conclusion. */
   evolution: number | null;
+  /** Le total de la période — pour la conclusion. */
+  total: number | null;
 }
 
 /** L'analyse calculée de chaque tableau analysable, dans l'ordre du canevas. */
@@ -59,6 +61,7 @@ export function propositions(ctx: ContexteCanevas, valeur: FournisseurValeur): P
         vide,
         sansComparaison: a.sansComparaison,
         evolution: a.evolution,
+        total: a.total,
       });
     }
   }

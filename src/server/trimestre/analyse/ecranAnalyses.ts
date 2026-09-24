@@ -69,15 +69,20 @@ export async function propositionsPour(db: PrismaClient, periode: Periode, profi
   return propositions(ctx, fournisseur(donnees, ctx)).filter((p) => concerne(p, profil));
 }
 
-/** La conclusion et la synthèse pré-rédigées, sur les chiffres de ce profil. */
-export async function textesCalculesPour(db: PrismaClient, periode: Periode, profil: Profil): Promise<Map<string, string>> {
+/** Les conclusions rédigées automatiquement, sur les chiffres et les textes de ce profil. */
+export async function textesCalculesPour(
+  db: PrismaClient,
+  periode: Periode,
+  profil: Profil,
+  ecrits: Map<string, string> = new Map()
+): Promise<Map<string, string>> {
   const portee = await porteeDe(db, profil);
   const ctx = await contextePour(db, periode, profil);
   const donnees = await preparer(db, periode, champsMobilises(), {
     autoriserIncomplet: true,
     arrondissementId: portee || undefined,
   });
-  return textesCalcules(ctx, fournisseur(donnees, ctx));
+  return textesCalcules(ctx, fournisseur(donnees, ctx), ecrits);
 }
 
 export async function ecranAnalyses(db: PrismaClient, periode: Periode, profil: Profil): Promise<EcranAnalyses> {

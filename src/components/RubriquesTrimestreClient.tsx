@@ -27,6 +27,12 @@ interface Zone {
   reference: string | null;
   /** Ce qui a été écrit au trimestre précédent. */
   precedent: string | null;
+  /**
+   * Le texte rédigé AUTOMATIQUEMENT à partir du rapport (les conclusions). Tant
+   * que personne ne le modifie, c'est lui qui part au document, et il suit les
+   * chiffres.
+   */
+  automatique: string | null;
 }
 
 interface Etat {
@@ -104,7 +110,9 @@ export default function RubriquesTrimestreClient({ annee, trimestre }: { annee: 
     return Array.from(m.entries());
   }, [etat]);
 
-  const redigees = Object.values(saisie).filter((t) => t.trim()).length;
+  /** Une zone est prête si elle est écrite, ou rédigée automatiquement, ou couverte par un texte de référence. */
+  const prete = (z: Zone) => Boolean((saisie[z.cle] ?? "").trim() || z.automatique || z.reference);
+  const redigees = (etat?.zones ?? []).filter(prete).length;
   const total = etat?.total ?? 0;
 
   if (chargement && !etat) return <p className="text-sm text-ink-muted">Chargement…</p>;
@@ -131,7 +139,7 @@ export default function RubriquesTrimestreClient({ annee, trimestre }: { annee: 
           {TRIMESTRES.map((t) => <option key={t} value={t}>{t}ᵉ trimestre</option>)}
         </select>
         <span className="text-sm text-ink-muted">
-          {redigees} / {total} zones rédigées
+          {redigees} / {total} zones prêtes
           {etat?.pour === "arrondissement" ? " — pour votre arrondissement" : ""}
         </span>
       </div>
@@ -144,13 +152,14 @@ export default function RubriquesTrimestreClient({ annee, trimestre }: { annee: 
       </div>
 
       <p className="mt-3 text-xs text-ink-muted">
-        Une zone laissée vide sort dans le document avec sa consigne entre crochets, en gris : le rapport
-        montre alors ce qui reste à écrire, au lieu de faire silence.
+        Une zone laissée vide porte « Néant. » dans le document — sauf une présentation suivie de ses
+        tableaux, qui n&apos;écrit rien. Les conclusions sont rédigées automatiquement à partir du rapport :
+        relisez-les, et ne les modifiez que si c&apos;est nécessaire.
       </p>
 
       {sections.map(([cle, s]) => {
         const ouverte = ouvertes.has(cle);
-        const faites = s.zones.filter((z) => (saisie[z.cle] ?? "").trim()).length;
+        const faites = s.zones.filter(prete).length;
         return (
           <section key={cle} className="mt-4 rounded-lg border border-gray-200 bg-white">
             <button
@@ -205,6 +214,36 @@ export default function RubriquesTrimestreClient({ annee, trimestre }: { annee: 
                         )}
                       </div>
                     )}
+                    {z.automatique && !(saisie[z.cle] ?? "").trim() ? (
+                      <div>
+                        <p className="mb-1 text-xs font-semibold text-green-800">
+                          Rédigée automatiquement à partir du rapport — elle se met à jour toute seule avec les chiffres.
+                        </p>
+                        <p className="whitespace-pre-line rounded border border-green-200 bg-green-50 p-3 text-sm text-gray-900">
+                          {z.automatique}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setSaisie({ ...saisie, [z.cle]: z.automatique! })}
+                          className="mt-1 rounded border border-gray-400 px-2 py-1 text-xs text-gray-700 hover:bg-gray-100"
+                        >
+                          Modifier ce texte
+                        </button>
+                      </div>
+                    ) : (
+                    <>
+                    {z.automatique && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSaisie({ ...saisie, [z.cle]: "" });
+                          void enregistrer(z.cle, "");
+                        }}
+                        className="mb-1 rounded border border-green-700 px-2 py-1 text-xs text-green-800 hover:bg-green-50"
+                      >
+                        Revenir au texte automatique
+                      </button>
+                    )}
                     <textarea
                       className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
                       rows={Math.min(12, Math.max(3, Math.ceil((saisie[z.cle] ?? "").length / 90) + 2))}
@@ -214,9 +253,11 @@ export default function RubriquesTrimestreClient({ annee, trimestre }: { annee: 
                       placeholder={
                         z.reference
                           ? "Vide : le texte de référence figurera dans le document. Pour le corriger, cliquez sur « Reprendre le texte de référence »."
-                          : "Laissez vide pour conserver la consigne dans le document."
+                          : "Laissez vide : le document portera « Néant. »."
                       }
                     />
+                    </>
+                    )}
                     <p className="mt-0.5 text-[11px] text-ink-muted">
                       {enCours === z.cle
                         ? "Enregistrement…"
