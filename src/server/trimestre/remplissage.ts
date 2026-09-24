@@ -92,9 +92,8 @@ export async function preparer(
 
   // Les arrondissements du département de l'appelant — `db` porte le
   // cloisonnement, la liste est donc la sienne.
-  const codeParNom = new Map(
-    (await listerArrondissements(db)).map((a) => [a.nomCanevas, a.code] as const)
-  );
+  const arrondissementsDuDepartement = await listerArrondissements(db);
+  const codeParNom = new Map(arrondissementsDuDepartement.map((a) => [a.nomCanevas, a.code] as const));
 
   /*
    * Les cellules saisies à la main, si le trimestre existe déjà en base. On ne
@@ -158,6 +157,19 @@ export async function preparer(
 
   const a = ranger(courant.valeurs);
   const b = ranger(precedent);
+
+  /*
+   * Le rapport d’un arrondissement : sa ligne TOTAL est la SIENNE. La
+   * consolidation rend toujours la valeur départementale (clé null), que les
+   * lignes et colonnes TOTAL lisent ; laissée telle quelle, le rapport de
+   * Dschang affichait sous sa propre ligne le total des six arrondissements.
+   */
+  const sien = options.arrondissementId
+    ? arrondissementsDuDepartement.find((x) => x.id === options.arrondissementId)?.code
+    : undefined;
+  if (sien) {
+    for (const m of [a.m, b.m]) m.forEach((parArr) => parArr.set(null, parArr.get(sien) ?? null));
+  }
   return { valeurs: a.m, valeursN1: b.m, renseignees: a.n, codeParNom, saisies, saisiesN1, evenements };
 }
 

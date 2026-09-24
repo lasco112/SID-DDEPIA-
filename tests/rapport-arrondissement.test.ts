@@ -18,6 +18,11 @@ import { genererRapportCanevas, SECTIONS_CANEVAS } from "../src/server/trimestre
 import { adapterTitre, resoudre } from "../src/server/trimestre/canevas/types";
 import { TEXTES_FIXES } from "../src/server/trimestre/canevas/textesFixes";
 import { TEXTES_ARRONDISSEMENTS } from "../src/server/trimestre/canevas/textesArrondissements";
+import { listerArrondissements } from "../src/lib/arrondissements";
+import { preparer, fournisseur } from "../src/server/trimestre/remplissage";
+import { champsMobilises } from "../src/server/trimestre/liaison";
+import { SECTION_II_BOVIN } from "../src/server/trimestre/canevas/sectionBovin";
+import type { Bloc, ContexteCanevas } from "../src/server/trimestre/canevas/types";
 
 const db = base;
 const P = trimestrielle(2026, 3);
@@ -171,6 +176,21 @@ test("les chiffres d'un arrondissement sont les siens, pas ceux du département"
   const [ds, fk, dd] = [await produire("Dschang"), await produire("Fokoué"), await produire()];
   assert.notEqual(chiffres(ds.texte), chiffres(fk.texte), "Deux arrondissements ne peuvent pas porter les mêmes chiffres.");
   assert.notEqual(chiffres(ds.texte), chiffres(dd.texte), "Un arrondissement ne peut pas porter les chiffres du département.");
+});
+
+test("la ligne TOTAL d'un arrondissement est la sienne, pas celle du département", async () => {
+  // Avant correction, la ligne TOTAL du cheptel bovin du rapport de Dschang
+  // affichait le cheptel des six arrondissements.
+  const dschang = (await listerArrondissements(db)).find((a) => a.nom === "Dschang")!;
+  const ctx = { periodeCourt: "T3 2026", periodeCourtN1: "T3 2025", annee: 2026, mois: [], arrondissements: ["Dschang"], arrondissement: "Dschang" } as unknown as ContexteCanevas;
+  const valeur = fournisseur(await preparer(db, P, champsMobilises(), { autoriserIncomplet: true, arrondissementId: dschang.id }), ctx);
+  const bloc = SECTION_II_BOVIN.blocs.find((b) => b.type === "tableau" && b.numero === 14) as Extract<Bloc, { type: "tableau" }>;
+  const lire = (ligne: string, colonne: string) =>
+    valeur({ numeroTableau: 14, titreTableau: bloc.titre, bloc, ligne, colonne, indexColonne: 0 });
+  for (const colonne of ["TOTAL T3 2026", "TOTAL T3 2025"]) {
+    assert.ok(lire("Dschang", colonne) != null, "le test suppose des données de cheptel à Dschang");
+    assert.equal(lire("TOTAL T3 2026", colonne), lire("Dschang", colonne), colonne);
+  }
 });
 
 test("le rapport départemental garde ses six colonnes et ses textes", async () => {
