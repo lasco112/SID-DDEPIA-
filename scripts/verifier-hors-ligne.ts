@@ -120,7 +120,7 @@ async function principal() {
     controle(
       "« non renseigné » sans motif, modèle inconnu : signalés à l'appareil",
       signalees === 2,
-      `${signalees}/2 signalées — les autres restent « en attente » sur l'appareil sans explication`
+      `${signalees}/2 signalées`
     );
 
     console.log("\n7. GROS LOT (une semaine de saisie d'événements)");

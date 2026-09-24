@@ -63,6 +63,30 @@ function estConflitSurLaCelluleExistante(e: unknown): boolean {
   return champs.includes("fieldCode") || champs.includes("rapportId");
 }
 
+/** Une violation d'unicité, quelle qu'en soit la cible. */
+const estViolationUnicite = (e: unknown) => e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002";
+
+/**
+ * La base ne dit pas toujours QUELLE contrainte a sauté (« Unique constraint
+ * failed on the (not available) », constaté le 24 septembre 2026) : on ne peut
+ * alors pas lire la cible. On regarde la cellule elle-même. Si elle existe
+ * déjà pour ce rapport, c'est que le serveur détient une version plus récente
+ * — la correction du DA pendant que l'agent était hors ligne. Cas légitime :
+ * la ligne est confirmée (le serveur a mieux), sans quoi l'appareil de l'agent
+ * restait en erreur à chaque envoi, indéfiniment.
+ */
+async function celluleDejaPlusRecente(e: unknown, existe: () => Promise<unknown>): Promise<boolean> {
+  if (estConflitSurLaCelluleExistante(e)) return true;
+  return estViolationUnicite(e) && (await existe()) != null;
+}
+
+/** Le motif d'un refus, dit à l'agent en français — le détail technique va au journal. */
+function motifLisible(e: unknown): string {
+  const brut = e instanceof Error ? e.message : "";
+  if (/Foreign key|foreign key|violates foreign key/.test(brut)) return "Référence inconnue (établissement ou tableau supprimé ?).";
+  return "Enregistrement impossible sur le serveur.";
+}
+
 export async function POST(req: Request) {
   try {
     const user = await requireUser();
@@ -130,18 +154,25 @@ export async function POST(req: Request) {
 
     const confirmedIds: string[] = [];
     /** Lignes refusées par la base : tracées à l'audit, jamais fatales pour le lot. */
-    const lignesEnEchec: Array<{ clientId: string; templateCode: string; fieldCode: string | null; erreur: string }> = [];
+    const lignesEnEchec: Array<{ clientId: string; templateCode: string; fieldCode: string | null; erreur: string; lisible?: string }> = [];
     /** Saisies volontairement non appliquées : le serveur détenait une version plus récente. */
     let ignorees = 0;
     /** Heure de référence unique pour tout le lot (cohérence des comparaisons). */
     const maintenant = new Date();
 
     for (const s of body.saisies) {
+      // Motif obligatoire (CDC §4.4), tableau connu : sinon la ligne est
+      // SIGNALÉE à l'appareil. Écartée en silence, elle restait « en attente »
+      // indéfiniment, sans que l'agent sache pourquoi.
       if (s.nonRenseigne && !s.motifNonRenseigne) {
-        continue; // motif obligatoire (CDC §4.4) — rejeté silencieusement de ce lot
+        lignesEnEchec.push({ clientId: s.clientId, templateCode: s.templateCode, fieldCode: s.fieldCode ?? null, erreur: "« Non renseigné » sans motif : indiquez le motif." });
+        continue;
       }
       const templateId = templateIdByCode.get(s.templateCode);
-      if (!templateId) continue;
+      if (!templateId) {
+        lignesEnEchec.push({ clientId: s.clientId, templateCode: s.templateCode, fieldCode: s.fieldCode ?? null, erreur: "Tableau inconnu du serveur." });
+        continue;
+      }
 
       const valeur = s.nonRenseigne ? null : s.valeur ?? null;
       const valeurTexte = s.nonRenseigne ? null : s.valeurTexte ?? null;
@@ -193,7 +224,8 @@ export async function POST(req: Request) {
                 data: { clientId: s.clientId, rapportId: rapport.id, fieldCode: s.fieldCode, ...champsCommuns },
               });
             } catch (e) {
-              if (!estConflitSurLaCelluleExistante(e)) throw e;
+              const existe = () => db.saisieMatrice.findFirst({ where: { rapportId: rapport.id, fieldCode: s.fieldCode! }, select: { id: true } });
+              if (!(await celluleDejaPlusRecente(e, existe))) throw e;
               ignorees++; // version du serveur plus récente : conservée
             }
           }
@@ -221,7 +253,12 @@ export async function POST(req: Request) {
                 },
               });
             } catch (e) {
-              if (!estConflitSurLaCelluleExistante(e)) throw e;
+              const existe = () =>
+                db.saisieNominative.findFirst({
+                  where: { rapportId: rapport.id, etablissementId: s.etablissementId!, fieldCode: s.fieldCode! },
+                  select: { id: true },
+                });
+              if (!(await celluleDejaPlusRecente(e, existe))) throw e;
               ignorees++;
             }
           }
@@ -233,8 +270,10 @@ export async function POST(req: Request) {
           // s'applique quand même, pour le cas où la même ligne serait
           // corrigée depuis deux appareils.
           const payload = s.payload as Prisma.InputJsonValue;
+          // Toujours DANS son rapport : un appareil d'un autre arrondissement
+          // qui enverrait le même identifiant ne doit rien pouvoir y changer.
           const misAJour = await db.saisieEvenement.updateMany({
-            where: { clientId: s.clientId, ...plusRecenteQueSurLeServeur },
+            where: { clientId: s.clientId, rapportId: rapport.id, ...plusRecenteQueSurLeServeur },
             data: { payload, modifieLe, syncedAt: maintenant, saisiParId: user.id },
           });
           if (misAJour.count === 0) {
@@ -251,11 +290,19 @@ export async function POST(req: Request) {
                 },
               });
             } catch (e) {
-              if (!estConflitSurLaCelluleExistante(e)) throw e;
+              // L'identifiant existe déjà. Dans CE rapport : une version plus
+              // récente y est déjà — confirmée. Dans un AUTRE : refus, sans
+              // rien toucher à la ligne de l'autre arrondissement.
+              const sienne = await db.saisieEvenement.findFirst({ where: { clientId: s.clientId, rapportId: rapport.id }, select: { id: true } });
+              if (!estViolationUnicite(e) || !sienne) throw e;
               ignorees++;
             }
           }
           confirmedIds.push(s.clientId);
+        } else {
+          // Ligne incomplète (famille inconnue, champ absent) : signalée, jamais
+          // laissée « en attente » sans explication sur l'appareil.
+          lignesEnEchec.push({ clientId: s.clientId, templateCode: s.templateCode, fieldCode: s.fieldCode ?? null, erreur: "Ligne incomplète : elle ne peut pas être enregistrée." });
         }
       } catch (erreurLigne) {
         // JAMAIS confirmée : une ligne refusée par la base n'est PAS
@@ -269,6 +316,7 @@ export async function POST(req: Request) {
           templateCode: s.templateCode,
           fieldCode: s.fieldCode ?? null,
           erreur: erreurLigne instanceof Error ? erreurLigne.message.slice(0, 300) : "inconnue",
+          lisible: motifLisible(erreurLigne),
         });
       }
     }
@@ -315,7 +363,7 @@ export async function POST(req: Request) {
       // Renvoyées à l'appareil pour qu'il les CONSERVE en attente, avec le
       // motif : une saisie non enregistrée ne doit jamais disparaître de la
       // file en silence.
-      echecs: lignesEnEchec.map((l) => ({ clientId: l.clientId, erreur: l.erreur })),
+      echecs: lignesEnEchec.map((l) => ({ clientId: l.clientId, erreur: l.lisible ?? l.erreur })),
       ignorees,
     });
   } catch (e) {
