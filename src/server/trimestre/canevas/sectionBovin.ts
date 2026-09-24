@@ -41,7 +41,7 @@ export const SECTION_II_BOVIN: SectionCanevas = {
     { type: "titre", niveau: 1, texte: "CHAPITRE II : PRODUCTIONS ET INDUSTRIES ANIMALES" },
     {
       type: "zoneTexte",
-      cle: "II.introduction",
+      cle: "II.introduction", siVide: "rien",
       consigne: "Introduction du chapitre : place de l'élevage dans le département, faits marquants de la période.",
     },
     { type: "titre", niveau: 2, texte: "II-1. L'ÉLEVAGE BOVIN" },
@@ -49,7 +49,7 @@ export const SECTION_II_BOVIN: SectionCanevas = {
     // ---- Le cheptel : présentation de l'espèce, sans numéro ----
     {
       type: "zoneTexte",
-      cle: "II1.cheptel.preambule",
+      cle: "II1.cheptel.preambule", siVide: "rien",
       // Le cheptel est un stock : l'effectif présent à la clôture, jamais la
       // somme des trois mois.
       consigne: "Présentation de l'élevage bovin et de son cheptel.",

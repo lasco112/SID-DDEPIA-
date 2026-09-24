@@ -22,7 +22,7 @@ export const SECTION_I: SectionCanevas = {
     { type: "titre", niveau: 1, texte: "INTRODUCTION" },
     {
       type: "zoneTexte",
-      cle: "I.introduction",
+      cle: "I.introduction", siVide: "rien",
       consigne:
         "Rappeler le cadre réglementaire du rapport, la période couverte, le périmètre géographique et les principales orientations du trimestre.",
     },
@@ -373,7 +373,7 @@ export const SECTION_I: SectionCanevas = {
     { type: "titre", niveau: 3, texte: "Performances par structure" },
     {
       type: "zoneTexte",
-      cle: "I4.performances",
+      cle: "I4.performances", siVide: "rien",
       consigne: "Analyse des réalisations par régie au regard des objectifs assignés.",
     },
     { type: "titre", niveau: 3, texte: "Difficultés rencontrées" },
@@ -418,7 +418,7 @@ export const SECTION_I: SectionCanevas = {
     { type: "titre", niveau: 4, texte: "C. Résumé des contraintes stratégiques et solutions proposées (maximum 03)" },
     {
       type: "zoneTexte",
-      cle: "I5.contraintes.preambule",
+      cle: "I5.contraintes.preambule", siVide: "rien",
       consigne: "Les principales contraintes stratégiques de la période (trois au maximum), détaillées avec leurs solutions dans le tableau ci-dessous.",
     },
     {

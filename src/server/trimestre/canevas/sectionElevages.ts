@@ -39,7 +39,7 @@ export const SECTION_II_OVIN: SectionCanevas = {
   titre: "Deuxième partie, II-2 — L'élevage ovin",
   blocs: [
     { type: "titre", niveau: 2, texte: "II-2. L'ÉLEVAGE OVIN" },
-    { type: "zoneTexte", cle: "II2.cheptel", consigne: "Présentation de l'élevage ovin et de son cheptel." },
+    { type: "zoneTexte", cle: "II2.cheptel", siVide: "rien", consigne: "Présentation de l'élevage ovin et de son cheptel." },
     {
       type: "tableau",
       kind: "libre",
@@ -111,7 +111,7 @@ export const SECTION_II_CAPRIN: SectionCanevas = {
   titre: "Deuxième partie, II-3 — L'élevage caprin",
   blocs: [
     { type: "titre", niveau: 2, texte: "II-3. L'ÉLEVAGE CAPRIN" },
-    { type: "zoneTexte", cle: "II3.cheptel", consigne: "Présentation de l'élevage caprin et de son cheptel." },
+    { type: "zoneTexte", cle: "II3.cheptel", siVide: "rien", consigne: "Présentation de l'élevage caprin et de son cheptel." },
     {
       type: "tableau",
       kind: "libre",
@@ -190,7 +190,7 @@ export const SECTION_II_EQUIDES: SectionCanevas = {
   titre: "Deuxième partie, II-4 — Les élevages d'asins et d'équidés",
   blocs: [
     { type: "titre", niveau: 2, texte: "II-4. LES ÉLEVAGES D'ASINS ET D'ÉQUIDÉS" },
-    { type: "zoneTexte", cle: "II4.cheptel", consigne: "Présentation des élevages d'asins et d'équidés." },
+    { type: "zoneTexte", cle: "II4.cheptel", siVide: "rien", consigne: "Présentation des élevages d'asins et d'équidés." },
     {
       type: "tableau",
       kind: "libre",

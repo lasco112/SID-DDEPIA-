@@ -202,7 +202,19 @@ export type Bloc =
    * document officiel ; elle indique au rédacteur ce qui est attendu.
    * `cle` identifie la zone de façon stable pour stocker le texte saisi.
    */
-  | { type: "zoneTexte"; cle: string; consigne: string }
+  | {
+      type: "zoneTexte";
+      cle: string;
+      consigne: string;
+      /**
+       * Ce que le document porte quand la zone n'est pas rédigée. Par défaut
+       * « Néant. » : la zone rend compte d'une activité, et aucune n'est
+       * déclarée. « rien » pour une PRÉSENTATION suivie de ses tableaux —
+       * « Néant » sous « L'élevage porcin », au-dessus du tableau des porcs,
+       * dirait qu'il n'y a pas de porcs.
+       */
+      siVide?: "neant" | "rien";
+    }
   | ({ type: "tableau" } & Tableau);
 
 export interface SectionCanevas {

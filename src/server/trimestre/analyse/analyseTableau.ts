@@ -54,6 +54,8 @@ export interface AnalyseTableau {
   phrases: PhraseAnalyse[];
   /** Vrai quand la comparaison à l'an passé manque faute de données N-1. */
   sansComparaison: boolean;
+  /** L'évolution du total sur un an, en %, quand elle est calculable. */
+  evolution: number | null;
 }
 
 const nf = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1 });
@@ -119,6 +121,7 @@ export function analyserTableau(
       numero,
       phrases: [{ texte: `Aucune donnée n’a été renseignée pour ce tableau au ${ctx.periodeCourt}.`, calcul: "Toutes les cases sont vides." }],
       sansComparaison: false,
+      evolution: null,
     };
   }
 
@@ -242,7 +245,8 @@ export function analyserTableau(
     }
   }
 
-  return { numero, phrases, sansComparaison };
+  const evolution = totalPasse != null && totalPasse !== 0 ? variation(total, totalPasse) : null;
+  return { numero, phrases, sansComparaison, evolution };
 }
 
 function mediane(xs: number[]): number {

@@ -243,6 +243,34 @@ test("aucune consigne n'est imprimée : une zone non rédigée porte « Néant. 
   }
 });
 
+test("« Néant. » jamais au-dessus d'un tableau, ni sous une présentation d'espèce", async () => {
+  const xml = new PizZip((await produire()).buffer).file("word/document.xml")!.asText();
+  const lignes = xml
+    .replace(/<w:tbl>[\s\S]*?<\/w:tbl>/g, "[TABLEAU]</w:p>")
+    .split("</w:p>")
+    .map((p) => p.replace(/<[^>]+>/g, "").replace(/&apos;/g, "'").trim())
+    .filter(Boolean);
+  // findLastIndex : le titre figure d'abord dans la table des matières.
+  const apres = (titre: RegExp) => lignes[lignes.findLastIndex((l) => titre.test(l)) + 1];
+  // Présentation de l'espèce : le tableau du cheptel suit directement.
+  assert.notEqual(apres(/^II-5\. L'ÉLEVAGE PORCIN/), "Néant.");
+  // Animation pastorale : le tableau des organisations suit, sans « Néant ».
+  assert.notEqual(apres(/^II-5-2\. Animation pastorale/), "Néant.");
+  // Une activité sans tableau, non rédigée : « Néant. ».
+  assert.equal(apres(/^II-5-6\. Exportation/), "Néant.");
+});
+
+test("la conclusion générale est pré-rédigée, domaine par domaine, sans répéter la viande", async () => {
+  const { texte } = await produire();
+  const debut = texte.lastIndexOf("CONCLUSION GÉNÉRALE");
+  const conclusion = texte.slice(debut, texte.indexOf("RÉFÉRENCES BIBLIOGRAPHIQUES", debut));
+  assert.match(conclusion, /Au cours de ce trimestre, qui couvre la période de Juillet à Septembre 2026, la DDEPIA-Menoua/);
+  assert.match(conclusion, /Pour les productions animales, la période est marquée, par rapport au T3 2025, par la hausse/);
+  // La viande se calcule sur les abattages : la citer répéterait leur pourcentage.
+  assert.doesNotMatch(conclusion, /production de viande/);
+  assert.doesNotMatch(conclusion, /Néant/);
+});
+
 test("la présentation des programmes est la même dans tous les rapports", async () => {
   for (const arrondissement of [undefined, "Dschang"]) {
     const { texte } = await produire(arrondissement);

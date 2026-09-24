@@ -228,10 +228,25 @@ function rendreTableau(
  * défaut, la consigne du canevas est rappelée en gris, entre crochets, comme
  * dans le document officiel — le rédacteur voit ainsi ce qui est attendu.
  */
+/**
+ * La zone est-elle suivie d'un tableau sous le même titre ? « Néant » y
+ * contredirait le tableau qui suit — « Animation pastorale : Néant », puis le
+ * tableau des organisations d'éleveurs.
+ */
+function suiviDUnTableau(blocs: Bloc[], i: number): boolean {
+  for (const b of blocs.slice(i + 1)) {
+    if (b.type === "titre") return false;
+    if (b.type === "tableau") return true;
+  }
+  return false;
+}
+
 function rendreZoneTexte(
   bloc: Extract<Bloc, { type: "zoneTexte" }>,
   textes: Map<string, string>,
-  ctx: ContexteCanevas
+  ctx: ContexteCanevas,
+  /** Un tableau suit la zone sous le même titre : vide, elle n'écrit rien. */
+  avantUnTableau = false
 ): Paragraph[] {
   // Les textes repris d'une période à l'autre portent des jetons — « couvre la
   // période allant de {MOIS_DEBUT} à {MOIS_FIN} {A} » — pour ne jamais annoncer
@@ -259,8 +274,11 @@ function rendreZoneTexte(
       new Paragraph({ text: "" }),
     ];
   }
-  // Non rédigée : « Néant. » (décision du Délégué). La consigne guide le
-  // rédacteur à l'écran ; elle n'a pas sa place dans un document transmis.
+  // Non rédigée : « Néant. » (décision du Délégué) — sauf une présentation,
+  // que ses tableaux et leurs analyses suivent : rien n'y est alors écrit. La
+  // consigne guide le rédacteur à l'écran ; elle n'a pas sa place dans un
+  // document transmis.
+  if (bloc.siVide === "rien" || avantUnTableau) return [];
   return [
     new Paragraph({
       alignment: AlignmentType.JUSTIFIED,
@@ -296,7 +314,7 @@ export function rendreSection(section: SectionCanevas, o: OptionsRendu): (Paragr
   const textes = o.textes ?? new Map<string, string>();
   const sortie: (Paragraph | Table)[] = [];
 
-  for (const bloc of section.blocs) {
+  section.blocs.forEach((bloc, i) => {
     if (bloc.type === "titre") {
       sortie.push(
         new Paragraph({
@@ -305,11 +323,11 @@ export function rendreSection(section: SectionCanevas, o: OptionsRendu): (Paragr
         })
       );
     } else if (bloc.type === "zoneTexte") {
-      sortie.push(...rendreZoneTexte(bloc, textes, o.ctx));
+      sortie.push(...rendreZoneTexte(bloc, textes, o.ctx, suiviDUnTableau(section.blocs, i)));
     } else {
       sortie.push(...rendreTableau(bloc, o.ctx, valeur, o.compteur, bloc.numero == null ? undefined : o.analyses?.get(bloc.numero)));
     }
-  }
+  });
   return sortie;
 }
 

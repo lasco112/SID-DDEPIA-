@@ -36,6 +36,8 @@ export interface Proposition {
   /** Le tableau est vide : rien à analyser, rien à valider. */
   vide: boolean;
   sansComparaison: boolean;
+  /** L'évolution du total sur un an, en % — pour la conclusion. */
+  evolution: number | null;
 }
 
 /** L'analyse calculée de chaque tableau analysable, dans l'ordre du canevas. */
@@ -56,6 +58,7 @@ export function propositions(ctx: ContexteCanevas, valeur: FournisseurValeur): P
         texte: a.phrases.map((p) => p.texte).join(" "),
         vide,
         sansComparaison: a.sansComparaison,
+        evolution: a.evolution,
       });
     }
   }

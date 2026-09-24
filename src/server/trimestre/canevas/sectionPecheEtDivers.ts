@@ -50,7 +50,7 @@ export const SECTION_II_AUTRES: SectionCanevas = {
   titre: "Deuxième partie, II-7 à II-9 — Élevages non conventionnels, apicole, animaux de compagnie",
   blocs: [
     { type: "titre", niveau: 2, texte: "II-7. LES ÉLEVAGES NON CONVENTIONNELS" },
-    { type: "zoneTexte", cle: "II7.cheptel", consigne: "Présentation des élevages non conventionnels et de leurs cheptels." },
+    { type: "zoneTexte", cle: "II7.cheptel", siVide: "rien", consigne: "Présentation des élevages non conventionnels et de leurs cheptels." },
     {
       type: "tableau",
       kind: "libre",
@@ -74,7 +74,7 @@ export const SECTION_II_AUTRES: SectionCanevas = {
     ...rubrique("II-7-3. Exploitation du cheptel", "II7.exploitation", "Commercialisation des animaux."),
 
     { type: "titre", niveau: 2, texte: "II-8. L'ÉLEVAGE APICOLE" },
-    { type: "zoneTexte", cle: "II8.presentation", consigne: "Présentation de l'apiculture dans le territoire." },
+    { type: "zoneTexte", cle: "II8.presentation", siVide: "rien", consigne: "Présentation de l'apiculture dans le territoire." },
     {
       type: "tableau",
       kind: "libre",
@@ -108,7 +108,7 @@ export const SECTION_II_AUTRES: SectionCanevas = {
     },
 
     { type: "titre", niveau: 2, texte: "II-9. LES ANIMAUX DE COMPAGNIE ET ÉLEVAGES CANINS ET FÉLINS" },
-    { type: "zoneTexte", cle: "II9.presentation", consigne: "Présentation des animaux de compagnie dans le territoire." },
+    { type: "zoneTexte", cle: "II9.presentation", siVide: "rien", consigne: "Présentation des animaux de compagnie dans le territoire." },
     {
       type: "tableau",
       kind: "libre",
@@ -118,7 +118,7 @@ export const SECTION_II_AUTRES: SectionCanevas = {
       lignes: LIGNES_ARRONDISSEMENTS,
     },
     { type: "titre", niveau: 2, texte: "CONCLUSION DU CHAPITRE II" },
-    { type: "zoneTexte", cle: "II.conclusion", consigne: "Synthèse des productions animales de la période." },
+    { type: "zoneTexte", cle: "II.conclusion", siVide: "rien", consigne: "Synthèse des productions animales de la période." },
   ],
 };
 
@@ -134,7 +134,7 @@ export const SECTION_III_PECHE: SectionCanevas = {
 
     // ---- III-1. Pêche artisanale continentale ----
     { type: "titre", niveau: 2, texte: "III-1. LA PÊCHE ARTISANALE CONTINENTALE" },
-    { type: "zoneTexte", cle: "III1.presentation", consigne: "Présentation de la pêche dans le territoire : plans d'eau, acteurs." },
+    { type: "zoneTexte", cle: "III1.presentation", siVide: "rien", consigne: "Présentation de la pêche dans le territoire : plans d'eau, acteurs." },
     { type: "titre", niveau: 3, texte: "III-1-1. Situation des pêcheurs par nationalité" },
     {
       type: "tableau",
@@ -235,7 +235,7 @@ export const SECTION_III_PECHE: SectionCanevas = {
     // Le régional numérote « III-2.1 » et « III-2-1 » en double, et place
     // III-3 avant les difficultés de l'aquaculture : la suite est ici continue.
     { type: "titre", niveau: 2, texte: "III-2. L'AQUACULTURE" },
-    { type: "zoneTexte", cle: "III2.presentation", consigne: "Présentation de l'aquaculture dans le territoire : faits marquants de la période." },
+    { type: "zoneTexte", cle: "III2.presentation", siVide: "rien", consigne: "Présentation de l'aquaculture dans le territoire : faits marquants de la période." },
     { type: "titre", niveau: 3, texte: "III-2-1. Initiatives paysannes" },
     {
       type: "tableau",

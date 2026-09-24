@@ -18,6 +18,7 @@ import { rendreSection, champsAutomatiques } from "./canevas/rendu";
 import { pageDeGarde, tableauAcronymes } from "./canevas/pageDeGarde";
 import { preremplirTablesAutomatiques } from "./canevas/tablesAutomatiques";
 import { analysesDuRapport } from "./analyse/analyses";
+import { textesCalcules } from "./analyse/conclusion";
 import { TEXTES_FIXES, TEXTES_COMMUNS } from "./canevas/textesFixes";
 import { TEXTES_ARRONDISSEMENTS } from "./canevas/textesArrondissements";
 import type { ContexteCanevas, SectionCanevas } from "./canevas/types";
@@ -245,6 +246,12 @@ export async function genererRapportCanevas(
       if (texte?.trim()) textes.set(cle, texte);
     }
   }
+
+  // La conclusion et la synthèse des productions, pré-rédigées à partir des
+  // chiffres (analyse/conclusion.ts), tant que personne ne les a écrites.
+  textesCalcules(ctx, valeur).forEach((t, cle) => {
+    if (!textes.has(cle)) textes.set(cle, t);
+  });
 
   // Ce que le rédacteur a écrit pour CETTE période l'emporte sur le texte fixe :
   // le fixe n'est qu'un point de départ, pas une contrainte.

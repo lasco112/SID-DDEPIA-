@@ -74,7 +74,7 @@ export const SECTION_II_PORCIN: SectionCanevas = {
   blocs: [
     { type: "titre", niveau: 2, texte: "II-5. L'ÉLEVAGE PORCIN" },
 
-    { type: "zoneTexte", cle: "II5.cheptel", consigne: "Présentation de l'élevage porcin et de son cheptel." },
+    { type: "zoneTexte", cle: "II5.cheptel", siVide: "rien", consigne: "Présentation de l'élevage porcin et de son cheptel." },
     {
       type: "tableau",
       kind: "libre",
@@ -169,13 +169,13 @@ export const SECTION_II_AVICOLE: SectionCanevas = {
     { type: "titre", niveau: 2, texte: "II-6. LES ÉLEVAGES AVICOLES" },
 
     { type: "titre", niveau: 4, texte: "a) La poule locale" },
-    { type: "zoneTexte", cle: "II6.pouleLocale", consigne: "Situation de l'élevage de la poule locale : effectifs, encadrement, faits marquants." },
+    { type: "zoneTexte", cle: "II6.pouleLocale", siVide: "rien", consigne: "Situation de l'élevage de la poule locale : effectifs, encadrement, faits marquants." },
     { type: "titre", niveau: 4, texte: "b) L'élevage des poulets de chair" },
-    { type: "zoneTexte", cle: "II6.pouletsChair", consigne: "Situation de l'élevage des poulets de chair : bandes, production, faits marquants." },
+    { type: "zoneTexte", cle: "II6.pouletsChair", siVide: "rien", consigne: "Situation de l'élevage des poulets de chair : bandes, production, faits marquants." },
     { type: "titre", niveau: 4, texte: "c) L'élevage des pondeuses" },
-    { type: "zoneTexte", cle: "II6.pondeuses", consigne: "Situation de l'élevage des pondeuses : bandes, production d'œufs, faits marquants." },
+    { type: "zoneTexte", cle: "II6.pondeuses", siVide: "rien", consigne: "Situation de l'élevage des pondeuses : bandes, production d'œufs, faits marquants." },
     { type: "titre", niveau: 4, texte: "d) L'élevage des parentaux (production de poussins d'un jour)" },
-    { type: "zoneTexte", cle: "II6.parentaux", consigne: "Situation de l'élevage des parentaux et de la production de poussins." },
+    { type: "zoneTexte", cle: "II6.parentaux", siVide: "rien", consigne: "Situation de l'élevage des parentaux et de la production de poussins." },
 
     // Situation des bandes : le « cheptel » de l'aviculture, sans numéro.
     // Les bandes EN COURS à la clôture de la période : un stock, jamais la

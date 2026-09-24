@@ -183,7 +183,7 @@ export const SECTION_IV_SANTE: SectionCanevas = {
     { type: "titre", niveau: 1, texte: "CONCLUSION GÉNÉRALE" },
     {
       type: "zoneTexte",
-      cle: "conclusion",
+      cle: "conclusion", siVide: "rien",
       consigne: "Synthèse de la période, difficultés majeures et perspectives.",
     },
 

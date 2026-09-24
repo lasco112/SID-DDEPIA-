@@ -22,6 +22,7 @@ import { requireUser, assertRole, permissionErrorResponse } from "@/lib/permissi
 import { trimestrielle, libelleOfficiel, periodePrecedente } from "@/server/periodes/calendrier";
 import { TEXTES_FIXES, TEXTES_COMMUNS } from "@/server/trimestre/canevas/textesFixes";
 import { chefDeSection } from "@/server/trimestre/canevas/sections";
+import { textesCalculesPour } from "@/server/trimestre/analyse/ecranAnalyses";
 import { TEXTES_ARRONDISSEMENTS } from "@/server/trimestre/canevas/textesArrondissements";
 import { resoudre } from "@/server/trimestre/canevas/types";
 import { contextePour, nomArrondissement } from "@/server/trimestre/saisieTrimestrielle";
@@ -81,11 +82,14 @@ export async function GET(req: Request) {
     // le texte de référence, déjà mis à la période (« de Juillet à
     // Septembre 2026 »), et ce qu'il a écrit au trimestre précédent.
     const nom = await nomArrondissement(db, arrondissementId);
+    const profil = { role: user.role, arrondissement: nom };
     const references = {
+      // La conclusion et la synthèse des productions : un brouillon calculé sur les chiffres.
+      ...Object.fromEntries(await textesCalculesPour(db, p, profil)),
       ...Object.fromEntries(TEXTES_COMMUNS),
       ...(nom ? TEXTES_ARRONDISSEMENTS.get(nom) ?? {} : Object.fromEntries(TEXTES_FIXES)),
     };
-    const ctx = await contextePour(db, p, { role: user.role, arrondissement: nom });
+    const ctx = await contextePour(db, p, profil);
     const precedents = await lireRubriques(db, periodePrecedente(p), arrondissementId).catch(() => new Map<string, string>());
     const zones = zonesDe(user).map((z) => {
       const reference = (references as Record<string, string | undefined>)[z.cle];

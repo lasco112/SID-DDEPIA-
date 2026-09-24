@@ -12,6 +12,7 @@ import { preparer, fournisseur } from "../remplissage";
 import { champsMobilises } from "../liaison";
 import { contextePour, type Profil } from "../saisieTrimestrielle";
 import { listerArrondissements } from "@/lib/arrondissements";
+import { textesCalcules } from "./conclusion";
 import { propositions, lireAnalyses, statutDe, texteAuRapport, type Proposition, type StatutAnalyse } from "./analyses";
 import type { PhraseAnalyse } from "./analyseTableau";
 
@@ -66,6 +67,17 @@ export async function propositionsPour(db: PrismaClient, periode: Periode, profi
     arrondissementId: portee || undefined,
   });
   return propositions(ctx, fournisseur(donnees, ctx)).filter((p) => concerne(p, profil));
+}
+
+/** La conclusion et la synthèse pré-rédigées, sur les chiffres de ce profil. */
+export async function textesCalculesPour(db: PrismaClient, periode: Periode, profil: Profil): Promise<Map<string, string>> {
+  const portee = await porteeDe(db, profil);
+  const ctx = await contextePour(db, periode, profil);
+  const donnees = await preparer(db, periode, champsMobilises(), {
+    autoriserIncomplet: true,
+    arrondissementId: portee || undefined,
+  });
+  return textesCalcules(ctx, fournisseur(donnees, ctx));
 }
 
 export async function ecranAnalyses(db: PrismaClient, periode: Periode, profil: Profil): Promise<EcranAnalyses> {
