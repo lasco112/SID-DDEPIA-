@@ -13,6 +13,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
+import { trimestreARapporter } from "@/lib/trimestreEchu";
 
 type Statut = "vide" | "a_valider" | "valide" | "a_revoir";
 
@@ -48,13 +49,8 @@ const LIBELLE: Record<Statut, { texte: string; classe: string }> = {
   vide: { texte: "Tableau vide", classe: "bg-gray-100 text-gray-600" },
 };
 
-function trimestreCourant() {
-  const d = new Date();
-  return { annee: d.getFullYear(), trimestre: Math.floor(d.getMonth() / 3) + 1 };
-}
-
 export default function AnalysesTrimestreClient({ presentation }: { presentation: string }) {
-  const [{ annee, trimestre }, setPeriode] = useState(trimestreCourant);
+  const [{ annee, trimestre }, setPeriode] = useState(() => trimestreARapporter());
   const [ecran, setEcran] = useState<Ecran | null>(null);
   const [ouvert, setOuvert] = useState<number | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);

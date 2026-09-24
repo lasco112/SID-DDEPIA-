@@ -25,6 +25,7 @@ import { trimestrielle, libelleOfficiel, libelleCourt } from "@/server/periodes/
 import { inspecterPeriode, PeriodeNonCalculableError } from "@/server/trimestre/agregation";
 import { genererRapportCanevas } from "@/server/trimestre/rapportCanevas";
 import { archiverRapportTrimestriel } from "@/server/trimestre/archivage";
+import { arrondissementFige } from "@/server/trimestre/circuit";
 import type { PrismaClient } from "@prisma/client";
 
 /**
@@ -103,6 +104,7 @@ export async function GET(req: Request) {
 
     const p = trimestrielle(annee, trimestre);
     const etat = await inspecterPeriode(db, p);
+    const sien = await db.arrondissement.findFirst({ where: { nom: arrondissement }, select: { id: true } });
 
     return NextResponse.json({
       arrondissement,
@@ -116,6 +118,8 @@ export async function GET(req: Request) {
       calculable: etat.calculable,
       moisAbsents: etat.moisAbsents,
       moisIncomplets: etat.moisIncomplets,
+      // Le circuit : le définitif est celui que le DA a transmis au DD.
+      transmis: sien ? await arrondissementFige(db, p, sien.id) : false,
     });
   } catch (e) {
     const { status, message } = permissionErrorResponse(e);
@@ -138,16 +142,29 @@ export async function POST(req: Request) {
     const arrondissement = await arrondissementDemande(user, db, demande ?? null);
 
     const p = trimestrielle(annee, trimestre);
-    const { buffer, nomFichier, etat, rubriquesAlimentees, valeursConsolidees } =
-      await genererRapportCanevas(db, p, { autoriserIncomplet: Boolean(apercu), arrondissement });
-
-    // Comme pour le rapport départemental : seul le définitif est conservé.
-    // Un brouillon n'est transmis à personne.
     const sien = await db.arrondissement.findFirst({
       where: { nom: arrondissement },
       select: { id: true },
     });
-    const archive = etat.calculable
+    // Le circuit : la version DÉFINITIVE du rapport d'un arrondissement est
+    // celle que son DA a transmise au DD, après relecture.
+    const transmis = await arrondissementFige(db, p, sien!.id);
+    if (!apercu && !transmis) {
+      return NextResponse.json(
+        { message: "La version définitive est celle que le DA a transmise au DD. Transmettez d'abord le rapport, ou produisez un aperçu." },
+        { status: 409 }
+      );
+    }
+    const { buffer, nomFichier, etat, rubriquesAlimentees, valeursConsolidees } =
+      await genererRapportCanevas(db, p, {
+        autoriserIncomplet: Boolean(apercu),
+        arrondissement,
+        circuitIncomplet: transmis ? undefined : "rapport non encore transmis au Délégué départemental",
+      });
+
+    // Comme pour le rapport départemental : seul le définitif est conservé.
+    // Un brouillon n'est transmis à personne.
+    const archive = etat.calculable && transmis
       ? await archiverRapportTrimestriel(db, p, {
           buffer, nomFichier, auteurId: user.id, arrondissementId: sien!.id,
         })
@@ -162,7 +179,7 @@ export async function POST(req: Request) {
         details: {
           periode: libelleCourt(p),
           arrondissement,
-          brouillon: !etat.calculable,
+          brouillon: !etat.calculable || !transmis,
           moisAbsents: etat.moisAbsents,
           moisIncomplets: etat.moisIncomplets,
           rubriquesAlimentees,

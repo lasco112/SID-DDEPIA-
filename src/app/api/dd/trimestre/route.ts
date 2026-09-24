@@ -19,6 +19,7 @@ import { trimestrielle, libelleOfficiel, libelleCourt, memePeriodeAnneePrecedent
 import { inspecterPeriode, PeriodeNonCalculableError } from "@/server/trimestre/agregation";
 import { genererRapportCanevas, ControlesCroisesError } from "@/server/trimestre/rapportCanevas";
 import { archiverRapportTrimestriel } from "@/server/trimestre/archivage";
+import { etatCircuit, messageIncomplet } from "@/server/trimestre/circuit";
 import { rassembler } from "@/server/trimestre/rapport-docx";
 import type { PrismaClient } from "@prisma/client";
 
@@ -96,6 +97,8 @@ export async function GET(req: Request) {
       moisIncomplets: etat.moisIncomplets,
       champsSansRegle: etat.champsSansRegle,
       apercuFaits,
+      // Le circuit : six rapports transmis, quatre domaines validés.
+      circuit: await etatCircuit(db, p).then((c) => ({ complet: c.complet, message: c.complet ? null : messageIncomplet(c) })),
     });
   } catch (e) {
     const { status, message } = permissionErrorResponse(e);
@@ -116,11 +119,20 @@ export async function POST(req: Request) {
     };
 
     const p = trimestrielle(annee, trimestre);
+    // Le circuit de validation : la version DÉFINITIVE exige les six rapports
+    // d'arrondissement transmis et les quatre domaines validés par leur chef.
+    const circuit = await etatCircuit(db, p);
+    if (!apercu && !circuit.complet) {
+      return NextResponse.json({ message: messageIncomplet(circuit), circuit }, { status: 409 });
+    }
     // Le rendu suit le canevas : ce sont ses 78 tableaux qui sont dessinés, et
     // les valeurs consolidées viennent remplir les cases pour lesquelles une
     // liaison a été écrite. Voir src/server/trimestre/rapportCanevas.ts.
     const { buffer, nomFichier, etat, rubriquesAlimentees, valeursConsolidees } =
-      await genererRapportCanevas(db, p, { autoriserIncomplet: Boolean(apercu) });
+      await genererRapportCanevas(db, p, {
+        autoriserIncomplet: Boolean(apercu),
+        circuitIncomplet: circuit.complet ? undefined : "circuit de validation non achevé",
+      });
 
     /*
      * Seul le rapport DÉFINITIF est conservé. Un brouillon se régénère dix fois
@@ -129,7 +141,7 @@ export async function POST(req: Request) {
      * un brouillon n'est transmis à personne. Sa production reste tracée dans
      * le journal d'activité.
      */
-    const archive = etat.calculable
+    const archive = etat.calculable && circuit.complet
       ? await archiverRapportTrimestriel(db, p, {
           buffer, nomFichier, auteurId: user.id, arrondissementId: null,
         })
@@ -143,7 +155,7 @@ export async function POST(req: Request) {
         entiteId: `${annee}-T${trimestre}`,
         details: {
           periode: libelleCourt(p),
-          brouillon: !etat.calculable,
+          brouillon: !etat.calculable || !circuit.complet,
           moisAbsents: etat.moisAbsents,
           moisIncomplets: etat.moisIncomplets,
           rubriquesAlimentees,

@@ -15,6 +15,7 @@ import { periodeTrimestrielle } from "@/server/trimestre/rubriques";
 import { nomArrondissement, type Profil } from "@/server/trimestre/saisieTrimestrielle";
 import { ecranAnalyses, porteeDe, propositionsPour, ROLES_ANALYSE } from "@/server/trimestre/analyse/ecranAnalyses";
 import { validerAnalyse, retirerAnalyse } from "@/server/trimestre/analyse/analyses";
+import { motifDeVerrou } from "@/server/trimestre/circuit";
 
 function periodeDe(annee: unknown, trimestre: unknown) {
   const a = Number(annee);
@@ -59,6 +60,9 @@ async function cible(user: Awaited<ReturnType<typeof requireUser>>, body: { anne
   if (proposition.vide) return { refus: erreur("Ce tableau est vide : il n'y a rien à analyser.", 409) };
   const portee = await porteeDe(user.db, profil);
   if (portee == null) return { refus: erreur("Arrondissement introuvable.", 400) };
+  // Le circuit : un rapport transmis, un domaine validé, ne se modifient plus.
+  const verrou = await motifDeVerrou(user.db, periode, { role: user.role, arrondissementId: user.arrondissementId });
+  if (verrou) return { refus: erreur(verrou, 409) };
   return { periode, proposition, portee };
 }
 

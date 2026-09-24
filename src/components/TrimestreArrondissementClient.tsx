@@ -23,6 +23,8 @@ interface Etat {
   periode?: { annee: number; trimestre: number; libelle: string; court: string };
   mois?: MoisEtat[];
   calculable?: boolean;
+  /** Le rapport a été transmis au DD (circuit du trimestre) : seul le définitif en découle. */
+  transmis?: boolean;
   message?: string;
 }
 
@@ -94,6 +96,7 @@ export default function TrimestreArrondissementClient() {
   }
 
   const complet = etat.calculable === true;
+  const transmis = etat.transmis === true;
 
   return (
     <div className="max-w-4xl">
@@ -101,7 +104,7 @@ export default function TrimestreArrondissementClient() {
         <label className="text-sm font-semibold text-gray-700" htmlFor="trimestre">Période</label>
         <select
           id="trimestre"
-          className="rounded border border-gray-300 px-3 py-2 text-sm"
+          className="w-full max-w-full rounded border border-gray-300 px-3 py-2 text-sm sm:w-auto"
           value={choix ? `${choix.annee}-${choix.trimestre}` : ""}
           onChange={(e) => {
             const [a, t] = e.target.value.split("-").map(Number);
@@ -122,9 +125,11 @@ export default function TrimestreArrondissementClient() {
         </h2>
         <div className={`rounded-lg border p-4 ${complet ? "border-green-200 bg-green-50" : "border-amber-200 bg-amber-50"}`}>
           <p className={`text-sm font-semibold ${complet ? "text-green-900" : "text-amber-900"}`}>
-            {complet
-              ? "Vos trois mois sont transmis : le rapport définitif peut être produit."
-              : "Il vous manque au moins un mois — seul un brouillon peut être produit."}
+            {!complet
+              ? "Il vous manque au moins un mois — seul un brouillon peut être produit."
+              : transmis
+                ? "Vos trois mois sont transmis et le rapport trimestriel aussi : le rapport définitif peut être produit."
+                : "Vos trois mois sont transmis. Le rapport définitif suivra la transmission du rapport trimestriel au DD."}
           </p>
           <ul className="mt-3 space-y-1 text-sm">
             {etat.mois?.map((m) => (
@@ -147,9 +152,9 @@ export default function TrimestreArrondissementClient() {
         <div className="flex flex-wrap gap-3">
           <button
             onClick={() => generer(false)}
-            disabled={!complet || generation !== null}
+            disabled={!complet || !transmis || generation !== null}
             className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-hover disabled:bg-gray-300"
-            title={complet ? undefined : "Vos trois mois doivent être transmis"}
+            title={!complet ? "Vos trois mois doivent être transmis" : !transmis ? "Transmettez d'abord le rapport au DD (Circuit du trimestre)" : undefined}
           >
             {generation === "final" ? "Génération…" : "Générer mon rapport trimestriel (.docx)"}
           </button>
@@ -164,9 +169,16 @@ export default function TrimestreArrondissementClient() {
 
         <p className="mt-3 text-xs text-ink-muted">
           Le document suit le canevas officiel, ramené à votre arrondissement : une seule colonne
-          territoriale au lieu de six. Les rubriques que votre saisie mensuelle alimente sont remplies
-          automatiquement ; les autres restent vides, à compléter à la main avant signature.
+          territoriale au lieu de six. Les tableaux, leurs analyses et la conclusion se remplissent à partir
+          de vos saisies. Le rapport définitif est celui que vous avez transmis au Délégué départemental
+          (menu « Circuit du trimestre ») ; avant, seul un brouillon peut être produit.
         </p>
+        {complet && !transmis && (
+          <p className="mt-3 rounded-md bg-amber-50 p-3 text-sm text-amber-900">
+            Le rapport définitif sera disponible une fois le rapport transmis au Délégué départemental, depuis le
+            menu « Circuit du trimestre ». En attendant, produisez un brouillon pour le relire.
+          </p>
+        )}
         {message && <p className="mt-3 text-sm text-gray-700">{message}</p>}
       </section>
     </div>

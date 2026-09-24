@@ -29,6 +29,8 @@ interface Etat {
   moisIncomplets?: string[];
   champsSansRegle?: string[];
   apercuFaits?: FaitApercu[];
+  /** Le circuit de validation : six rapports transmis, quatre domaines validés. */
+  circuit?: { complet: boolean; message: string | null };
 }
 
 export default function TrimestreClient() {
@@ -97,6 +99,7 @@ export default function TrimestreClient() {
   }
 
   const complet = etat.calculable === true;
+  const circuitComplet = etat.circuit?.complet === true;
 
   return (
     <div className="max-w-5xl">
@@ -105,7 +108,7 @@ export default function TrimestreClient() {
         <label className="text-sm font-semibold text-gray-700" htmlFor="trimestre">Période</label>
         <select
           id="trimestre"
-          className="rounded border border-gray-300 px-3 py-2 text-sm"
+          className="w-full max-w-full rounded border border-gray-300 px-3 py-2 text-sm sm:w-auto"
           value={choix ? `${choix.annee}-${choix.trimestre}` : ""}
           onChange={(e) => {
             const [a, t] = e.target.value.split("-").map(Number);
@@ -125,9 +128,11 @@ export default function TrimestreClient() {
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">Mois composant la période</h2>
         <div className={`rounded-lg border p-4 ${complet ? "border-green-200 bg-green-50" : "border-amber-200 bg-amber-50"}`}>
           <p className={`text-sm font-semibold ${complet ? "text-green-900" : "text-amber-900"}`}>
-            {complet
-              ? "Les trois mois sont présents et complets : le rapport définitif peut être produit."
-              : "La période est incomplète — seul un brouillon peut être produit."}
+            {!complet
+              ? "La période est incomplète — seul un brouillon peut être produit."
+              : circuitComplet
+                ? "Les trois mois sont complets et le circuit de validation est achevé : le rapport définitif peut être produit."
+                : "Les trois mois sont complets. Le rapport définitif attend la fin du circuit de validation (menu « Circuit du trimestre »)."}
           </p>
 
           <ul className="mt-3 space-y-1 text-sm">
@@ -201,9 +206,9 @@ export default function TrimestreClient() {
         <div className="flex flex-wrap gap-3">
           <button
             onClick={() => generer(false)}
-            disabled={!complet || generation !== null}
+            disabled={!complet || !circuitComplet || generation !== null}
             className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-hover disabled:bg-gray-300"
-            title={complet ? undefined : "La période doit être complète"}
+            title={!complet ? "La période doit être complète" : !circuitComplet ? "Le circuit de validation doit être achevé" : undefined}
           >
             {generation === "final" ? "Génération…" : "Générer le rapport trimestriel (.docx)"}
           </button>
@@ -217,10 +222,15 @@ export default function TrimestreClient() {
         </div>
 
         <p className="mt-3 text-xs text-ink-muted">
-          Le document reproduit le canevas officiel : ses 78 tableaux, leurs colonnes et leurs libellés de
-          ligne. Les rubriques que la collecte mensuelle alimente sont remplies automatiquement ; les autres
-          restent vides, à compléter à la main.
+          Le document reproduit le canevas officiel : ses tableaux, leurs colonnes et leurs libellés de
+          ligne. Les tableaux, leurs analyses et la conclusion se remplissent à partir des saisies ; les textes
+          viennent des chefs de section.
         </p>
+        {complet && !circuitComplet && (
+          <p className="mt-2 rounded-md bg-amber-50 p-3 text-xs text-amber-900">
+            {etat.circuit?.message} Suivez l&apos;avancement dans « Circuit du trimestre ».
+          </p>
+        )}
 
         {!complet && (
           <p className="mt-2 text-xs text-amber-900">

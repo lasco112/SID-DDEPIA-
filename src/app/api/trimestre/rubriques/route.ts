@@ -24,6 +24,7 @@ import { TEXTES_FIXES, TEXTES_COMMUNS } from "@/server/trimestre/canevas/textesF
 import { chefDeSection } from "@/server/trimestre/canevas/sections";
 import { textesCalculesPour } from "@/server/trimestre/analyse/ecranAnalyses";
 import { ZONES_AUTOMATIQUES } from "@/server/trimestre/analyse/conclusion";
+import { motifDeVerrou } from "@/server/trimestre/circuit";
 import { TEXTES_ARRONDISSEMENTS } from "@/server/trimestre/canevas/textesArrondissements";
 import { resoudre } from "@/server/trimestre/canevas/types";
 import { contextePour, nomArrondissement } from "@/server/trimestre/saisieTrimestrielle";
@@ -130,6 +131,9 @@ export async function PUT(req: Request) {
     const p = periodeDe(annee, trimestre);
     if (!p) return NextResponse.json({ message: "Période demandée invalide." }, { status: 400 });
     if (!cle) return NextResponse.json({ message: "Zone non précisée." }, { status: 400 });
+    // Le circuit : un rapport transmis, un domaine validé, ne se modifient plus.
+    const verrou = await motifDeVerrou(db, p, { role: user.role, arrondissementId: user.arrondissementId });
+    if (verrou) return NextResponse.json({ message: verrou }, { status: 409 });
 
     // La clé doit être une zone RÉELLE du canevas. Sans ce contrôle, n'importe
     // quelle chaîne créerait une rubrique fantôme, invisible à l'écran et

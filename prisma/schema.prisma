@@ -68,6 +68,7 @@ model User {
   rubriques          RubriqueNarrative[]     @relation("AuteurRubrique")
   saisiesCanevas     SaisieCanevas[]         @relation("AuteurSaisieCanevas")
   analysesValidees   AnalyseCanevas[]        @relation("ValideurAnalyse")
+  etapesTrimestre    CircuitTrimestre[]      @relation("AuteurEtapeTrimestre")
   exports            ExportDocument[]
   notifications      Notification[]
   auditLogs          AuditLog[]
@@ -127,6 +128,7 @@ model Departement {
   rubriqueNarratives     RubriqueNarrative[]
   saisieCanevas          SaisieCanevas[]
   analysesCanevas        AnalyseCanevas[]
+  circuitsTrimestre      CircuitTrimestre[]
   appelsIA               AppelIA[]
   casBancEssai           CasBancEssai[]
   syntheseSections       SyntheseSection[]
@@ -368,6 +370,7 @@ model PeriodeReporting {
   rubriques      RubriqueNarrative[]
   saisiesCanevas SaisieCanevas[]
   analyses       AnalyseCanevas[]
+  circuit        CircuitTrimestre[]
 
   @@unique([type, annee, mois, trimestre, semestre])
   @@index([statut, dateLimiteDA])
@@ -1115,4 +1118,47 @@ model AnalyseCanevas {
 
   @@unique([periodeId, numeroTableau, portee])
   @@index([periodeId, portee])
+}
+
+/// Le CIRCUIT DE VALIDATION du rapport trimestriel (décision du Délégué, 24
+/// septembre 2026) — une ligne par étape franchie :
+///
+///   - niveau ARRONDISSEMENT, cle = identifiant de l'arrondissement : le DA a
+///     TRANSMIS son rapport au DD (il l'a relu après ses agents), ou il lui a
+///     été RENVOYÉ pour correction, motif à l'appui ;
+///   - niveau SECTION, cle = code de la section (BAC, PSA, SPAIH, SSV) : le chef
+///     de section a VALIDÉ son domaine du rapport départemental.
+///
+/// Absence de ligne : l'étape n'est pas franchie. Le DD relit le document
+/// final ; il ne le produit en version définitive que lorsque les six
+/// arrondissements ont transmis et que les quatre sections ont validé.
+///
+/// Table distincte des `RapportArrondissement` et `ValidationSection` du
+/// mensuel À DESSEIN : les écrans et relances du mensuel les lisent sans
+/// distinguer le type de période ; y mêler le trimestre changerait leur
+/// comportement. Ce n'est pas une table de DONNÉES parallèle : elle ne porte
+/// aucun chiffre, seulement l'état du circuit.
+model CircuitTrimestre {
+  departementId String?
+  departement   Departement? @relation(fields: [departementId], references: [id])
+
+  id        String   @id @default(cuid())
+  periodeId String
+  /// "ARRONDISSEMENT" ou "SECTION".
+  niveau    String
+  /// L'identifiant de l'arrondissement, ou le code de la section.
+  cle       String
+  /// "TRANSMIS" ou "RENVOYE" pour un arrondissement ; "VALIDE" pour une section.
+  statut    String
+  /// Le motif d'un renvoi, affiché au DA.
+  motif     String?  @db.Text
+  auteurId  String?
+  date      DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  periode PeriodeReporting @relation(fields: [periodeId], references: [id])
+  auteur  User?            @relation("AuteurEtapeTrimestre", fields: [auteurId], references: [id])
+
+  @@unique([periodeId, niveau, cle])
+  @@index([periodeId])
 }

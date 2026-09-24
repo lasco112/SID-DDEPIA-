@@ -1,9 +1,9 @@
 import AppShell from "@/components/AppShell";
 import RubriquesTrimestreClient from "@/components/RubriquesTrimestreClient";
-import { trimestreEchu } from "@/lib/trimestreEchu";
+import { trimestreARapporter } from "@/lib/trimestreEchu";
 
 export default function RubriquesDDPage() {
-  const { annee, trimestre } = trimestreEchu();
+  const { annee, trimestre } = trimestreARapporter();
   return (
     <AppShell allowedRoles={["DD"]}>
       <div className="max-w-4xl">

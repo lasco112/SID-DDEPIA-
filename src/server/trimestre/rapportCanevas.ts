@@ -65,6 +65,8 @@ export interface ZoneTexte {
  * main : décrire une nouvelle zone dans une section la fait apparaître à
  * l'écran de rédaction sans autre intervention.
  */
+const ZONES_FINALES = new Set(["conclusion", "bibliographie"]);
+
 export function zonesTexte(options: { arrondissement?: boolean } = {}): ZoneTexte[] {
   // Les zones qui ont un texte de référence : celles du département, ou
   // celles que chaque arrondissement reçoit toutes rédigées.
@@ -81,11 +83,15 @@ export function zonesTexte(options: { arrondissement?: boolean } = {}): ZoneText
     for (const bloc of section.blocs) {
       if (bloc.type === "titre") contexte = bloc.texte;
       else if (bloc.type === "zoneTexte") {
+        // La conclusion générale et les références sont décrites à la fin de la
+        // dernière section, mais n'en font pas partie : à l'écran, elles ont leur
+        // propre groupe — sinon le chef PSA trouvait la conclusion sous « Santé animale ».
+        const finale = ZONES_FINALES.has(bloc.cle);
         zones.push({
           cle: bloc.cle,
           consigne: bloc.consigne,
-          sectionCle: section.cle,
-          sectionTitre: section.titre,
+          sectionCle: finale ? "FIN" : section.cle,
+          sectionTitre: finale ? "Conclusion générale et références" : section.titre,
           contexte,
           fixe: fixes.has(bloc.cle),
         });
@@ -128,6 +134,12 @@ export async function genererRapportCanevas(
      * le canevas régional ramené aux six arrondissements.
      */
     arrondissement?: string;
+    /**
+     * Le circuit de validation n'est pas achevé (rapport non transmis, domaine
+     * non validé) : le document est un BROUILLON, quel que soit l'état des mois.
+     * Le motif est imprimé sur la page de garde.
+     */
+    circuitIncomplet?: string;
   } = {}
 ): Promise<RapportProduit> {
   const identite = await identiteDepartement(db);
@@ -183,7 +195,7 @@ export async function genererRapportCanevas(
   });
   const valeur = fournisseur(donnees, ctx);
   const bilan = bilanLiaisons();
-  const provisoire = !etat.calculable;
+  const provisoire = !etat.calculable || Boolean(options.circuitIncomplet);
 
   // Page de garde du rapport départemental (décisions D5, D8), puis les pièces
   // liminaires du régional. La note technique qui annonçait « N rubriques
@@ -192,6 +204,10 @@ export async function genererRapportCanevas(
   const garde = pageDeGarde({ identite, periode, arrondissement: options.arrondissement });
   if (provisoire) {
     const raisons = [...etat.moisAbsents, ...etat.moisIncomplets];
+    const motif = [
+      raisons.length ? `période incomplète : ${raisons.join(", ")}` : "",
+      options.circuitIncomplet ?? "",
+    ].filter(Boolean).join(" — ");
     garde.splice(
       garde.length - 1,
       0,
@@ -200,7 +216,7 @@ export async function genererRapportCanevas(
         alignment: AlignmentType.CENTER,
         children: [
           new TextRun({
-            text: `DOCUMENT PROVISOIRE — période incomplète : ${raisons.join(", ")}`,
+            text: `DOCUMENT PROVISOIRE — ${motif}`,
             bold: true, color: "B00020", size: 20,
           }),
         ],

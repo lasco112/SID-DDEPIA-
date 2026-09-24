@@ -47,6 +47,9 @@ const PROTECTED_PREFIXES: Array<{ prefix: string; roles: string[] }> = [
   { prefix: "/api/trimestre/analyses", roles: ["DD", "DA", "AGENT_SAISIE", ...CHEF_ROLES] },
   { prefix: "/trimestre/analyses", roles: ["DD", "DA", "AGENT_SAISIE", ...CHEF_ROLES] },
   { prefix: "/trimestre/textes", roles: ["DD", "DA", "AGENT_SAISIE", ...CHEF_ROLES] },
+  // Circuit du trimestre : chacun y franchit SON étape ; les droits fins sont dans la route.
+  { prefix: "/api/trimestre/circuit", roles: ["DD", "DA", "AGENT_SAISIE", ...CHEF_ROLES] },
+  { prefix: "/trimestre/circuit", roles: ["DD", "DA", "AGENT_SAISIE", ...CHEF_ROLES] },
   { prefix: "/trimestre", roles: ["DD", "CHEF_BAC", "DA", "AGENT_SAISIE"] },
   { prefix: "/api/technique/audit", roles: ["DD", "ADMIN_TECH"] }, // AVANT la règle générale : Array.find prend la première correspondance
   { prefix: "/api/technique", roles: ["ADMIN_TECH"] },

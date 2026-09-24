@@ -222,3 +222,17 @@ test("les fonctions ne modifient pas la période reçue", () => {
   periodePrecedente(t); periodeSuivante(t); moisDeLaPeriode(t); decouper(t, "MENSUEL");
   assert.deepEqual(t, copie);
 });
+
+test("le trimestre à rapporter est le même sur tous les écrans du trimestre", async () => {
+  const { trimestreARapporter } = await import("../src/lib/trimestreEchu");
+  const le = (iso: string) => trimestreARapporter(new Date(iso));
+  // Dernier mois du trimestre : lui-même, sa saisie commence.
+  assert.deepEqual(le("2026-09-24T10:00:00Z"), { annee: 2026, trimestre: 3 });
+  // Les deux mois suivants : toujours lui, son rapport se rédige et circule.
+  assert.deepEqual(le("2026-10-15T10:00:00Z"), { annee: 2026, trimestre: 3 });
+  assert.deepEqual(le("2026-11-30T10:00:00Z"), { annee: 2026, trimestre: 3 });
+  assert.deepEqual(le("2026-12-01T10:00:00Z"), { annee: 2026, trimestre: 4 });
+  // Changement d'année : en janvier et février, le T4 de l'an passé.
+  assert.deepEqual(le("2027-01-10T10:00:00Z"), { annee: 2026, trimestre: 4 });
+  assert.deepEqual(le("2027-03-02T10:00:00Z"), { annee: 2027, trimestre: 1 });
+});

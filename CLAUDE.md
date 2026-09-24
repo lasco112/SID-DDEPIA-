@@ -175,6 +175,13 @@ Méthode, sans jamais saisir de mot de passe : forger un jeton avec `encode` de
 Toujours tester **le refus** autant que le succès, et **remettre en état** les
 données touchées par un test.
 
+Le protocole complet — accès par rôle, cloisonnement DA/DD, circuit
+trimestriel agent → DA → chef de section → DD, verrous, rapports mensuels et
+trimestriels — est écrit : `scripts/verifier-protocole.ts`, à rejouer sur le
+serveur local avant toute livraison. Pour vérifier un écran dans le navigateur
+avec plusieurs rôles à la fois : une adresse locale par rôle (`127.0.0.1`,
+`127.0.0.2`…), chacune a ses propres cookies.
+
 Deux pièges pendant la vérification :
 
 - `next build` pendant que `npm run dev` tourne écrase `.next` et casse le

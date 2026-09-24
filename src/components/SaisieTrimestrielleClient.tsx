@@ -18,6 +18,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { trimestreARapporter } from "@/lib/trimestreEchu";
 
 type EtatCase = "saisie" | "calculee" | "total" | "lecture";
 
@@ -65,12 +66,6 @@ interface Liste {
   nonClassees: LigneNonClassee[];
 }
 
-/** Le trimestre en cours, à défaut d'un choix explicite. */
-function trimestreCourant() {
-  const d = new Date();
-  return { annee: d.getFullYear(), trimestre: Math.floor(d.getMonth() / 3) + 1 };
-}
-
 const cleCase = (ligne: string, colonne: string) => `${ligne} | ${colonne}`;
 
 export default function SaisieTrimestrielleClient({
@@ -83,7 +78,7 @@ export default function SaisieTrimestrielleClient({
   /** Limite l'écran à certains tableaux — ceux du BAC, pour le chef BAC. */
   seulement?: number[];
 }) {
-  const [{ annee, trimestre }, setPeriode] = useState(trimestreCourant);
+  const [{ annee, trimestre }, setPeriode] = useState(() => trimestreARapporter());
   const [liste, setListe] = useState<Liste | null>(null);
   const [grille, setGrille] = useState<Grille | null>(null);
   const [ouvert, setOuvert] = useState<number | null>(null);

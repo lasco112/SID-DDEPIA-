@@ -20,6 +20,7 @@ import {
   type Profil,
 } from "@/server/trimestre/saisieTrimestrielle";
 import { preparerEvenements } from "@/server/trimestre/evenements";
+import { motifDeVerrou } from "@/server/trimestre/circuit";
 
 function periodeDe(annee: unknown, trimestre: unknown) {
   const a = Number(annee);
@@ -97,6 +98,9 @@ export async function PUT(req: Request) {
 
     const refus = await refusDeSaisie(user.db, periode, profil, body.numeroTableau, body.ligne, body.colonne);
     if (refus) return NextResponse.json({ message: refus }, { status: 403 });
+    // Le circuit : un rapport transmis, un domaine validé, ne se modifient plus.
+    const verrou = await motifDeVerrou(user.db, periode, { role: user.role, arrondissementId: user.arrondissementId });
+    if (verrou) return NextResponse.json({ message: verrou }, { status: 409 });
 
     const cellule = { numeroTableau: body.numeroTableau, ligne: body.ligne, colonne: body.colonne };
 

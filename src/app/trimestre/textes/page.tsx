@@ -1,6 +1,6 @@
 import AppShell from "@/components/AppShell";
 import RubriquesTrimestreClient from "@/components/RubriquesTrimestreClient";
-import { trimestreEchu } from "@/lib/trimestreEchu";
+import { trimestreARapporter } from "@/lib/trimestreEchu";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 
@@ -11,7 +11,7 @@ import { authOptions } from "@/lib/auth";
  * relisent, depuis leurs propres écrans.
  */
 export default async function TextesTrimestrePage() {
-  const { annee, trimestre } = trimestreEchu();
+  const { annee, trimestre } = trimestreARapporter();
   const session = await getServerSession(authOptions);
   const role = (session?.user as { role?: string } | undefined)?.role ?? "";
   const presentation =
