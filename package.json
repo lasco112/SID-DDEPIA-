@@ -5,7 +5,7 @@
   "type": "commonjs",
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "prisma generate && next build",
     "start": "node scripts/migrer.mjs deploy && node scripts/migrations-demo.mjs && next start",
     "migrate:demo": "node scripts/migrations-demo.mjs",
     "lint": "next lint",
