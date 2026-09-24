@@ -37,8 +37,10 @@ export interface SujetTableau {
   /** « Le cheptel bovin », « Les abattages contrôlés de bovins ». */
   sujet: string;
   pluriel: boolean;
-  /** « têtes », « FCFA »… */
+  /** « têtes », « FCFA »… Vide quand le canevas ne la précise pas. */
   unite: string;
+  /** Faux quand le détail est une suite de mois ou une liste : pas de « rubrique dominante ». */
+  detail?: boolean;
 }
 
 export interface PhraseAnalyse {
@@ -108,6 +110,7 @@ export function analyserTableau(
 
   const phrases: PhraseAnalyse[] = [];
   const { sujet: s, pluriel, unite } = sujet;
+  const u = unite ? ` ${unite}` : "";
   const verbe = pluriel ? "s’établissent" : "s’établit";
   const unArrondissement = territoires.length === 1;
 
@@ -125,23 +128,23 @@ export function analyserTableau(
     sansComparaison = true;
     phrases.push({
       texte:
-        `${s} ${verbe} à ${nb(total)} ${unite} au ${ctx.periodeCourt}. ` +
+        `${s} ${verbe} à ${nb(total)}${u} au ${ctx.periodeCourt}. ` +
         `La comparaison avec le ${ctx.periodeCourtN1} n’est pas possible : les données de cette période n’ont pas été renseignées.`,
       calcul: `Total ${ctx.periodeCourt} = ${nb(total)} ; total ${ctx.periodeCourtN1} non renseigné.`,
     });
   } else if (totalPasse === 0) {
     phrases.push({
-      texte: `${s} ${verbe} à ${nb(total)} ${unite} au ${ctx.periodeCourt}, contre aucun au ${ctx.periodeCourtN1}.`,
+      texte: `${s} ${verbe} à ${nb(total)}${u} au ${ctx.periodeCourt}, contre zéro au ${ctx.periodeCourtN1}.`,
       calcul: `${nb(total)} contre 0.`,
     });
   } else {
     const v = variation(total, totalPasse);
     const sens =
       Math.abs(v) < seuils.stabilite
-        ? `stable par rapport au ${ctx.periodeCourtN1} (${nb(totalPasse)} ${unite})`
-        : `${Math.abs(v) >= seuils.rupture ? "en forte " : "en "}${v > 0 ? "hausse" : "baisse"} de ${pct(v)} par rapport au ${ctx.periodeCourtN1} (${nb(totalPasse)} ${unite})`;
+        ? `stable par rapport au ${ctx.periodeCourtN1} (${nb(totalPasse)}${u})`
+        : `${Math.abs(v) >= seuils.rupture ? "en forte " : "en "}${v > 0 ? "hausse" : "baisse"} de ${pct(v)} par rapport au ${ctx.periodeCourtN1} (${nb(totalPasse)}${u})`;
     phrases.push({
-      texte: `${s} ${verbe} à ${nb(total)} ${unite} au ${ctx.periodeCourt}, ${sens}.`,
+      texte: `${s} ${verbe} à ${nb(total)}${u} au ${ctx.periodeCourt}, ${sens}.`,
       calcul: `(${nb(total)} − ${nb(totalPasse)}) ÷ ${nb(totalPasse)} = ${v >= 0 ? "+" : "−"}${pct(v)}.`,
     });
   }
@@ -219,7 +222,7 @@ export function analyserTableau(
   }
 
   // 4. La catégorie dominante (colonnes ou lignes de détail).
-  if (categories.length > 1) {
+  if (categories.length > 1 && sujet.detail !== false) {
     const parCategorie = categories
       .map((c) => [c, (axeP ? lire(axeP, c) : null) ?? somme(territoires.map((t) => lire(t, c)))] as const)
       .filter((e): e is readonly [string, number] => e[1] != null && e[1] > 0)

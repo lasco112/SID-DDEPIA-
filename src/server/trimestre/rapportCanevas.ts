@@ -17,6 +17,7 @@ import { SECTIONS_CANEVAS } from "./canevas/sections";
 import { rendreSection, champsAutomatiques } from "./canevas/rendu";
 import { pageDeGarde, tableauAcronymes } from "./canevas/pageDeGarde";
 import { preremplirTablesAutomatiques } from "./canevas/tablesAutomatiques";
+import { analysesDuRapport } from "./analyse/analyses";
 import { TEXTES_FIXES } from "./canevas/textesFixes";
 import { TEXTES_ARRONDISSEMENTS } from "./canevas/textesArrondissements";
 import type { ContexteCanevas, SectionCanevas } from "./canevas/types";
@@ -244,9 +245,12 @@ export async function genererRapportCanevas(
 
   options.textes?.forEach((t, cle) => textes.set(cle, t));
 
+  // L'analyse de chaque tableau : validée par son auteur, ou calculée.
+  const analyses = await analysesDuRapport(db, trimestreExistant?.id ?? null, sien?.id ?? "", ctx, valeur);
+
   const compteur = { tableaux: 0 };
   for (const section of SECTIONS_CANEVAS) {
-    enfants.push(...rendreSection(section, { ctx, valeur, textes, compteur }));
+    enfants.push(...rendreSection(section, { ctx, valeur, textes, compteur, analyses }));
   }
 
   // La signature est portée par la page de garde, comme au rapport

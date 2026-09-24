@@ -39,6 +39,11 @@ const PROTECTED_PREFIXES: Array<{ prefix: string; roles: string[] }> = [
   // pour un DA ou un agent, les tableaux du BAC pour le chef BAC — sont
   // vérifiés case par case dans la route.
   { prefix: "/api/trimestre/saisie", roles: ["DD", "CHEF_BAC", "DA", "AGENT_SAISIE"] },
+  // Analyses du trimestre : l'agent valide pour son arrondissement, le chef de
+  // section pour son domaine ; le DA et le DD relisent. Le ressort de chacun
+  // est vérifié dans la route. AVANT la règle générale "/trimestre".
+  { prefix: "/api/trimestre/analyses", roles: ["DD", "DA", "AGENT_SAISIE", ...CHEF_ROLES] },
+  { prefix: "/trimestre/analyses", roles: ["DD", "DA", "AGENT_SAISIE", ...CHEF_ROLES] },
   { prefix: "/trimestre", roles: ["DD", "CHEF_BAC", "DA", "AGENT_SAISIE"] },
   { prefix: "/api/technique/audit", roles: ["DD", "ADMIN_TECH"] }, // AVANT la règle générale : Array.find prend la première correspondance
   { prefix: "/api/technique", roles: ["ADMIN_TECH"] },

@@ -67,6 +67,7 @@ model User {
   syntheses          SyntheseSection[]       @relation("AuteurSynthese")
   rubriques          RubriqueNarrative[]     @relation("AuteurRubrique")
   saisiesCanevas     SaisieCanevas[]         @relation("AuteurSaisieCanevas")
+  analysesValidees   AnalyseCanevas[]        @relation("ValideurAnalyse")
   exports            ExportDocument[]
   notifications      Notification[]
   auditLogs          AuditLog[]
@@ -125,6 +126,7 @@ model Departement {
   corrections            Correction[]
   rubriqueNarratives     RubriqueNarrative[]
   saisieCanevas          SaisieCanevas[]
+  analysesCanevas        AnalyseCanevas[]
   appelsIA               AppelIA[]
   casBancEssai           CasBancEssai[]
   syntheseSections       SyntheseSection[]
@@ -365,6 +367,7 @@ model PeriodeReporting {
   assignations   AssignationSaisie[]
   rubriques      RubriqueNarrative[]
   saisiesCanevas SaisieCanevas[]
+  analyses       AnalyseCanevas[]
 
   @@unique([type, annee, mois, trimestre, semestre])
   @@index([statut, dateLimiteDA])
@@ -1074,4 +1077,42 @@ model ConfigSysteme {
   updatedAt    DateTime @updatedAt
 
   modifiePar User? @relation(fields: [modifieParId], references: [id])
+}
+
+/// L'ANALYSE d'un tableau du rapport trimestriel, telle que son auteur l'a validée.
+///
+/// Le texte n'est pas rédigé : le SID le CALCULE à partir des chiffres du
+/// tableau (src/server/trimestre/analyse/). Ce modèle ne conserve que ce qu'un
+/// humain y a ajouté : sa validation, sa correction éventuelle, et
+/// l'explication — la cause — que seul l'agent connaît.
+///
+/// Qui valide (décision du Délégué, 24 septembre 2026) : dans un
+/// arrondissement, l'agent de saisie — le DA relit et corrige s'il le juge
+/// utile ; au département, le chef de section de son domaine — le DD relit le
+/// document final et n'intervient que s'il le veut.
+model AnalyseCanevas {
+  departementId String?
+  departement   Departement? @relation(fields: [departementId], references: [id])
+
+  id            String   @id @default(cuid())
+  periodeId     String
+  numeroTableau Int
+  /// "" : le rapport départemental ; l'identifiant d'un arrondissement : son rapport.
+  portee        String   @default("")
+  /// Le texte calculé au moment de la validation. S'il ne correspond plus au
+  /// texte calculé aujourd'hui, les chiffres ont changé : l'analyse est à revoir.
+  texteCalcule  String   @db.Text
+  /// Le texte retenu : le texte calculé, ou sa correction par l'auteur.
+  texte         String   @db.Text
+  /// L'explication ajoutée par l'auteur — la cause, que les chiffres ne disent pas.
+  explication   String?  @db.Text
+  valideParId   String?
+  valideLe      DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  periode   PeriodeReporting @relation(fields: [periodeId], references: [id])
+  validePar User?            @relation("ValideurAnalyse", fields: [valideParId], references: [id])
+
+  @@unique([periodeId, numeroTableau, portee])
+  @@index([periodeId, portee])
 }

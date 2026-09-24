@@ -168,7 +168,9 @@ function rendreTableau(
   bloc: Extract<Bloc, { type: "tableau" }>,
   ctx: ContexteCanevas,
   valeur: FournisseurValeur,
-  compteur?: CompteurLegendes
+  compteur?: CompteurLegendes,
+  /** L'analyse du tableau, placée sous lui. */
+  analyse?: string
 ): (Paragraph | Table)[] {
   const colonnes = colonnesDe(bloc, ctx);
   const lignes = lignesDe(bloc, ctx);
@@ -205,9 +207,20 @@ function rendreTableau(
   // Certains tableaux du canevas n'ont PAS de légende — ceux du
   // budget-programme, par exemple. Leur en inventer une les ferait apparaître
   // dans la liste des tableaux, où le canevas ne les met pas.
+  // L'analyse, sous le tableau, dans le même corps que le texte courant.
+  const commentaire = analyse
+    ? [
+        new Paragraph({ text: "" }),
+        new Paragraph({
+          alignment: AlignmentType.JUSTIFIED,
+          spacing: { after: 120 },
+          children: [new TextRun({ text: analyse, size: 24 })],
+        }),
+      ]
+    : [];
   return bloc.titre
-    ? [legendeTableau(bloc.titre, numeroAffiche(bloc.numero, compteur)), tableau, new Paragraph({ text: "" })]
-    : [tableau, new Paragraph({ text: "" })];
+    ? [legendeTableau(bloc.titre, numeroAffiche(bloc.numero, compteur)), tableau, ...commentaire, new Paragraph({ text: "" })]
+    : [tableau, ...commentaire, new Paragraph({ text: "" })];
 }
 
 /**
@@ -269,6 +282,8 @@ export interface OptionsRendu {
   compteur?: CompteurLegendes;
   /** Textes analytiques déjà validés, par clé de zone. */
   textes?: Map<string, string>;
+  /** L'analyse de chaque tableau, par numéro. */
+  analyses?: Map<number, string>;
 }
 
 /** Rend une section complète du canevas. */
@@ -288,7 +303,7 @@ export function rendreSection(section: SectionCanevas, o: OptionsRendu): (Paragr
     } else if (bloc.type === "zoneTexte") {
       sortie.push(...rendreZoneTexte(bloc, textes, o.ctx));
     } else {
-      sortie.push(...rendreTableau(bloc, o.ctx, valeur, o.compteur));
+      sortie.push(...rendreTableau(bloc, o.ctx, valeur, o.compteur, bloc.numero == null ? undefined : o.analyses?.get(bloc.numero)));
     }
   }
   return sortie;
