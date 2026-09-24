@@ -70,6 +70,8 @@ export const VACCINS = [
   ["VAC_CHARBON_SYMPTOMATIQUE", "Vaccin charbon symptomatique"],
   ["VAC_CHOLERA", "Vaccin choléra"],
   ["VAC_PARVOVIROSE", "Vaccin parvovirose"],
+  // Migration 20260925090000 : la maladie existait, pas son vaccin.
+  ["VAC_DERMATOSE_NODULAIRE", "Vaccin dermatose nodulaire contagieuse"],
 ] as const;
 
 export const ACTES_VETERINAIRES = [
