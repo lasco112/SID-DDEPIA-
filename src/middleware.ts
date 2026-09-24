@@ -34,7 +34,9 @@ const PROTECTED_PREFIXES: Array<{ prefix: string; roles: string[] }> = [
   // département, le DA les siennes ; le cloisonnement est REFAIT dans la route,
   // le middleware ne connaissant que le rôle. L'agent de saisie en est exclu :
   // il ne signe aucun rapport.
-  { prefix: "/api/trimestre/rubriques", roles: ["DD", "DA"] },
+  // Depuis le 24 septembre 2026 : l'agent rédige pour son arrondissement, le
+  // chef de section pour son domaine ; le DA et le DD relisent et corrigent.
+  { prefix: "/api/trimestre/rubriques", roles: ["DD", "DA", "AGENT_SAISIE", ...CHEF_ROLES] },
   // Saisie trimestrielle (décision D9) : les droits fins — son arrondissement
   // pour un DA ou un agent, les tableaux du BAC pour le chef BAC — sont
   // vérifiés case par case dans la route.
@@ -44,6 +46,7 @@ const PROTECTED_PREFIXES: Array<{ prefix: string; roles: string[] }> = [
   // est vérifié dans la route. AVANT la règle générale "/trimestre".
   { prefix: "/api/trimestre/analyses", roles: ["DD", "DA", "AGENT_SAISIE", ...CHEF_ROLES] },
   { prefix: "/trimestre/analyses", roles: ["DD", "DA", "AGENT_SAISIE", ...CHEF_ROLES] },
+  { prefix: "/trimestre/textes", roles: ["DD", "DA", "AGENT_SAISIE", ...CHEF_ROLES] },
   { prefix: "/trimestre", roles: ["DD", "CHEF_BAC", "DA", "AGENT_SAISIE"] },
   { prefix: "/api/technique/audit", roles: ["DD", "ADMIN_TECH"] }, // AVANT la règle générale : Array.find prend la première correspondance
   { prefix: "/api/technique", roles: ["ADMIN_TECH"] },

@@ -23,6 +23,7 @@ import { preparer, fournisseur } from "../src/server/trimestre/remplissage";
 import { champsMobilises } from "../src/server/trimestre/liaison";
 import { SECTION_II_BOVIN } from "../src/server/trimestre/canevas/sectionBovin";
 import type { Bloc, ContexteCanevas } from "../src/server/trimestre/canevas/types";
+import { chefDeSection } from "../src/server/trimestre/canevas/sections";
 
 const db = base;
 const P = trimestrielle(2026, 3);
@@ -230,6 +231,36 @@ test("table des matières et liste des tableaux sont écrites d'avance, jamais b
     // Chaque lien mène à un signet qui existe.
     for (const [, cible] of Array.from(xml.matchAll(/w:anchor="([^"]+)"/g))) assert.ok(xml.includes(`w:name="${cible}"`), cible);
   }
+});
+
+test("aucune consigne n'est imprimée : une zone non rédigée porte « Néant. »", async () => {
+  for (const arrondissement of [undefined, "Santchou"]) {
+    const xml = new PizZip((await produire(arrondissement)).buffer).file("word/document.xml")!.asText();
+    const paragraphes = (xml.match(/<w:p[ >][\s\S]*?<\/w:p>/g) ?? []).map((p) => p.replace(/<[^>]+>/g, "").trim());
+    assert.deepEqual(paragraphes.filter((p) => /^\[ .* \]$/.test(p)), [], "une consigne entre crochets est restée");
+    assert.ok(!xml.includes('w:color w:val="808080"'), "plus de texte gris");
+    assert.ok(paragraphes.includes("Néant."));
+  }
+});
+
+test("la présentation des programmes est la même dans tous les rapports", async () => {
+  for (const arrondissement of [undefined, "Dschang"]) {
+    const { texte } = await produire(arrondissement);
+    assert.ok(texte.includes("Le programme 053 « Développement des productions et des industries animales » vise"));
+    // Les jetons sont résolus : l'exercice, et la structure de l'émetteur.
+    assert.ok(texte.includes("Au titre de l’exercice 2026, il est mis en œuvre à travers 6 actions"));
+    assert.ok(!/\{A\}|\{STRUCTURE\}/.test(texte));
+  }
+});
+
+test("chaque zone du rapport départemental a son chef de section", () => {
+  assert.equal(chefDeSection("I", "I.introduction"), "CHEF_BAC");
+  assert.equal(chefDeSection("BUDGET", "BP.053.presentation"), "CHEF_BAC");
+  assert.equal(chefDeSection("II-6", "II6.pondeuses"), "CHEF_PSA");
+  assert.equal(chefDeSection("III", "III2.difficultes"), "CHEF_SPAIH");
+  assert.equal(chefDeSection("IV", "IV2.bilan"), "CHEF_SSV");
+  // La conclusion générale est décrite dans la dernière section, mais elle est générale.
+  assert.equal(chefDeSection("IV", "conclusion"), "CHEF_BAC");
 });
 
 test("un arrondissement inconnu est refusé, pas silencieusement ignoré", async () => {

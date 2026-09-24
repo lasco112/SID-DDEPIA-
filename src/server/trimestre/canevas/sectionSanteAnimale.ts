@@ -53,7 +53,7 @@ export const SECTION_IV_SANTE: SectionCanevas = {
       lignes: LIGNES_ARRONDISSEMENTS,
     },
     { type: "titre", niveau: 3, texte: "IV-1-2. Surveillance sentinelle de l'influenza aviaire hautement pathogène" },
-    { type: "zoneTexte", cle: "IV2.influenza", consigne: "Rubrique imposée." },
+    { type: "zoneTexte", cle: "IV2.influenza", consigne: "Résultats de la surveillance sentinelle de l'influenza aviaire au cours de la période." },
     {
       // Sans légende dans le régional, qui compare les prélèvements des trois
       // dernières années, territoire par territoire.
@@ -131,12 +131,8 @@ export const SECTION_IV_SANTE: SectionCanevas = {
       entetes: ["Arrondissement", ...ESPECES_ABATTAGES_INSPECTION, ...TOTAUX],
       lignes: LIGNES_ARRONDISSEMENTS,
     },
-    {
-      type: "zoneTexte",
-      cle: "IV5.controleCroise",
-      consigne:
-        "Contrôle obligatoire : ce tableau doit être égal à la somme des tableaux des abattages par espèce (bovins, ovins, caprins, porcins, volaille).",
-    },
+    // Contrôle obligatoire (controles.ts) : ce tableau est égal à la somme des
+    // tableaux des abattages par espèce (bovins, ovins, caprins, porcins, volaille).
     { type: "titre", niveau: 3, texte: "IV-4-2. Lésions décelées en inspection" },
     {
       type: "tableau",
@@ -169,9 +165,9 @@ export const SECTION_IV_SANTE: SectionCanevas = {
 
     // ---- IV-6 à IV-8 ----
     { type: "titre", niveau: 2, texte: "IV-6. AUTRES ACTIVITÉS DU SERVICE" },
-    { type: "zoneTexte", cle: "IV7.autres", consigne: "Rubrique imposée." },
+    { type: "zoneTexte", cle: "IV7.autres", consigne: "Autres activités du service vétérinaire au cours de la période." },
     { type: "titre", niveau: 2, texte: "IV-7. CARTOGRAPHIE DES VÉTÉRINAIRES INSTALLÉS EN CLIENTÈLE PRIVÉE" },
-    { type: "zoneTexte", cle: "IV8.cartographie", consigne: "Rubrique imposée." },
+    { type: "zoneTexte", cle: "IV8.cartographie", consigne: "Répartition des vétérinaires installés en clientèle privée dans le territoire." },
     {
       type: "tableau",
       kind: "libre",
@@ -181,7 +177,7 @@ export const SECTION_IV_SANTE: SectionCanevas = {
       lignes: ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10"],
     },
     { type: "titre", niveau: 2, texte: "IV-8. CARTE ÉPIDÉMIOLOGIQUE ACTUALISÉE DU DÉPARTEMENT" },
-    { type: "zoneTexte", cle: "IV9.carte", consigne: "Rubrique imposée." },
+    { type: "zoneTexte", cle: "IV9.carte", consigne: "Carte épidémiologique actualisée : foyers déclarés au cours de la période." },
 
     // ---- Conclusion ----
     { type: "titre", niveau: 1, texte: "CONCLUSION GÉNÉRALE" },

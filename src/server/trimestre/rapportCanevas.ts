@@ -18,7 +18,7 @@ import { rendreSection, champsAutomatiques } from "./canevas/rendu";
 import { pageDeGarde, tableauAcronymes } from "./canevas/pageDeGarde";
 import { preremplirTablesAutomatiques } from "./canevas/tablesAutomatiques";
 import { analysesDuRapport } from "./analyse/analyses";
-import { TEXTES_FIXES } from "./canevas/textesFixes";
+import { TEXTES_FIXES, TEXTES_COMMUNS } from "./canevas/textesFixes";
 import { TEXTES_ARRONDISSEMENTS } from "./canevas/textesArrondissements";
 import type { ContexteCanevas, SectionCanevas } from "./canevas/types";
 import { identiteDepartement } from "@/lib/departement";
@@ -67,9 +67,12 @@ export interface ZoneTexte {
 export function zonesTexte(options: { arrondissement?: boolean } = {}): ZoneTexte[] {
   // Les zones qui ont un texte de référence : celles du département, ou
   // celles que chaque arrondissement reçoit toutes rédigées.
-  const fixes = options.arrondissement
-    ? new Set(Array.from(TEXTES_ARRONDISSEMENTS.values()).flatMap((t) => Object.keys(t)))
-    : new Set(Array.from(TEXTES_FIXES.keys()));
+  const fixes = new Set([
+    ...Array.from(TEXTES_COMMUNS.keys()),
+    ...(options.arrondissement
+      ? Array.from(TEXTES_ARRONDISSEMENTS.values()).flatMap((t) => Object.keys(t))
+      : Array.from(TEXTES_FIXES.keys())),
+  ]);
 
   const zones: ZoneTexte[] = [];
   for (const section of SECTIONS_CANEVAS) {
@@ -229,7 +232,11 @@ export async function genererRapportCanevas(
    * textes. Les zones qu'il n'a pas renseignées gardent leur consigne — mieux
    * vaut une consigne visible qu'un texte emprunté.
    */
-  const textes = options.arrondissement ? new Map<string, string>() : new Map(TEXTES_FIXES);
+  // Les présentations des programmes sont les mêmes pour tous.
+  const textes = new Map<string, string>([
+    ...Array.from(TEXTES_COMMUNS),
+    ...(options.arrondissement ? [] : Array.from(TEXTES_FIXES)),
+  ]);
 
   if (options.arrondissement) {
     // Ses textes à LUI : présentation, pédologie, démographie, missions,

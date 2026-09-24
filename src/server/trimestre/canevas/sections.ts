@@ -23,6 +23,27 @@ export const SECTIONS_CANEVAS: SectionCanevas[] = [
 /** Les tableaux du Bureau des Affaires Communes : départementaux par nature. */
 export const TABLEAUX_BAC = new Set([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 101, 102]);
 
+/** Le chef de section qui répond d'une partie du rapport départemental. */
+export type ChefDeSection = "CHEF_BAC" | "CHEF_PSA" | "CHEF_SPAIH" | "CHEF_SSV";
+
+/** Les zones générales du rapport — introduction, conclusion, sources — relèvent du BAC. */
+const ZONES_GENERALES = new Set(["conclusion", "bibliographie"]);
+
+/**
+ * Le chef de section responsable d'une partie du rapport (décision du
+ * Délégué, 24 septembre 2026 : les chefs de section valident, le DD relit).
+ * Première partie et budget-programme : BAC ; productions animales : PSA ;
+ * pêche et aquaculture : SPAIH ; santé animale : SSV. L'introduction, la
+ * conclusion générale et les références vont au BAC.
+ */
+export function chefDeSection(sectionCle: string, zoneCle?: string): ChefDeSection {
+  if (zoneCle && ZONES_GENERALES.has(zoneCle)) return "CHEF_BAC";
+  if (sectionCle === "I" || sectionCle === "BUDGET") return "CHEF_BAC";
+  if (sectionCle === "III") return "CHEF_SPAIH";
+  if (sectionCle === "IV") return "CHEF_SSV";
+  return "CHEF_PSA";
+}
+
 /**
  * Les tableaux SANS maille territoriale — budget-programme, contraintes, BIP,
  * vétérinaires, bilan épidémiologique… Chacun existe en une version par

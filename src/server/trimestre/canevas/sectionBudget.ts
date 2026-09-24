@@ -60,13 +60,9 @@ function programme(code: string, intitule: string, tableau: Extract<Bloc, { type
     { type: "titre", niveau: 3, texte: "Présentation" },
     { type: "zoneTexte", cle: `BP.${code}.presentation`, consigne: RAPPEL_PRESENTATION },
     { type: "titre", niveau: 3, texte: "Activités menées" },
+    // La colonne « Description du niveau de réalisation » se rédige pour la
+    // période ; les quantités y sont chiffrées, et non noyées dans le texte.
     tableau,
-    {
-      type: "zoneTexte",
-      cle: `BP.${code}.methode`,
-      consigne:
-        "La colonne « Description du niveau de réalisation » est à rédiger pour la période. Les quantités sont chiffrées, et non noyées dans le texte.",
-    },
   ];
 }
 
@@ -271,6 +267,48 @@ const P059 = tableauActivites(107, "059", COLONNES_ACTIVITES, [
     activites: [["Archivage physique."], ["Archivage numérique."], ["Construction d’un bâtiment."]],
   },
 ]);
+
+/**
+ * La PRÉSENTATION de chaque programme (décision du Délégué, 24 septembre
+ * 2026) : un texte fixe, repris à chaque trimestre comme la mission et la
+ * vision, le même au département et dans les arrondissements. Son objet, puis
+ * ses actions — celles du tableau d'activités, qu'on ne recopie pas à la main.
+ * Le rédacteur peut le corriger pour une période donnée.
+ */
+const OBJETS_PROGRAMMES: Record<string, string> = {
+  "053":
+    "Le programme 053 « Développement des productions et des industries animales » vise à accroître la production et la productivité des filières animales, et à développer leur transformation.",
+  "055":
+    "Le programme 055 « Amélioration de la couverture sanitaire des cheptels et lutte contre les zoonoses » vise à protéger la santé des animaux et, à travers elle, celle des consommateurs.",
+  "057":
+    "Le programme 057 « Développement des productions halieutiques » vise à accroître la production de poisson, par l’aquaculture et par une exploitation durable des pêches de capture.",
+  "059":
+    "Le programme 059 « Amélioration du cadre institutionnel » est le programme support : il porte la coordination, la gestion des moyens, le pilotage et la communication des services.",
+};
+
+function presentationProgramme(code: string, tableau: Extract<Bloc, { type: "tableau" }>): string {
+  const actions =
+    tableau.kind === "libre"
+      ? tableau.lignes
+          .map((c, i) => [c.trim(), tableau.prerempli?.[i]?.[0]?.trim() ?? ""] as const)
+          // Une action sans code au régional (« Protection des consommateurs »,
+          // programme 055) reste une action ; la ligne « Autres activités » n'en est pas une.
+          .filter(([, a]) => a && !/^Autres activités/.test(a))
+      : [];
+  return (
+    `${OBJETS_PROGRAMMES[code]}\n\n` +
+    `Au titre de l’exercice {A}, il est mis en œuvre à travers ${actions.length} actions : ` +
+    `${actions.map(([c, a]) => (c ? `${c} « ${a} »` : `« ${a} »`)).join(" ; ")}.`
+  );
+}
+
+/** Les présentations des quatre programmes, par clé de zone. */
+export const PRESENTATIONS_PROGRAMMES: Record<string, string> = {
+  "BP.053.presentation": presentationProgramme("053", P053),
+  "BP.055.presentation": presentationProgramme("055", P055),
+  "BP.057.presentation": presentationProgramme("057", P057),
+  "BP.059.presentation": presentationProgramme("059", P059),
+};
 
 export const SECTION_BUDGET: SectionCanevas = {
   cle: "BUDGET",

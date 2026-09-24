@@ -359,12 +359,8 @@ export const SECTION_I: SectionCanevas = {
     },
 
     { type: "titre", niveau: 2, texte: "I-4-1. État des recettes" },
-    {
-      type: "zoneTexte",
-      cle: "I4.recettes.preambule",
-      consigne:
-        "Le canevas régional impose les mois en lignes et les structures en colonnes. Pour le trimestre : trois lignes de mois et une ligne de total.",
-    },
+    // Le canevas régional impose les mois en lignes et les structures en
+    // colonnes ; pour le trimestre, trois lignes de mois et une ligne de total.
     {
       type: "tableau",
       kind: "libre",
@@ -381,9 +377,9 @@ export const SECTION_I: SectionCanevas = {
       consigne: "Analyse des réalisations par régie au regard des objectifs assignés.",
     },
     { type: "titre", niveau: 3, texte: "Difficultés rencontrées" },
-    { type: "zoneTexte", cle: "I4.difficultes", consigne: "Rubrique imposée par le canevas régional." },
+    { type: "zoneTexte", cle: "I4.difficultes", consigne: "Difficultés rencontrées dans le recouvrement des recettes au cours de la période." },
     { type: "titre", niveau: 3, texte: "Perspectives" },
-    { type: "zoneTexte", cle: "I4.perspectives", consigne: "Rubrique imposée par le canevas régional." },
+    { type: "zoneTexte", cle: "I4.perspectives", consigne: "Mesures envisagées pour améliorer le recouvrement des recettes." },
 
     {
       type: "titre",
@@ -418,12 +414,12 @@ export const SECTION_I: SectionCanevas = {
     // Les rubriques B, C et D sont celles du compte rendu du PDCVEP dans le
     // régional : elles suivent donc le projet, au niveau inférieur.
     { type: "titre", niveau: 4, texte: "B. Autres activités et commentaires" },
-    { type: "zoneTexte", cle: "I5.autres", consigne: "Rubrique B du canevas régional." },
+    { type: "zoneTexte", cle: "I5.autres", consigne: "Autres activités menées au cours de la période, et commentaires." },
     { type: "titre", niveau: 4, texte: "C. Résumé des contraintes stratégiques et solutions proposées (maximum 03)" },
     {
       type: "zoneTexte",
       cle: "I5.contraintes.preambule",
-      consigne: "Rubrique C du canevas régional. Trois contraintes au maximum.",
+      consigne: "Les principales contraintes stratégiques de la période (trois au maximum), détaillées avec leurs solutions dans le tableau ci-dessous.",
     },
     {
       type: "tableau",
@@ -437,7 +433,7 @@ export const SECTION_I: SectionCanevas = {
     {
       type: "zoneTexte",
       cle: "I5.attention",
-      consigne: "Rubrique D du canevas régional, s'il en existe.",
+      consigne: "Autres points d'attention d'importance stratégique, s'il en existe.",
     },
   ],
 };

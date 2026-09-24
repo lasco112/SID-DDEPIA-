@@ -229,7 +229,7 @@ export const SECTION_III_PECHE: SectionCanevas = {
     },
     ...rubrique("c) Exploitation des produits dérivés", "III1.produitsDerives", NEANT, 4),
     { type: "titre", niveau: 3, texte: "III-1-6. Difficultés rencontrées" },
-    { type: "zoneTexte", cle: "III1.difficultes", consigne: "Rubrique imposée." },
+    { type: "zoneTexte", cle: "III1.difficultes", consigne: "Difficultés rencontrées par la pêche au cours de la période." },
 
     // ---- III-2. Aquaculture ----
     // Le régional numérote « III-2.1 » et « III-2-1 » en double, et place
@@ -284,11 +284,11 @@ export const SECTION_III_PECHE: SectionCanevas = {
       lignes: LIGNES_ARRONDISSEMENTS,
     },
     { type: "titre", niveau: 3, texte: "III-2-5. Difficultés rencontrées" },
-    { type: "zoneTexte", cle: "III2.difficultes", consigne: "Rubrique imposée." },
+    { type: "zoneTexte", cle: "III2.difficultes", consigne: "Difficultés rencontrées par l'aquaculture au cours de la période." },
 
     // ---- III-3 ----
     { type: "titre", niveau: 2, texte: "III-3. PROMOTION DE LA POLITIQUE D'IMPORT-SUBSTITUTION" },
-    { type: "zoneTexte", cle: "III3.importSubstitution", consigne: "Rubrique imposée par le canevas régional." },
+    { type: "zoneTexte", cle: "III3.importSubstitution", consigne: "Actions menées en faveur de l'import-substitution, et leurs résultats." },
     {
       type: "tableau",
       kind: "libre",

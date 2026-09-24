@@ -204,9 +204,6 @@ function rendreTableau(
     rows: [entete, ...corps],
   });
 
-  // Certains tableaux du canevas n'ont PAS de légende — ceux du
-  // budget-programme, par exemple. Leur en inventer une les ferait apparaître
-  // dans la liste des tableaux, où le canevas ne les met pas.
   // L'analyse, sous le tableau, dans le même corps que le texte courant.
   const commentaire = analyse
     ? [
@@ -218,6 +215,9 @@ function rendreTableau(
         }),
       ]
     : [];
+  // Certains tableaux du canevas n'ont PAS de légende — ceux du
+  // budget-programme, par exemple. Leur en inventer une les ferait apparaître
+  // dans la liste des tableaux, où le canevas ne les met pas.
   return bloc.titre
     ? [legendeTableau(bloc.titre, numeroAffiche(bloc.numero, compteur)), tableau, ...commentaire, new Paragraph({ text: "" })]
     : [tableau, ...commentaire, new Paragraph({ text: "" })];
@@ -259,9 +259,13 @@ function rendreZoneTexte(
       new Paragraph({ text: "" }),
     ];
   }
+  // Non rédigée : « Néant. » (décision du Délégué). La consigne guide le
+  // rédacteur à l'écran ; elle n'a pas sa place dans un document transmis.
   return [
     new Paragraph({
-      children: [new TextRun({ text: `[ ${bloc.consigne} ]`, italics: true, color: "808080", size: 18 })],
+      alignment: AlignmentType.JUSTIFIED,
+      spacing: { after: 120 },
+      children: [new TextRun({ text: "Néant.", size: 24 })],
     }),
     new Paragraph({ text: "" }),
   ];

@@ -10,14 +10,18 @@
  *   GET ?annee=2026&trimestre=3   les zones, avec ce qui est déjà écrit
  *   PUT { annee, trimestre, cle, contenu }   enregistre une zone
  *
- * Chacun n'écrit que pour lui : le DD les zones du département, le DA les
- * siennes. Le périmètre est lu sur la session, jamais reçu du client — sans
- * quoi il suffirait d'un paramètre pour écrire sous la signature d'un autre.
+ * Qui rédige (décision du Délégué, 24 septembre 2026) : dans un
+ * arrondissement, l'agent de saisie rédige et le DA relit — il corrige s'il le
+ * veut ; au département, chaque chef de section rédige les zones de son
+ * domaine et le DD relit. Le périmètre est lu sur la session, jamais reçu du
+ * client — sans quoi il suffirait d'un paramètre pour écrire sous la
+ * signature d'un autre.
  */
 import { NextResponse } from "next/server";
 import { requireUser, assertRole, permissionErrorResponse } from "@/lib/permissions";
 import { trimestrielle, libelleOfficiel, periodePrecedente } from "@/server/periodes/calendrier";
-import { TEXTES_FIXES } from "@/server/trimestre/canevas/textesFixes";
+import { TEXTES_FIXES, TEXTES_COMMUNS } from "@/server/trimestre/canevas/textesFixes";
+import { chefDeSection } from "@/server/trimestre/canevas/sections";
 import { TEXTES_ARRONDISSEMENTS } from "@/server/trimestre/canevas/textesArrondissements";
 import { resoudre } from "@/server/trimestre/canevas/types";
 import { contextePour, nomArrondissement } from "@/server/trimestre/saisieTrimestrielle";
@@ -26,13 +30,23 @@ import { lireRubriques, ecrireRubrique } from "@/server/trimestre/rubriques";
 import type { PrismaClient } from "@prisma/client";
 import type { SessionUser } from "@/lib/permissions";
 
+const ROLES_REDACTION = ["DD", "DA", "AGENT_SAISIE", "CHEF_BAC", "CHEF_PSA", "CHEF_SPAIH", "CHEF_SSV"] as const;
+const estArrondissement = (user: SessionUser) => user.role === "DA" || user.role === "AGENT_SAISIE";
+
 /** Pour qui écrit-on : le département (null) ou un arrondissement précis ? */
 function perimetre(user: SessionUser): { arrondissementId: string | null } {
-  if (user.role === "DA") {
+  if (estArrondissement(user)) {
     if (!user.arrondissementId) throw new Error("Compte sans arrondissement assigné.");
     return { arrondissementId: user.arrondissementId };
   }
   return { arrondissementId: null };
+}
+
+/** Les zones de ce rédacteur : celles de son rapport ; pour un chef de section, celles de son domaine. */
+function zonesDe(user: SessionUser) {
+  const zones = zonesTexte({ arrondissement: estArrondissement(user) });
+  if (!user.role.startsWith("CHEF_")) return zones;
+  return zones.filter((z) => chefDeSection(z.sectionCle, z.cle) === user.role);
 }
 
 /** Lit et valide la période demandée. */
@@ -47,7 +61,7 @@ function periodeDe(annee: unknown, trimestre: unknown) {
 export async function GET(req: Request) {
   try {
     const user = await requireUser();
-    assertRole(user, ["DD", "DA"]);
+    assertRole(user, [...ROLES_REDACTION]);
     const db = user.db as PrismaClient;
     const { arrondissementId } = perimetre(user);
 
@@ -67,10 +81,13 @@ export async function GET(req: Request) {
     // le texte de référence, déjà mis à la période (« de Juillet à
     // Septembre 2026 »), et ce qu'il a écrit au trimestre précédent.
     const nom = await nomArrondissement(db, arrondissementId);
-    const references = nom ? TEXTES_ARRONDISSEMENTS.get(nom) ?? {} : Object.fromEntries(TEXTES_FIXES);
+    const references = {
+      ...Object.fromEntries(TEXTES_COMMUNS),
+      ...(nom ? TEXTES_ARRONDISSEMENTS.get(nom) ?? {} : Object.fromEntries(TEXTES_FIXES)),
+    };
     const ctx = await contextePour(db, p, { role: user.role, arrondissement: nom });
     const precedents = await lireRubriques(db, periodePrecedente(p), arrondissementId).catch(() => new Map<string, string>());
-    const zones = zonesTexte({ arrondissement: user.role === "DA" }).map((z) => {
+    const zones = zonesDe(user).map((z) => {
       const reference = (references as Record<string, string | undefined>)[z.cle];
       return {
         ...z,
@@ -96,7 +113,7 @@ export async function GET(req: Request) {
 export async function PUT(req: Request) {
   try {
     const user = await requireUser();
-    assertRole(user, ["DD", "DA"]);
+    assertRole(user, [...ROLES_REDACTION]);
     const db = user.db as PrismaClient;
     const { arrondissementId } = perimetre(user);
 
@@ -110,9 +127,9 @@ export async function PUT(req: Request) {
     // La clé doit être une zone RÉELLE du canevas. Sans ce contrôle, n'importe
     // quelle chaîne créerait une rubrique fantôme, invisible à l'écran et
     // jamais reprise dans le document.
-    const connue = zonesTexte({ arrondissement: user.role === "DA" }).some((z) => z.cle === cle);
+    const connue = zonesDe(user).some((z) => z.cle === cle);
     if (!connue) {
-      return NextResponse.json({ message: `Zone inconnue du canevas : « ${cle} ».` }, { status: 400 });
+      return NextResponse.json({ message: `Zone inconnue du canevas, ou hors de votre ressort : « ${cle} ».` }, { status: 400 });
     }
 
     const { enregistre } = await ecrireRubrique(db, user.transaction, p, arrondissementId, cle, contenu ?? "", user.id);

@@ -18,6 +18,15 @@
  */
 
 /** clé de zone de texte → texte validé par le Délégué */
+import { PRESENTATIONS_PROGRAMMES } from "./sectionBudget";
+
+/**
+ * Les textes COMMUNS au rapport départemental et aux rapports d'arrondissement :
+ * la présentation des quatre programmes du budget-programme, qui sont ceux du
+ * MINEPIA à tous les niveaux (décision du Délégué, 24 septembre 2026).
+ */
+export const TEXTES_COMMUNS = new Map<string, string>(Object.entries(PRESENTATIONS_PROGRAMMES));
+
 export const TEXTES_FIXES = new Map<string, string>([
   [
     "I.introduction",

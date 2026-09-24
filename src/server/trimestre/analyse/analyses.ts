@@ -15,29 +15,15 @@
  */
 import type { PrismaClient } from "@prisma/client";
 import type { Transactionnelle } from "@/lib/dbCloisonne";
-import type { Bloc, ContexteCanevas, SectionCanevas } from "../canevas/types";
+import type { Bloc, ContexteCanevas } from "../canevas/types";
 import type { FournisseurValeur } from "../canevas/rendu";
-import { SECTIONS_CANEVAS } from "../canevas/sections";
-import { SECTION_I } from "../canevas/sectionI";
-import { SECTION_BUDGET } from "../canevas/sectionBudget";
-import { SECTION_III_PECHE } from "../canevas/sectionPecheEtDivers";
-import { SECTION_IV_SANTE } from "../canevas/sectionSanteAnimale";
+import { SECTIONS_CANEVAS, chefDeSection, type ChefDeSection } from "../canevas/sections";
 import { analyserTableau, type PhraseAnalyse } from "./analyseTableau";
 import { SUJETS } from "./sujets";
 
 type BlocTableau = Extract<Bloc, { type: "tableau" }>;
 
-/** Le chef de section responsable d'un domaine du canevas. */
-export type ChefDeSection = "CHEF_BAC" | "CHEF_PSA" | "CHEF_SPAIH" | "CHEF_SSV";
-
-function chefDe(section: SectionCanevas): ChefDeSection {
-  if (section === SECTION_I || section === SECTION_BUDGET) return "CHEF_BAC";
-  if (section === SECTION_III_PECHE) return "CHEF_SPAIH";
-  if (section === SECTION_IV_SANTE) return "CHEF_SSV";
-  // Toute la deuxième partie : bovins, petits ruminants, équidés, porcins,
-  // aviculture et autres élevages.
-  return "CHEF_PSA";
-}
+export type { ChefDeSection };
 
 export interface Proposition {
   numero: number;
@@ -65,7 +51,7 @@ export function propositions(ctx: ContexteCanevas, valeur: FournisseurValeur): P
         numero: bloc.numero,
         titre: bloc.titre,
         section: section.titre,
-        chef: chefDe(section),
+        chef: chefDeSection(section.cle),
         phrases: a.phrases,
         texte: a.phrases.map((p) => p.texte).join(" "),
         vide,

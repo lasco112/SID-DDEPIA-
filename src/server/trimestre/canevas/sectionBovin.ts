@@ -50,8 +50,9 @@ export const SECTION_II_BOVIN: SectionCanevas = {
     {
       type: "zoneTexte",
       cle: "II1.cheptel.preambule",
-      consigne:
-        "Effectif présent à la clôture de la période. Un cheptel est un stock : il ne s'additionne pas sur les trois mois.",
+      // Le cheptel est un stock : l'effectif présent à la clôture, jamais la
+      // somme des trois mois.
+      consigne: "Présentation de l'élevage bovin et de son cheptel.",
     },
     {
       type: "tableau",

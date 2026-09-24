@@ -9,8 +9,9 @@ export default function RubriquesDDPage() {
       <div className="max-w-4xl">
         <h1 className="text-2xl font-bold text-primary-dark">Textes du rapport trimestriel</h1>
         <p className="mt-1 text-sm text-ink-muted">
-          Les zones d&apos;analyse du canevas. Ce que vous écrivez ici est repris tel quel dans le document
-          produit — vous n&apos;avez plus à le retaper dans Word après téléchargement.
+          Les chefs de section rédigent les zones de texte de leur domaine. Vous les relisez, et ne corrigez
+          que si vous le souhaitez : ce qui est écrit ici est repris tel quel dans le document ; une zone vide
+          y est marquée « Néant ».
         </p>
         <div className="mt-6">
           <RubriquesTrimestreClient annee={annee} trimestre={trimestre} />
