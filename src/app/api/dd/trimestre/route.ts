@@ -19,7 +19,8 @@ import { trimestrielle, libelleOfficiel, libelleCourt, memePeriodeAnneePrecedent
 import { inspecterPeriode, PeriodeNonCalculableError } from "@/server/trimestre/agregation";
 import { genererRapportCanevas, ControlesCroisesError } from "@/server/trimestre/rapportCanevas";
 import { archiverRapportTrimestriel } from "@/server/trimestre/archivage";
-import { etatCircuit, messageIncomplet } from "@/server/trimestre/circuit";
+import { etatCircuit, messageIncomplet, finaliserParLeDD, RefusCircuit } from "@/server/trimestre/circuit";
+import { periodeTrimestrielle } from "@/server/trimestre/rubriques";
 import { rassembler } from "@/server/trimestre/rapport-docx";
 import type { PrismaClient } from "@prisma/client";
 
@@ -112,16 +113,40 @@ export async function POST(req: Request) {
     assertRole(user, ["DD"]);
     const db = user.db as PrismaClient;
 
-    const { annee, trimestre, apercu } = (await req.json()) as {
+    const { annee, trimestre, apercu, exceptionnel, motif } = (await req.json()) as {
       annee: number;
       trimestre: number;
       apercu?: boolean;
+      /** Le DD finalise lui-même ce qui reste du circuit (DA ou chef défaillant), motif à l'appui. */
+      exceptionnel?: boolean;
+      motif?: string;
     };
 
     const p = trimestrielle(annee, trimestre);
     // Le circuit de validation : la version DÉFINITIVE exige les six rapports
     // d'arrondissement transmis et les quatre domaines validés par leur chef.
-    const circuit = await etatCircuit(db, p);
+    let circuit = await etatCircuit(db, p);
+    // Exceptionnellement, le DD prend le relais : il franchit lui-même les
+    // étapes restantes — marquées « par le DD », motif à l'appui — puis produit
+    // le définitif. Comme « Valider en tant que DD » au mensuel.
+    if (!apercu && !circuit.complet && exceptionnel) {
+      try {
+        const franchi = await finaliserParLeDD(db, user.transaction, await periodeTrimestrielle(db, p), p, motif ?? "", user.id);
+        await db.auditLog.create({
+          data: {
+            userId: user.id,
+            action: "CIRCUIT_TRIMESTRE_FINALISER",
+            entite: "CircuitTrimestre",
+            entiteId: `${annee}-T${trimestre}`,
+            details: { ...franchi, motif, parLeDD: true },
+          },
+        });
+      } catch (e) {
+        if (e instanceof RefusCircuit) return NextResponse.json({ message: e.message }, { status: 409 });
+        throw e;
+      }
+      circuit = await etatCircuit(db, p);
+    }
     if (!apercu && !circuit.complet) {
       return NextResponse.json({ message: messageIncomplet(circuit), circuit }, { status: 409 });
     }

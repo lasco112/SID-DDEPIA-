@@ -74,3 +74,45 @@ test("le circuit, de l'agent au DD — et le renvoi", async () => {
   assert.ok(etat.sections.every((s) => s.statut === "EN_ATTENTE"));
   assert.equal(await motifDeVerrou(base, P, { role: "AGENT_SAISIE", arrondissementId: premier.id }), null);
 });
+
+test("le DD prend le relais d'un DA ou d'un chef défaillant — motif obligatoire, étape marquée", async () => {
+  const { transmettreParLeDD, validerSectionParLeDD, finaliserParLeDD } = await import("../src/server/trimestre/circuit");
+  const P2 = trimestrielle(2031, 4);
+  const pid = await periodeTrimestrielle(base, P2);
+  try {
+    const dd = await base.user.findFirstOrThrow({ where: { role: "DD", actif: true }, select: { id: true } });
+    const [a] = await base.arrondissement.findMany({ select: { id: true }, take: 1 });
+
+    await assert.rejects(transmettreParLeDD(base, transaction, pid, P2, a.id, " ", dd.id), RefusCircuit, "sans motif");
+    await transmettreParLeDD(base, transaction, pid, P2, a.id, "DA absent.", dd.id);
+    let etat = await etatCircuit(base, P2);
+    const sien = etat.arrondissements.find((x) => x.id === a.id)!;
+    assert.equal(sien.statut, "TRANSMIS");
+    assert.equal(sien.parLeDD, true);
+    assert.equal(sien.motif, "DA absent.");
+
+    // Le DD valide un domaine sans attendre les six : c'est sa responsabilité.
+    await validerSectionParLeDD(base, transaction, pid, "SSV", "Chef en mission.", dd.id);
+    etat = await etatCircuit(base, P2);
+    assert.deepEqual(
+      etat.sections.find((s) => s.code === "SSV"),
+      { ...etat.sections.find((s) => s.code === "SSV")!, statut: "VALIDE", parLeDD: true, motif: "Chef en mission." }
+    );
+
+    // Finaliser : tout ce qui reste, d'un coup, au nom du DD.
+    const franchi = await finaliserParLeDD(base, transaction, pid, P2, "Délais dépassés.", dd.id);
+    assert.equal(franchi.arrondissements.length, 5);
+    assert.deepEqual(franchi.sections.sort(), ["BAC", "PSA", "SPAIH"]);
+    etat = await etatCircuit(base, P2);
+    assert.ok(etat.complet);
+    // Ce que le DA a transmis lui-même ne serait pas marqué ; ici, tout l'est.
+    assert.ok(etat.arrondissements.every((x) => x.parLeDD));
+    // Les DA et les chefs concernés sont prévenus.
+    const notes = await base.notification.count({ where: { declencheur: { in: ["TRANSMISSION_TRIMESTRE_PAR_DD", "VALIDATION_TRIMESTRE_PAR_DD"] }, sentAt: { gte: new Date(Date.now() - 60_000) } } });
+    assert.ok(notes > 0, "notifications envoyées");
+  } finally {
+    await base.circuitTrimestre.deleteMany({ where: { periodeId: pid } });
+    await base.notification.deleteMany({ where: { declencheur: { in: ["TRANSMISSION_TRIMESTRE_PAR_DD", "VALIDATION_TRIMESTRE_PAR_DD"] } } });
+    await base.periodeReporting.delete({ where: { id: pid } }).catch(() => {});
+  }
+});

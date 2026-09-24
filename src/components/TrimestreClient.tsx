@@ -58,15 +58,22 @@ export default function TrimestreClient() {
   useEffect(() => { charger(null); }, [charger]);
   useEffect(() => { if (choix) charger(choix); }, [choix, charger]);
 
-  async function generer(brouillon: boolean) {
+  /** Le motif de la finalisation exceptionnelle par le DD ; null tant qu'il ne l'a pas demandée. */
+  const [motifRelais, setMotifRelais] = useState<string | null>(null);
+
+  async function generer(brouillon: boolean, exceptionnel = false) {
     if (!choix) return;
     setGeneration(brouillon ? "brouillon" : "final");
     setMessage(null);
     const res = await fetch("/api/dd/trimestre", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...choix, apercu: brouillon }),
+      body: JSON.stringify({ ...choix, apercu: brouillon, ...(exceptionnel ? { exceptionnel: true, motif: motifRelais } : {}) }),
     });
+    if (exceptionnel && res.ok) {
+      setMotifRelais(null);
+      void charger(choix);
+    }
     if (!res.ok) {
       const d = await res.json().catch(() => ({}));
       setMessage(d.message ?? "La génération a échoué.");
@@ -227,9 +234,46 @@ export default function TrimestreClient() {
           viennent des chefs de section.
         </p>
         {complet && !circuitComplet && (
-          <p className="mt-2 rounded-md bg-amber-50 p-3 text-xs text-amber-900">
-            {etat.circuit?.message} Suivez l&apos;avancement dans « Circuit du trimestre ».
-          </p>
+          <div className="mt-2 rounded-md bg-amber-50 p-3 text-xs text-amber-900">
+            <p>{etat.circuit?.message} Suivez l&apos;avancement dans « Circuit du trimestre ».</p>
+            {/* Exceptionnellement, le DD prend le relais d'un DA ou d'un chef défaillant — comme au mensuel. */}
+            {motifRelais == null ? (
+              <button
+                type="button"
+                onClick={() => setMotifRelais("")}
+                className="mt-2 rounded border border-blue-700 bg-white px-3 py-2 text-sm text-blue-800 hover:bg-blue-50"
+              >
+                Finaliser exceptionnellement en tant que DD
+              </button>
+            ) : (
+              <div className="mt-2">
+                <p className="text-blue-900">
+                  Les rapports non transmis seront transmis, et les domaines non validés validés, EN VOTRE NOM — marqués
+                  « par le DD » avec ce motif, et les intéressés prévenus. Puis le rapport définitif sera produit.
+                </p>
+                <textarea
+                  value={motifRelais}
+                  onChange={(e) => setMotifRelais(e.target.value)}
+                  rows={2}
+                  placeholder="Motif (obligatoire)"
+                  className="mt-1 w-full rounded border border-gray-300 p-2 text-sm text-gray-900"
+                />
+                <div className="mt-1 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    disabled={!motifRelais.trim() || generation !== null}
+                    onClick={() => generer(false, true)}
+                    className="rounded-md bg-blue-800 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                  >
+                    {generation === "final" ? "Génération…" : "Finaliser et produire le rapport définitif"}
+                  </button>
+                  <button type="button" onClick={() => setMotifRelais(null)} className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm">
+                    Annuler
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         )}
 
         {!complet && (

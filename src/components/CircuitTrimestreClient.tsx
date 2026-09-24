@@ -20,6 +20,7 @@ interface Arrondissement {
   date: string | null;
   auteur: string | null;
   motif: string | null;
+  parLeDD: boolean;
 }
 
 interface Section {
@@ -29,6 +30,8 @@ interface Section {
   statut: "EN_ATTENTE" | "A_VALIDER" | "VALIDE";
   date: string | null;
   auteur: string | null;
+  parLeDD: boolean;
+  motif: string | null;
 }
 
 interface Etat {
@@ -38,7 +41,7 @@ interface Etat {
   sections: Section[];
   tousTransmis: boolean;
   complet: boolean;
-  peut: { transmettre: boolean; renvoyer: boolean; valider: boolean; annulerSection: string | null };
+  peut: { transmettre: boolean; renvoyer: boolean; valider: boolean; annulerSection: string | null; relaisDD: boolean };
 }
 
 const BADGE_ARR: Record<Arrondissement["statut"], { texte: string; classe: string }> = {
@@ -68,6 +71,8 @@ export default function CircuitTrimestreClient() {
   const [message, setMessage] = useState<string | null>(null);
   const [occupe, setOccupe] = useState(false);
   const [renvoi, setRenvoi] = useState<{ id: string; motif: string } | null>(null);
+  /** Le DD prend le relais : quelle étape, et pourquoi. */
+  const [relais, setRelais] = useState<{ cle: string; corps: Record<string, unknown>; motif: string } | null>(null);
 
   const charger = useCallback(async () => {
     setErreur(null);
@@ -100,12 +105,53 @@ export default function CircuitTrimestreClient() {
       }
       setMessage("Enregistré.");
       setRenvoi(null);
+      setRelais(null);
       await charger();
     } catch {
       setErreur("Pas de connexion : rien n'a été enregistré. Réessayez quand le réseau revient.");
     } finally {
       setOccupe(false);
     }
+  }
+
+  /** Le formulaire « en tant que DD » : un motif, puis la confirmation. */
+  function formulaireRelais(cle: string, libelle: string, corps: Record<string, unknown>) {
+    if (!etat?.peut.relaisDD) return null;
+    if (relais?.cle !== cle) {
+      return (
+        <button
+          type="button"
+          onClick={() => setRelais({ cle, corps, motif: "" })}
+          className="mt-2 rounded border border-blue-700 px-2 py-1 text-xs text-blue-800 hover:bg-blue-50"
+        >
+          {libelle}
+        </button>
+      );
+    }
+    return (
+      <div className="mt-2">
+        <textarea
+          value={relais.motif}
+          onChange={(e) => setRelais({ ...relais, motif: e.target.value })}
+          rows={2}
+          placeholder="Motif (obligatoire) : pourquoi vous prenez le relais."
+          className="w-full rounded border border-gray-300 p-2 text-sm"
+        />
+        <div className="mt-1 flex gap-2">
+          <button
+            type="button"
+            disabled={occupe || !relais.motif.trim()}
+            onClick={() => void agir({ ...relais.corps, motif: relais.motif })}
+            className="flex-1 rounded-md bg-blue-800 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
+          >
+            {libelle}
+          </button>
+          <button type="button" onClick={() => setRelais(null)} className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm">
+            Annuler
+          </button>
+        </div>
+      </div>
+    );
   }
 
   if (erreur && !etat) return <p className="rounded-md bg-red-50 p-4 text-sm text-red-800">{erreur}</p>;
@@ -166,8 +212,16 @@ export default function CircuitTrimestreClient() {
             <span className={`rounded px-2 py-0.5 text-xs font-semibold ${BADGE_ARR[sien.statut].classe}`}>
               {BADGE_ARR[sien.statut].texte}
             </span>
-            {sien.date && <span className="ml-2 text-xs text-gray-500">le {le(sien.date)}{sien.auteur ? `, par ${sien.auteur}` : ""}</span>}
+            {sien.date && (
+              <span className="ml-2 text-xs text-gray-500">
+                le {le(sien.date)}
+                {sien.parLeDD ? ", par le Délégué départemental à votre place" : sien.auteur ? `, par ${sien.auteur}` : ""}
+              </span>
+            )}
           </p>
+          {sien.parLeDD && sien.motif && (
+            <p className="mt-2 rounded-md bg-blue-50 p-3 text-sm text-blue-900">Motif du DD : {sien.motif}</p>
+          )}
           {sien.statut === "RENVOYE" && sien.motif && (
             <p className="mt-2 rounded-md bg-red-50 p-3 text-sm text-red-800">Motif du renvoi : {sien.motif}</p>
           )}
@@ -211,8 +265,14 @@ export default function CircuitTrimestreClient() {
                   <span className="text-sm font-medium text-gray-900">{a.nom}</span>
                   <span className={`rounded px-2 py-0.5 text-xs font-semibold ${BADGE_ARR[a.statut].classe}`}>{BADGE_ARR[a.statut].texte}</span>
                 </div>
-                {a.date && <p className="text-xs text-gray-500">le {le(a.date)}{a.auteur ? `, par ${a.auteur}` : ""}</p>}
-                {a.motif && <p className="mt-1 text-xs text-red-800">Motif : {a.motif}</p>}
+                {a.date && (
+                  <p className="text-xs text-gray-500">
+                    le {le(a.date)}
+                    {a.parLeDD ? ", transmis par le DD à la place du DA" : a.auteur ? `, par ${a.auteur}` : ""}
+                  </p>
+                )}
+                {a.motif && <p className={`mt-1 text-xs ${a.parLeDD ? "text-blue-800" : "text-red-800"}`}>Motif : {a.motif}</p>}
+                {a.statut !== "TRANSMIS" && formulaireRelais(`arr-${a.id}`, "Transmettre en tant que DD", { action: "transmettre", arrondissementId: a.id })}
                 {etat.peut.renvoyer && a.statut === "TRANSMIS" && (
                   renvoi?.id === a.id ? (
                     <div className="mt-2">
@@ -265,7 +325,14 @@ export default function CircuitTrimestreClient() {
                 </span>
                 <span className={`rounded px-2 py-0.5 text-xs font-semibold ${BADGE_SECTION[s.statut].classe}`}>{BADGE_SECTION[s.statut].texte}</span>
               </div>
-              {s.date && <p className="text-xs text-gray-500">le {le(s.date)}{s.auteur ? `, par ${s.auteur}` : ""}</p>}
+              {s.date && (
+                <p className="text-xs text-gray-500">
+                  le {le(s.date)}
+                  {s.parLeDD ? ", validé par le DD à la place du chef" : s.auteur ? `, par ${s.auteur}` : ""}
+                </p>
+              )}
+              {s.parLeDD && s.motif && <p className="mt-1 text-xs text-blue-800">Motif : {s.motif}</p>}
+              {s.statut !== "VALIDE" && formulaireRelais(`sec-${s.code}`, "Valider en tant que DD", { action: "valider", section: s.code })}
               {s.chef === etat.role && etat.peut.valider && (
                 <button
                   type="button"
@@ -302,6 +369,15 @@ export default function CircuitTrimestreClient() {
             ? "Le circuit est achevé : vous pouvez produire la version définitive depuis « Rapport trimestriel »."
             : "Tant que le circuit n'est pas achevé, « Rapport trimestriel » ne produit qu'un aperçu, marqué PROVISOIRE."}
         </p>
+      )}
+      {etat.role === "DD" && !etat.complet && (
+        <section className="mt-3 rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
+          <p>
+            Exceptionnellement, si un DA ou un chef de section ne franchit pas son étape, vous pouvez prendre le
+            relais : chaque étape sera marquée « par le DD », avec votre motif, et l&apos;intéressé prévenu.
+          </p>
+          {formulaireRelais("tout", "Finaliser tout le circuit en tant que DD", { action: "finaliser" })}
+        </section>
       )}
     </div>
   );

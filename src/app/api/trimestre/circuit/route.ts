@@ -8,6 +8,11 @@
  *        { action: "valider" }                                  un chef de section, pour son domaine
  *        { action: "annuler", section? }                        le chef pour son domaine, ou le DD
  *
+ * LE DD PREND LE RELAIS, motif obligatoire (comme au mensuel) :
+ *        { action: "transmettre", arrondissementId, motif }     à la place d'un DA
+ *        { action: "valider", section, motif }                  à la place d'un chef
+ *        { action: "finaliser", motif }                         tout ce qui reste, d'un coup
+ *
  * Le périmètre est lu sur la session, jamais reçu du client : un DA ne
  * transmet que SON arrondissement, un chef ne valide que SON domaine.
  */
@@ -17,6 +22,7 @@ import { trimestrielle, libelleOfficiel } from "@/server/periodes/calendrier";
 import { periodeTrimestrielle } from "@/server/trimestre/rubriques";
 import {
   etatCircuit, transmettre, renvoyer, validerSection, annulerValidationSection, codeSection, RefusCircuit, SECTIONS_CIRCUIT,
+  transmettreParLeDD, validerSectionParLeDD, finaliserParLeDD,
 } from "@/server/trimestre/circuit";
 
 const ROLES = ["DD", "DA", "AGENT_SAISIE", "CHEF_BAC", "CHEF_PSA", "CHEF_SPAIH", "CHEF_SSV"] as const;
@@ -54,6 +60,8 @@ export async function GET(req: Request) {
         renvoyer: user.role === "DD" || user.role.startsWith("CHEF_"),
         valider: maSection != null && maSection.statut === "A_VALIDER",
         annulerSection: user.role === "DD" ? "toutes" : maSection?.statut === "VALIDE" ? maSection.code : null,
+        // Le DD prend le relais d'un DA ou d'un chef défaillant.
+        relaisDD: user.role === "DD",
       },
     });
   } catch (e) {
@@ -76,6 +84,12 @@ export async function POST(req: Request) {
     let details: Record<string, unknown> = {};
     switch (body.action) {
       case "transmettre": {
+        if (user.role === "DD") {
+          if (!body.arrondissementId) return erreur("Arrondissement non précisé.", 400);
+          await transmettreParLeDD(user.db, user.transaction, periodeId, periode, body.arrondissementId, body.motif ?? "", user.id);
+          details = { arrondissementId: body.arrondissementId, parLeDD: true, motif: body.motif };
+          break;
+        }
         // L'agent prépare, il ne transmet jamais — comme au mensuel.
         if (user.role !== "DA") return erreur("Seul le Délégué d'arrondissement transmet le rapport de son arrondissement.", 403);
         if (!user.arrondissementId) return erreur("Votre compte n'est rattaché à aucun arrondissement.", 400);
@@ -93,6 +107,12 @@ export async function POST(req: Request) {
         break;
       }
       case "valider": {
+        if (user.role === "DD") {
+          if (!body.section) return erreur("Domaine non précisé.", 400);
+          await validerSectionParLeDD(user.db, user.transaction, periodeId, body.section, body.motif ?? "", user.id);
+          details = { section: body.section, parLeDD: true, motif: body.motif };
+          break;
+        }
         if (!user.role.startsWith("CHEF_")) return erreur("Seul un chef de section valide un domaine du rapport.", 403);
         await validerSection(user.db, user.transaction, periodeId, periode, user.role, user.id);
         details = { section: codeSection(user.role) };
@@ -105,6 +125,11 @@ export async function POST(req: Request) {
         if (user.role !== "DD" && !user.role.startsWith("CHEF_")) return erreur("Action non permise.", 403);
         await annulerValidationSection(user.transaction, periodeId, code);
         details = { section: code };
+        break;
+      }
+      case "finaliser": {
+        if (user.role !== "DD") return erreur("Seul le Délégué départemental finalise le rapport à la place des autres.", 403);
+        details = { ...(await finaliserParLeDD(user.db, user.transaction, periodeId, periode, body.motif ?? "", user.id)), motif: body.motif, parLeDD: true };
         break;
       }
       default:

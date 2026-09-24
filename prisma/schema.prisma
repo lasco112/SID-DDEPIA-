@@ -1150,8 +1150,13 @@ model CircuitTrimestre {
   cle       String
   /// "TRANSMIS" ou "RENVOYE" pour un arrondissement ; "VALIDE" pour une section.
   statut    String
-  /// Le motif d'un renvoi, affiché au DA.
+  /// Le motif d'un renvoi, affiché au DA — ou celui pour lequel le DD a
+  /// franchi l'étape à la place du DA ou du chef.
   motif     String?  @db.Text
+  /// L'étape a été franchie PAR LE DD, à la place d'un DA ou d'un chef de
+  /// section défaillant — comme « Valider en tant que DD » au mensuel. Elle
+  /// reste distincte d'une étape ordinaire, à l'écran comme au journal.
+  parLeDD   Boolean  @default(false)
   auteurId  String?
   date      DateTime @default(now())
   updatedAt DateTime @updatedAt

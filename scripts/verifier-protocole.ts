@@ -205,6 +205,30 @@ async function principal() {
   controle("DA de Dschang : peut de nouveau écrire", (await appel(DA_DSC, "PUT", "/api/trimestre/rubriques", { ...P, cle: "II2.animation", contenu: "" })).status === 200);
   controle("DD : définitif de nouveau refusé", (await appel(DD, "POST", "/api/dd/trimestre", { ...P, apercu: false })).status === 409);
 
+  // =================================================================== C bis
+  bloc("C bis. LE DD PREND LE RELAIS — exceptionnellement, comme au mensuel");
+  controle("chef : ne peut PAS transmettre à la place d'un DA", (await appel(CHEF_PSA, "POST", "/api/trimestre/circuit", { ...P, action: "transmettre", arrondissementId: idDe("Dschang"), motif: "x" })).status === 403);
+  controle("DA : ne peut PAS finaliser le circuit", (await appel(DA_DSC, "POST", "/api/trimestre/circuit", { ...P, action: "finaliser", motif: "x" })).status === 403);
+  const sansMotif = await appel(DD, "POST", "/api/dd/trimestre", { ...P, apercu: false, exceptionnel: true, motif: " " });
+  controle("DD : finalisation exceptionnelle refusée sans motif", sansMotif.status === 409, sansMotif.json?.message);
+  const exc = await appel(DD, "POST", "/api/dd/trimestre", { ...P, apercu: false, exceptionnel: true, motif: "DA de Dschang en congé." });
+  controle(
+    "DD : finalise exceptionnellement et produit le définitif",
+    exc.status === 200 && !/BROUILLON/.test(exc.fichier) && !texteDocx(exc.buffer!).includes("DOCUMENT PROVISOIRE"),
+    exc.fichier.replace(/.*filename="|"/g, "")
+  );
+  const vueDsc2 = (await appel(DA_DSC, "GET", `/api/trimestre/circuit?${q}`)).json;
+  controle(
+    "DA de Dschang : voit que le DD a transmis à sa place, et pourquoi",
+    vueDsc2?.arrondissements[0]?.statut === "TRANSMIS" && vueDsc2.arrondissements[0].parLeDD && vueDsc2.arrondissements[0].motif === "DA de Dschang en congé."
+  );
+  const vueDD2 = (await appel(DD, "GET", `/api/trimestre/circuit?${q}`)).json;
+  controle(
+    "circuit : seules les étapes manquantes sont marquées « par le DD »",
+    vueDD2?.complet && vueDD2.arrondissements.filter((a: { parLeDD: boolean }) => a.parLeDD).length === 1 && vueDD2.sections.every((s: { parLeDD: boolean }) => s.parLeDD)
+  );
+  controle("DA de Dschang : prévenu par une notification", (await db.notification.count({ where: { declencheur: "TRANSMISSION_TRIMESTRE_PAR_DD", createdAt: { gte: DEBUT } } })) > 0);
+
   // =================================================================== D
   bloc("D. MENSUEL — génération et droits inchangés");
   const mois = await db.periodeReporting.findFirst({ where: { type: "MENSUEL", statut: "VALIDEE_DD" }, orderBy: [{ annee: "desc" }, { mois: "desc" }], select: { id: true, annee: true, mois: true } });
@@ -227,6 +251,7 @@ async function principal() {
   const pid = (await db.periodeReporting.findFirst({ where: { type: "TRIMESTRIEL", annee: ANNEE, trimestre: TRIMESTRE }, select: { id: true } }))!.id;
   await db.circuitTrimestre.deleteMany({ where: { periodeId: pid } });
   await db.exportDocument.deleteMany({ where: { createdAt: { gte: DEBUT } } });
+  await db.notification.deleteMany({ where: { declencheur: { in: ["TRANSMISSION_TRIMESTRE_PAR_DD", "VALIDATION_TRIMESTRE_PAR_DD"] }, createdAt: { gte: DEBUT } } });
 
   const fautes = resultats.filter((r) => !r.ok);
   console.log(`\n${resultats.length - fautes.length}/${resultats.length} contrôles réussis.`);
