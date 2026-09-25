@@ -7,7 +7,7 @@ import { NextResponse } from "next/server";
 import { notifierEvenement } from "@/server/notifications/evenements";
 import type { PrismaClient } from "@prisma/client";
 import { assertPeriodeModifiable } from "@/server/periodes/gel";
-import { tableauxNonConfirmes } from "@/server/periodes/report";
+import { tableauxNonConfirmes, reprendreDansMoisSuivant } from "@/server/periodes/report";
 import { requireUser, assertRole, permissionErrorResponse } from "@/lib/permissions";
 
 export async function POST(req: Request) {
@@ -75,6 +75,27 @@ export async function POST(req: Request) {
         entiteId: rapport.id,
       },
     });
+
+    // Le mois suivant est peut-être déjà ouvert : ses chiffres y sont repris
+    // tout de suite, sans quoi un DA qui finit en retard ne retrouvait rien
+    // (la reprise n'avait lieu qu'à l'ouverture du mois). La transmission est
+    // faite : un échec ici ne doit jamais la remettre en cause.
+    try {
+      const reprise = await reprendreDansMoisSuivant(db as PrismaClient, periode.id, user.arrondissementId);
+      if (reprise && reprise.resultat.matrice + reprise.resultat.nominatif > 0) {
+        await db.auditLog.create({
+          data: {
+            userId: user.id,
+            action: "REPRISE_MOIS_SUIVANT",
+            entite: "PeriodeReporting",
+            entiteId: reprise.periodeCibleId,
+            details: { depuis: periode.id, arrondissementId: user.arrondissementId, ...reprise.resultat },
+          },
+        });
+      }
+    } catch (e) {
+      console.error("[submit] reprise dans le mois suivant impossible", e);
+    }
 
     const arr = await db.arrondissement.findUnique({ where: { id: user.arrondissementId } });
     await notifierEvenement(

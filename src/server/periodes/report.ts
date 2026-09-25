@@ -18,8 +18,15 @@
  * sont jamais repris : ce sont des listes de faits datés, pas des états. Les
  * recopier reviendrait à déclarer une seconde fois des événements qui n'ont
  * eu lieu qu'une fois.
+ *
+ * Deux moments de reprise : à l'ouverture du mois par le DD (pour tous les
+ * arrondissements), et à la TRANSMISSION d'un mois par un DA quand le mois
+ * suivant est déjà ouvert (pour son seul arrondissement). Sans le second, un
+ * DA qui finissait son mois après l'ouverture du suivant ne retrouvait rien
+ * (Fokoué, juillet → août 2026).
  */
 import type { PrismaClient } from "@prisma/client";
+import { periodeEstCloturee } from "@/server/periodes/gel";
 
 export interface ResultatReport {
   matrice: number;
@@ -28,24 +35,45 @@ export interface ResultatReport {
 }
 
 /**
+ * Date d'une valeur reprise : l'origine des temps, plus son rang. Une reprise
+ * doit perdre contre TOUTE vraie saisie — sur le serveur, `modifieLe` vide la
+ * rend remplaçable ; sur le téléphone, c'est cette date qui départage, et une
+ * date « maintenant » ferait passer la reprise devant une saisie d'août encore
+ * en attente d'envoi, qui serait alors perdue. Le rang garde l'ordre d'arrivée
+ * du mois source (ordre des établissements dans le rapport).
+ */
+const dateDeReprise = (rang: number) => new Date(rang);
+
+/** Un rapport déjà transmis ne reçoit plus rien : il est entre les mains du DD. */
+const STATUTS_FERMES = ["SOUMIS", "CLOTURE"];
+
+/**
  * Recopie les valeurs de `periodeSourceId` vers `periodeCibleId`, pour tous
- * les arrondissements. N'écrase JAMAIS une valeur déjà présente dans le mois
- * cible : si un agent a commencé à saisir, son travail prime.
+ * les arrondissements (ou le seul `arrondissementId`). N'écrase JAMAIS une
+ * valeur déjà présente dans le mois cible : si un agent a commencé à saisir,
+ * son travail prime. Un rapport cible déjà transmis n'est pas touché.
  */
 export async function reporterMoisPrecedent(
   db: PrismaClient,
   periodeSourceId: string,
-  periodeCibleId: string
+  periodeCibleId: string,
+  options: { arrondissementId?: string } = {}
 ): Promise<ResultatReport> {
   const resultat: ResultatReport = { matrice: 0, nominatif: 0, arrondissements: 0 };
 
   const rapportsSource = await db.rapportArrondissement.findMany({
-    where: { periodeId: periodeSourceId },
+    where: { periodeId: periodeSourceId, ...(options.arrondissementId ? { arrondissementId: options.arrondissementId } : {}) },
     select: { id: true, arrondissementId: true },
   });
   if (rapportsSource.length === 0) return resultat;
 
   for (const source of rapportsSource) {
+    const existant = await db.rapportArrondissement.findUnique({
+      where: { periodeId_arrondissementId: { periodeId: periodeCibleId, arrondissementId: source.arrondissementId } },
+      select: { statut: true },
+    });
+    if (existant && STATUTS_FERMES.includes(existant.statut)) continue;
+
     // Le rapport du mois cible peut ne pas exister encore : on le crée, sinon
     // les valeurs reprises n'auraient nulle part où se rattacher.
     const cible = await db.rapportArrondissement.upsert({
@@ -59,6 +87,7 @@ export async function reporterMoisPrecedent(
     const matrice = await db.saisieMatrice.findMany({
       where: { rapportId: source.id, nonRenseigne: false },
       select: { fieldCode: true, valeur: true, valeurTexte: true },
+      orderBy: [{ syncedAt: "asc" }, { id: "asc" }],
     });
     const dejaMatrice = new Set(
       (await db.saisieMatrice.findMany({ where: { rapportId: cible.id }, select: { fieldCode: true } })).map((s) => s.fieldCode)
@@ -66,13 +95,14 @@ export async function reporterMoisPrecedent(
     const aCreerMatrice = matrice.filter((s) => !dejaMatrice.has(s.fieldCode));
     if (aCreerMatrice.length > 0) {
       await db.saisieMatrice.createMany({
-        data: aCreerMatrice.map((s) => ({
+        data: aCreerMatrice.map((s, rang) => ({
           rapportId: cible.id,
           fieldCode: s.fieldCode,
           valeur: s.valeur,
           valeurTexte: s.valeurTexte,
           nonRenseigne: false,
           reporte: true,
+          syncedAt: dateDeReprise(rang),
           clientId: `report:${cible.id}:${s.fieldCode}`,
         })),
         skipDuplicates: true,
@@ -84,6 +114,7 @@ export async function reporterMoisPrecedent(
     const nominatif = await db.saisieNominative.findMany({
       where: { rapportId: source.id, nonRenseigne: false },
       select: { templateId: true, etablissementId: true, fieldCode: true, valeur: true, valeurTexte: true },
+      orderBy: [{ syncedAt: "asc" }, { id: "asc" }],
     });
     const dejaNominatif = new Set(
       (await db.saisieNominative.findMany({ where: { rapportId: cible.id }, select: { etablissementId: true, fieldCode: true } })).map(
@@ -93,7 +124,7 @@ export async function reporterMoisPrecedent(
     const aCreerNominatif = nominatif.filter((s) => !dejaNominatif.has(`${s.etablissementId}:${s.fieldCode}`));
     if (aCreerNominatif.length > 0) {
       await db.saisieNominative.createMany({
-        data: aCreerNominatif.map((s) => ({
+        data: aCreerNominatif.map((s, rang) => ({
           rapportId: cible.id,
           templateId: s.templateId,
           etablissementId: s.etablissementId,
@@ -102,6 +133,7 @@ export async function reporterMoisPrecedent(
           valeurTexte: s.valeurTexte,
           nonRenseigne: false,
           reporte: true,
+          syncedAt: dateDeReprise(rang),
           clientId: `report:${cible.id}:${s.etablissementId}:${s.fieldCode}`,
         })),
         skipDuplicates: true,
@@ -111,6 +143,31 @@ export async function reporterMoisPrecedent(
   }
 
   return resultat;
+}
+
+/**
+ * À la transmission d'un mois par un DA : si le mois SUIVANT est déjà ouvert,
+ * ses chiffres y sont repris aussitôt, pour son seul arrondissement. Sans
+ * effet s'il n'y a pas de mois suivant (il sera repris à son ouverture), si ce
+ * mois est clôturé, ou si le rapport suivant est déjà transmis.
+ */
+export async function reprendreDansMoisSuivant(
+  db: PrismaClient,
+  periodeId: string,
+  arrondissementId: string
+): Promise<{ periodeCibleId: string; resultat: ResultatReport } | null> {
+  const periode = await db.periodeReporting.findUnique({ where: { id: periodeId }, select: { type: true, annee: true, mois: true } });
+  if (!periode || periode.type !== "MENSUEL" || periode.mois == null) return null;
+
+  const suivante = await db.periodeReporting.findFirst({
+    where: { type: "MENSUEL", OR: [{ annee: { gt: periode.annee } }, { annee: periode.annee, mois: { gt: periode.mois } }] },
+    orderBy: [{ annee: "asc" }, { mois: "asc" }],
+    select: { id: true },
+  });
+  if (!suivante || (await periodeEstCloturee(db, suivante.id))) return null;
+
+  const resultat = await reporterMoisPrecedent(db, periodeId, suivante.id, { arrondissementId });
+  return { periodeCibleId: suivante.id, resultat };
 }
 
 /** Tableaux d'un rapport contenant encore des valeurs reprises non confirmées. */
