@@ -223,8 +223,8 @@ async function carteTrimestrielle(
       section?.statut === "VALIDE"
         ? `Votre section est validée${section.date ? ` depuis le ${le(section.date)}` : ""}.`
         : section?.statut === "A_VALIDER"
-          ? "Les six arrondissements ont transmis : relisez puis validez votre section."
-          : `${role === "CHEF_BAC" ? "Complétez les tableaux du BAC, puis relisez" : "Relisez"} les commentaires et les textes de votre section. Validation possible quand les six auront transmis (${transmis} sur 6).`;
+          ? "Les six arrondissements ont transmis : terminez l'analyse et les rubriques de votre section, puis validez-la."
+          : `${role === "CHEF_BAC" ? "Complétez les tableaux du BAC, validez" : "Validez"} l'analyse des chiffres et rédigez les rubriques de votre section. Validation de la section possible quand les six auront transmis (${transmis} sur 6).`;
   }
 
   const renvoye = (role === "DA" || role === "AGENT_SAISIE") && phrase.startsWith("Renvoyé");
