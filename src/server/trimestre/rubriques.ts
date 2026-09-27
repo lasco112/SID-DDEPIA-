@@ -10,7 +10,7 @@
  */
 import type { PrismaClient } from "@prisma/client";
 import type { Transactionnelle } from "@/lib/dbCloisonne";
-import { type Periode, libelleOfficiel, moisDeLaPeriode } from "../periodes/calendrier";
+import { type Periode, libelleOfficiel, moisDeLaPeriode, periodeContenant, dernierMois } from "../periodes/calendrier";
 
 /**
  * La ligne `PeriodeReporting` d'un trimestre, créée si elle n'existe pas.
@@ -26,51 +26,74 @@ import { type Periode, libelleOfficiel, moisDeLaPeriode } from "../periodes/cale
  * commandent aucun verrouillage.
  */
 export async function periodeTrimestrielle(db: PrismaClient, p: Periode): Promise<string> {
-  const trimestre = Math.floor((moisDeLaPeriode(p)[0].mois - 1) / 3) + 1;
-  const existante = await db.periodeReporting.findFirst({
-    where: { type: "TRIMESTRIEL", annee: p.annee, trimestre },
-    select: { id: true },
-  });
-  if (existante) return existante.id;
+  // Un semestre ou une année se matérialise de la même façon, sous SON type :
+  // ses propres textes et corrections s'y rattachent.
+  const existante = await ligneDePeriode(db, p);
+  if (existante) return existante;
 
   const dernierMois = moisDeLaPeriode(p).at(-1)!;
-  const finDuTrimestre = new Date(Date.UTC(dernierMois.annee, dernierMois.mois, 0));
+  const finDeLaPeriode = new Date(Date.UTC(dernierMois.annee, dernierMois.mois, 0));
   const creee = await db.periodeReporting.create({
     data: {
-      type: "TRIMESTRIEL",
+      type: p.type,
       annee: p.annee,
-      trimestre,
+      ...(p.type === "TRIMESTRIEL" ? { trimestre: p.rang } : p.type === "SEMESTRIEL" ? { semestre: p.rang } : {}),
       dateOuverture: new Date(Date.UTC(dernierMois.annee, dernierMois.mois - 1, 1)),
-      dateLimiteDA: finDuTrimestre,
-      dateLimiteChef: finDuTrimestre,
-      dateLimiteDD: finDuTrimestre,
+      dateLimiteDA: finDeLaPeriode,
+      dateLimiteChef: finDeLaPeriode,
+      dateLimiteDD: finDeLaPeriode,
     },
     select: { id: true },
   });
   return creee.id;
 }
 
-/** Les textes déjà rédigés pour une période, par clé de zone. */
+/** La ligne `PeriodeReporting` d'un trimestre, d'un semestre ou d'une année — sans la créer. */
+export async function ligneDePeriode(db: PrismaClient, p: Periode): Promise<string | null> {
+  const selon =
+    p.type === "TRIMESTRIEL" ? { trimestre: p.rang } : p.type === "SEMESTRIEL" ? { semestre: p.rang } : p.type === "MENSUEL" ? { mois: p.rang } : {};
+  const ligne = await db.periodeReporting.findFirst({ where: { type: p.type, annee: p.annee, ...selon }, select: { id: true } });
+  return ligne?.id ?? null;
+}
+
+/**
+ * Le trimestre qui CLÔT une période : le T2 pour le premier semestre, le T4
+ * pour le second et pour l'année. Le semestre et l'année se produisent en même
+ * temps que lui, en reprennent les textes et suivent son circuit (décisions du
+ * Délégué, 28 septembre 2026).
+ */
+export function trimestreDeCloture(p: Periode): Periode {
+  return periodeContenant("TRIMESTRIEL", p.annee, dernierMois(p));
+}
+
+async function rubriquesDe(db: PrismaClient, periodeId: string | null, arrondissementId: string | null) {
+  const m = new Map<string, string>();
+  if (!periodeId) return m;
+  const lignes = await db.rubriqueNarrative.findMany({
+    where: { periodeId, arrondissementId },
+    select: { cle: true, contenu: true },
+  });
+  for (const l of lignes) if (l.contenu?.trim()) m.set(l.cle, l.contenu);
+  return m;
+}
+
+/**
+ * Les textes déjà rédigés pour une période, par clé de zone. Un semestre ou
+ * une année part des textes du trimestre qui le clôt ; ce qui a été rédigé
+ * pour lui-même l'emporte.
+ */
 export async function lireRubriques(
   db: PrismaClient,
   p: Periode,
   arrondissementId: string | null
 ): Promise<Map<string, string>> {
-  const periode = await db.periodeReporting.findFirst({
-    where: { type: "TRIMESTRIEL", annee: p.annee, trimestre: Math.floor((moisDeLaPeriode(p)[0].mois - 1) / 3) + 1 },
-    select: { id: true },
-  });
-  // Rien n'a encore été rédigé pour ce trimestre : ne pas créer la période pour
-  // une simple lecture, sinon le moindre aperçu laisserait une ligne en base.
-  if (!periode) return new Map();
-
-  const lignes = await db.rubriqueNarrative.findMany({
-    where: { periodeId: periode.id, arrondissementId },
-    select: { cle: true, contenu: true },
-  });
-  const m = new Map<string, string>();
-  for (const l of lignes) if (l.contenu?.trim()) m.set(l.cle, l.contenu);
-  return m;
+  // Rien n'a encore été rédigé pour une période absente : on ne la crée pas
+  // pour une simple lecture, sinon le moindre aperçu laisserait une ligne en base.
+  const propres = await rubriquesDe(db, await ligneDePeriode(db, p), arrondissementId);
+  if (p.type === "TRIMESTRIEL") return propres;
+  const repris = await rubriquesDe(db, await ligneDePeriode(db, trimestreDeCloture(p)), arrondissementId);
+  propres.forEach((t, cle) => repris.set(cle, t));
+  return repris;
 }
 
 /**

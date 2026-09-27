@@ -6,7 +6,11 @@
  * elle n'appartient ni au DA ni à l'agent de saisie.
  *
  *   GET  ?annee=2026&trimestre=3   état de la période, sans rien produire
- *   POST { annee, trimestre, apercu }   génère le .docx
+ *   GET  ?annee=2026&type=SEMESTRIEL&rang=1   idem pour un semestre (ou type=ANNUEL)
+ *   POST { annee, trimestre | type+rang, apercu }   génère le .docx
+ *
+ * Le semestre et l'année (décision du Délégué, 28 septembre 2026) suivent le
+ * même canevas et le circuit du trimestre qui les clôt (periodeRapport.ts).
  *
  * `apercu: true` autorise une période incomplète — le document produit porte
  * alors BROUILLON sur chaque page. Sans ce drapeau, une période incomplète est
@@ -21,6 +25,8 @@ import { genererRapportCanevas, ControlesCroisesError } from "@/server/trimestre
 import { archiverRapportTrimestriel } from "@/server/trimestre/archivage";
 import { etatCircuit, messageIncomplet, finaliserParLeDD, RefusCircuit } from "@/server/trimestre/circuit";
 import { periodeTrimestrielle } from "@/server/trimestre/rubriques";
+import { periodeDuRapport, periodeDuCircuit, cleDeRapport } from "@/server/trimestre/periodeRapport";
+import { trimestresSansSaisie } from "@/server/trimestre/consolidation";
 import { rassembler } from "@/server/trimestre/rapport-docx";
 import type { PrismaClient } from "@prisma/client";
 
@@ -55,20 +61,21 @@ export async function GET(req: Request) {
     // Attention : `Number(null)` vaut 0, et `Number.isInteger(0)` est vrai.
     // Convertir avant d'avoir vérifié la présence du paramètre ferait passer
     // une requête sans période pour une demande sur l'an 0.
-    const anneeBrute = url.searchParams.get("annee");
-    const trimestreBrut = url.searchParams.get("trimestre");
-
     const disponibles = await trimestresDisponibles(db);
-    if (!anneeBrute || !trimestreBrut) {
+    if (!url.searchParams.get("annee")) {
       return NextResponse.json({ disponibles });
     }
-    const annee = Number(anneeBrute);
-    const trimestre = Number(trimestreBrut);
-    if (!Number.isInteger(annee) || !Number.isInteger(trimestre) || trimestre < 1 || trimestre > 4) {
+    const p = periodeDuRapport({
+      annee: url.searchParams.get("annee"),
+      type: url.searchParams.get("type") ?? undefined,
+      rang: url.searchParams.get("rang") ?? undefined,
+      trimestre: url.searchParams.get("trimestre") ?? undefined,
+    });
+    if (!p) {
       return NextResponse.json({ message: "Période demandée invalide.", disponibles }, { status: 400 });
     }
-
-    const p = trimestrielle(annee, trimestre);
+    const { annee } = p;
+    const trimestre = p.type === "TRIMESTRIEL" ? p.rang : null;
     const etat = await inspecterPeriode(db, p);
     const etatN1 = await inspecterPeriode(db, memePeriodeAnneePrecedente(p));
 
@@ -85,7 +92,9 @@ export async function GET(req: Request) {
 
     return NextResponse.json({
       disponibles,
-      periode: { annee, trimestre, libelle: etat.libelle, court: libelleCourt(p) },
+      periode: { annee, trimestre, type: p.type, rang: p.rang, libelle: etat.libelle, court: libelleCourt(p) },
+      // Semestre ou année : les trimestres dont aucun tableau n'a été saisi.
+      trimestresSansSaisie: p.type === "TRIMESTRIEL" ? [] : await trimestresSansSaisie(db, p),
       comparaison: { libelle: libelleOfficiel(memePeriodeAnneePrecedente(p)), disponible: etatN1.mois.some((m) => m.periodeId) },
       mois: etat.mois.map((m) => ({
         libelle: `${String(m.mois).padStart(2, "0")}/${m.annee}`,
@@ -99,7 +108,7 @@ export async function GET(req: Request) {
       champsSansRegle: etat.champsSansRegle,
       apercuFaits,
       // Le circuit : six rapports transmis, quatre domaines validés.
-      circuit: await etatCircuit(db, p).then((c) => ({ complet: c.complet, message: c.complet ? null : messageIncomplet(c) })),
+      circuit: await etatCircuit(db, periodeDuCircuit(p)).then((c) => ({ complet: c.complet, message: c.complet ? null : messageIncomplet(c) })),
     });
   } catch (e) {
     const { status, message } = permissionErrorResponse(e);
@@ -113,31 +122,37 @@ export async function POST(req: Request) {
     assertRole(user, ["DD"]);
     const db = user.db as PrismaClient;
 
-    const { annee, trimestre, apercu, exceptionnel, motif } = (await req.json()) as {
+    const corps = (await req.json()) as {
       annee: number;
-      trimestre: number;
+      trimestre?: number;
+      type?: string;
+      rang?: number;
       apercu?: boolean;
       /** Le DD finalise lui-même ce qui reste du circuit (DA ou chef défaillant), motif à l'appui. */
       exceptionnel?: boolean;
       motif?: string;
     };
 
-    const p = trimestrielle(annee, trimestre);
+    const { apercu, exceptionnel, motif } = corps;
+    const p = periodeDuRapport(corps);
+    if (!p) return NextResponse.json({ message: "Période demandée invalide." }, { status: 400 });
+    // Le semestre et l'année suivent le circuit du trimestre qui les clôt.
+    const pc = periodeDuCircuit(p);
     // Le circuit de validation : la version DÉFINITIVE exige les six rapports
     // d'arrondissement transmis et les quatre domaines validés par leur chef.
-    let circuit = await etatCircuit(db, p);
+    let circuit = await etatCircuit(db, pc);
     // Exceptionnellement, le DD prend le relais : il franchit lui-même les
     // étapes restantes — marquées « par le DD », motif à l'appui — puis produit
     // le définitif. Comme « Valider en tant que DD » au mensuel.
     if (!apercu && !circuit.complet && exceptionnel) {
       try {
-        const franchi = await finaliserParLeDD(db, user.transaction, await periodeTrimestrielle(db, p), p, motif ?? "", user.id);
+        const franchi = await finaliserParLeDD(db, user.transaction, await periodeTrimestrielle(db, pc), pc, motif ?? "", user.id);
         await db.auditLog.create({
           data: {
             userId: user.id,
             action: "CIRCUIT_TRIMESTRE_FINALISER",
             entite: "CircuitTrimestre",
-            entiteId: `${annee}-T${trimestre}`,
+            entiteId: cleDeRapport(pc),
             details: { ...franchi, motif, parLeDD: true },
           },
         });
@@ -145,7 +160,7 @@ export async function POST(req: Request) {
         if (e instanceof RefusCircuit) return NextResponse.json({ message: e.message }, { status: 409 });
         throw e;
       }
-      circuit = await etatCircuit(db, p);
+      circuit = await etatCircuit(db, pc);
     }
     if (!apercu && !circuit.complet) {
       return NextResponse.json({ message: messageIncomplet(circuit), circuit }, { status: 409 });
@@ -177,7 +192,7 @@ export async function POST(req: Request) {
         userId: user.id,
         action: "GENERATION_RAPPORT_TRIMESTRIEL",
         entite: "PeriodeReporting",
-        entiteId: `${annee}-T${trimestre}`,
+        entiteId: cleDeRapport(p),
         details: {
           periode: libelleCourt(p),
           brouillon: !etat.calculable || !circuit.complet,

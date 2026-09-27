@@ -13,6 +13,7 @@
  */
 import type { PrismaClient } from "@prisma/client";
 import { type Periode, memePeriodeAnneePrecedente } from "../periodes/calendrier";
+import { saisiesConsolidees } from "./consolidation";
 import { agreger, type ValeurAgregee } from "./agregation";
 import { liaisonDe, evaluer, estLiee, type Correspondance, type Formule } from "./liaison";
 import { colonnesDe, lignesDe, type FournisseurValeur } from "./canevas/rendu";
@@ -67,6 +68,11 @@ export interface DonneesRemplissage {
   saisiesN1: Map<string, ValeurCellule>;
   /** Les listes du mensuel additionnées : vaccinations, cliniques, circulation. */
   evenements: DonneesEvenements;
+  /**
+   * Semestre ou année : les trimestres sans aucune saisie (le calcul les
+   * ignore) et les tableaux saisis sans règle de calcul. Vides au trimestre.
+   */
+  consolidation: { trimestresSansSaisie: string[]; sansRegle: number[] };
 }
 
 /**
@@ -95,37 +101,40 @@ export async function preparer(
   const arrondissementsDuDepartement = await listerArrondissements(db);
   const codeParNom = new Map(arrondissementsDuDepartement.map((a) => [a.nomCanevas, a.code] as const));
 
+  // Le rapport d'un arrondissement lit SA version des tableaux sans maille.
+  const sansMaille = numerosSansMaille();
+
   /*
    * Les cellules saisies à la main, si le trimestre existe déjà en base. On ne
    * le CRÉE pas ici : produire un aperçu ne doit pas matérialiser une période.
+   * Un semestre ou une année ne se saisit pas : ses cases se calculent à
+   * partir de ses trimestres (consolidation.ts).
    */
-  const trimestre = await db.periodeReporting.findFirst({
-    where: { type: "TRIMESTRIEL", annee: periode.annee, trimestre: periode.rang },
-    select: { id: true },
-  });
-  // Le rapport d'un arrondissement lit SA version des tableaux sans maille.
-  const sansMaille = numerosSansMaille();
-  const saisies = trimestre
-    ? await saisiesVues(db, trimestre.id, options.arrondissementId, sansMaille)
-    : new Map<string, ValeurCellule>();
-  const n1 = memePeriodeAnneePrecedente(periode);
-  const trimestreN1 = await db.periodeReporting.findFirst({
-    where: { type: "TRIMESTRIEL", annee: n1.annee, trimestre: n1.rang },
-    select: { id: true },
-  });
-  const saisiesN1 = trimestreN1
-    ? await saisiesVues(db, trimestreN1.id, options.arrondissementId, sansMaille)
-    : new Map<string, ValeurCellule>();
+  const lireSaisies = async (p: Periode) => {
+    if (p.type !== "TRIMESTRIEL") return saisiesConsolidees(db, p, options.arrondissementId, sansMaille);
+    const trimestre = await db.periodeReporting.findFirst({
+      where: { type: "TRIMESTRIEL", annee: p.annee, trimestre: p.rang },
+      select: { id: true },
+    });
+    const saisies = trimestre
+      ? await saisiesVues(db, trimestre.id, options.arrondissementId, sansMaille)
+      : new Map<string, ValeurCellule>();
+    return { saisies, trimestresSansSaisie: [], sansRegle: [] };
+  };
+  const courantes = await lireSaisies(periode);
+  const saisies = courantes.saisies;
+  const saisiesN1 = (await lireSaisies(memePeriodeAnneePrecedente(periode))).saisies;
+  const consolidation = { trimestresSansSaisie: courantes.trimestresSansSaisie, sansRegle: courantes.sansRegle };
 
   if (options.sansAgregation) {
     const aucun: DonneesEvenements = { courant: new Map(), precedent: new Map(), nonClassees: [] };
-    return { valeurs: vide(), valeursN1: vide(), renseignees: 0, codeParNom, saisies, saisiesN1, evenements: aucun };
+    return { valeurs: vide(), valeursN1: vide(), renseignees: 0, codeParNom, saisies, saisiesN1, evenements: aucun, consolidation };
   }
 
   const evenements = await preparerEvenements(db, periode, { arrondissementId: options.arrondissementId });
 
   if (champs.length === 0) {
-    return { valeurs: vide(), valeursN1: vide(), renseignees: 0, codeParNom, saisies, saisiesN1, evenements };
+    return { valeurs: vide(), valeursN1: vide(), renseignees: 0, codeParNom, saisies, saisiesN1, evenements, consolidation };
   }
 
   const ranger = (agregees: ValeurAgregee[]) => {
@@ -170,7 +179,7 @@ export async function preparer(
   if (sien) {
     for (const m of [a.m, b.m]) m.forEach((parArr) => parArr.set(null, parArr.get(sien) ?? null));
   }
-  return { valeurs: a.m, valeursN1: b.m, renseignees: a.n, codeParNom, saisies, saisiesN1, evenements };
+  return { valeurs: a.m, valeursN1: b.m, renseignees: a.n, codeParNom, saisies, saisiesN1, evenements, consolidation };
 }
 
 /**

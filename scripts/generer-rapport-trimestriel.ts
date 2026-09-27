@@ -9,21 +9,23 @@
  *   npm run trimestre:rapport -- 2026 3
  *   npm run trimestre:rapport -- 2026 1 --brouillon
  *   npm run trimestre:rapport -- 2026 3 --brouillon --da      (le DD + les six DA)
+ *   npm run trimestre:rapport -- 2026 S1 --brouillon          (premier semestre)
+ *   npm run trimestre:rapport -- 2026 A --brouillon           (l'année)
  */
 import { writeFileSync, mkdirSync } from "node:fs";
 import { base } from "../src/lib/baseDeTravail";
-import { trimestrielle, libelleOfficiel } from "../src/server/periodes/calendrier";
+import { type Periode, annuelle, semestrielle, trimestrielle, libelleOfficiel } from "../src/server/periodes/calendrier";
 import { genererRapportCanevas } from "../src/server/trimestre/rapportCanevas";
 import { listerArrondissements } from "../src/lib/arrondissements";
 
 async function principal() {
   const annee = Number(process.argv[2] ?? 2026);
-  const trimestre = Number(process.argv[3] ?? 3);
+  const quoi = String(process.argv[3] ?? "3").toUpperCase();
   const brouillon = process.argv.includes("--brouillon");
   const avecDA = process.argv.includes("--da");
 
   const db = base;
-  const p = trimestrielle(annee, trimestre);
+  const p: Periode = quoi === "A" ? annuelle(annee) : quoi.startsWith("S") ? semestrielle(annee, Number(quoi.slice(1))) : trimestrielle(annee, Number(quoi));
 
   await produire(db, p, brouillon);
   if (avecDA) {
@@ -33,8 +35,8 @@ async function principal() {
   await db.$disconnect();
 }
 
-async function produire(db: typeof base, p: ReturnType<typeof trimestrielle>, brouillon: boolean, arrondissement?: string) {
-  const { buffer, nomFichier, etat, rubriquesAlimentees, valeursConsolidees, lignesNonClassees } =
+async function produire(db: typeof base, p: Periode, brouillon: boolean, arrondissement?: string) {
+  const { buffer, nomFichier, etat, rubriquesAlimentees, valeursConsolidees, lignesNonClassees, trimestresSansSaisie } =
     await genererRapportCanevas(db, p, { autoriserIncomplet: brouillon, arrondissement });
 
   mkdirSync("storage/exports", { recursive: true });
@@ -45,6 +47,7 @@ async function produire(db: typeof base, p: ReturnType<typeof trimestrielle>, br
   console.log(`  rubriques alimentées : ${rubriquesAlimentees}`);
   console.log(`  valeurs consolidées  : ${valeursConsolidees}`);
   console.log(`  lignes non classées  : ${lignesNonClassees.length}`);
+  if (trimestresSansSaisie.length) console.log(`  trimestres sans saisie : ${trimestresSansSaisie.join(", ")}`);
   for (const l of lignesNonClassees) console.log(`    - ${l.arrondissement} · ${l.ligne} · ${l.quantite ?? "—"} → ${l.tableau}`);
 }
 

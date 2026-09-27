@@ -13,7 +13,10 @@
  * fixes du DA — jamais ceux du Délégué départemental.
  *
  *   GET                             périodes disponibles + état de la sienne
- *   POST { annee, trimestre, apercu }   génère le .docx
+ *   POST { annee, trimestre | type+rang, apercu }   génère le .docx
+ *
+ * Semestre et année (décision du Délégué, 28 septembre 2026) : même canevas ;
+ * le définitif suit la transmission du trimestre qui les clôt.
  *
  * Un DA ne peut demander QUE son arrondissement : le sien est lu sur sa
  * session, jamais reçu du client. Le DD, lui, peut demander celui de n'importe
@@ -26,6 +29,8 @@ import { inspecterPeriode, PeriodeNonCalculableError } from "@/server/trimestre/
 import { genererRapportCanevas } from "@/server/trimestre/rapportCanevas";
 import { archiverRapportTrimestriel } from "@/server/trimestre/archivage";
 import { arrondissementFige } from "@/server/trimestre/circuit";
+import { periodeDuRapport, periodeDuCircuit, cleDeRapport } from "@/server/trimestre/periodeRapport";
+import { trimestresSansSaisie } from "@/server/trimestre/consolidation";
 import type { PrismaClient } from "@prisma/client";
 
 /**
@@ -89,27 +94,29 @@ export async function GET(req: Request) {
     // `Number(null)` vaut 0 et `Number.isInteger(0)` est vrai : on vérifie la
     // présence du paramètre AVANT de convertir, sinon une requête sans période
     // passe pour une demande sur l'an 0.
-    const anneeBrute = url.searchParams.get("annee");
-    const trimestreBrut = url.searchParams.get("trimestre");
-
     const disponibles = await trimestresDisponibles(db);
-    if (!anneeBrute || !trimestreBrut) {
+    if (!url.searchParams.get("annee")) {
       return NextResponse.json({ arrondissement, disponibles });
     }
-    const annee = Number(anneeBrute);
-    const trimestre = Number(trimestreBrut);
-    if (!Number.isInteger(annee) || !Number.isInteger(trimestre) || trimestre < 1 || trimestre > 4) {
+    const p = periodeDuRapport({
+      annee: url.searchParams.get("annee"),
+      type: url.searchParams.get("type") ?? undefined,
+      rang: url.searchParams.get("rang") ?? undefined,
+      trimestre: url.searchParams.get("trimestre") ?? undefined,
+    });
+    if (!p) {
       return NextResponse.json({ message: "Période demandée invalide.", disponibles }, { status: 400 });
     }
-
-    const p = trimestrielle(annee, trimestre);
+    const { annee } = p;
+    const trimestre = p.type === "TRIMESTRIEL" ? p.rang : null;
     const etat = await inspecterPeriode(db, p);
     const sien = await db.arrondissement.findFirst({ where: { nom: arrondissement }, select: { id: true } });
 
     return NextResponse.json({
       arrondissement,
       disponibles,
-      periode: { annee, trimestre, libelle: etat.libelle, court: libelleCourt(p) },
+      periode: { annee, trimestre, type: p.type, rang: p.rang, libelle: etat.libelle, court: libelleCourt(p) },
+      trimestresSansSaisie: p.type === "TRIMESTRIEL" || !sien ? [] : await trimestresSansSaisie(db, p, sien.id),
       mois: etat.mois.map((m) => ({
         libelle: `${String(m.mois).padStart(2, "0")}/${m.annee}`,
         present: Boolean(m.periodeId),
@@ -119,7 +126,7 @@ export async function GET(req: Request) {
       moisAbsents: etat.moisAbsents,
       moisIncomplets: etat.moisIncomplets,
       // Le circuit : le définitif est celui que le DA a transmis au DD.
-      transmis: sien ? await arrondissementFige(db, p, sien.id) : false,
+      transmis: sien ? await arrondissementFige(db, periodeDuCircuit(p), sien.id) : false,
     });
   } catch (e) {
     const { status, message } = permissionErrorResponse(e);
@@ -133,22 +140,27 @@ export async function POST(req: Request) {
     assertRole(user, ["DA", "DD"]);
     const db = user.db as PrismaClient;
 
-    const { annee, trimestre, apercu, arrondissement: demande } = (await req.json()) as {
+    const corps = (await req.json()) as {
       annee: number;
-      trimestre: number;
+      trimestre?: number;
+      type?: string;
+      rang?: number;
       apercu?: boolean;
       arrondissement?: string;
     };
+    const { apercu, arrondissement: demande } = corps;
     const arrondissement = await arrondissementDemande(user, db, demande ?? null);
 
-    const p = trimestrielle(annee, trimestre);
+    const p = periodeDuRapport(corps);
+    if (!p) return NextResponse.json({ message: "Période demandée invalide." }, { status: 400 });
     const sien = await db.arrondissement.findFirst({
       where: { nom: arrondissement },
       select: { id: true },
     });
     // Le circuit : la version DÉFINITIVE du rapport d'un arrondissement est
     // celle que son DA a transmise au DD, après relecture.
-    const transmis = await arrondissementFige(db, p, sien!.id);
+    // Semestre et année : la transmission du trimestre qui les clôt.
+    const transmis = await arrondissementFige(db, periodeDuCircuit(p), sien!.id);
     if (!apercu && !transmis) {
       return NextResponse.json(
         { message: "La version définitive est celle que le DA a transmise au DD. Transmettez d'abord le rapport, ou produisez un aperçu." },
@@ -175,7 +187,7 @@ export async function POST(req: Request) {
         userId: user.id,
         action: "GENERATION_RAPPORT_TRIMESTRIEL_ARRONDISSEMENT",
         entite: "PeriodeReporting",
-        entiteId: `${annee}-T${trimestre}`,
+        entiteId: cleDeRapport(p),
         details: {
           periode: libelleCourt(p),
           arrondissement,

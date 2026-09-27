@@ -30,7 +30,7 @@ export class ControlesCroisesError extends Error {
   name = "ControlesCroisesError";
 }
 import { champsMobilises, bilanLiaisons } from "./liaison";
-import { lireRubriques } from "./rubriques";
+import { lireRubriques, ligneDePeriode } from "./rubriques";
 import { preparer, fournisseur } from "./remplissage";
 import type { LigneNonClassee } from "./evenements";
 import { inspecterPeriode, type EtatPeriode } from "./agregation";
@@ -119,6 +119,11 @@ export interface RapportProduit {
    * correspondent à aucune case du canevas : le Délégué décide de leur sort.
    */
   lignesNonClassees: LigneNonClassee[];
+  /**
+   * Semestre ou année : les trimestres sans aucune saisie, dont les tableaux
+   * saisis ne sont donc calculés que sur les autres. Vide au trimestre.
+   */
+  trimestresSansSaisie: string[];
 }
 
 export async function genererRapportCanevas(
@@ -175,13 +180,12 @@ export async function genererRapportCanevas(
    * arrête la production. Le rapport d'un arrondissement n'y est pas soumis :
    * ces contrôles portent sur des tableaux départementaux.
    */
-  const trimestreExistant = await db.periodeReporting.findFirst({
-    where: { type: "TRIMESTRIEL", annee: periode.annee, trimestre: periode.rang },
-    select: { id: true },
-  });
+  // La période en base : le trimestre, ou le semestre et l'année eux-mêmes
+  // (leurs analyses validées s'y rattachent ; sans elles, l'analyse calculée).
+  const periodeEnBase = await ligneDePeriode(db, periode);
   const controles = options.arrondissement
     ? null
-    : await passerControles(db, periode, trimestreExistant?.id ?? null, ctx.mois, [
+    : await passerControles(db, periode, periodeEnBase, ctx.mois, [
         "DDEPIA",
         ...tous.map((a) => a.nom),
       ]);
@@ -279,7 +283,7 @@ export async function genererRapportCanevas(
   options.textes?.forEach((t, cle) => textes.set(cle, t));
 
   // L'analyse de chaque tableau : validée par son auteur, ou calculée.
-  const analyses = await analysesDuRapport(db, trimestreExistant?.id ?? null, sien?.id ?? "", ctx, valeur);
+  const analyses = await analysesDuRapport(db, periodeEnBase, sien?.id ?? "", ctx, valeur);
 
   const compteur = { tableaux: 0 };
   for (const section of SECTIONS_CANEVAS) {
@@ -332,5 +336,6 @@ export async function genererRapportCanevas(
     rubriquesAlimentees: bilan.casesLiees,
     valeursConsolidees: donnees.renseignees,
     lignesNonClassees: donnees.evenements.nonClassees,
+    trimestresSansSaisie: donnees.consolidation.trimestresSansSaisie,
   };
 }

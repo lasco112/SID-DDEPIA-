@@ -13,6 +13,8 @@
  *   {A}    l'année millésime — « 2026 »
  *   {A-1}  l'année précédente — « 2025 »
  *   {M1} {M2} {M3}  les trois mois en majuscules — « JUILLET »…
+ *   {MOIS} (ligne entière) une ligne par mois de la période : trois, six ou
+ *          douze — seul jeton qui fasse varier le NOMBRE de lignes.
  */
 
 export interface ContexteCanevas {

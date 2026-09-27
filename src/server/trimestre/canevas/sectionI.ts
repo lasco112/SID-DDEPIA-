@@ -360,14 +360,15 @@ export const SECTION_I: SectionCanevas = {
 
     { type: "titre", niveau: 2, texte: "I-4-1. État des recettes" },
     // Le canevas régional impose les mois en lignes et les structures en
-    // colonnes ; pour le trimestre, trois lignes de mois et une ligne de total.
+    // colonnes : une ligne par mois de la période (trois au trimestre, six au
+    // semestre, douze à l'année), puis les totaux.
     {
       type: "tableau",
       kind: "libre",
       numero: 13,
       titre: "Synthèse des recettes par régie et par mois",
       entetes: ["MOIS", "DDEPIA", "{ARRONDISSEMENTS}", "TOTAL"],
-      lignes: ["{M1}", "{M2}", "{M3}", "TOTAL {P}", "TOTAL {P-1}", "ÉCART"],
+      lignes: ["{MOIS}", "TOTAL {P}", "TOTAL {P-1}", "ÉCART"],
     },
 
     { type: "titre", niveau: 3, texte: "Performances par structure" },

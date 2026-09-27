@@ -140,8 +140,11 @@ export function lignesDe(bloc: Extract<Bloc, { type: "tableau" }>, ctx: Contexte
   // La ligne « DDEPIA » — présente aux tableaux du personnel et des
   // infrastructures — sort du rapport d'un arrondissement : il ne possède pas
   // cette structure. La ligne « DAEPIA », elle, est la sienne et reste.
+  // `{MOIS}` se déplie en une ligne par mois de la période : trois au
+  // trimestre, six au semestre, douze à l'année — comme le canevas régional
+  // du semestre, qui liste les mois de janvier à décembre.
   return sansNiveauDepartemental(
-    bloc.lignes.flatMap((l) => (l === "{ARRONDISSEMENTS}" ? ctx.arrondissements : [l])),
+    bloc.lignes.flatMap((l) => (l === "{ARRONDISSEMENTS}" ? ctx.arrondissements : l === "{MOIS}" ? ctx.mois : [l])),
     ctx
   ).map((l) => resoudre(l, ctx));
 }
@@ -342,7 +345,8 @@ export function inventaireSection(section: SectionCanevas, ctx: ContexteCanevas)
       numero: t.numero,
       titre: t.titre,
       colonnes: colonnesDe(t, ctx).length,
-      lignes: t.lignes.length,
+      // `{MOIS}` compte pour autant de lignes que la période a de mois.
+      lignes: t.lignes.reduce((n, l) => n + (l === "{MOIS}" ? ctx.mois.length : 1), 0),
       entetes: colonnesDe(t, ctx),
     })),
   };
