@@ -53,7 +53,16 @@ const LIBELLE: Record<Statut, { texte: string; classe: string }> = {
   vide: { texte: "Tableau vide", classe: "bg-gray-100 text-gray-600" },
 };
 
-export default function AnalysesTrimestreClient({ presentation, username }: { presentation: string; username: string }) {
+export default function AnalysesTrimestreClient({
+  titre,
+  presentation,
+  username,
+}: {
+  /** Le nom de l'étape pour ce rôle, tel que le menu l'écrit. */
+  titre: string;
+  presentation: string;
+  username: string;
+}) {
   const [{ annee, trimestre }, setPeriode] = useState(() => trimestreARapporter());
   const [ecran, setEcran] = useState<Ecran | null>(null);
   const [ouvert, setOuvert] = useState<number | null>(null);
@@ -331,7 +340,7 @@ export default function AnalysesTrimestreClient({ presentation, username }: { pr
     <div className="max-w-3xl">
       <HorsLigneTrimestre username={username} copieDu={copieDu} onEnvoye={() => void charger()} />
       {info && <p className="mb-3 rounded-md bg-blue-50 p-3 text-sm text-blue-900">{info}</p>}
-      <h1 className="text-2xl font-bold text-primary-dark">Relire l&apos;analyse sous chaque tableau</h1>
+      <h1 className="text-2xl font-bold text-primary-dark">{titre}</h1>
       <p className="mt-1 text-gray-600">
         {presentation} Rapport de {ecran.portee}.
       </p>

@@ -40,14 +40,20 @@ export const TITRE_MENSUEL = "Rapport mensuel";
 export const TITRE_TRIMESTRIEL = "Rapport trimestriel";
 
 /**
- * Les deux relectures du trimestre, qu'on confondait (question du Délégué) :
- * l'ANALYSE est le paragraphe que le SID écrit sous chaque tableau à partir des
- * chiffres ; les TEXTES sont les parties sans tableau, déjà pré-rédigées.
+ * Les deux étapes qu'on confondait (question du Délégué, 28 septembre 2026).
+ * L'ANALYSE : les phrases que le SID écrit sous chaque tableau à partir des
+ * chiffres — on les valide. Les TEXTES : les rubriques que seul le terrain
+ * connaît — on les rédige. Nommées par les rubriques que le personnel connaît
+ * par cœur, pas par une notion abstraite (décision du Délégué : « Rédiger les
+ * perspectives », pas « ce que les chiffres ne disent pas »).
  */
+const ANALYSE = "Valider l'analyse des chiffres sous chaque tableau";
+const REDIGER = "Rédiger les infrastructures, l'encadrement, les échanges, les difficultés et les perspectives";
+
 const AIDE = {
   tableaux: "Les chiffres du trimestre que les rapports mensuels ne donnent pas.",
   analyses: "Sous chaque tableau, quelques phrases écrites par le SID à partir des chiffres : les lire, corriger si besoin, valider.",
-  textes: "Les parties sans tableau (présentation, activités, difficultés, conclusion), déjà pré-rédigées : relire, compléter.",
+  textes: "Section I, chaque filière d'élevage, pêche, santé animale ; les conclusions sont déjà écrites, à relire.",
   verifier: "Produire le document Word de l'arrondissement et le relire.",
   transmettre: "Envoyer le rapport au DD. Il n'est plus modifiable ensuite, sauf renvoi.",
   valider: "Possible une fois les six arrondissements transmis.",
@@ -66,16 +72,43 @@ const MENSUEL_CHEF: NavGroupe = {
   ],
 };
 
-/** Les chefs PSA, SSV, SPAIH : relire leur section, puis la valider. */
-const TRIMESTRIEL_CHEF: NavGroupe = {
+/**
+ * Ce que chaque chef rédige : les rubriques de SA partie du rapport
+ * (répartition de canevas/sections.ts, chefDeSection).
+ */
+const REDACTION_CHEF: Record<"CHEF_BAC" | "CHEF_PSA" | "CHEF_SPAIH" | "CHEF_SSV", NavItem> = {
+  CHEF_BAC: {
+    href: "/trimestre/textes",
+    label: "Rédiger le fonctionnement du service, les projets, les difficultés et les perspectives",
+    aide: "Section I : personnel, performances, projets (AFOP, ACEFA, PDCVEP…), contraintes ; références.",
+  },
+  CHEF_PSA: {
+    href: "/trimestre/textes",
+    label: "Rédiger les infrastructures, l'encadrement et les échanges des filières d'élevage",
+    aide: "Deuxième partie, chaque filière : infrastructures, pâturages, animation, produits dérivés, exportations et importations ; conclusions à relire.",
+  },
+  CHEF_SPAIH: {
+    href: "/trimestre/textes",
+    label: "Rédiger la pêche et l'aquaculture : infrastructures, encadrement, difficultés",
+    aide: "Chapitre III : présentation, infrastructures, encadrement, produits dérivés, difficultés.",
+  },
+  CHEF_SSV: {
+    href: "/trimestre/textes",
+    label: "Rédiger la situation sanitaire : influenza aviaire, bilan, cartographie",
+    aide: "Chapitre IV : influenza aviaire, bilan sanitaire, cartographie des maladies.",
+  },
+};
+
+/** Les chefs PSA, SSV, SPAIH : valider les analyses de leur section, rédiger ses rubriques, la valider. */
+const trimestrielChef = (chef: "CHEF_PSA" | "CHEF_SPAIH" | "CHEF_SSV"): NavGroupe => ({
   cle: "trimestriel",
   titre: TITRE_TRIMESTRIEL,
   items: [
-    { href: "/trimestre/analyses", label: "Relire l'analyse des tableaux de ma section", etape: 1, aide: AIDE.analyses },
-    { href: "/trimestre/textes", label: "Relire les textes rédigés de ma section", etape: 2, aide: AIDE.textes },
+    { href: "/trimestre/analyses", label: `${ANALYSE} de ma section`, etape: 1, aide: AIDE.analyses },
+    { ...REDACTION_CHEF[chef], etape: 2 },
     { href: "/trimestre/circuit", label: "Valider ma section", etape: 3, aide: AIDE.valider },
   ],
-};
+});
 
 export const MENU_PAR_ROLE: Record<string, NavGroupe[]> = {
   DA: [
@@ -94,8 +127,8 @@ export const MENU_PAR_ROLE: Record<string, NavGroupe[]> = {
       titre: TITRE_TRIMESTRIEL,
       items: [
         { href: "/trimestre/saisie", label: "Compléter les tableaux du trimestre", etape: 1, aide: AIDE.tableaux },
-        { href: "/trimestre/analyses", label: "Relire l'analyse sous chaque tableau", etape: 2, aide: AIDE.analyses },
-        { href: "/da/trimestre/rubriques", label: "Relire les textes rédigés", etape: 3, aide: AIDE.textes },
+        { href: "/trimestre/analyses", label: ANALYSE, etape: 2, aide: AIDE.analyses },
+        { href: "/da/trimestre/rubriques", label: REDIGER, etape: 3, aide: AIDE.textes },
         { href: "/da/trimestre", label: "Vérifier et télécharger mon rapport", etape: 4, aide: AIDE.verifier },
         { href: "/trimestre/circuit", label: "Transmettre mon rapport au DD", etape: 5, aide: AIDE.transmettre },
       ],
@@ -122,8 +155,8 @@ export const MENU_PAR_ROLE: Record<string, NavGroupe[]> = {
       titre: TITRE_TRIMESTRIEL,
       items: [
         { href: "/trimestre/saisie", label: "Compléter les tableaux du trimestre", etape: 1, aide: AIDE.tableaux },
-        { href: "/trimestre/analyses", label: "Relire l'analyse sous chaque tableau", etape: 2, aide: AIDE.analyses },
-        { href: "/trimestre/textes", label: "Relire les textes rédigés", etape: 3, aide: AIDE.textes },
+        { href: "/trimestre/analyses", label: ANALYSE, etape: 2, aide: AIDE.analyses },
+        { href: "/trimestre/textes", label: REDIGER, etape: 3, aide: AIDE.textes },
       ],
     },
     {
@@ -151,9 +184,15 @@ export const MENU_PAR_ROLE: Record<string, NavGroupe[]> = {
       cle: "trimestriel",
       titre: TITRE_TRIMESTRIEL,
       items: [
+        // Le DD relit (les chefs valident, les agents rédigent) : « Relire », pas « Valider » ni « Rédiger ».
         { href: "/trimestre/circuit", label: "Suivre l'avancement du trimestre", etape: 1, aide: AIDE.suivre },
-        { href: "/trimestre/analyses", label: "Relire l'analyse sous chaque tableau", etape: 2, aide: AIDE.analyses },
-        { href: "/dd/trimestre/rubriques", label: "Relire les textes rédigés", etape: 3, aide: AIDE.textes },
+        { href: "/trimestre/analyses", label: "Relire l'analyse des chiffres sous chaque tableau", etape: 2, aide: AIDE.analyses },
+        {
+          href: "/dd/trimestre/rubriques",
+          label: "Relire les infrastructures, l'encadrement, les échanges, les difficultés et les perspectives",
+          etape: 3,
+          aide: AIDE.textes,
+        },
         { href: "/dd/trimestre", label: "Produire le rapport du département", etape: 4, aide: AIDE.produire },
         { href: "/trimestre/saisie", label: "Corriger un tableau du trimestre" },
         { href: "/section/bac", label: "Tableaux administratifs du BAC" },
@@ -184,15 +223,15 @@ export const MENU_PAR_ROLE: Record<string, NavGroupe[]> = {
       titre: TITRE_TRIMESTRIEL,
       items: [
         { href: "/section/bac", label: "Compléter les tableaux du BAC", etape: 1, aide: AIDE.bac },
-        { href: "/trimestre/analyses", label: "Relire l'analyse des tableaux de ma section", etape: 2, aide: AIDE.analyses },
-        { href: "/trimestre/textes", label: "Relire les textes rédigés de ma section", etape: 3, aide: AIDE.textes },
+        { href: "/trimestre/analyses", label: `${ANALYSE} de ma section`, etape: 2, aide: AIDE.analyses },
+        { ...REDACTION_CHEF.CHEF_BAC, etape: 3 },
         { href: "/trimestre/circuit", label: "Valider ma section", etape: 4, aide: AIDE.valider },
       ],
     },
   ],
-  CHEF_SSV: [ACCUEIL, MENSUEL_CHEF, TRIMESTRIEL_CHEF],
-  CHEF_PSA: [ACCUEIL, MENSUEL_CHEF, TRIMESTRIEL_CHEF],
-  CHEF_SPAIH: [ACCUEIL, MENSUEL_CHEF, TRIMESTRIEL_CHEF],
+  CHEF_SSV: [ACCUEIL, MENSUEL_CHEF, trimestrielChef("CHEF_SSV")],
+  CHEF_PSA: [ACCUEIL, MENSUEL_CHEF, trimestrielChef("CHEF_PSA")],
+  CHEF_SPAIH: [ACCUEIL, MENSUEL_CHEF, trimestrielChef("CHEF_SPAIH")],
   ADMIN_TECH: [
     ACCUEIL,
     {

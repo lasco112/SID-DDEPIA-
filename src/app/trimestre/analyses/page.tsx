@@ -2,6 +2,7 @@ import AppShell from "@/components/AppShell";
 import AnalysesTrimestreClient from "@/components/AnalysesTrimestreClient";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { entreeCourante } from "@/lib/navItems";
 
 /**
  * Relecture des analyses du rapport trimestriel (décision du Délégué, 24
@@ -24,6 +25,7 @@ export default async function AnalysesPage() {
   return (
     <AppShell allowedRoles={["DD", "DA", "AGENT_SAISIE", "CHEF_BAC", "CHEF_PSA", "CHEF_SPAIH", "CHEF_SSV"]}>
       <AnalysesTrimestreClient
+        titre={entreeCourante(role, "/trimestre/analyses")?.item.label ?? "Analyse des chiffres sous chaque tableau"}
         presentation={PRESENTATION[role] ?? PRESENTATION_CHEF}
         username={(session?.user as { username?: string } | undefined)?.username ?? ""}
       />

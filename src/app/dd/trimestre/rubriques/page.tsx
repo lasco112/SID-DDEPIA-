@@ -2,6 +2,7 @@ import AppShell from "@/components/AppShell";
 import RubriquesTrimestreClient from "@/components/RubriquesTrimestreClient";
 import { nomDeCompte } from "@/lib/utilisateurCourant";
 import { trimestreARapporter } from "@/lib/trimestreEchu";
+import { entreeCourante } from "@/lib/navItems";
 
 export default async function RubriquesDDPage() {
   const { annee, trimestre } = trimestreARapporter();
@@ -9,7 +10,7 @@ export default async function RubriquesDDPage() {
   return (
     <AppShell allowedRoles={["DD"]}>
       <div className="max-w-4xl">
-        <h1 className="text-2xl font-bold text-primary-dark">Relire les textes rédigés</h1>
+        <h1 className="text-2xl font-bold text-primary-dark">{entreeCourante("DD", "/dd/trimestre/rubriques")?.item.label}</h1>
         <p className="mt-1 text-sm text-ink-muted">
           Les chefs de section rédigent les zones de texte de leur domaine. Vous les relisez, et ne corrigez
           que si vous le souhaitez : ce qui est écrit ici est repris tel quel dans le document ; une zone vide
