@@ -331,7 +331,7 @@ export default function AnalysesTrimestreClient({ presentation, username }: { pr
     <div className="max-w-3xl">
       <HorsLigneTrimestre username={username} copieDu={copieDu} onEnvoye={() => void charger()} />
       {info && <p className="mb-3 rounded-md bg-blue-50 p-3 text-sm text-blue-900">{info}</p>}
-      <h1 className="text-2xl font-bold text-primary-dark">Relire les commentaires des tableaux</h1>
+      <h1 className="text-2xl font-bold text-primary-dark">Relire l&apos;analyse sous chaque tableau</h1>
       <p className="mt-1 text-gray-600">
         {presentation} Rapport de {ecran.portee}.
       </p>

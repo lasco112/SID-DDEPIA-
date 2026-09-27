@@ -36,8 +36,8 @@ interface Carte {
   /** Échéance proche ou dépassée, rapport pas encore transmis : la carte passe devant. */
   urgent: boolean;
   bouton?: Lien;
-  /** Les étapes numérotées (trimestriel). */
-  etapes?: (Lien & { numero: number })[];
+  /** Les étapes numérotées (trimestriel), avec ce à quoi chacune sert. */
+  etapes?: (Lien & { numero: number; aide?: string })[];
   etapesFaites?: boolean;
   liens?: Lien[];
 }
@@ -238,7 +238,7 @@ async function carteTrimestrielle(
     bouton: fait
       ? { href: etapes[etapes.length - 1].href, label: etapes[etapes.length - 1].label }
       : { href: etapes[0].href, label: `Commencer : ${etapes[0].label.charAt(0).toLowerCase()}${etapes[0].label.slice(1)}` },
-    etapes: etapes.map((e) => ({ href: e.href, label: e.label, numero: e.etape! })),
+    etapes: etapes.map((e) => ({ href: e.href, label: e.label, numero: e.etape!, aide: e.aide })),
     etapesFaites: fait,
   };
 }
@@ -248,6 +248,35 @@ const TONS = {
   attention: "bg-amber-50 text-amber-900",
   fait: "bg-green-50 text-green-800",
 };
+
+/**
+ * « Bonsoir Jean Kamdem » / « Délégué d'arrondissement de Dschang » : le nom
+ * et le poste de la personne, pas son identifiant de connexion (demande du
+ * Délégué : plus convivial, et ça attire l'attention). La fonction saisie au
+ * compte l'emporte ; à défaut, le rôle et son rattachement.
+ */
+async function salutation(db: PrismaClient, moi: { id: string; role: string; username: string }) {
+  const u = await db.user.findUnique({
+    where: { id: moi.id },
+    select: { nom: true, fonction: true, arrondissement: { select: { nom: true } }, section: { select: { code: true, nom: true } } },
+  });
+  const heure = Number(new Intl.DateTimeFormat("fr-FR", { hour: "numeric", hour12: false, timeZone: "Africa/Douala" }).format(new Date()));
+  const salut = heure >= 18 || heure < 4 ? "Bonsoir" : "Bonjour";
+  const arr = u?.arrondissement?.nom;
+  const section = u?.section ? `${u.section.code} (${u.section.nom})` : null;
+  const parRole: Record<string, string> = {
+    DD: "Délégué départemental",
+    DA: arr ? `Délégué d'arrondissement de ${arr}` : "Délégué d'arrondissement",
+    AGENT_SAISIE: arr ? `Agent de saisie · arrondissement de ${arr}` : "Agent de saisie",
+    CHEF_BAC: section ? `Chef de section ${section}` : "Chef de section BAC",
+    CHEF_PSA: section ? `Chef de section ${section}` : "Chef de section PSA",
+    CHEF_SSV: section ? `Chef de section ${section}` : "Chef de section SSV",
+    CHEF_SPAIH: section ? `Chef de section ${section}` : "Chef de section SPAIH",
+    ADMIN_TECH: "Administrateur technique",
+  };
+  const poste = u?.fonction?.trim() ? `${u.fonction.trim()}${arr && !u.fonction.includes(arr) ? ` · ${arr}` : ""}` : parRole[moi.role] ?? "";
+  return { titre: `${salut} ${u?.nom?.trim() || moi.username}`, poste };
+}
 
 function CarteRapport({ c }: { c: Carte }) {
   return (
@@ -274,18 +303,21 @@ function CarteRapport({ c }: { c: Carte }) {
       )}
 
       {c.etapes && (
-        <ol className="mt-4 space-y-1">
+        <ol className="mt-4 space-y-0.5">
           {c.etapes.map((e) => (
             <li key={e.href}>
-              <a href={e.href} className="flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm text-ink-muted hover:bg-appbg hover:text-primary-dark">
+              <a href={e.href} className="flex items-start gap-2.5 rounded-md px-2 py-2 hover:bg-appbg">
                 <span
-                  className={`flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
+                  className={`mt-px flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
                     c.etapesFaites ? "bg-green-100 text-green-800" : "bg-appbg text-ink-muted"
                   }`}
                 >
                   {c.etapesFaites ? "✓" : e.numero}
                 </span>
-                {e.label}
+                <span>
+                  <span className="block text-sm font-semibold text-[#28323d]">{e.label}</span>
+                  {e.aide && <span className="mt-0.5 block text-xs leading-snug text-ink-faint">{e.aide}</span>}
+                </span>
               </a>
             </li>
           ))}
@@ -314,7 +346,8 @@ export default async function DashboardPage() {
   const db = moi.db as PrismaClient;
   const role = moi.role as string;
 
-  const cartes = (await Promise.all([carteMensuelle(db, moi), carteTrimestrielle(db, moi)])).filter((c): c is Carte => c != null);
+  const [accueil, ...lesCartes] = await Promise.all([salutation(db, moi), carteMensuelle(db, moi), carteTrimestrielle(db, moi)]);
+  const cartes = lesCartes.filter((c): c is Carte => c != null);
   // L'urgent d'abord ; à égalité, le mensuel puis le trimestriel.
   cartes.sort((a, b) => Number(b.urgent) - Number(a.urgent));
 
@@ -325,8 +358,9 @@ export default async function DashboardPage() {
   return (
     <AppShell>
       <div className="max-w-[1080px]">
-        <h1 className="mb-0.5 text-[23px] font-bold text-primary-dark">Bonjour {moi.username}</h1>
-        <p className="mb-[20px] text-sm text-ink-muted">Voici les rapports du moment et ce qu&apos;il reste à faire.</p>
+        <h1 className="text-[23px] font-bold leading-tight text-primary-dark">{accueil.titre}</h1>
+        {accueil.poste && <p className="mt-0.5 text-[15px] font-semibold text-primary">{accueil.poste}</p>}
+        <p className="mb-[20px] mt-1 text-sm text-ink-muted">Voici les rapports du moment et ce qu&apos;il vous reste à faire.</p>
 
         {cartes.length > 0 && (
           <div className="mb-[26px] grid grid-cols-1 items-start gap-4 lg:grid-cols-2">

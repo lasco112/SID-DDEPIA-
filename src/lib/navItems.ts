@@ -1,14 +1,16 @@
 /**
  * navItems.ts — le menu de chaque rôle. Source unique du menu latéral
- * (Sidebar.tsx), du fil d'étapes (FilEtapes.tsx), de la recherche rapide
- * (RechercheGlobale.tsx) et du préchargement hors ligne (offlineStore.ts).
+ * (Sidebar.tsx), du fil d'étapes (FilEtapes.tsx), de la page d'accueil, de la
+ * recherche rapide (RechercheGlobale.tsx) et du préchargement hors ligne
+ * (offlineStore.ts).
  *
  * Rangé PAR RAPPORT, à la demande du Délégué (27 septembre 2026) : ses
  * collègues ne savaient pas où se faisait le rapport mensuel, où se faisait le
  * trimestriel, ni à quoi servait chaque écran du trimestre. Chaque groupe dit
  * quel rapport il prépare ; dans le trimestriel, les écrans sont des ÉTAPES
  * numérotées, dans l'ordre où on les franchit (saisir avant de relire les
- * commentaires, relire avant de transmettre), et nommées par ce qu'on y FAIT.
+ * analyses, relire avant de transmettre), nommées par ce qu'on y FAIT, et
+ * chacune a une phrase d'aide qui dit à quoi elle sert.
  *
  * Les adresses ne changent pas : le hors ligne déjà en cache et les habitudes
  * restent valables.
@@ -19,21 +21,40 @@ export interface NavItem {
   label: string;
   /** Rang dans les étapes du groupe (1, 2…). Absent : écran d'appoint, hors du fil. */
   etape?: number;
+  /** À quoi sert l'étape, en une phrase (page d'accueil). */
+  aide?: string;
 }
 
 export type CleGroupe = "accueil" | "mensuel" | "trimestriel" | "autres" | "outils" | "administration";
 
 export interface NavGroupe {
   cle: CleGroupe;
-  /** Titre affiché au-dessus du groupe ; absent pour l'accueil. */
+  /** Titre du groupe ; absent pour l'accueil. */
   titre?: string;
   items: NavItem[];
 }
 
-const ACCUEIL: NavGroupe = { cle: "accueil", items: [{ href: "/dashboard", label: "Accueil — ce que j'ai à faire" }] };
+const ACCUEIL: NavGroupe = { cle: "accueil", items: [{ href: "/dashboard", label: "Accueil" }] };
 
 export const TITRE_MENSUEL = "Rapport mensuel";
 export const TITRE_TRIMESTRIEL = "Rapport trimestriel";
+
+/**
+ * Les deux relectures du trimestre, qu'on confondait (question du Délégué) :
+ * l'ANALYSE est le paragraphe que le SID écrit sous chaque tableau à partir des
+ * chiffres ; les TEXTES sont les parties sans tableau, déjà pré-rédigées.
+ */
+const AIDE = {
+  tableaux: "Les chiffres du trimestre que les rapports mensuels ne donnent pas.",
+  analyses: "Sous chaque tableau, quelques phrases écrites par le SID à partir des chiffres : les lire, corriger si besoin, valider.",
+  textes: "Les parties sans tableau (présentation, activités, difficultés, conclusion), déjà pré-rédigées : relire, compléter.",
+  verifier: "Produire le document Word de l'arrondissement et le relire.",
+  transmettre: "Envoyer le rapport au DD. Il n'est plus modifiable ensuite, sauf renvoi.",
+  valider: "Possible une fois les six arrondissements transmis.",
+  bac: "Personnel, budget, recettes, infrastructures : ce que seul le BAC connaît.",
+  suivre: "Qui a transmis, qui a validé ; prendre le relais au besoin.",
+  produire: "Le document Word du département, définitif quand tout est validé.",
+};
 
 /** Les écrans des chefs de section pour le mensuel. */
 const MENSUEL_CHEF: NavGroupe = {
@@ -50,9 +71,9 @@ const TRIMESTRIEL_CHEF: NavGroupe = {
   cle: "trimestriel",
   titre: TITRE_TRIMESTRIEL,
   items: [
-    { href: "/trimestre/analyses", label: "Relire les commentaires de ma section", etape: 1 },
-    { href: "/trimestre/textes", label: "Relire les textes de ma section", etape: 2 },
-    { href: "/trimestre/circuit", label: "Valider ma section", etape: 3 },
+    { href: "/trimestre/analyses", label: "Relire l'analyse des tableaux de ma section", etape: 1, aide: AIDE.analyses },
+    { href: "/trimestre/textes", label: "Relire les textes rédigés de ma section", etape: 2, aide: AIDE.textes },
+    { href: "/trimestre/circuit", label: "Valider ma section", etape: 3, aide: AIDE.valider },
   ],
 };
 
@@ -72,11 +93,11 @@ export const MENU_PAR_ROLE: Record<string, NavGroupe[]> = {
       cle: "trimestriel",
       titre: TITRE_TRIMESTRIEL,
       items: [
-        { href: "/trimestre/saisie", label: "Compléter les tableaux du trimestre", etape: 1 },
-        { href: "/trimestre/analyses", label: "Relire les commentaires des tableaux", etape: 2 },
-        { href: "/da/trimestre/rubriques", label: "Relire les textes du rapport", etape: 3 },
-        { href: "/da/trimestre", label: "Vérifier et télécharger mon rapport", etape: 4 },
-        { href: "/trimestre/circuit", label: "Transmettre mon rapport au DD", etape: 5 },
+        { href: "/trimestre/saisie", label: "Compléter les tableaux du trimestre", etape: 1, aide: AIDE.tableaux },
+        { href: "/trimestre/analyses", label: "Relire l'analyse sous chaque tableau", etape: 2, aide: AIDE.analyses },
+        { href: "/da/trimestre/rubriques", label: "Relire les textes rédigés", etape: 3, aide: AIDE.textes },
+        { href: "/da/trimestre", label: "Vérifier et télécharger mon rapport", etape: 4, aide: AIDE.verifier },
+        { href: "/trimestre/circuit", label: "Transmettre mon rapport au DD", etape: 5, aide: AIDE.transmettre },
       ],
     },
     {
@@ -100,9 +121,9 @@ export const MENU_PAR_ROLE: Record<string, NavGroupe[]> = {
       cle: "trimestriel",
       titre: TITRE_TRIMESTRIEL,
       items: [
-        { href: "/trimestre/saisie", label: "Compléter les tableaux du trimestre", etape: 1 },
-        { href: "/trimestre/analyses", label: "Relire les commentaires des tableaux", etape: 2 },
-        { href: "/trimestre/textes", label: "Relire les textes du rapport", etape: 3 },
+        { href: "/trimestre/saisie", label: "Compléter les tableaux du trimestre", etape: 1, aide: AIDE.tableaux },
+        { href: "/trimestre/analyses", label: "Relire l'analyse sous chaque tableau", etape: 2, aide: AIDE.analyses },
+        { href: "/trimestre/textes", label: "Relire les textes rédigés", etape: 3, aide: AIDE.textes },
       ],
     },
     {
@@ -130,10 +151,10 @@ export const MENU_PAR_ROLE: Record<string, NavGroupe[]> = {
       cle: "trimestriel",
       titre: TITRE_TRIMESTRIEL,
       items: [
-        { href: "/trimestre/circuit", label: "Suivre l'avancement du trimestre", etape: 1 },
-        { href: "/trimestre/analyses", label: "Relire les commentaires des tableaux", etape: 2 },
-        { href: "/dd/trimestre/rubriques", label: "Relire les textes du rapport", etape: 3 },
-        { href: "/dd/trimestre", label: "Produire le rapport du département", etape: 4 },
+        { href: "/trimestre/circuit", label: "Suivre l'avancement du trimestre", etape: 1, aide: AIDE.suivre },
+        { href: "/trimestre/analyses", label: "Relire l'analyse sous chaque tableau", etape: 2, aide: AIDE.analyses },
+        { href: "/dd/trimestre/rubriques", label: "Relire les textes rédigés", etape: 3, aide: AIDE.textes },
+        { href: "/dd/trimestre", label: "Produire le rapport du département", etape: 4, aide: AIDE.produire },
         { href: "/trimestre/saisie", label: "Corriger un tableau du trimestre" },
         { href: "/section/bac", label: "Tableaux administratifs du BAC" },
       ],
@@ -162,10 +183,10 @@ export const MENU_PAR_ROLE: Record<string, NavGroupe[]> = {
       cle: "trimestriel",
       titre: TITRE_TRIMESTRIEL,
       items: [
-        { href: "/section/bac", label: "Compléter les tableaux du BAC", etape: 1 },
-        { href: "/trimestre/analyses", label: "Relire les commentaires de ma section", etape: 2 },
-        { href: "/trimestre/textes", label: "Relire les textes de ma section", etape: 3 },
-        { href: "/trimestre/circuit", label: "Valider ma section", etape: 4 },
+        { href: "/section/bac", label: "Compléter les tableaux du BAC", etape: 1, aide: AIDE.bac },
+        { href: "/trimestre/analyses", label: "Relire l'analyse des tableaux de ma section", etape: 2, aide: AIDE.analyses },
+        { href: "/trimestre/textes", label: "Relire les textes rédigés de ma section", etape: 3, aide: AIDE.textes },
+        { href: "/trimestre/circuit", label: "Valider ma section", etape: 4, aide: AIDE.valider },
       ],
     },
   ],

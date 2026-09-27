@@ -23,7 +23,7 @@ export default async function TextesTrimestrePage() {
   return (
     <AppShell allowedRoles={["AGENT_SAISIE", "DA", "DD", "CHEF_BAC", "CHEF_PSA", "CHEF_SPAIH", "CHEF_SSV"]}>
       <div className="max-w-4xl">
-        <h1 className="text-2xl font-bold text-primary-dark">Relire les textes du rapport</h1>
+        <h1 className="text-2xl font-bold text-primary-dark">Relire les textes rédigés</h1>
         <p className="mt-1 text-sm text-ink-muted">{presentation}</p>
         <div className="mt-6">
           <RubriquesTrimestreClient annee={annee} trimestre={trimestre} username={username} />
