@@ -72,7 +72,7 @@ const cleCase = (ligne: string, colonne: string) => `${ligne} | ${colonne}`;
 
 export default function SaisieTrimestrielleClient({
   username,
-  titre = "Saisie trimestrielle",
+  titre = "Compléter les tableaux du trimestre",
   presentation,
   seulement,
 }: {

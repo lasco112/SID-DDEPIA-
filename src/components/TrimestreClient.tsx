@@ -139,7 +139,7 @@ export default function TrimestreClient() {
               ? "La période est incomplète — seul un brouillon peut être produit."
               : circuitComplet
                 ? "Les trois mois sont complets et le circuit de validation est achevé : le rapport définitif peut être produit."
-                : "Les trois mois sont complets. Le rapport définitif attend la fin du circuit de validation (menu « Circuit du trimestre »)."}
+                : "Les trois mois sont complets. Le rapport définitif attend la fin du circuit de validation (étape 1, « Suivre l'avancement du trimestre »)."}
           </p>
 
           <ul className="mt-3 space-y-1 text-sm">
@@ -235,7 +235,7 @@ export default function TrimestreClient() {
         </p>
         {complet && !circuitComplet && (
           <div className="mt-2 rounded-md bg-amber-50 p-3 text-xs text-amber-900">
-            <p>{etat.circuit?.message} Suivez l&apos;avancement dans « Circuit du trimestre ».</p>
+            <p>{etat.circuit?.message} Suivez-le à l&apos;étape 1, « Suivre l&apos;avancement du trimestre ».</p>
             {/* Exceptionnellement, le DD prend le relais d'un DA ou d'un chef défaillant — comme au mensuel. */}
             {motifRelais == null ? (
               <button

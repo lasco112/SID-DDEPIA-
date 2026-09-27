@@ -53,7 +53,7 @@ export const FAQ: QuestionFAQ[] = [
   {
     question: "Comment attribuer un tableau ou une section à un agent de saisie ?",
     reponse:
-      "Depuis « Organisation du travail » (menu latéral), choisissez l'agent responsable tableau par tableau, ou attribuez toute une section en une fois. Ceci reste indicatif : tout agent de l'arrondissement peut quand même intervenir si besoin.",
+      "Depuis « Répartir les tableaux entre mes agents » (menu latéral, rubrique Rapport mensuel), choisissez l'agent responsable tableau par tableau, ou attribuez toute une section en une fois. Ceci reste indicatif : tout agent de l'arrondissement peut quand même intervenir si besoin.",
     roles: ["DA"],
   },
   {

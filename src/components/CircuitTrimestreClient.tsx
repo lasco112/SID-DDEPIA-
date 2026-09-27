@@ -46,6 +46,19 @@ interface Etat {
   peut: { transmettre: boolean; renvoyer: boolean; valider: boolean; annulerSection: string | null; relaisDD: boolean };
 }
 
+/**
+ * Le titre de l'écran dit ce que CE rôle vient y faire (demande du Délégué,
+ * 27 septembre 2026 : « circuit » ne parlait à personne). Mêmes mots que le menu.
+ */
+const TITRE_PAR_ROLE: Record<string, string> = {
+  DA: "Transmettre mon rapport au DD",
+  DD: "Suivre l'avancement du trimestre",
+  CHEF_BAC: "Valider ma section",
+  CHEF_PSA: "Valider ma section",
+  CHEF_SPAIH: "Valider ma section",
+  CHEF_SSV: "Valider ma section",
+};
+
 const BADGE_ARR: Record<Arrondissement["statut"], { texte: string; classe: string }> = {
   EN_PREPARATION: { texte: "En préparation", classe: "bg-amber-100 text-amber-900" },
   TRANSMIS: { texte: "Transmis au DD", classe: "bg-green-100 text-green-800" },
@@ -173,8 +186,8 @@ export default function CircuitTrimestreClient({ username }: { username: string 
   return (
     <div className="max-w-3xl">
       <HorsLigneTrimestre username={username} copieDu={copieDu} />
-      <h1 className="text-2xl font-bold text-primary-dark">Circuit du rapport trimestriel</h1>
-      <p className="mt-1 text-sm text-gray-600">{etat.periode}</p>
+      <h1 className="text-2xl font-bold text-primary-dark">{TITRE_PAR_ROLE[etat.role] ?? "Avancement du rapport trimestriel"}</h1>
+      <p className="mt-1 text-sm text-gray-600">Rapport trimestriel · {etat.periode}</p>
 
       <div className="mt-3 flex flex-wrap items-center gap-3">
         <label className="text-sm text-gray-700">
@@ -245,7 +258,7 @@ export default function CircuitTrimestreClient({ username }: { username: string 
             </p>
           ) : (
             <p className="mt-2 text-sm text-gray-700">
-              Vos agents ont préparé le rapport. Relisez la saisie, les analyses et les textes, produisez un aperçu depuis « Mon rapport trimestriel », puis transmettez.
+              Vos agents ont préparé le rapport. Relisez la saisie, les analyses et les textes, produisez un aperçu à l&apos;étape 4, « Vérifier et télécharger mon rapport », puis transmettez.
             </p>
           )}
           {etat.peut.transmettre && (
@@ -357,7 +370,7 @@ export default function CircuitTrimestreClient({ username }: { username: string 
                   }
                   className="mt-2 w-full rounded-md bg-primary px-4 py-3 text-sm font-semibold text-white hover:bg-primary-dark disabled:opacity-50 sm:w-auto"
                 >
-                  Valider mon domaine
+                  Valider ma section
                 </button>
               )}
               {s.statut === "VALIDE" && (etat.peut.annulerSection === "toutes" || etat.peut.annulerSection === s.code) && (
@@ -378,8 +391,8 @@ export default function CircuitTrimestreClient({ username }: { username: string 
       {etat.role === "DD" && (
         <p className={`mt-5 rounded-md p-3 text-sm ${etat.complet ? "bg-green-50 text-green-800" : "bg-amber-50 text-amber-900"}`}>
           {etat.complet
-            ? "Le circuit est achevé : vous pouvez produire la version définitive depuis « Rapport trimestriel »."
-            : "Tant que le circuit n'est pas achevé, « Rapport trimestriel » ne produit qu'un aperçu, marqué PROVISOIRE."}
+            ? "Le circuit est achevé : vous pouvez produire la version définitive à l'étape 4, « Produire le rapport du département »."
+            : "Tant que le circuit n'est pas achevé, l'étape 4 « Produire le rapport du département » ne donne qu'un aperçu, marqué PROVISOIRE."}
         </p>
       )}
       {etat.role === "DD" && !etat.complet && (

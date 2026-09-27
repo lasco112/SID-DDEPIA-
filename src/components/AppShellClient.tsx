@@ -21,6 +21,7 @@ import BootstrapPreload from "@/components/BootstrapPreload";
 import PinGate from "@/components/PinGate";
 import RechercheGlobale from "@/components/RechercheGlobale";
 import AideButton from "@/components/AideButton";
+import FilEtapes from "@/components/FilEtapes";
 
 const LIBELLES_ROLE: Record<string, string> = {
   DD: "Délégué Départemental",
@@ -131,7 +132,11 @@ export default function AppShellClient({
           <Sidebar role={role} periodeLabel={periodeLabel} onNavigate={() => setMenuOuvert(false)} />
         </div>
 
-        <main className="sid-scroll flex-1 min-w-0 overflow-auto bg-appbg p-6 md:p-[26px_30px]">{children}</main>
+        <main className="sid-scroll flex-1 min-w-0 overflow-auto bg-appbg p-6 md:p-[26px_30px]">
+          <FilEtapes role={role} position="haut" />
+          {children}
+          <FilEtapes role={role} position="bas" />
+        </main>
       </div>
     </div>
     </PinGate>

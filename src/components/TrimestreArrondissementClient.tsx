@@ -171,12 +171,12 @@ export default function TrimestreArrondissementClient() {
           Le document suit le canevas officiel, ramené à votre arrondissement : une seule colonne
           territoriale au lieu de six. Les tableaux, leurs analyses et la conclusion se remplissent à partir
           de vos saisies. Le rapport définitif est celui que vous avez transmis au Délégué départemental
-          (menu « Circuit du trimestre ») ; avant, seul un brouillon peut être produit.
+          (étape 5, « Transmettre mon rapport au DD ») ; avant, seul un brouillon peut être produit.
         </p>
         {complet && !transmis && (
           <p className="mt-3 rounded-md bg-amber-50 p-3 text-sm text-amber-900">
-            Le rapport définitif sera disponible une fois le rapport transmis au Délégué départemental, depuis le
-            menu « Circuit du trimestre ». En attendant, produisez un brouillon pour le relire.
+            Le rapport définitif sera disponible une fois le rapport transmis au Délégué départemental, à
+            l&apos;étape suivante. En attendant, produisez un brouillon pour le relire.
           </p>
         )}
         {message && <p className="mt-3 text-sm text-gray-700">{message}</p>}

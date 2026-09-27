@@ -9,7 +9,7 @@ export default async function RubriquesDDPage() {
   return (
     <AppShell allowedRoles={["DD"]}>
       <div className="max-w-4xl">
-        <h1 className="text-2xl font-bold text-primary-dark">Textes du rapport trimestriel</h1>
+        <h1 className="text-2xl font-bold text-primary-dark">Relire les textes du rapport</h1>
         <p className="mt-1 text-sm text-ink-muted">
           Les chefs de section rédigent les zones de texte de leur domaine. Vous les relisez, et ne corrigez
           que si vous le souhaitez : ce qui est écrit ici est repris tel quel dans le document ; une zone vide

@@ -1,94 +1,221 @@
 /**
- * navItems.ts — pages accessibles par rôle. Source unique utilisée par
- * Sidebar.tsx (menu latéral) et RechercheGlobale.tsx (recherche rapide) pour
- * ne jamais désynchroniser les deux.
+ * navItems.ts — le menu de chaque rôle. Source unique du menu latéral
+ * (Sidebar.tsx), du fil d'étapes (FilEtapes.tsx), de la recherche rapide
+ * (RechercheGlobale.tsx) et du préchargement hors ligne (offlineStore.ts).
+ *
+ * Rangé PAR RAPPORT, à la demande du Délégué (27 septembre 2026) : ses
+ * collègues ne savaient pas où se faisait le rapport mensuel, où se faisait le
+ * trimestriel, ni à quoi servait chaque écran du trimestre. Chaque groupe dit
+ * quel rapport il prépare ; dans le trimestriel, les écrans sont des ÉTAPES
+ * numérotées, dans l'ordre où on les franchit (saisir avant de relire les
+ * commentaires, relire avant de transmettre), et nommées par ce qu'on y FAIT.
+ *
+ * Les adresses ne changent pas : le hors ligne déjà en cache et les habitudes
+ * restent valables.
  */
 
 export interface NavItem {
   href: string;
   label: string;
+  /** Rang dans les étapes du groupe (1, 2…). Absent : écran d'appoint, hors du fil. */
+  etape?: number;
 }
 
-export const NAV_PAR_ROLE: Record<string, NavItem[]> = {
-  DA: [
-    { href: "/dashboard", label: "Tableau de bord" },
-    { href: "/da/saisie", label: "Saisie de données" },
-    { href: "/trimestre/saisie", label: "Saisie trimestrielle" },
-    { href: "/trimestre/analyses", label: "Analyses du trimestre" },
-    { href: "/trimestre/circuit", label: "Circuit du trimestre" },
-    { href: "/da/trimestre", label: "Mon rapport trimestriel" },
-    { href: "/da/trimestre/rubriques", label: "Textes de mon rapport" },
-    { href: "/etablissements", label: "Établissements" },
-    { href: "/da/supervision-agents", label: "Suivi des agents de saisie" },
-    { href: "/da/assignations", label: "Organisation du travail" },
-    { href: "/mon-compte/synchronisation", label: "Synchronisation" },
-  ],
-  AGENT_SAISIE: [
-    { href: "/dashboard", label: "Tableau de bord" },
-    { href: "/da/saisie", label: "Saisie de données" },
-    { href: "/trimestre/saisie", label: "Saisie trimestrielle" },
-    { href: "/trimestre/analyses", label: "Analyses du trimestre" },
-    { href: "/trimestre/circuit", label: "Circuit du trimestre" },
-    { href: "/trimestre/textes", label: "Textes du rapport trimestriel" },
-    { href: "/etablissements", label: "Établissements" },
-    { href: "/mon-compte/synchronisation", label: "Synchronisation" },
-  ],
-  DD: [
-    { href: "/dashboard", label: "Tableau de bord" },
-    { href: "/dd/supervision", label: "Supervision" },
-    { href: "/dd/donnees", label: "Données par arrondissement" },
-    { href: "/dd/periodes", label: "Gestion des périodes" },
-    { href: "/trimestre/saisie", label: "Saisie trimestrielle" },
-    { href: "/trimestre/analyses", label: "Analyses du trimestre" },
-    { href: "/trimestre/circuit", label: "Circuit du trimestre" },
-    { href: "/dd/trimestre", label: "Rapport trimestriel" },
-    { href: "/dd/trimestre/rubriques", label: "Textes du rapport trimestriel" },
-    { href: "/dd/rapports-thematiques", label: "Rapports thématiques" },
-    { href: "/admin/utilisateurs", label: "Comptes utilisateurs" },
-    { href: "/etablissements", label: "Établissements" },
-    { href: "/dd/referentiels", label: "Propositions de référentiel" },
-    { href: "/technique/audit", label: "Journal d'activité" },
-    { href: "/technique/aide", label: "Questions des utilisateurs" },
-  ],
-  CHEF_BAC: [
-    { href: "/dashboard", label: "Tableau de bord" },
-    { href: "/section/bac", label: "Tableaux du BAC" },
-    { href: "/trimestre/analyses", label: "Analyses du trimestre" },
-    { href: "/trimestre/circuit", label: "Circuit du trimestre" },
-    { href: "/trimestre/textes", label: "Textes du rapport trimestriel" },
-    { href: "/section/controle", label: "Vue croisée de contrôle" },
-    { href: "/section/analyse", label: "Synthèse d'analyse" },
-  ],
-  CHEF_SSV: [
-    { href: "/dashboard", label: "Tableau de bord" },
-    { href: "/trimestre/analyses", label: "Analyses du trimestre" },
-    { href: "/trimestre/circuit", label: "Circuit du trimestre" },
-    { href: "/trimestre/textes", label: "Textes du rapport trimestriel" },
-    { href: "/section/controle", label: "Vue croisée de contrôle" },
-    { href: "/section/analyse", label: "Synthèse d'analyse" },
-  ],
-  CHEF_PSA: [
-    { href: "/dashboard", label: "Tableau de bord" },
-    { href: "/trimestre/analyses", label: "Analyses du trimestre" },
-    { href: "/trimestre/circuit", label: "Circuit du trimestre" },
-    { href: "/trimestre/textes", label: "Textes du rapport trimestriel" },
-    { href: "/section/controle", label: "Vue croisée de contrôle" },
-    { href: "/section/analyse", label: "Synthèse d'analyse" },
-  ],
-  CHEF_SPAIH: [
-    { href: "/dashboard", label: "Tableau de bord" },
-    { href: "/trimestre/analyses", label: "Analyses du trimestre" },
-    { href: "/trimestre/circuit", label: "Circuit du trimestre" },
-    { href: "/trimestre/textes", label: "Textes du rapport trimestriel" },
-    { href: "/section/controle", label: "Vue croisée de contrôle" },
-    { href: "/section/analyse", label: "Synthèse d'analyse" },
-  ],
-  ADMIN_TECH: [
-    { href: "/dashboard", label: "Tableau de bord" },
-    { href: "/technique", label: "Santé du système" },
-    { href: "/technique/sauvegarde", label: "Sauvegarde de la base" },
-    { href: "/technique/referentiels", label: "Listes de référence" },
-    { href: "/technique/audit", label: "Journal d'audit" },
-    { href: "/technique/aide", label: "Questions des utilisateurs" },
+export type CleGroupe = "accueil" | "mensuel" | "trimestriel" | "autres" | "outils" | "administration";
+
+export interface NavGroupe {
+  cle: CleGroupe;
+  /** Titre affiché au-dessus du groupe ; absent pour l'accueil. */
+  titre?: string;
+  items: NavItem[];
+}
+
+const ACCUEIL: NavGroupe = { cle: "accueil", items: [{ href: "/dashboard", label: "Accueil — ce que j'ai à faire" }] };
+
+export const TITRE_MENSUEL = "Rapport mensuel";
+export const TITRE_TRIMESTRIEL = "Rapport trimestriel";
+
+/** Les écrans des chefs de section pour le mensuel. */
+const MENSUEL_CHEF: NavGroupe = {
+  cle: "mensuel",
+  titre: TITRE_MENSUEL,
+  items: [
+    { href: "/section/controle", label: "Contrôler les chiffres des arrondissements" },
+    { href: "/section/analyse", label: "Rédiger la synthèse de ma section" },
   ],
 };
+
+/** Les chefs PSA, SSV, SPAIH : relire leur section, puis la valider. */
+const TRIMESTRIEL_CHEF: NavGroupe = {
+  cle: "trimestriel",
+  titre: TITRE_TRIMESTRIEL,
+  items: [
+    { href: "/trimestre/analyses", label: "Relire les commentaires de ma section", etape: 1 },
+    { href: "/trimestre/textes", label: "Relire les textes de ma section", etape: 2 },
+    { href: "/trimestre/circuit", label: "Valider ma section", etape: 3 },
+  ],
+};
+
+export const MENU_PAR_ROLE: Record<string, NavGroupe[]> = {
+  DA: [
+    ACCUEIL,
+    {
+      cle: "mensuel",
+      titre: TITRE_MENSUEL,
+      items: [
+        { href: "/da/saisie", label: "Remplir et envoyer les tableaux du mois" },
+        { href: "/da/assignations", label: "Répartir les tableaux entre mes agents" },
+        { href: "/da/supervision-agents", label: "Suivre le travail de mes agents" },
+      ],
+    },
+    {
+      cle: "trimestriel",
+      titre: TITRE_TRIMESTRIEL,
+      items: [
+        { href: "/trimestre/saisie", label: "Compléter les tableaux du trimestre", etape: 1 },
+        { href: "/trimestre/analyses", label: "Relire les commentaires des tableaux", etape: 2 },
+        { href: "/da/trimestre/rubriques", label: "Relire les textes du rapport", etape: 3 },
+        { href: "/da/trimestre", label: "Vérifier et télécharger mon rapport", etape: 4 },
+        { href: "/trimestre/circuit", label: "Transmettre mon rapport au DD", etape: 5 },
+      ],
+    },
+    {
+      cle: "outils",
+      titre: "Outils",
+      items: [
+        { href: "/etablissements", label: "Établissements" },
+        { href: "/mon-compte/synchronisation", label: "Synchronisation" },
+      ],
+    },
+  ],
+  AGENT_SAISIE: [
+    ACCUEIL,
+    {
+      cle: "mensuel",
+      titre: TITRE_MENSUEL,
+      items: [{ href: "/da/saisie", label: "Remplir les tableaux du mois" }],
+    },
+    {
+      // L'agent prépare ; c'est son DA qui transmet. Pas de circuit ici.
+      cle: "trimestriel",
+      titre: TITRE_TRIMESTRIEL,
+      items: [
+        { href: "/trimestre/saisie", label: "Compléter les tableaux du trimestre", etape: 1 },
+        { href: "/trimestre/analyses", label: "Relire les commentaires des tableaux", etape: 2 },
+        { href: "/trimestre/textes", label: "Relire les textes du rapport", etape: 3 },
+      ],
+    },
+    {
+      cle: "outils",
+      titre: "Outils",
+      items: [
+        { href: "/etablissements", label: "Établissements" },
+        { href: "/mon-compte/synchronisation", label: "Synchronisation" },
+      ],
+    },
+  ],
+  DD: [
+    ACCUEIL,
+    {
+      cle: "mensuel",
+      titre: TITRE_MENSUEL,
+      items: [
+        { href: "/dd/supervision", label: "Suivre les arrondissements" },
+        { href: "/dd/donnees", label: "Consulter les chiffres par arrondissement" },
+        { href: "/dd/periodes", label: "Ouvrir et clôturer les mois" },
+      ],
+    },
+    {
+      // Le DD relit et produit ; il n'intervient dans les tableaux qu'au besoin.
+      cle: "trimestriel",
+      titre: TITRE_TRIMESTRIEL,
+      items: [
+        { href: "/trimestre/circuit", label: "Suivre l'avancement du trimestre", etape: 1 },
+        { href: "/trimestre/analyses", label: "Relire les commentaires des tableaux", etape: 2 },
+        { href: "/dd/trimestre/rubriques", label: "Relire les textes du rapport", etape: 3 },
+        { href: "/dd/trimestre", label: "Produire le rapport du département", etape: 4 },
+        { href: "/trimestre/saisie", label: "Corriger un tableau du trimestre" },
+        { href: "/section/bac", label: "Tableaux administratifs du BAC" },
+      ],
+    },
+    {
+      cle: "autres",
+      titre: "Autres rapports",
+      items: [{ href: "/dd/rapports-thematiques", label: "Rapports thématiques" }],
+    },
+    {
+      cle: "administration",
+      titre: "Administration",
+      items: [
+        { href: "/admin/utilisateurs", label: "Comptes utilisateurs" },
+        { href: "/etablissements", label: "Établissements" },
+        { href: "/dd/referentiels", label: "Propositions de référentiel" },
+        { href: "/technique/audit", label: "Journal d'activité" },
+        { href: "/technique/aide", label: "Questions des utilisateurs" },
+      ],
+    },
+  ],
+  CHEF_BAC: [
+    ACCUEIL,
+    MENSUEL_CHEF,
+    {
+      cle: "trimestriel",
+      titre: TITRE_TRIMESTRIEL,
+      items: [
+        { href: "/section/bac", label: "Compléter les tableaux du BAC", etape: 1 },
+        { href: "/trimestre/analyses", label: "Relire les commentaires de ma section", etape: 2 },
+        { href: "/trimestre/textes", label: "Relire les textes de ma section", etape: 3 },
+        { href: "/trimestre/circuit", label: "Valider ma section", etape: 4 },
+      ],
+    },
+  ],
+  CHEF_SSV: [ACCUEIL, MENSUEL_CHEF, TRIMESTRIEL_CHEF],
+  CHEF_PSA: [ACCUEIL, MENSUEL_CHEF, TRIMESTRIEL_CHEF],
+  CHEF_SPAIH: [ACCUEIL, MENSUEL_CHEF, TRIMESTRIEL_CHEF],
+  ADMIN_TECH: [
+    ACCUEIL,
+    {
+      cle: "administration",
+      titre: "Administration technique",
+      items: [
+        { href: "/technique", label: "Santé du système" },
+        { href: "/technique/sauvegarde", label: "Sauvegarde de la base" },
+        { href: "/technique/referentiels", label: "Listes de référence" },
+        { href: "/technique/audit", label: "Journal d'audit" },
+        { href: "/technique/aide", label: "Questions des utilisateurs" },
+      ],
+    },
+  ],
+};
+
+/** Toutes les pages d'un rôle, à plat (recherche rapide, préchargement hors ligne). */
+export const NAV_PAR_ROLE: Record<string, NavItem[]> = Object.fromEntries(
+  Object.entries(MENU_PAR_ROLE).map(([role, groupes]) => [role, groupes.flatMap((g) => g.items)])
+);
+
+/**
+ * L'entrée du menu qui correspond à une adresse : la plus précise gagne
+ * (« /dd/trimestre/rubriques » n'est pas « /dd/trimestre »).
+ */
+export function entreeCourante(role: string, pathname: string | null): { groupe: NavGroupe; item: NavItem } | null {
+  if (!pathname) return null;
+  let meilleur: { groupe: NavGroupe; item: NavItem } | null = null;
+  for (const groupe of MENU_PAR_ROLE[role] ?? []) {
+    for (const item of groupe.items) {
+      const correspond = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href + "/"));
+      if (correspond && (!meilleur || item.href.length > meilleur.item.href.length)) meilleur = { groupe, item };
+    }
+  }
+  return meilleur;
+}
+
+/** Les étapes numérotées d'un groupe, dans l'ordre. */
+export function etapesDu(groupe: NavGroupe): NavItem[] {
+  return groupe.items.filter((i) => i.etape != null).sort((a, b) => a.etape! - b.etape!);
+}
+
+/** Les étapes du rapport trimestriel pour un rôle (page d'accueil). */
+export function etapesTrimestrielles(role: string): NavItem[] {
+  const groupe = (MENU_PAR_ROLE[role] ?? []).find((g) => g.cle === "trimestriel");
+  return groupe ? etapesDu(groupe) : [];
+}

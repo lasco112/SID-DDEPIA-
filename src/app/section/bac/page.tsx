@@ -16,7 +16,7 @@ export default async function SectionBacPage() {
     <AppShell allowedRoles={["CHEF_BAC", "DD"]}>
       <SaisieTrimestrielleClient
         username={username}
-        titre="Tableaux du Bureau des Affaires Communes"
+        titre="Compléter les tableaux du BAC"
         presentation="Personnel, infrastructures, matériel, équipements, budget et recettes. Chaque arrondissement remplit sa colonne ; vous complétez et corrigez. Les totaux se calculent seuls."
         seulement={TABLEAUX_BAC}
       />
