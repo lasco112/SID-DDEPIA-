@@ -13,6 +13,8 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
+import { ChoixDuRapport } from "@/components/TrimestreClient";
+import { choixDepuisAdresse, libelleRapport, requeteRapport, type ChoixRapport, type TypeRapport } from "@/lib/choixRapport";
 
 interface Trimestre { annee: number; trimestre: number; libelle: string; court: string }
 interface MoisEtat { libelle: string; present: boolean; complet: boolean }
@@ -20,7 +22,9 @@ interface MoisEtat { libelle: string; present: boolean; complet: boolean }
 interface Etat {
   arrondissement?: string;
   disponibles: Trimestre[];
-  periode?: { annee: number; trimestre: number; libelle: string; court: string };
+  periode?: { annee: number; trimestre: number | null; type: TypeRapport; rang: number; libelle: string; court: string };
+  /** Semestre ou année : les trimestres dont aucun tableau n'a été saisi. */
+  trimestresSansSaisie?: string[];
   mois?: MoisEtat[];
   calculable?: boolean;
   /** Le rapport a été transmis au DD (circuit du trimestre) : seul le définitif en découle. */
@@ -30,20 +34,20 @@ interface Etat {
 
 export default function TrimestreArrondissementClient() {
   const [etat, setEtat] = useState<Etat | null>(null);
-  const [choix, setChoix] = useState<{ annee: number; trimestre: number } | null>(null);
+  const [choix, setChoix] = useState<ChoixRapport | null>(null);
   const [chargement, setChargement] = useState(true);
   const [generation, setGeneration] = useState<"final" | "brouillon" | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
-  const charger = useCallback(async (c: { annee: number; trimestre: number } | null) => {
+  const charger = useCallback(async (c: ChoixRapport | null) => {
     setChargement(true);
-    const q = c ? `?annee=${c.annee}&trimestre=${c.trimestre}` : "";
-    const res = await fetch(`/api/da/trimestre${q}`);
+    const res = await fetch(`/api/da/trimestre${c ? `?${requeteRapport(c)}` : ""}`);
     const data = await res.json();
     setEtat(data);
-    // Premier chargement : on se place sur le trimestre le plus récent.
+    // Premier chargement : la période demandée par l'accueil (?type=…), sinon
+    // le trimestre le plus récent.
     if (!c && data.disponibles?.length) {
-      setChoix({ annee: data.disponibles[0].annee, trimestre: data.disponibles[0].trimestre });
+      setChoix(choixDepuisAdresse() ?? { annee: data.disponibles[0].annee, type: "TRIMESTRIEL", rang: data.disponibles[0].trimestre });
     }
     setChargement(false);
   }, []);
@@ -100,24 +104,19 @@ export default function TrimestreArrondissementClient() {
 
   return (
     <div className="max-w-4xl">
-      <div className="flex flex-wrap items-center gap-3">
-        <label className="text-sm font-semibold text-gray-700" htmlFor="trimestre">Période</label>
-        <select
-          id="trimestre"
-          className="w-full max-w-full rounded border border-gray-300 px-3 py-2 text-sm sm:w-auto"
-          value={choix ? `${choix.annee}-${choix.trimestre}` : ""}
-          onChange={(e) => {
-            const [a, t] = e.target.value.split("-").map(Number);
-            setChoix({ annee: a, trimestre: t });
-          }}
-        >
-          {etat.disponibles.map((d) => (
-            <option key={`${d.annee}-${d.trimestre}`} value={`${d.annee}-${d.trimestre}`}>
-              {d.libelle}
-            </option>
-          ))}
-        </select>
-      </div>
+      <ChoixDuRapport disponibles={etat.disponibles} choix={choix} onChange={setChoix} />
+      {choix && choix.type !== "TRIMESTRIEL" && (
+        <p className="mt-3 text-sm text-ink-muted">
+          Le rapport {choix.type === "ANNUEL" ? "annuel" : "semestriel"} se calcule à partir de vos trimestres, et suit la
+          transmission du {choix.type === "SEMESTRIEL" && choix.rang === 1 ? "2e" : "4e"} trimestre : rien à ressaisir.
+        </p>
+      )}
+      {etat.trimestresSansSaisie && etat.trimestresSansSaisie.length > 0 && (
+        <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+          Aucun tableau du trimestre n&apos;a été saisi pour : <strong>{etat.trimestresSansSaisie.join(", ")}</strong>. Le
+          rapport ne les compte pas.
+        </p>
+      )}
 
       <section className="mt-6">
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">
@@ -128,8 +127,8 @@ export default function TrimestreArrondissementClient() {
             {!complet
               ? "Il vous manque au moins un mois — seul un brouillon peut être produit."
               : transmis
-                ? "Vos trois mois sont transmis et le rapport trimestriel aussi : le rapport définitif peut être produit."
-                : "Vos trois mois sont transmis. Le rapport définitif suivra la transmission du rapport trimestriel au DD."}
+                ? `Vos ${etat.mois?.length ?? 3} mois sont transmis et le rapport aussi : le rapport définitif peut être produit.`
+                : `Vos ${etat.mois?.length ?? 3} mois sont transmis. Le rapport définitif suivra la transmission du rapport trimestriel au DD.`}
           </p>
           <ul className="mt-3 space-y-1 text-sm">
             {etat.mois?.map((m) => (
@@ -154,9 +153,9 @@ export default function TrimestreArrondissementClient() {
             onClick={() => generer(false)}
             disabled={!complet || !transmis || generation !== null}
             className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-hover disabled:bg-gray-300"
-            title={!complet ? "Vos trois mois doivent être transmis" : !transmis ? "Transmettez d'abord le rapport au DD (Circuit du trimestre)" : undefined}
+            title={!complet ? "Tous vos mois doivent être transmis" : !transmis ? "Transmettez d'abord le rapport au DD (étape 5)" : undefined}
           >
-            {generation === "final" ? "Génération…" : "Générer mon rapport trimestriel (.docx)"}
+            {generation === "final" ? "Génération…" : `Générer mon rapport — ${choix ? libelleRapport(choix).toLowerCase() : ""} (.docx)`}
           </button>
           <button
             onClick={() => generer(true)}

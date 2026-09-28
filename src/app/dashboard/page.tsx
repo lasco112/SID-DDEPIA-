@@ -35,6 +35,8 @@ interface Carte {
   echeance?: string;
   /** Échéance proche ou dépassée, rapport pas encore transmis : la carte passe devant. */
   urgent: boolean;
+  /** Une précision en petit, sous les étapes. */
+  note?: string;
   bouton?: Lien;
   /** Les étapes numérotées (trimestriel), avec ce à quoi chacune sert. */
   etapes?: (Lien & { numero: number; aide?: string })[];
@@ -228,7 +230,10 @@ async function carteTrimestrielle(
   }
 
   const renvoye = (role === "DA" || role === "AGENT_SAISIE") && phrase.startsWith("Renvoyé");
+  // Le T2 clôt le premier semestre ; le T4, le second et l'année.
+  const clot = trimestre === 2 ? "le 1er semestre" : trimestre === 4 ? "le 2e semestre et l'année" : null;
   return {
+    note: clot ? `Ce trimestre clôt aussi ${clot} : ces rapports se calculent seuls à partir de vos trimestres, sans rien ressaisir.` : undefined,
     titre: TITRE_TRIMESTRIEL,
     periode: `${ordinal(trimestre)} trimestre ${annee}`,
     etat: phrase,
@@ -241,6 +246,38 @@ async function carteTrimestrielle(
     etapes: etapes.map((e) => ({ href: e.href, label: e.label, numero: e.etape!, aide: e.aide })),
     etapesFaites: fait,
   };
+}
+
+/**
+ * Au T2, le rapport du 1er semestre ; au T4, celui du 2e semestre et le rapport
+ * annuel (décision du Délégué, 28 septembre 2026). Même canevas, calculés à
+ * partir des trimestres, produits avec le trimestre qui les clôt et transmis
+ * avec lui : une carte chacun pour le DA et le DD, qui les produisent.
+ */
+function cartesSemestreEtAnnee(role: string, trimestreFait: boolean): Carte[] {
+  if (role !== "DA" && role !== "DD") return [];
+  const { annee, trimestre } = trimestreARapporter();
+  if (trimestre !== 2 && trimestre !== 4) return [];
+  const ecran = role === "DA" ? "/da/trimestre" : "/dd/trimestre";
+  const faire = role === "DA" ? "Vérifier et télécharger" : "Produire";
+  const rapports: { titre: string; periode: string; type: string; rang: number; mois: string; nom: string }[] = [
+    trimestre === 2
+      ? { titre: "Rapport semestriel", periode: `1er semestre ${annee}`, type: "SEMESTRIEL", rang: 1, mois: "janvier à juin", nom: "le rapport semestriel" }
+      : { titre: "Rapport semestriel", periode: `2e semestre ${annee}`, type: "SEMESTRIEL", rang: 2, mois: "juillet à décembre", nom: "le rapport semestriel" },
+    ...(trimestre === 4
+      ? [{ titre: "Rapport annuel", periode: `Année ${annee}`, type: "ANNUEL", rang: 1, mois: "janvier à décembre", nom: "le rapport annuel" }]
+      : []),
+  ];
+  return rapports.map((r) => ({
+    titre: r.titre,
+    periode: r.periode,
+    etat: trimestreFait
+      ? `Prêt : il se calcule à partir de vos trimestres (${r.mois}), et le ${ordinal(trimestre)} trimestre est transmis.`
+      : `Se calcule seul à partir de vos trimestres (${r.mois}) : rien à ressaisir. Il part avec la transmission du ${ordinal(trimestre)} trimestre.`,
+    ton: trimestreFait ? "fait" : "neutre",
+    urgent: false,
+    bouton: { href: `${ecran}?annee=${annee}&type=${r.type}&rang=${r.rang}`, label: `${faire} ${r.nom}` },
+  }));
 }
 
 const TONS = {
@@ -324,6 +361,8 @@ function CarteRapport({ c }: { c: Carte }) {
         </ol>
       )}
 
+      {c.note && <p className="mt-3 border-t border-line pt-3 text-xs leading-snug text-ink-muted">{c.note}</p>}
+
       {c.liens && c.liens.length > 0 && (
         <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1 border-t border-line pt-3">
           {c.liens.map((l) => (
@@ -348,6 +387,8 @@ export default async function DashboardPage() {
 
   const [accueil, ...lesCartes] = await Promise.all([salutation(db, moi), carteMensuelle(db, moi), carteTrimestrielle(db, moi)]);
   const cartes = lesCartes.filter((c): c is Carte => c != null);
+  const trimestre = cartes.find((c) => c.titre === TITRE_TRIMESTRIEL);
+  if (trimestre) cartes.push(...cartesSemestreEtAnnee(role, trimestre.etapesFaites === true));
   // L'urgent d'abord ; à égalité, le mensuel puis le trimestriel.
   cartes.sort((a, b) => Number(b.urgent) - Number(a.urgent));
 

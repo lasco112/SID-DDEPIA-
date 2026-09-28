@@ -14,6 +14,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
+import { choixDepuisAdresse, optionsDeRapports, requeteRapport, type ChoixRapport, type TypeRapport } from "@/lib/choixRapport";
 
 interface Trimestre { annee: number; trimestre: number; libelle: string; court: string; moisPresents: number }
 interface MoisEtat { libelle: string; present: boolean; transmis: number; complet: boolean }
@@ -21,7 +22,9 @@ interface FaitApercu { libelle: string; phrase: string; calcul: string }
 
 interface Etat {
   disponibles: Trimestre[];
-  periode?: { annee: number; trimestre: number; libelle: string; court: string };
+  periode?: { annee: number; trimestre: number | null; type: TypeRapport; rang: number; libelle: string; court: string };
+  /** Semestre ou année : les trimestres dont aucun tableau n'a été saisi. */
+  trimestresSansSaisie?: string[];
   comparaison?: { libelle: string; disponible: boolean };
   mois?: MoisEtat[];
   calculable?: boolean;
@@ -33,24 +36,80 @@ interface Etat {
   circuit?: { complet: boolean; message: string | null };
 }
 
+/**
+ * Deux listes : le type de rapport, puis la période. Le semestre et l'année se
+ * produisent avec le trimestre qui les clôt (T2, T4) et suivent son circuit.
+ */
+export function ChoixDuRapport({
+  disponibles,
+  choix,
+  onChange,
+}: {
+  disponibles: { annee: number; trimestre: number; moisPresents?: number }[];
+  choix: ChoixRapport | null;
+  onChange: (c: ChoixRapport) => void;
+}) {
+  const options = optionsDeRapports(disponibles);
+  const type = choix?.type ?? "TRIMESTRIEL";
+  const duType = options.filter((o) => o.type === type);
+  return (
+    <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+      <label className="text-sm font-semibold text-gray-700">
+        Rapport
+        <select
+          className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm sm:w-auto"
+          value={type}
+          onChange={(e) => {
+            const t = e.target.value as TypeRapport;
+            const premier = options.find((o) => o.type === t);
+            if (premier) onChange({ annee: premier.annee, type: t, rang: premier.rang });
+          }}
+        >
+          <option value="TRIMESTRIEL">Trimestriel</option>
+          <option value="SEMESTRIEL">Semestriel</option>
+          <option value="ANNUEL">Annuel</option>
+        </select>
+      </label>
+      <label className="text-sm font-semibold text-gray-700">
+        Période
+        <select
+          className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm sm:w-auto"
+          value={choix ? `${choix.annee}-${choix.rang}` : ""}
+          onChange={(e) => {
+            const [a, r] = e.target.value.split("-").map(Number);
+            onChange({ annee: a, type, rang: r });
+          }}
+        >
+          {duType.map((o) => (
+            <option key={`${o.annee}-${o.rang}`} value={`${o.annee}-${o.rang}`}>
+              {o.libelle}
+              {o.moisPresents != null ? ` — ${o.moisPresents}/${o.mois} mois en base` : ""}
+            </option>
+          ))}
+        </select>
+      </label>
+    </div>
+  );
+}
+
 export default function TrimestreClient() {
   const [etat, setEtat] = useState<Etat | null>(null);
-  const [choix, setChoix] = useState<{ annee: number; trimestre: number } | null>(null);
+  const [choix, setChoix] = useState<ChoixRapport | null>(null);
   const [chargement, setChargement] = useState(true);
   const [generation, setGeneration] = useState<"final" | "brouillon" | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [calculOuvert, setCalculOuvert] = useState<number | null>(null);
 
-  const charger = useCallback(async (c: { annee: number; trimestre: number } | null) => {
+  const charger = useCallback(async (c: ChoixRapport | null) => {
     setChargement(true);
-    const q = c ? `?annee=${c.annee}&trimestre=${c.trimestre}` : "";
-    const res = await fetch(`/api/dd/trimestre${q}`);
+    const res = await fetch(`/api/dd/trimestre${c ? `?${requeteRapport(c)}` : ""}`);
     const data = await res.json();
     setEtat(data);
-    // Premier chargement : on se place sur le trimestre le plus récent.
+    // Premier chargement : la période demandée par l'accueil (?type=…), sinon
+    // le trimestre le plus récent.
     if (!c && data.disponibles?.length) {
       const d = data.disponibles[0];
-      setChoix({ annee: d.annee, trimestre: d.trimestre });
+      setChoix(choixDepuisAdresse() ?? { annee: d.annee, type: "TRIMESTRIEL", rang: d.trimestre });
     }
     setChargement(false);
   }, []);
@@ -110,25 +169,15 @@ export default function TrimestreClient() {
 
   return (
     <div className="max-w-5xl">
-      {/* ---- Choix du trimestre ---- */}
-      <div className="flex flex-wrap items-center gap-3">
-        <label className="text-sm font-semibold text-gray-700" htmlFor="trimestre">Période</label>
-        <select
-          id="trimestre"
-          className="w-full max-w-full rounded border border-gray-300 px-3 py-2 text-sm sm:w-auto"
-          value={choix ? `${choix.annee}-${choix.trimestre}` : ""}
-          onChange={(e) => {
-            const [a, t] = e.target.value.split("-").map(Number);
-            setChoix({ annee: a, trimestre: t });
-          }}
-        >
-          {etat.disponibles.map((d) => (
-            <option key={`${d.annee}-${d.trimestre}`} value={`${d.annee}-${d.trimestre}`}>
-              {d.libelle} — {d.moisPresents}/3 mois en base
-            </option>
-          ))}
-        </select>
-      </div>
+      {/* ---- Choix du rapport : trimestriel, semestriel ou annuel ---- */}
+      <ChoixDuRapport disponibles={etat.disponibles} choix={choix} onChange={setChoix} />
+
+      {etat.trimestresSansSaisie && etat.trimestresSansSaisie.length > 0 && (
+        <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+          Aucun tableau du trimestre n&apos;a été saisi pour : <strong>{etat.trimestresSansSaisie.join(", ")}</strong>. Les
+          tableaux saisis de ce rapport ne sont calculés que sur les autres trimestres.
+        </p>
+      )}
 
       {/* ---- État des mois ---- */}
       <section className="mt-6">
@@ -138,8 +187,8 @@ export default function TrimestreClient() {
             {!complet
               ? "La période est incomplète — seul un brouillon peut être produit."
               : circuitComplet
-                ? "Les trois mois sont complets et le circuit de validation est achevé : le rapport définitif peut être produit."
-                : "Les trois mois sont complets. Le rapport définitif attend la fin du circuit de validation (étape 1, « Suivre l'avancement du trimestre »)."}
+                ? `Les ${etat.mois?.length ?? 3} mois sont complets et le circuit de validation est achevé : le rapport définitif peut être produit.`
+                : `Les ${etat.mois?.length ?? 3} mois sont complets. Le rapport définitif attend la fin du circuit de validation (étape 1, « Suivre l'avancement du trimestre »).`}
           </p>
 
           <ul className="mt-3 space-y-1 text-sm">
