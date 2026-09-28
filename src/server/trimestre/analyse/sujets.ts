@@ -1,13 +1,13 @@
 /**
  * Comment chaque tableau se nomme dans les phrases d'analyse.
  *
- * Un tableau n'est analysé automatiquement que s'il figure ici. Sont laissés
- * de côté, À DESSEIN, les tableaux dont les colonnes ne s'additionnent pas :
- * prix et quantités (cuirs, commercialisation), kilogrammes et boîtes
- * (saisies, produits inspectés), litres et kilogrammes (apiculture), texte
- * (organisations, listes). Leur « total » ne voudrait rien dire, et une
- * phrase calculée sur lui serait fausse. L'agent peut y écrire une analyse
- * lui-même.
+ * Le moteur GÉNÉRAL ne lit que les tableaux qui figurent ici. Ceux dont les
+ * colonnes ne s'additionnent pas — prix et quantités (cuirs,
+ * commercialisation), kilogrammes et boîtes (saisies, produits inspectés),
+ * litres et kilogrammes (apiculture), textes et listes — n'ont pas de
+ * « total » qui veuille dire quelque chose : ils ont leur analyse
+ * PARTICULIÈRE (analysesParticulieres.ts), une phrase par indicateur, par
+ * rubrique, ou un décompte.
  */
 import type { SujetTableau } from "./analyseTableau";
 
@@ -33,6 +33,9 @@ export const SUJETS: Record<number, SujetTableau> = {
   8: s("Le matériel de transport en service", "engins"),
   9: s("Les besoins en matériel de transport", "engins"),
   10: s("Les équipements", "équipements"),
+  // Une seule colonne de montant par arrondissement : le moteur général convient.
+  12: s("Les crédits de fonctionnement", "FCFA", SANS_DETAIL),
+  102: s("Les crédits d’investissement", "FCFA", SANS_DETAIL),
   13: s("Les recettes", "FCFA", SANS_DETAIL),
 
   // II-1 — Bovins

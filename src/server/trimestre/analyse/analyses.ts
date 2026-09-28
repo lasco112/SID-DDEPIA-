@@ -20,6 +20,7 @@ import type { FournisseurValeur } from "../canevas/rendu";
 import { SECTIONS_CANEVAS, chefDeSection, type ChefDeSection } from "../canevas/sections";
 import { analyserTableau, type PhraseAnalyse } from "./analyseTableau";
 import { SUJETS } from "./sujets";
+import { ANALYSES_PARTICULIERES, analyserParticulier } from "./analysesParticulieres";
 
 type BlocTableau = Extract<Bloc, { type: "tableau" }>;
 
@@ -47,8 +48,14 @@ export function propositions(ctx: ContexteCanevas, valeur: FournisseurValeur): P
   const sortie: Proposition[] = [];
   for (const section of SECTIONS_CANEVAS) {
     for (const bloc of section.blocs) {
-      if (bloc.type !== "tableau" || bloc.numero == null || !SUJETS[bloc.numero]) continue;
-      const a = analyserTableau(bloc as BlocTableau, ctx, valeur, SUJETS[bloc.numero]);
+      if (bloc.type !== "tableau" || bloc.numero == null) continue;
+      // Le moteur général pour les tableaux à un total ; les autres (unités
+      // mêlées, rubriques, listes) ont leur analyse particulière.
+      const a = SUJETS[bloc.numero]
+        ? analyserTableau(bloc as BlocTableau, ctx, valeur, SUJETS[bloc.numero])
+        : ANALYSES_PARTICULIERES[bloc.numero]
+          ? analyserParticulier(bloc as BlocTableau, ctx, valeur)
+          : null;
       if (!a) continue;
       const vide = a.phrases.length === 1 && /^Aucune donnée n’a été renseignée pour ce tableau/.test(a.phrases[0].texte);
       sortie.push({
