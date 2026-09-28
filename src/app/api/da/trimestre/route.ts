@@ -109,8 +109,11 @@ export async function GET(req: Request) {
     }
     const { annee } = p;
     const trimestre = p.type === "TRIMESTRIEL" ? p.rang : null;
-    const etat = await inspecterPeriode(db, p);
     const sien = await db.arrondissement.findFirst({ where: { nom: arrondissement }, select: { id: true } });
+    // SES transmissions seulement, comme le document lui-même : sans cette
+    // restriction, l'écran attendait les six arrondissements et disait « non
+    // transmis » à un DA qui avait tout transmis (Fokoué, 28 septembre 2026).
+    const etat = await inspecterPeriode(db, p, { arrondissementId: sien?.id });
 
     return NextResponse.json({
       arrondissement,
