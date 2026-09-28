@@ -33,7 +33,7 @@ import { preparer, fournisseur, estCaseCalculee, estCaseHistorique, valeurRepris
 import { REPRISES, repriseDe } from "./canevas/reprises";
 import { champsMobilises, liaisonDe, estLiee } from "./liaison";
 import { liaisonEvenementDe } from "./evenements";
-import { listerArrondissements } from "@/lib/arrondissements";
+import { listerArrondissements, graphieCanevas } from "@/lib/arrondissements";
 import { identiteDepartement } from "@/lib/departement";
 import {
   type Periode, libelleCourt, memePeriodeAnneePrecedente, moisDeLaPeriode,
@@ -513,6 +513,39 @@ function alertesReprises(numero: number, ctx: ContexteCanevas, saisies: Map<stri
 }
 
 /**
+ * Le détail d'un refus « catégories ≠ total mensuel », pour que l'agent aille
+ * droit au problème et compare (demande du Délégué, 28 septembre 2026) : ce
+ * qu'il a saisi, le chiffre de CHAQUE mois dans les rapports mensuels, le mois
+ * retenu (le plus récent pour un cheptel, qui est un effectif à date ; tous
+ * les mois pour des abattages, qui s'additionnent), l'état de chaque rapport,
+ * et le tableau mensuel à ouvrir.
+ */
+export interface ControleCategories {
+  tableau: number;
+  titreTableau: string;
+  arrondissement: string;
+  /** « cheptel ovin », « nombre de bovins abattus »… */
+  nature: string;
+  categories: { libelle: string; valeur: number }[];
+  somme: number;
+  total: number;
+  ecart: number;
+  /** Un cheptel : le mois le plus récent fait foi. Des abattages : les mois s'additionnent. */
+  regle: "DERNIERE_VALEUR" | "SOMME";
+  mois: {
+    periodeId: string | null;
+    libelle: string;
+    valeur: number | null;
+    /** Ce mois fait (ou contribue au) total des rapports mensuels. */
+    retenu: boolean;
+    /** Le rapport mensuel de l'arrondissement : EN_SAISIE, SOUMIS, REJETE, CLOTURE — ou null s'il n'existe pas. */
+    statutRapport: string | null;
+  }[];
+  /** Le tableau du rapport mensuel qui porte ce total : pour l'ouvrir. */
+  mensuel: { code: string; numero: string; titre: string } | null;
+}
+
+/**
  * Refuse une saisie qui rendrait la somme des catégories DIFFÉRENTE du total
  * des rapports mensuels (décision du Délégué). Le contrôle ne joue que lorsque
  * toutes les catégories de l'arrondissement sont remplies, et que le total
@@ -526,7 +559,7 @@ export async function incoherenceCategories(
   ligne: string,
   colonne: string,
   nouvelle: number | null
-): Promise<string | null> {
+): Promise<{ message: string; controle: ControleCategories | null } | null> {
   const nature = TOTAL_MENSUEL[numero];
   const liaison = liaisonDe(numero);
   if (!nature || !liaison?.total || liaison.orientation !== "lignes") return null;
@@ -537,21 +570,99 @@ export async function incoherenceCategories(
   const l = g?.lignes.find((x) => x.cle === ligne);
   if (!g || !l) return null;
   let somme = 0;
+  const saisies: { libelle: string; valeur: number }[] = [];
   for (const c of l.cases) {
     if (!categories.includes(c.colonne)) continue;
     const v = c.colonne === colonne ? nouvelle : versNombre(c.saisi);
     if (v == null) return null; // une catégorie manque encore : on attend
     somme += v;
+    saisies.push({ libelle: c.colonne, valeur: v });
   }
   const ctx = await contextePour(db, periode, profil);
   const total = versNombre(l.cases.find((c) => c.colonne === `TOTAL ${ctx.periodeCourt}`)?.affiche);
   if (total == null || Math.abs(somme - total) < 0.5) return null;
   const f = (n: number) => n.toLocaleString("fr-FR");
-  return (
+  const message =
     `${l.libelle} : la somme des catégories (${f(somme)}) doit être égale au ${nature} des rapports mensuels (${f(total)}), ` +
     `soit un écart de ${f(Math.abs(somme - total))}. La saisie n'est pas enregistrée : corrigez les catégories, ` +
-    `ou faites corriger le rapport mensuel.`
+    `ou faites corriger le rapport mensuel.`;
+
+  // Le détail n'est qu'une aide : s'il ne peut pas être établi, le refus reste.
+  let controle: ControleCategories | null = null;
+  try {
+    controle = await detailDuTotal(db, periode, liaison.total, l.libelle);
+    if (controle) {
+      Object.assign(controle, {
+        tableau: numero,
+        titreTableau: g.titre,
+        arrondissement: l.libelle,
+        nature,
+        categories: saisies,
+        somme,
+        total,
+        ecart: Math.abs(somme - total),
+      });
+    }
+  } catch {
+    controle = null;
+  }
+  return { message, controle };
+}
+
+/**
+ * Le total mensuel d'un arrondissement, mois par mois : la même formule que
+ * le rapport, appliquée à chaque mois, et la règle qui en fait le total de la
+ * période (le mois le plus récent pour un stock, la somme pour un flux).
+ */
+async function detailDuTotal(
+  db: PrismaClient,
+  periode: Periode,
+  formule: NonNullable<ReturnType<typeof liaisonDe>>["total"],
+  territoire: string
+): Promise<ControleCategories | null> {
+  if (!formule) return null;
+  const arr = (await listerArrondissements(db)).find((a) => a.nomCanevas === graphieCanevas(territoire) || a.nom === territoire);
+  if (!arr) return null;
+  const { agreger } = await import("./agregation");
+  const { regleDuChamp } = await import("./reglesChamps");
+  const { evaluer } = await import("./liaison");
+  const r = await agreger(db, periode, { champs: formule.champs, arrondissementId: arr.id, autoriserIncomplet: true });
+  const regle = regleDuChamp(formule.champs[0]) === "DERNIERE_VALEUR" ? "DERNIERE_VALEUR" : "SOMME";
+
+  const moisDeLaP = moisDeLaPeriode(periode);
+  const valeurs = moisDeLaP.map(({ annee, mois }) =>
+    evaluer(formule, (champ) => {
+      const v = r.valeurs.find((x) => x.fieldCode === champ && x.arrondissementCode === arr.code);
+      return v?.detail.find((d) => d.annee === annee && d.mois === mois)?.valeur ?? null;
+    })
   );
+  // Le mois retenu pour un stock : le plus récent renseigné.
+  const dernier = valeurs.map((v, i) => (v != null ? i : -1)).filter((i) => i >= 0).pop() ?? -1;
+
+  const lignes = await db.periodeReporting.findMany({
+    where: { type: "MENSUEL", OR: moisDeLaP.map(({ annee, mois }) => ({ annee, mois })) },
+    select: { id: true, annee: true, mois: true, rapports: { where: { arrondissementId: arr.id }, select: { statut: true } } },
+  });
+  const champ = await db.formField.findFirst({
+    where: { code: formule.champs[0] },
+    select: { template: { select: { code: true, numero: true, titre: true } } },
+  });
+
+  return {
+    tableau: 0, titreTableau: "", arrondissement: territoire, nature: "", categories: [], somme: 0, total: 0, ecart: 0,
+    regle,
+    mois: moisDeLaP.map(({ annee, mois }, i) => {
+      const ligne = lignes.find((x) => x.annee === annee && x.mois === mois);
+      return {
+        periodeId: ligne?.id ?? null,
+        libelle: `${MOIS_MAJ[mois - 1].charAt(0)}${MOIS_MAJ[mois - 1].slice(1).toLowerCase()} ${annee}`,
+        valeur: valeurs[i],
+        retenu: regle === "DERNIERE_VALEUR" ? i === dernier : valeurs[i] != null,
+        statutRapport: ligne?.rapports[0]?.statut ?? null,
+      };
+    }),
+    mensuel: champ?.template ?? null,
+  };
 }
 
 /**

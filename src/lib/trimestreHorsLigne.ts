@@ -67,7 +67,8 @@ export type ResultatEnvoi =
   | { statut: "en_file" }
   /** Le serveur détient une modification plus récente : elle est conservée. */
   | { statut: "ignore" }
-  | { statut: "refuse"; message: string };
+  /** `details` : ce que le serveur joint à son refus (le détail d'un contrôle, par exemple). */
+  | { statut: "refuse"; message: string; details?: Record<string, unknown> };
 
 /**
  * Envoie une écriture ; sans réseau, la met en file. Une nouvelle écriture sur
@@ -87,7 +88,7 @@ export async function envoyer(
         await retirer(username, op.cle);
         return d.ignoree ? { statut: "ignore" } : { statut: "envoye", reponse: d };
       }
-      if (r.status < 500) return { statut: "refuse", message: String(d.message ?? "Enregistrement impossible.") };
+      if (r.status < 500) return { statut: "refuse", message: String(d.message ?? "Enregistrement impossible."), details: d };
       // Serveur en difficulté : on garde, on réessaiera.
     } catch {
       // pas de réseau : en file

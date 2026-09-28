@@ -267,7 +267,19 @@ test("catégories ≠ total mensuel : la saisie est refusée, avec l'écart", as
     // Cinq catégories à 1 : le veau doit valoir total − 5.
     assert.equal(await incoherenceCategories(base, T3, DD, 14, arr, "Veau", total - 5), null, "la somme égale au total passe");
     const faux = await incoherenceCategories(base, T3, DD, 14, arr, "Veau", total - 4);
-    assert.match(faux ?? "", new RegExp(`^${arr} : la somme des catégories .* doit être égale au cheptel bovin des rapports mensuels .* écart de 1\\.`));
+    assert.match(faux?.message ?? "", new RegExp(`^${arr} : la somme des catégories .* doit être égale au cheptel bovin des rapports mensuels .* écart de 1\\.`));
+
+    // Le détail, pour aller droit au problème : les trois mois, le plus récent
+    // retenu (un cheptel est un effectif à date), le tableau mensuel à ouvrir.
+    const c = faux!.controle!;
+    assert.equal(c.regle, "DERNIERE_VALEUR");
+    assert.deepEqual(c.mois.map((m) => m.libelle), ["Juillet 2026", "Août 2026", "Septembre 2026"]);
+    const retenu = c.mois.filter((m) => m.retenu);
+    assert.equal(retenu.length, 1, "un seul mois fait le cheptel du trimestre");
+    assert.equal(retenu[0].valeur, total, "et c'est lui qui donne le total");
+    assert.equal(c.ecart, 1);
+    assert.equal(c.categories.length, 6);
+    assert.ok(c.mensuel?.code, "le tableau mensuel du cheptel est désigné");
   } finally {
     await base.saisieCanevas.deleteMany({ where: { periodeId: id, numeroTableau: 14, ligne: arr, colonne: { in: categories } } });
   }

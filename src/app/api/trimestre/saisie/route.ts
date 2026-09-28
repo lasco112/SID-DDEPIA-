@@ -131,7 +131,9 @@ export async function PUT(req: Request) {
     const incoherence = await incoherenceCategories(
       user.db, periode, profil, body.numeroTableau, body.ligne, body.colonne, estNombre ? nombre : null
     );
-    if (incoherence) return NextResponse.json({ message: incoherence }, { status: 409 });
+    // Le détail accompagne le refus : l'agent voit mois par mois d'où vient le
+    // total, et peut ouvrir le rapport mensuel concerné pour comparer.
+    if (incoherence) return NextResponse.json({ message: incoherence.message, controle: incoherence.controle }, { status: 409 });
 
     const periodeId = await periodeTrimestrielle(user.db, periode);
     const { enregistre, ignoree } = await ecrireSaisieCanevas(
