@@ -85,6 +85,26 @@ test("le semestre additionne les mouvements, reprend les situations, fait la moy
   assert.deepEqual(await trimestresSansSaisie(base, annuelle(2033)), ["T3 2033", "T4 2033"]);
 });
 
+test("le bilan de surveillance réunit les suspicions des deux trimestres, renumérotées", async () => {
+  const t1 = await periodeTrimestrielle(base, trimestrielle(2033, 1));
+  const t2 = await periodeTrimestrielle(base, trimestrielle(2033, 2));
+  await saisir(t1, 114, "1", "Semaine épidémiologique (SE)", "SE 5");
+  await saisir(t1, 114, "1", "Maladie suspectée", "Rage");
+  await saisir(t1, 114, "3", "Maladie suspectée", "Newcastle"); // une ligne sautée au T1
+  await saisir(t2, 114, "1", "Maladie suspectée", "PPR");
+  const { saisies } = await saisiesConsolidees(base, semestrielle(2033, 1), null, new Set());
+  const m = (ligne: string) => saisies.get(cleCellule({ numeroTableau: 114, ligne, colonne: "Maladie suspectée" }))?.texte;
+  assert.deepEqual([m("1"), m("2"), m("3"), m("4")], ["Rage", "Newcastle", "PPR", undefined], "la rage de février n'est plus perdue");
+  assert.equal(saisies.get(cleCellule({ numeroTableau: 114, ligne: "1", colonne: "Semaine épidémiologique (SE)" }))?.texte, "SE 5");
+
+  const bloc = SECTIONS_CANEVAS.flatMap((s) => s.blocs).find((b) => b.type === "tableau" && b.numero === 114);
+  assert.ok(bloc && bloc.type === "tableau");
+  const ctx = (n: number) => ({ periodeCourt: "P", periodeCourtN1: "P-1", annee: 2033, mois: Array(n).fill("M"), arrondissements: ["DSCHANG"] });
+  assert.equal(lignesDe(bloc, ctx(3)).length, 10, "au trimestre : les 10 lignes du canevas");
+  assert.equal(lignesDe(bloc, ctx(6)).length, 20, "au semestre : 10 par trimestre");
+  assert.equal(lignesDe(bloc, ctx(12)).length, 40);
+});
+
 test("une correction saisie pour le semestre lui-même l'emporte sur le calcul", async () => {
   const S1 = semestrielle(2033, 1);
   const s1 = await periodeTrimestrielle(base, S1);

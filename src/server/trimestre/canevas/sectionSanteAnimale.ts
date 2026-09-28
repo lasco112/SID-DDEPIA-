@@ -76,6 +76,8 @@ export const SECTION_IV_SANTE: SectionCanevas = {
       // additionnerait des numéros de semaine.
       entetes: ["N°", "Semaine épidémiologique (SE)", "Maladie suspectée", "Confirmé", "Négatif"],
       lignes: ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"],
+      // Au semestre et à l'année : les suspicions de chaque trimestre, à la suite.
+      lignesParTrimestre: true,
     },
 
     // ---- IV-2. Dispensaires et cliniques ----

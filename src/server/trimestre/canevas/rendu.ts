@@ -143,6 +143,12 @@ export function lignesDe(bloc: Extract<Bloc, { type: "tableau" }>, ctx: Contexte
   // `{MOIS}` se déplie en une ligne par mois de la période : trois au
   // trimestre, six au semestre, douze à l'année — comme le canevas régional
   // du semestre, qui liste les mois de janvier à décembre.
+  // Une liste d'événements numérotés au semestre ou à l'année : autant de
+  // lignes par trimestre, numérotées à la suite (1 à 20 au semestre).
+  if (bloc.kind === "libre" && bloc.lignesParTrimestre && ctx.mois.length > 3) {
+    const n = bloc.lignes.length * Math.ceil(ctx.mois.length / 3);
+    return Array.from({ length: n }, (_, i) => String(i + 1));
+  }
   return sansNiveauDepartemental(
     bloc.lignes.flatMap((l) => (l === "{ARRONDISSEMENTS}" ? ctx.arrondissements : l === "{MOIS}" ? ctx.mois : [l])),
     ctx
@@ -201,10 +207,20 @@ function rendreTableau(
     });
   });
 
+  // Liste d'événements allongée (semestre, année) : au-delà des lignes du
+  // canevas, une ligne entièrement vide n'est pas imprimée.
+  const lignesGardees =
+    bloc.kind === "libre" && bloc.lignesParTrimestre && lignes.length > bloc.lignes.length
+      ? corps.filter((_, r) =>
+          r < bloc.lignes.length ||
+          colonnes.slice(1).some((col, i) => valeur({ numeroTableau: bloc.numero, titreTableau: bloc.titre, bloc, ligne: cles[r], colonne: col, indexColonne: i + 1 }))
+        )
+      : corps;
+
   const tableau = new Table({
     width: { size: 100, type: WidthType.PERCENTAGE },
     borders: BORDURES,
-    rows: [entete, ...corps],
+    rows: [entete, ...lignesGardees],
   });
 
   // L'analyse, sous le tableau, dans le même corps que le texte courant.

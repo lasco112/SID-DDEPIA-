@@ -32,7 +32,13 @@ import type { PrismaClient } from "@prisma/client";
 import { type Periode, decouper, libelleCourt, memePeriodeAnneePrecedente } from "../periodes/calendrier";
 import { saisiesVues, cleCellule, type ValeurCellule } from "./saisieCanevas";
 
-export type Regle = "somme" | "dernier" | "moyenne";
+/**
+ * `fusion` : une LISTE d'événements numérotés (suspicions de maladies) — les
+ * lignes remplies de chaque trimestre sont mises bout à bout et renumérotées.
+ * Reprendre la seule liste du dernier trimestre ferait disparaître du semestre
+ * la suspicion de rage de février (décision du Délégué, 28 septembre 2026).
+ */
+export type Regle = "somme" | "dernier" | "moyenne" | "fusion";
 
 interface RegleTableau {
   regle: Regle;
@@ -62,8 +68,9 @@ export const REGLES: Record<number, RegleTableau> = {
   9: { regle: "dernier", motif: "Besoins en véhicules : situation en fin de période." },
   10: { regle: "dernier", motif: "Équipements : situation en fin de période." },
   11: { regle: "dernier", motif: "Masse du budget de l'exercice : montant du dernier trimestre." },
-  12: { regle: "dernier", motif: "À CONFIRMER — crédits de fonctionnement supposés cumulés depuis janvier : dernier trimestre." },
-  102: { regle: "dernier", motif: "À CONFIRMER — crédits d'investissement supposés cumulés depuis janvier : dernier trimestre." },
+  // Confirmé par le Délégué (28 septembre 2026) : les crédits se saisissent en cumul depuis janvier.
+  12: { regle: "dernier", motif: "Crédits de fonctionnement, cumulés depuis janvier : dernier trimestre." },
+  102: { regle: "dernier", motif: "Crédits d'investissement, cumulés depuis janvier : dernier trimestre." },
   13: { regle: "somme", motif: "Recettes : une ligne par mois, chaque mois vient de son trimestre." },
   103: { regle: "dernier", motif: "Contraintes et solutions : celles du dernier trimestre." },
   104: { regle: "dernier", motif: "Activités du programme 053 : niveau de réalisation du dernier trimestre." },
@@ -97,7 +104,8 @@ export const REGLES: Record<number, RegleTableau> = {
   39: { regle: "somme", motif: "Abattages de porcins : additionnés." },
   41: { regle: "somme", motif: "Commercialisation : additionnée." },
   109: { regle: "somme", motif: "Circulation des porcins : têtes additionnées, provenances et destinations réunies." },
-  42: { regle: "dernier", motif: "À CONFIRMER — situation des bandes supposée être un effectif présent : dernier trimestre." },
+  // Confirmé par le Délégué (28 septembre 2026) : des effectifs présents.
+  42: { regle: "dernier", motif: "Situation des bandes, effectifs présents : dernier trimestre." },
   43: { regle: "somme", motif: "Ventes d'oiseaux : additionnées." },
   44: { regle: "somme", motif: "Ventes d'oiseaux par catégorie : additionnées." },
   45: { regle: "somme", motif: "Abattages de volaille : additionnés." },
@@ -133,7 +141,7 @@ export const REGLES: Record<number, RegleTableau> = {
   // Chapitre IV — santé animale et inspection.
   64: { regle: "somme", motif: "Vaccinations : additionnées." },
   113: { regle: "dernier", motif: "Prélèvements (cumuls par année) : dernier trimestre." },
-  114: { regle: "dernier", motif: "Bilan de surveillance : liste du dernier trimestre." },
+  114: { regle: "fusion", motif: "Bilan de surveillance : les suspicions de chaque trimestre, à la suite." },
   65: { regle: "somme", motif: "Consultations : additionnées." },
   66: { regle: "somme", motif: "Déparasitages : additionnés." },
   67: { regle: "somme", motif: "Castrations : additionnées." },
@@ -201,10 +209,31 @@ export async function saisiesConsolidees(
   const cles = new Set(parTrimestre.flatMap((m) => Array.from(m.keys())));
   const sortie = new Map<string, ValeurCellule>();
   const sansRegle = new Set<number>();
+  const fusionnes = new Set(Object.entries(REGLES).filter(([, r]) => r.regle === "fusion").map(([n]) => Number(n)));
+
+  // Les listes d'événements : les lignes remplies de chaque trimestre, à la
+  // suite, renumérotées 1, 2, 3… dans l'ordre des trimestres puis des lignes.
+  for (const numero of Array.from(fusionnes)) {
+    let rang = 0;
+    for (const m of parTrimestre) {
+      const lignes = new Map<string, [string, ValeurCellule][]>();
+      m.forEach((v, cle) => {
+        const [n, ligne, colonne] = cle.split(" | ");
+        if (Number(n) !== numero || (v.valeur == null && !v.texte?.trim())) return;
+        lignes.set(ligne, [...(lignes.get(ligne) ?? []), [colonne, v]]);
+      });
+      const ordre = Array.from(lignes.keys()).sort((a, b) => Number(a) - Number(b) || a.localeCompare(b));
+      for (const ligne of ordre) {
+        rang++;
+        for (const [colonne, v] of lignes.get(ligne)!) sortie.set(`${numero} | ${rang} | ${colonne}`, v);
+      }
+    }
+  }
 
   for (const cle of Array.from(cles)) {
     const [numeroBrut, ligne, colonne] = cle.split(" | ");
     const numero = Number(numeroBrut);
+    if (fusionnes.has(numero)) continue;
     const regle = regleDe(numero, ligne, colonne);
     if (!regle) sansRegle.add(numero);
     const valeurs = parTrimestre.map((m) => m.get(cle)).filter((v): v is ValeurCellule => v != null);

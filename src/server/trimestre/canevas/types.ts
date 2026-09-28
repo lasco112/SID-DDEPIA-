@@ -191,6 +191,14 @@ export interface TableauLibre {
    * Réservé aux tableaux sans jeton {ARRONDISSEMENTS} en ligne.
    */
   prerempli?: string[][];
+  /**
+   * Liste d'ÉVÉNEMENTS numérotés (suspicions de maladies…) : au semestre et à
+   * l'année, les listes des trimestres sont mises bout à bout (décision du
+   * Délégué, 28 septembre 2026). Le tableau offre alors autant de lignes par
+   * trimestre, et le rendu n'imprime pas les lignes vides au-delà des
+   * premières. Sans effet au trimestre.
+   */
+  lignesParTrimestre?: boolean;
 }
 
 export type Tableau = TableauArrondissements | TableauLibre;
