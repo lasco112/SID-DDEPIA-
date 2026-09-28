@@ -21,6 +21,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { trimestreARapporter } from "@/lib/trimestreEchu";
 import { lireAvecCopie, garderCopie, envoyer, enAttente } from "@/lib/trimestreHorsLigne";
 import HorsLigneTrimestre from "@/components/HorsLigneTrimestre";
+import ComparaisonMensuel, { type ControleCategories } from "@/components/ComparaisonMensuel";
 
 type EtatCase = "saisie" | "calculee" | "total" | "lecture";
 
@@ -94,6 +95,8 @@ export default function SaisieTrimestrielleClient({
   const [voirNonClassees, setVoirNonClassees] = useState(false);
   /** Le refus d'une saisie, affiché AU-DESSUS DU TABLEAU, là où l'on saisit. */
   const [refus, setRefus] = useState<string | null>(null);
+  /** Le détail d'un refus « catégories ≠ total mensuel » : de quoi comparer et aller voir. */
+  const [controle, setControle] = useState<ControleCategories | null>(null);
   /** Ce qui s'est passé à l'enregistrement, quand ce n'est pas une erreur : gardé hors ligne, dépassé… */
   const [info, setInfo] = useState<string | null>(null);
   /** L'écran montre la copie du téléphone (pas de réseau) : de quand elle date. */
@@ -186,8 +189,23 @@ export default function SaisieTrimestrielleClient({
     void chargerListe();
   }, [chargerListe]);
 
+  // `?tableau=16` : ouvert d'emblée — le lien « voir le tableau » de l'étape
+  // de rédaction mène droit aux chiffres que la rubrique commente.
+  const tableauDemande = useRef<number | null>(
+    typeof window === "undefined" ? null : Number(new URLSearchParams(window.location.search).get("tableau")) || null
+  );
+  useEffect(() => {
+    const n = tableauDemande.current;
+    if (n == null || !liste?.tableaux.some((t) => t.numero === n)) return;
+    tableauDemande.current = null;
+    setOuvert(n);
+    setGrille(null);
+    void chargerGrille(n);
+  }, [liste, chargerGrille]);
+
   function ouvrir(numero: number, forcer = false) {
     setRefus(null);
+    setControle(null);
     enCoursDeFrappe.current.clear();
     if (forcer && ouvert !== numero) {
       setOuvert(numero);
@@ -205,7 +223,20 @@ export default function SaisieTrimestrielleClient({
     void chargerGrille(numero);
   }
 
-  async function enregistrer(ligne: string, colonne: string, avant: string | null) {
+  /**
+   * Les enregistrements partent L'UN APRÈS L'AUTRE. Tapés vite, deux cases
+   * partaient ensemble : chacune était contrôlée sans voir l'autre, et la
+   * somme des catégories pouvait s'écarter du mensuel sans être refusée
+   * (constaté le 28 septembre 2026 sur le cheptel ovin).
+   */
+  const fileEnregistrements = useRef<Promise<void>>(Promise.resolve());
+  function enregistrer(ligne: string, colonne: string, avant: string | null) {
+    const suite = fileEnregistrements.current.then(() => enregistrerMaintenant(ligne, colonne, avant));
+    fileEnregistrements.current = suite.catch(() => {});
+    return suite;
+  }
+
+  async function enregistrerMaintenant(ligne: string, colonne: string, avant: string | null) {
     if (!grille) return;
     const k = cleCase(ligne, colonne);
     const valeur = valeurs[k] ?? "";
@@ -216,6 +247,7 @@ export default function SaisieTrimestrielleClient({
     setEnCours(k);
     setErreur(null);
     setRefus(null);
+    setControle(null);
     // Refusée, la case reprend sa valeur enregistrée : un chiffre resté à
     // l'écran laisserait croire qu'il est enregistré.
     const annuler = (message: string) => {
@@ -233,6 +265,7 @@ export default function SaisieTrimestrielleClient({
       });
       if (resultat.statut === "refuse") {
         annuler(resultat.message);
+        setControle((resultat.details?.controle as ControleCategories | undefined) ?? null);
         return;
       }
       if (resultat.statut === "en_file") {
@@ -326,6 +359,9 @@ export default function SaisieTrimestrielleClient({
           {grille && grille.numero === courant.numero && (
             <TableauSaisie
               refus={refus}
+              controle={controle}
+              arrondissement={Boolean(liste.arrondissement)}
+              onFermerControle={() => setControle(null)}
               grille={grille}
               valeurs={valeurs}
               enCours={enCours}
@@ -515,6 +551,9 @@ function Enchainement({
 
 function TableauSaisie({
   refus,
+  controle,
+  arrondissement,
+  onFermerControle,
   grille,
   valeurs,
   enCours,
@@ -522,6 +561,10 @@ function TableauSaisie({
   onQuitter,
 }: {
   refus: string | null;
+  controle: ControleCategories | null;
+  /** DA ou agent : le bouton ouvre son rapport mensuel. */
+  arrondissement: boolean;
+  onFermerControle: () => void;
   grille: Grille;
   valeurs: Record<string, string>;
   enCours: string | null;
@@ -576,10 +619,14 @@ function TableauSaisie({
   return (
     <div>
       <p className="mb-3 text-sm text-gray-700">{grille.aide}</p>
-      {refus && (
-        <p role="alert" className="mb-3 rounded-md border border-red-300 bg-red-50 p-3 text-sm font-medium text-red-800">
-          {refus}
-        </p>
+      {controle ? (
+        <ComparaisonMensuel controle={controle} arrondissement={arrondissement} onFermer={onFermerControle} />
+      ) : (
+        refus && (
+          <p role="alert" className="mb-3 rounded-md border border-red-300 bg-red-50 p-3 text-sm font-medium text-red-800">
+            {refus}
+          </p>
+        )
       )}
       {grille.avertissements.length > 0 && (
         <ul className="mb-3 list-disc rounded-md bg-amber-50 p-3 pl-7 text-sm text-amber-900">

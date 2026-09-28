@@ -17,7 +17,7 @@ export default async function RubriquesDAPage() {
           marquée « Néant ».
         </p>
         <div className="mt-6">
-          <RubriquesTrimestreClient annee={annee} trimestre={trimestre} username={username} />
+          <RubriquesTrimestreClient annee={annee} trimestre={trimestre} username={username} role="DA" />
         </div>
       </div>
     </AppShell>

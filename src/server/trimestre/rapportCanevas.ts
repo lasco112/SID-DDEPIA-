@@ -56,6 +56,16 @@ export interface ZoneTexte {
   contexte: string;
   /** Vrai si un texte fixe couvre déjà cette zone (introduction, missions…). */
   fixe: boolean;
+  /** Laissée vide, elle n'écrit RIEN (présentation suivie de ses tableaux) : facultative. */
+  facultative: boolean;
+  /**
+   * Le tableau que la zone commente, pour rédiger avec les chiffres sous les
+   * yeux (demande du Délégué) : seulement s'il lui est COLLÉ dans le canevas —
+   * juste avant ou juste après, sans titre entre les deux. Chercher plus loin
+   * reliait « Animation pastorale » au tableau des abattages : un lien faux
+   * égare plus qu'aucun lien.
+   */
+  tableau: { numero: number; titre: string } | null;
 }
 
 /**
@@ -80,9 +90,12 @@ export function zonesTexte(options: { arrondissement?: boolean } = {}): ZoneText
   const zones: ZoneTexte[] = [];
   for (const section of SECTIONS_CANEVAS) {
     let contexte = section.titre;
-    for (const bloc of section.blocs) {
+    const colle = (b: (typeof section.blocs)[number] | undefined) =>
+      b && b.type === "tableau" && b.numero != null ? { numero: b.numero, titre: b.titre } : null;
+    section.blocs.forEach((bloc, i) => {
       if (bloc.type === "titre") contexte = bloc.texte;
       else if (bloc.type === "zoneTexte") {
+        const tableau = colle(section.blocs[i + 1]) ?? colle(section.blocs[i - 1]);
         // La conclusion générale et les références sont décrites à la fin de la
         // dernière section, mais n'en font pas partie : à l'écran, elles ont leur
         // propre groupe — sinon le chef PSA trouvait la conclusion sous « Santé animale ».
@@ -94,9 +107,11 @@ export function zonesTexte(options: { arrondissement?: boolean } = {}): ZoneText
           sectionTitre: finale ? "Conclusion générale et références" : section.titre,
           contexte,
           fixe: fixes.has(bloc.cle),
+          facultative: bloc.siVide === "rien",
+          tableau,
         });
       }
-    }
+    });
   }
   return zones;
 }

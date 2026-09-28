@@ -17,7 +17,7 @@ export default async function RubriquesDDPage() {
           y est marquée « Néant ».
         </p>
         <div className="mt-6">
-          <RubriquesTrimestreClient annee={annee} trimestre={trimestre} username={username} />
+          <RubriquesTrimestreClient annee={annee} trimestre={trimestre} username={username} role="DD" />
         </div>
       </div>
     </AppShell>
