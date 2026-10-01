@@ -165,7 +165,7 @@ export function ListeACorriger() {
                   onClick={() => void demander(p)}
                   className="min-h-[44px] rounded-lg border border-red-600 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50"
                 >
-                  Demander au DD de me renvoyer ce rapport
+                  {p.demande.libelle ?? "Demander au DD de me renvoyer ce rapport"}
                 </button>
               )}
             </div>

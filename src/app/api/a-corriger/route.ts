@@ -17,6 +17,8 @@ import { requireUser, permissionErrorResponse } from "@/lib/permissions";
 import { trimestrielle } from "@/server/periodes/calendrier";
 import { etatCircuit } from "@/server/trimestre/circuit";
 import { trimestreARapporter } from "@/lib/trimestreEchu";
+import { verifierCompletudeDD } from "@/server/export/rapport-docx";
+import type { PrismaClient } from "@prisma/client";
 
 export interface MoisACorriger {
   periodeId: string;
@@ -37,17 +39,78 @@ export interface DemandeDeRenvoi {
   le: string;
 }
 
+/**
+ * Un mois dont la date limite est passée et qui ne peut pas encore donner son
+ * rapport départemental : qui n'a pas transmis, quelle section n'a pas validé.
+ */
+export interface MoisBloque {
+  periodeId: string;
+  annee: number;
+  mois: number;
+  /** Après la date limite, le DA ne peut plus transmettre sans déverrouillage. */
+  verrouille: boolean;
+  daManquants: string[];
+  sectionsNonValidees: string[];
+}
+
 export interface ReponseACorriger {
   mensuel: MoisACorriger[];
   trimestreRenvoye: { annee: number; trimestre: number; motif: string | null } | null;
   demandes: DemandeDeRenvoi[];
+  /** Phase 2 — ce qui empêche de produire le rapport départemental du mois. */
+  production: MoisBloque[];
+}
+
+/**
+ * Les mois en retard : date limite des DA passée, mois pas encore clôturé.
+ * Avant la date limite, un rapport non transmis n'est pas une erreur.
+ */
+async function moisEnRetard(db: Awaited<ReturnType<typeof requireUser>>["db"]): Promise<MoisBloque[]> {
+  const periodes = await db.periodeReporting.findMany({
+    where: { type: "MENSUEL", statut: { not: "ARCHIVEE" }, dateLimiteDA: { lt: new Date() } },
+    select: { id: true, annee: true, mois: true, statut: true },
+    orderBy: [{ annee: "asc" }, { mois: "asc" }],
+  });
+  const sortie: MoisBloque[] = [];
+  for (const p of periodes) {
+    const c = await verifierCompletudeDD(db as PrismaClient, p.id);
+    if (c.complet) continue;
+    sortie.push({
+      periodeId: p.id,
+      annee: p.annee,
+      mois: p.mois ?? 0,
+      verrouille: p.statut === "VERROUILLEE_DA",
+      daManquants: c.daManquants,
+      sectionsNonValidees: c.sectionsNonValidees,
+    });
+  }
+  return sortie;
 }
 
 export async function GET() {
   try {
     const user = await requireUser();
     const db = user.db;
-    const reponse: ReponseACorriger = { mensuel: [], trimestreRenvoye: null, demandes: [] };
+    const reponse: ReponseACorriger = { mensuel: [], trimestreRenvoye: null, demandes: [], production: [] };
+
+    // Les mois en retard, vus par chacun : le DD voit tout ; le DA, son
+    // arrondissement ; le chef, sa section — et seulement quand les six
+    // arrondissements ont transmis (avant, il n'a rien à valider).
+    if (user.role === "DD" || user.role === "DA" || user.role.startsWith("CHEF_")) {
+      const enRetard = await moisEnRetard(db);
+      if (user.role === "DD") reponse.production = enRetard;
+      else if (user.role === "DA" && user.arrondissementId) {
+        const sien = (await db.arrondissement.findUnique({ where: { id: user.arrondissementId }, select: { nom: true } }))?.nom;
+        reponse.production = enRetard
+          .filter((m) => sien && m.daManquants.includes(sien))
+          .map((m) => ({ ...m, daManquants: [sien!], sectionsNonValidees: [] }));
+      } else if (user.sectionId) {
+        const section = (await db.section.findUnique({ where: { id: user.sectionId }, select: { nom: true } }))?.nom;
+        reponse.production = enRetard
+          .filter((m) => section && m.daManquants.length === 0 && m.sectionsNonValidees.includes(section))
+          .map((m) => ({ ...m, sectionsNonValidees: [section!] }));
+      }
+    }
 
     if ((user.role === "DA" || user.role === "AGENT_SAISIE") && user.arrondissementId) {
       const rapports = await db.rapportArrondissement.findMany({

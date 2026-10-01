@@ -15,9 +15,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { choixDepuisAdresse, optionsDeRapports, requeteRapport, type ChoixRapport, type TypeRapport } from "@/lib/choixRapport";
+import { allerAuMois } from "@/lib/allerAuMois";
 
 interface Trimestre { annee: number; trimestre: number; libelle: string; court: string; moisPresents: number }
-interface MoisEtat { libelle: string; present: boolean; transmis: number; complet: boolean }
+interface MoisEtat { periodeId?: string | null; libelle: string; present: boolean; transmis: number; complet: boolean }
 interface FaitApercu { libelle: string; phrase: string; calcul: string }
 
 interface Etat {
@@ -203,6 +204,19 @@ export default function TrimestreClient() {
                       ? "6 arrondissements sur 6 ont transmis"
                       : `${m.transmis} arrondissement(s) sur 6 ont transmis`}
                 </span>
+                {/* Qui manque : la Supervision de CE mois, lignes en retard encadrées. */}
+                {m.present && !m.complet && m.periodeId && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMessage(null);
+                      allerAuMois(m.periodeId!, "/dd/supervision").catch((e) => setMessage(e instanceof Error ? e.message : String(e)));
+                    }}
+                    className="rounded-full border border-amber-400 bg-white px-2.5 py-0.5 text-xs font-semibold text-amber-900 hover:bg-amber-100"
+                  >
+                    Voir qui n&apos;a pas transmis →
+                  </button>
+                )}
               </li>
             ))}
           </ul>
@@ -284,7 +298,12 @@ export default function TrimestreClient() {
         </p>
         {complet && !circuitComplet && (
           <div className="mt-2 rounded-md bg-amber-50 p-3 text-xs text-amber-900">
-            <p>{etat.circuit?.message} Suivez-le à l&apos;étape 1, « Suivre l&apos;avancement du trimestre ».</p>
+            <p>
+              {etat.circuit?.message}{" "}
+              <a href="/trimestre/circuit" className="font-semibold underline">
+                Voir qui manque dans le circuit →
+              </a>
+            </p>
             {/* Exceptionnellement, le DD prend le relais d'un DA ou d'un chef défaillant — comme au mensuel. */}
             {motifRelais == null ? (
               <button

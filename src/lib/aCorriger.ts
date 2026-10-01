@@ -40,7 +40,7 @@ export interface PointACorriger {
   /** Le mois du mensuel à ouvrir d'abord, s'il n'est pas le mois de travail de l'appareil. */
   periodeId?: string;
   /** Une demande au DD est possible (rapport transmis, mois verrouillé ou clôturé). */
-  demande?: { periodeId: string; tableaux: string[] };
+  demande?: { periodeId: string; tableaux: string[]; libelle?: string };
   /** Clé de tri : l'ordre du travail. */
   ordre: (number | string)[];
 }
@@ -85,6 +85,13 @@ const CONSEIL: Record<ReturnType<typeof natureDuRefus>, { quoi: (n: number, mois
     gravite: "a_verifier",
   },
 };
+
+/** Le bouton de la demande au DD, selon ce qui bloque. */
+const LIBELLE_DEMANDE = {
+  soumis: "Demander au DD de me renvoyer ce rapport",
+  verrou: "Demander au DD un déverrouillage",
+  cloture: "Demander au DD de rouvrir ce mois",
+} as const;
 
 /** Ce que l'appareil sait du compte : nom, rôle, mois de travail. */
 async function identite() {
@@ -198,7 +205,10 @@ async function pointsMensuels(username: string, periodeActiveId: string | null, 
       faire: conseil.faire,
       lien: avecCible(`/da/saisie/${templateCode}`, cibles),
       periodeId: enAutreMois(periodeId),
-      demande: nature === "soumis" || nature === "verrou" || nature === "cloture" ? { periodeId, tableaux: [nomTableau] } : undefined,
+      demande:
+        nature === "soumis" || nature === "verrou" || nature === "cloture"
+          ? { periodeId, tableaux: [nomTableau], libelle: LIBELLE_DEMANDE[nature] }
+          : undefined,
       ordre: [0, triMois(periodeId), t?.ordre ?? 999, nature === "ligne" ? 0 : 1],
     });
   }
@@ -381,6 +391,75 @@ function pointsDuDD(serveur: ReponseACorriger | null, periodeActiveId: string | 
   }));
 }
 
+/**
+ * Phase 2 — ce qui empêche de produire le rapport départemental d'un mois dont
+ * la date limite est passée (refus de « Générer le rapport définitif »).
+ */
+function pointsDeProduction(serveur: ReponseACorriger | null, role: string, periodeActiveId: string | null, deja: PointACorriger[]): PointACorriger[] {
+  const points: PointACorriger[] = [];
+  const autreMois = (id: string) => (id !== periodeActiveId ? id : undefined);
+  const liste = (noms: string[]) => (noms.length <= 1 ? noms.join("") : `${noms.slice(0, -1).join(", ")} et ${noms[noms.length - 1]}`);
+  for (const m of serveur?.production ?? []) {
+    const mois = libelleMois(m.annee, m.mois);
+    const ordre = [0, m.annee * 100 + m.mois, 900, 0];
+    if (role === "DD") {
+      const morceaux = [
+        m.daManquants.length
+          ? `${m.daManquants.length === 1 ? "1 arrondissement n'a" : `${m.daManquants.length} arrondissements n'ont`} pas transmis (${liste(m.daManquants)})`
+          : null,
+        m.sectionsNonValidees.length
+          ? `${m.sectionsNonValidees.length === 1 ? "1 section n'a" : `${m.sectionsNonValidees.length} sections n'ont`} pas validé (${liste(m.sectionsNonValidees)})`
+          : null,
+      ].filter(Boolean);
+      points.push({
+        id: `dd-production|${m.periodeId}`,
+        gravite: "bloquant",
+        rapport: "mensuel",
+        ou: `Mensuel · ${mois} · Rapport du département`,
+        quoi: `Date limite passée, le rapport du département ne peut pas être produit : ${morceaux.join(" ; ")}.`,
+        faire: m.daManquants.length
+          ? `Relancez ${m.daManquants.length > 1 ? "les DA" : "le DA"}${m.verrouille ? " ; s'il a un motif valable, « Déverrouiller » sa ligne" : ""}. Pour une section, relancez le chef ou « Valider en tant que DD ».`
+          : "Relancez le chef de section, ou cliquez « Valider en tant que DD » sur la ligne encadrée.",
+        lien: avecCible("/dd/supervision", [...m.daManquants.map((a) => jeton("arr", a)), ...m.sectionsNonValidees.map((s) => jeton("section", s))]),
+        periodeId: autreMois(m.periodeId),
+        ordre,
+      });
+    } else if (role === "DA") {
+      // Un rapport renvoyé a déjà son point : pas deux fois.
+      if (deja.some((p) => p.id === `m-renvoi|${m.periodeId}`)) continue;
+      points.push({
+        id: `da-retard|${m.periodeId}`,
+        gravite: "bloquant",
+        rapport: "mensuel",
+        ou: `Mensuel · ${mois}`,
+        quoi: m.verrouille
+          ? "Votre rapport n'est pas transmis et la date limite est passée : le mois est verrouillé."
+          : "Votre rapport n'est pas transmis et la date limite est passée : le rapport du département attend le vôtre.",
+        faire: m.verrouille
+          ? "Demandez au DD un déverrouillage, puis cliquez « Envoyer au Délégué Départemental »."
+          : "Terminez la saisie, puis cliquez « Envoyer au Délégué Départemental ».",
+        lien: "/da/saisie",
+        periodeId: autreMois(m.periodeId),
+        demande: m.verrouille ? { periodeId: m.periodeId, tableaux: [], libelle: LIBELLE_DEMANDE.verrou } : undefined,
+        ordre,
+      });
+    } else if (role.startsWith("CHEF_")) {
+      points.push({
+        id: `chef-validation|${m.periodeId}`,
+        gravite: "bloquant",
+        rapport: "mensuel",
+        ou: `Mensuel · ${mois} · Contrôle de ma section`,
+        quoi: "Les six arrondissements ont transmis et la date limite est passée : le rapport du département attend la validation de votre section.",
+        faire: "Contrôlez les tableaux de votre section, puis cliquez « Valider ma section pour cette période ».",
+        lien: avecCible("/section/controle", [jeton("valider-section")]),
+        periodeId: autreMois(m.periodeId),
+        ordre,
+      });
+    }
+  }
+  return points;
+}
+
 function comparer(a: PointACorriger, b: PointACorriger): number {
   for (let i = 0; i < Math.max(a.ordre.length, b.ordre.length); i++) {
     const x = a.ordre[i] ?? 0;
@@ -422,6 +501,7 @@ async function calculer(options: { forcerServeur?: boolean }): Promise<PointACor
   const points: PointACorriger[] = [];
   if (moi.role === "DA" || moi.role === "AGENT_SAISIE") points.push(...(await pointsMensuels(moi.username, moi.periodeActiveId, serveur)));
   if (moi.role === "DD") points.push(...pointsDuDD(serveur, moi.periodeActiveId));
+  points.push(...pointsDeProduction(serveur, moi.role, moi.periodeActiveId, points));
   points.push(...(await pointsTrimestriels(moi.username, moi.role, serveur)));
   return points.sort(comparer);
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import LiensBlocage from "@/components/LiensBlocage";
 
 interface Props {
   periodeId: string;
@@ -19,10 +20,12 @@ const LIBELLE_PAR_DEFAUT: Record<string, string> = {
 export default function GenererRapportDDButton({ periodeId, type = "DD", label, secondaire = false }: Props) {
   const [enCours, setEnCours] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [blocage, setBlocage] = useState<{ daManquants?: string[]; sectionsNonValidees?: string[] } | null>(null);
 
   async function generer() {
     setEnCours(true);
     setMessage(null);
+    setBlocage(null);
     try {
       const res = await fetch("/api/reports/generate", {
         method: "POST",
@@ -41,6 +44,9 @@ export default function GenererRapportDDButton({ periodeId, type = "DD", label, 
               ]
             : []),
         ].join(" ");
+        if (data.daManquants?.length || data.sectionsNonValidees?.length) {
+          setBlocage({ daManquants: data.daManquants, sectionsNonValidees: data.sectionsNonValidees });
+        }
         throw new Error([data.message, details].filter(Boolean).join(" "));
       }
       const blob = await res.blob();
@@ -72,6 +78,7 @@ export default function GenererRapportDDButton({ periodeId, type = "DD", label, 
         {enCours ? "Génération…" : label ?? LIBELLE_PAR_DEFAUT[type]}
       </button>
       {message && <p className="mt-2 text-sm text-gray-700">{message}</p>}
+      {blocage && <LiensBlocage {...blocage} />}
     </div>
   );
 }

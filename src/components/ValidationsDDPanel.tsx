@@ -11,6 +11,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { jeton } from "@/lib/surlignage";
 
 export interface EtatSection {
   sectionId: string;
@@ -85,7 +86,7 @@ export default function ValidationsDDPanel({
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Arrondissements</p>
             <ul className="space-y-1 text-sm">
               {arrondissements.map((a) => (
-                <li key={a.nom} className="flex items-center gap-2">
+                <li key={a.nom} data-cible={jeton("arr", a.nom)} className="flex items-center gap-2 rounded px-1">
                   <span>{a.soumis ? "✅" : "⚠️"}</span>
                   <span className={a.soumis ? "" : "font-semibold text-amber-900"}>{a.nom}</span>
                   {!a.soumis && <span className="text-xs text-amber-800">rapport non soumis</span>}
@@ -98,7 +99,7 @@ export default function ValidationsDDPanel({
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Services / Sections</p>
             <ul className="space-y-2 text-sm">
               {sections.map((s) => (
-                <li key={s.sectionId}>
+                <li key={s.sectionId} data-cible={jeton("section", s.nom)} className="rounded px-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <span>{s.valide ? "✅" : s.bloquante ? "⚠️" : "○"}</span>
                     <span className={s.valide ? "" : s.bloquante ? "font-semibold text-amber-900" : "text-gray-500"}>

@@ -14,6 +14,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { regleDuChamp, numeroTableau } from "@/lib/champsDerives";
+import { jeton } from "@/lib/surlignage";
 
 interface TemplateSummary {
   code: string;
@@ -223,7 +224,7 @@ export default function SectionControleClient() {
           <h1 className="text-[23px] font-bold text-primary-dark">Contrôle sectoriel</h1>
           <p className="mt-1 text-sm text-ink-muted">Vue croisée des 6 arrondissements. Cliquez une valeur pour la corriger (motif obligatoire, trace conservée).</p>
         </div>
-        <div className="text-right">
+        <div data-cible={jeton("valider-section")} className="rounded-lg p-1 text-right">
           <button onClick={validerSection} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-hover">
             Valider ma section pour cette période
           </button>

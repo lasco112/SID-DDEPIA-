@@ -97,6 +97,8 @@ export async function GET(req: Request) {
       trimestresSansSaisie: p.type === "TRIMESTRIEL" ? [] : await trimestresSansSaisie(db, p),
       comparaison: { libelle: libelleOfficiel(memePeriodeAnneePrecedente(p)), disponible: etatN1.mois.some((m) => m.periodeId) },
       mois: etat.mois.map((m) => ({
+        // Pour ouvrir la Supervision de ce mois et voir qui manque.
+        periodeId: m.periodeId,
         libelle: `${String(m.mois).padStart(2, "0")}/${m.annee}`,
         present: Boolean(m.periodeId),
         transmis: m.arrondissementsTransmis,

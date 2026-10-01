@@ -12,6 +12,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import LiensBlocage from "@/components/LiensBlocage";
 
 interface Evenement {
   id: string;
@@ -41,6 +42,7 @@ export default function CloturePeriodePanel({
   const [enCours, setEnCours] = useState(false);
   const [motif, setMotif] = useState("");
   const [message, setMessage] = useState<string | null>(null);
+  const [blocage, setBlocage] = useState<{ daManquants?: string[]; sectionsNonValidees?: string[] } | null>(null);
   const [evenements, setEvenements] = useState<Evenement[] | null>(null);
   const [historiqueOuvert, setHistoriqueOuvert] = useState(false);
 
@@ -54,6 +56,7 @@ export default function CloturePeriodePanel({
     });
     const data = await res.json().catch(() => ({}));
     setEnCours(false);
+    setBlocage(data.daManquants?.length || data.sectionsNonValidees?.length ? data : null);
     if (!res.ok) {
       const details = [
         ...(data.daManquants?.length ? [`Arrondissements sans rapport transmis : ${data.daManquants.join(", ")}.`] : []),
@@ -144,6 +147,7 @@ export default function CloturePeriodePanel({
         )}
 
         {message && <p className="mt-3 text-sm text-gray-700">{message}</p>}
+        {blocage && <LiensBlocage daManquants={blocage.daManquants} sectionsNonValidees={blocage.sectionsNonValidees} />}
       </div>
 
       <button
