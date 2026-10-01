@@ -6,6 +6,7 @@
  */
 
 import { useEffect, useState, useCallback } from "react";
+import VisiteGuidee from "@/components/VisiteGuidee";
 
 export default function SectionAnalyseClient() {
   const [periodeId, setPeriodeId] = useState<string | null>(null);
@@ -55,11 +56,13 @@ export default function SectionAnalyseClient() {
   return (
     <div className="max-w-3xl">
       <h1 className="text-[23px] font-bold text-primary-dark">Synthèse d'analyse de la section</h1>
+      <VisiteGuidee ecran="section-synthese" />
       <p className="mt-1 text-gray-600">
         Statut : {valideDD ? <span className="font-semibold text-green-700">Validée par le DD</span> : <span className="font-semibold text-amber-700">En attente de validation</span>}
       </p>
 
       <textarea
+        data-visite="synthese-texte"
         rows={12}
         className="mt-4 w-full rounded-lg border border-gray-300 p-3"
         placeholder="Faits marquants, difficultés rencontrées, recommandations…"
@@ -69,6 +72,7 @@ export default function SectionAnalyseClient() {
 
       <button
         onClick={enregistrer}
+        data-visite="synthese-enregistrer"
         disabled={enregistrement}
         className="mt-3 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-hover disabled:bg-gray-300"
       >

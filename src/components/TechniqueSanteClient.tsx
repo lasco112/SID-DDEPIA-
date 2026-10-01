@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import VisiteGuidee from "@/components/VisiteGuidee";
 
 interface Sante {
   db: { ok: boolean; latenceMs: number };
@@ -44,7 +45,7 @@ export default function TechniqueSanteClient() {
   return (
     <div className="space-y-6">
       <div className="rounded-lg border border-gray-200 bg-white p-4">
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">Base de données</h2>
+        <h2 data-visite="sante-base" className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">Base de données</h2>
         <div className="flex items-center gap-3">
           <span className={`h-3 w-3 rounded-full ${sante.db.ok ? "bg-green-500" : "bg-red-500"}`} />
           <span className="font-semibold">{sante.db.ok ? "Connectée" : "Injoignable"}</span>
@@ -65,7 +66,7 @@ export default function TechniqueSanteClient() {
       </div>
 
       <div className="rounded-lg border border-gray-200 bg-white p-4">
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">Dernière sauvegarde</h2>
+        <h2 data-visite="sante-sauvegarde" className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">Dernière sauvegarde</h2>
         {sante.dernierBackup ? (
           <p className="text-sm">
             <strong>{sante.dernierBackup.fichier}</strong> — {(sante.dernierBackup.tailleOctets / 1024).toFixed(1)} Ko —{" "}
@@ -76,7 +77,8 @@ export default function TechniqueSanteClient() {
         )}
       </div>
 
-      <button onClick={charger} className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">
+      <VisiteGuidee ecran="technique-sante" />
+        <button onClick={charger} data-visite="sante-actualiser" className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">
         Actualiser
       </button>
     </div>

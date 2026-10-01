@@ -9,6 +9,7 @@
  */
 
 import { useEffect, useState } from "react";
+import VisiteGuidee from "@/components/VisiteGuidee";
 
 interface Option {
   code: string;
@@ -104,7 +105,8 @@ export default function RapportThematiqueClient() {
 
   return (
     <div className="space-y-5">
-      <div>
+      <VisiteGuidee ecran="dd-thematique" />
+      <div data-visite="filtre-espece">
         <h3 className="mb-2 text-sm font-semibold text-gray-700">Espèce / animal (optionnel — laisser vide pour toutes)</h3>
         <div className="flex flex-wrap gap-2">
           {options.especes.map((e) => (
@@ -136,7 +138,7 @@ export default function RapportThematiqueClient() {
         </div>
       </div>
 
-      <div>
+      <div data-visite="filtre-periode">
         <h3 className="mb-2 text-sm font-semibold text-gray-700">Période(s) — au moins une requise</h3>
         <div className="flex flex-wrap gap-2">
           {options.periodes.map((p) => (
@@ -150,7 +152,7 @@ export default function RapportThematiqueClient() {
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-3 border-t border-gray-200 pt-4">
+      <div data-visite="generer-thematique" className="flex flex-wrap gap-3 border-t border-gray-200 pt-4">
         <button
           onClick={() => generer("xlsx")}
           disabled={enCours !== null}

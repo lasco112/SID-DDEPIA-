@@ -14,6 +14,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { ChoixDuRapport } from "@/components/TrimestreClient";
+import VisiteGuidee from "@/components/VisiteGuidee";
 import { choixDepuisAdresse, libelleRapport, requeteRapport, type ChoixRapport, type TypeRapport } from "@/lib/choixRapport";
 
 interface Trimestre { annee: number; trimestre: number; libelle: string; court: string }
@@ -104,6 +105,7 @@ export default function TrimestreArrondissementClient() {
 
   return (
     <div className="max-w-4xl">
+      <VisiteGuidee ecran="rapport-da" />
       <ChoixDuRapport disponibles={etat.disponibles} choix={choix} onChange={setChoix} />
       {choix && choix.type !== "TRIMESTRIEL" && (
         <p className="mt-3 text-sm text-ink-muted">
@@ -118,7 +120,7 @@ export default function TrimestreArrondissementClient() {
         </p>
       )}
 
-      <section className="mt-6">
+      <section data-visite="mois-periode" className="mt-6">
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">
           Mois composant la période
         </h2>
@@ -151,6 +153,7 @@ export default function TrimestreArrondissementClient() {
         <div className="flex flex-wrap gap-3">
           <button
             onClick={() => generer(false)}
+            data-visite="generer-definitif"
             disabled={!complet || !transmis || generation !== null}
             className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-hover disabled:bg-gray-300"
             title={!complet ? "Tous vos mois doivent être transmis" : !transmis ? "Transmettez d'abord le rapport au DD (étape 5)" : undefined}
@@ -159,6 +162,7 @@ export default function TrimestreArrondissementClient() {
           </button>
           <button
             onClick={() => generer(true)}
+            data-visite="generer-brouillon"
             disabled={generation !== null}
             className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:text-gray-400"
           >

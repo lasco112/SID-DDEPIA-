@@ -11,6 +11,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import VisiteGuidee from "@/components/VisiteGuidee";
 
 interface Periode {
   id: string;
@@ -127,6 +128,7 @@ export default function GestionPeriodesClient({ couranteId }: { couranteId: stri
   return (
     <div className="max-w-5xl">
       <h1 className="text-2xl font-bold text-primary-dark">Gestion des périodes</h1>
+      <VisiteGuidee ecran="dd-periodes" />
       <p className="mt-1 text-sm text-ink-muted">
         Une période correspond à un mois de rapportage. Vous pouvez créer un mois antérieur à la mise en service du
         système : les données saisies y seront rattachées à ce mois-là, quelle que soit la date réelle de saisie.
@@ -136,7 +138,7 @@ export default function GestionPeriodesClient({ couranteId }: { couranteId: stri
           « ouvrir le suivant ». Le faire chercher dans deux listes déroulantes
           revenait à cacher la fonction la plus courante derrière la plus rare. */}
       {suivant && (
-        <section className="mt-6 rounded-lg border-2 border-primary bg-green-50 p-4">
+        <section data-visite="mois-suivant" className="mt-6 rounded-lg border-2 border-primary bg-green-50 p-4">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-primary-dark">Mois suivant</h2>
           {suivant.existe ? (
             <>
@@ -170,7 +172,7 @@ export default function GestionPeriodesClient({ couranteId }: { couranteId: stri
         </section>
       )}
 
-      <section className="mt-6 rounded-lg border border-gray-200 bg-white p-4">
+      <section data-visite="autre-mois" className="mt-6 rounded-lg border border-gray-200 bg-white p-4">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">Créer un autre mois</h2>
         <p className="mb-2 text-xs text-gray-500">
           Pour rouvrir un mois passé et reconstituer son rapport, par exemple.
@@ -255,7 +257,7 @@ export default function GestionPeriodesClient({ couranteId }: { couranteId: stri
                         {p.documents > 1 ? "s" : ""}
                       </td>
                       <td className="border-b px-3 py-2">
-                        <div className="flex flex-wrap gap-2">
+                        <div data-visite="actions-periode" className="flex flex-wrap gap-2">
                           {!courante && (
                             <button
                               onClick={() => travaillerSur(p.id)}

@@ -8,6 +8,7 @@
  */
 
 import { useEffect, useState, useCallback } from "react";
+import VisiteGuidee from "@/components/VisiteGuidee";
 
 interface ItemEnAttente {
   id: string;
@@ -69,6 +70,7 @@ export default function ReferentielsEnAttenteClient() {
 
   return (
     <div>
+      <VisiteGuidee ecran="dd-referentiels" />
       {message && <p className="mb-4 rounded bg-blue-50 p-3 text-sm text-blue-800">{message}</p>}
       {items.length === 0 ? (
         <p className="text-sm text-gray-500">Aucune proposition en attente.</p>
@@ -87,7 +89,7 @@ export default function ReferentielsEnAttenteClient() {
                     {new Date(item.createdAt).toLocaleString("fr-FR")}
                   </p>
                 </div>
-                <div className="flex gap-2">
+                <div data-visite="decider-referentiel" className="flex gap-2">
                   <button
                     onClick={() => decider(item.id, "VALIDE")}
                     disabled={enCours === item.id}

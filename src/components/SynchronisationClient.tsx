@@ -13,6 +13,7 @@ import { useCallback, useEffect, useState } from "react";
 import { offlineDB } from "@/lib/dexie";
 import { etatSynchronisation, envoyerSaisiesEnAttente, type EtatSynchronisation } from "@/lib/synchronisation";
 import { synchroniserEtablissements } from "@/lib/etablissementsLocal";
+import VisiteGuidee from "@/components/VisiteGuidee";
 
 export default function SynchronisationClient({
   username,
@@ -83,7 +84,8 @@ export default function SynchronisationClient({
 
   return (
     <div className="max-w-xl">
-      <div className="rounded-card border border-line bg-surface p-5 shadow-card">
+      <VisiteGuidee ecran="synchronisation" />
+      <div data-visite="etat-synchro" className="rounded-card border border-line bg-surface p-5 shadow-card">
         <Ligne
           libelle="Connexion"
           valeur={enLigne ? "Disponible" : "Indisponible"}
@@ -120,6 +122,7 @@ export default function SynchronisationClient({
         <button
           type="button"
           onClick={synchroniserMaintenant}
+          data-visite="synchroniser"
           disabled={enCours}
           className="mt-5 w-full rounded-btn bg-primary py-2.5 text-sm font-semibold text-white hover:bg-primary-hover disabled:opacity-60"
         >

@@ -16,6 +16,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { choixDepuisAdresse, optionsDeRapports, requeteRapport, type ChoixRapport, type TypeRapport } from "@/lib/choixRapport";
 import { allerAuMois } from "@/lib/allerAuMois";
+import VisiteGuidee from "@/components/VisiteGuidee";
 
 interface Trimestre { annee: number; trimestre: number; libelle: string; court: string; moisPresents: number }
 interface MoisEtat { periodeId?: string | null; libelle: string; present: boolean; transmis: number; complet: boolean }
@@ -54,7 +55,7 @@ export function ChoixDuRapport({
   const type = choix?.type ?? "TRIMESTRIEL";
   const duType = options.filter((o) => o.type === type);
   return (
-    <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+    <div data-visite="choix-rapport" className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
       <label className="text-sm font-semibold text-gray-700">
         Rapport
         <select
@@ -170,6 +171,7 @@ export default function TrimestreClient() {
 
   return (
     <div className="max-w-5xl">
+      <VisiteGuidee ecran="rapport-dd" />
       {/* ---- Choix du rapport : trimestriel, semestriel ou annuel ---- */}
       <ChoixDuRapport disponibles={etat.disponibles} choix={choix} onChange={setChoix} />
 
@@ -181,7 +183,7 @@ export default function TrimestreClient() {
       )}
 
       {/* ---- État des mois ---- */}
-      <section className="mt-6">
+      <section data-visite="mois-periode" className="mt-6">
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">Mois composant la période</h2>
         <div className={`rounded-lg border p-4 ${complet ? "border-green-200 bg-green-50" : "border-amber-200 bg-amber-50"}`}>
           <p className={`text-sm font-semibold ${complet ? "text-green-900" : "text-amber-900"}`}>
@@ -242,7 +244,7 @@ export default function TrimestreClient() {
 
       {/* ---- Ce que le rapport dira ---- */}
       {etat.apercuFaits && etat.apercuFaits.length > 0 && (
-        <section className="mt-6">
+        <section data-visite="faits-notables" className="mt-6">
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">
             Ce que le rapport dira — faits les plus notables
           </h2>
@@ -276,6 +278,7 @@ export default function TrimestreClient() {
         <div className="flex flex-wrap gap-3">
           <button
             onClick={() => generer(false)}
+            data-visite="generer-definitif"
             disabled={!complet || !circuitComplet || generation !== null}
             className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-hover disabled:bg-gray-300"
             title={!complet ? "La période doit être complète" : !circuitComplet ? "Le circuit de validation doit être achevé" : undefined}
@@ -284,6 +287,7 @@ export default function TrimestreClient() {
           </button>
           <button
             onClick={() => generer(true)}
+            data-visite="generer-brouillon"
             disabled={generation !== null}
             className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:text-gray-400"
           >
@@ -309,6 +313,7 @@ export default function TrimestreClient() {
               <button
                 type="button"
                 onClick={() => setMotifRelais("")}
+                data-visite="finaliser-dd"
                 className="mt-2 rounded border border-blue-700 bg-white px-3 py-2 text-sm text-blue-800 hover:bg-blue-50"
               >
                 Finaliser exceptionnellement en tant que DD

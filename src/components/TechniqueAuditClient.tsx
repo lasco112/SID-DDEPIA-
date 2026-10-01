@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import VisiteGuidee from "@/components/VisiteGuidee";
 
 interface EntreeAudit {
   id: string;
@@ -49,7 +50,8 @@ export default function TechniqueAuditClient() {
 
   return (
     <div>
-      <div className="mb-4 flex flex-wrap items-center gap-3">
+      <VisiteGuidee ecran="journal-activite" />
+      <div data-visite="filtre-journal" className="mb-4 flex flex-wrap items-center gap-3">
         <label className="text-sm font-semibold text-gray-600">Filtrer par action :</label>
         <select
           value={actionFiltre}

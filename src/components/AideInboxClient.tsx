@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import VisiteGuidee from "@/components/VisiteGuidee";
 
 interface Demande {
   id: string;
@@ -35,6 +36,7 @@ export default function AideInboxClient() {
 
   return (
     <div className="space-y-3">
+      <VisiteGuidee ecran="aide-questions" />
       {demandes.map((d) => (
         <div key={d.id} className={`rounded-lg border p-4 ${d.traite ? "border-gray-200 bg-gray-50" : "border-amber-200 bg-amber-50"}`}>
           <div className="flex items-center justify-between text-xs text-gray-500">
@@ -46,7 +48,7 @@ export default function AideInboxClient() {
           </div>
           <p className="mt-2 text-sm text-gray-800">{d.message}</p>
           {!d.traite && (
-            <button onClick={() => marquerTraite(d.id)} className="mt-2 text-xs font-semibold text-primary hover:underline">
+            <button onClick={() => marquerTraite(d.id)} data-visite="marquer-traite" className="mt-2 text-xs font-semibold text-primary hover:underline">
               Marquer comme traité
             </button>
           )}

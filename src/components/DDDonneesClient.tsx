@@ -11,6 +11,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import VisiteGuidee from "@/components/VisiteGuidee";
 
 interface Arrondissement { id: string; code: string; nom: string }
 interface Template { code: string; numero: string; titre: string; type: string; section: string }
@@ -141,12 +142,13 @@ export default function DDDonneesClient({
   return (
     <div className="max-w-6xl">
       <h1 className="text-2xl font-bold text-primary-dark">Données par arrondissement</h1>
+      <VisiteGuidee ecran="dd-donnees" />
       <p className="mt-1 text-sm text-ink-muted">
         Période de travail : <strong>{MOIS[periode.mois]} {periode.annee}</strong>. Cliquez une valeur pour la corriger —
         le motif est obligatoire et la modification est conservée dans l'historique.
       </p>
 
-      <div className="mt-5 flex flex-wrap gap-2">
+      <div data-visite="choix-arrondissement" className="mt-5 flex flex-wrap gap-2">
         <button
           onClick={() => setArrondissementId(null)}
           className={`rounded-full px-3 py-1.5 text-sm font-semibold ${!arrondissementId ? "bg-primary text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
@@ -166,7 +168,7 @@ export default function DDDonneesClient({
 
       <div className="mt-5 space-y-3">
         {parSection.map(([section, liste]) => (
-          <div key={section} className="rounded-lg border border-gray-200 bg-white p-4">
+          <div key={section} data-visite="choix-tableau-dd" className="rounded-lg border border-gray-200 bg-white p-4">
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">{section}</p>
             <div className="flex flex-wrap gap-2">
               {liste.map((t) => (
@@ -210,6 +212,7 @@ export default function DDDonneesClient({
                       <td key={a.code} className="border-b px-3 py-2 text-center">
                         {cell ? (
                           <button
+                            data-visite="valeur-corrigeable"
                             className="rounded px-2 py-1 hover:bg-blue-50"
                             onClick={() => ouvrirCorrection(cell.id, `${f.libelle} — ${a.nom}`, String(cell.valeur ?? ""), "MATRICE")}
                           >

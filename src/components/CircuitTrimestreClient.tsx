@@ -14,6 +14,7 @@ import { useCallback, useEffect, useState } from "react";
 import { trimestreARapporter } from "@/lib/trimestreEchu";
 import { lireAvecCopie } from "@/lib/trimestreHorsLigne";
 import HorsLigneTrimestre from "@/components/HorsLigneTrimestre";
+import VisiteGuidee from "@/components/VisiteGuidee";
 
 interface Arrondissement {
   id: string;
@@ -146,6 +147,7 @@ export default function CircuitTrimestreClient({ username }: { username: string 
         <button
           type="button"
           onClick={() => setRelais({ cle, corps, motif: "" })}
+          data-visite="circuit-relais"
           className="mt-2 rounded border border-blue-700 px-2 py-1 text-xs text-blue-800 hover:bg-blue-50"
         >
           {libelle}
@@ -186,6 +188,7 @@ export default function CircuitTrimestreClient({ username }: { username: string 
   return (
     <div className="max-w-3xl">
       <HorsLigneTrimestre username={username} copieDu={copieDu} />
+      <VisiteGuidee ecran="circuit" />
       <h1 className="text-2xl font-bold text-primary-dark">{TITRE_PAR_ROLE[etat.role] ?? "Avancement du rapport trimestriel"}</h1>
       <p className="mt-1 text-sm text-gray-600">Rapport trimestriel · {etat.periode}</p>
 
@@ -215,7 +218,7 @@ export default function CircuitTrimestreClient({ username }: { username: string 
         </label>
       </div>
 
-      <ol className="mt-4 space-y-1 rounded-md border border-gray-200 bg-white p-3 text-sm text-gray-700">
+      <ol data-visite="circuit-etapes" className="mt-4 space-y-1 rounded-md border border-gray-200 bg-white p-3 text-sm text-gray-700">
         {ETAPES.map(([qui, quoi], i) => (
           <li key={qui}>
             <strong>
@@ -231,7 +234,7 @@ export default function CircuitTrimestreClient({ username }: { username: string 
 
       {/* ---- L'arrondissement de l'agent ou du DA ---- */}
       {sien && (
-        <section className="mt-5 rounded-md border border-gray-200 bg-white p-4">
+        <section data-visite="circuit-sien" className="mt-5 rounded-md border border-gray-200 bg-white p-4">
           <h2 className="font-semibold text-gray-900">Rapport de l&apos;arrondissement de {sien.nom}</h2>
           <p className="mt-2">
             <span className={`rounded px-2 py-0.5 text-xs font-semibold ${BADGE_ARR[sien.statut].classe}`}>
@@ -271,6 +274,7 @@ export default function CircuitTrimestreClient({ username }: { username: string 
                   "Transmettre le rapport trimestriel au Délégué départemental ? Il ne sera plus modifiable, sauf renvoi."
                 )
               }
+              data-visite="circuit-transmettre"
               className="mt-3 w-full rounded-md bg-primary px-4 py-3 text-sm font-semibold text-white hover:bg-primary-dark disabled:opacity-50 sm:w-auto"
             >
               Transmettre au Délégué départemental
@@ -283,7 +287,7 @@ export default function CircuitTrimestreClient({ username }: { username: string 
       {!sien && (
         <section className="mt-5">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">Rapports des arrondissements</h2>
-          <ul className="mt-2 divide-y divide-gray-100 rounded-md border border-gray-200 bg-white">
+          <ul data-visite="circuit-arrondissements" className="mt-2 divide-y divide-gray-100 rounded-md border border-gray-200 bg-white">
             {etat.arrondissements.map((a) => (
               <li key={a.id} className="px-3 py-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
@@ -326,6 +330,7 @@ export default function CircuitTrimestreClient({ username }: { username: string 
                     <button
                       type="button"
                       onClick={() => setRenvoi({ id: a.id, motif: "" })}
+                      data-visite="circuit-renvoyer"
                       className="mt-2 rounded border border-red-700 px-2 py-1 text-xs text-red-800 hover:bg-red-50"
                     >
                       Renvoyer pour correction
@@ -341,7 +346,7 @@ export default function CircuitTrimestreClient({ username }: { username: string 
       {/* ---- Les quatre domaines ---- */}
       <section className="mt-5">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">Validation par les chefs de section</h2>
-        <ul className="mt-2 divide-y divide-gray-100 rounded-md border border-gray-200 bg-white">
+        <ul data-visite="circuit-sections" className="mt-2 divide-y divide-gray-100 rounded-md border border-gray-200 bg-white">
           {etat.sections.map((s) => (
             <li key={s.code} className="px-3 py-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -368,6 +373,7 @@ export default function CircuitTrimestreClient({ username }: { username: string 
                       "Valider votre domaine du rapport trimestriel ? Ses analyses et ses textes ne seront plus modifiables."
                     )
                   }
+                  data-visite="circuit-valider"
                   className="mt-2 w-full rounded-md bg-primary px-4 py-3 text-sm font-semibold text-white hover:bg-primary-dark disabled:opacity-50 sm:w-auto"
                 >
                   Valider ma section

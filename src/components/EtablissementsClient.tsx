@@ -22,6 +22,7 @@ import {
   synchroniserEtablissements,
   nombreOperationsEnAttente,
 } from "@/lib/etablissementsLocal";
+import VisiteGuidee from "@/components/VisiteGuidee";
 
 interface Arrondissement {
   id: string;
@@ -165,7 +166,8 @@ export default function EtablissementsClient({
         </div>
       )}
 
-      <div className="mb-4 flex flex-wrap gap-2">
+      <VisiteGuidee ecran="etablissements" />
+      <div data-visite="types-etablissement" className="mb-4 flex flex-wrap gap-2">
         {TYPES.map((t) => (
           <button
             key={t.code}
@@ -196,7 +198,7 @@ export default function EtablissementsClient({
         </div>
       )}
 
-      <form onSubmit={ajouter} className="mb-5 rounded-lg border border-gray-200 bg-gray-50 p-4">
+      <form onSubmit={ajouter} data-visite="ajouter-etablissement" className="mb-5 rounded-lg border border-gray-200 bg-gray-50 p-4">
         <h3 className="mb-3 text-sm font-semibold text-gray-700">Ajouter un établissement</h3>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
           <input
@@ -288,7 +290,7 @@ function LigneEtablissement({
   return (
     <tr className={!etab.actif ? "bg-gray-50 text-gray-400" : ""}>
       <td className="border-b border-gray-100 px-3 py-2">
-        <input value={nom} disabled={!etab.actif} onChange={(e) => setNom(e.target.value)} onBlur={() => nom !== etab.nom && onModifier({ nom })} className={champCommun} />
+        <input data-visite="modifier-etablissement" value={nom} disabled={!etab.actif} onChange={(e) => setNom(e.target.value)} onBlur={() => nom !== etab.nom && onModifier({ nom })} className={champCommun} />
       </td>
       <td className="border-b border-gray-100 px-3 py-2">
         <input value={localite} disabled={!etab.actif} onChange={(e) => setLocalite(e.target.value)} onBlur={() => localite !== etab.localite && onModifier({ localite })} className={champCommun} />
@@ -301,6 +303,7 @@ function LigneEtablissement({
       </td>
       <td className="border-b border-gray-100 px-3 py-2">
         <button
+          data-visite="actif-etablissement"
           onClick={() => onModifier({ actif: !etab.actif })}
           className={`rounded-full px-2.5 py-1 text-xs font-semibold ${etab.actif ? "bg-green-100 text-green-800 hover:bg-red-100 hover:text-red-800" : "bg-gray-200 text-gray-600 hover:bg-green-100 hover:text-green-800"}`}
         >

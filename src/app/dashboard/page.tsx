@@ -20,6 +20,7 @@ import { contexteSession } from "@/lib/permissions";
 import { MENU_PAR_ROLE, etapesTrimestrielles, TITRE_MENSUEL, TITRE_TRIMESTRIEL } from "@/lib/navItems";
 import AppShell from "@/components/AppShell";
 import NotificationsPanel from "@/components/NotificationsPanel";
+import VisiteGuidee from "@/components/VisiteGuidee";
 
 interface Lien {
   href: string;
@@ -318,6 +319,7 @@ async function salutation(db: PrismaClient, moi: { id: string; role: string; use
 function CarteRapport({ c }: { c: Carte }) {
   return (
     <section
+      data-visite="carte-rapport"
       className={`rounded-xl border bg-white p-4 sm:p-5 ${c.urgent ? "border-primary shadow-[0_0_0_3px_rgba(47,98,108,.12)]" : "border-line"}`}
     >
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
@@ -327,11 +329,12 @@ function CarteRapport({ c }: { c: Carte }) {
         {c.urgent && <span className="rounded-full bg-primary px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-white">À faire maintenant</span>}
       </div>
 
-      <p className={`mt-3 rounded-md px-3 py-2 text-sm ${TONS[c.ton]}`}>{c.etat}</p>
+      <p data-visite="etat-rapport" className={`mt-3 rounded-md px-3 py-2 text-sm ${TONS[c.ton]}`}>{c.etat}</p>
       {c.echeance && <p className="mt-2 text-sm font-medium text-ink-muted">⏱ {c.echeance}</p>}
 
       {c.bouton && (
         <a
+          data-visite="bouton-carte"
           href={c.bouton.href}
           className="mt-4 flex w-full items-center justify-center rounded-lg bg-primary px-4 py-3 text-center text-[15px] font-semibold text-white hover:bg-primary-dark"
         >
@@ -340,7 +343,7 @@ function CarteRapport({ c }: { c: Carte }) {
       )}
 
       {c.etapes && (
-        <ol className="mt-4 space-y-0.5">
+        <ol data-visite="etapes-carte" className="mt-4 space-y-0.5">
           {c.etapes.map((e) => (
             <li key={e.href}>
               <a href={e.href} className="flex items-start gap-2.5 rounded-md px-2 py-2 hover:bg-appbg">
@@ -400,6 +403,7 @@ export default async function DashboardPage() {
     <AppShell>
       <div className="max-w-[1080px]">
         <h1 className="text-[23px] font-bold leading-tight text-primary-dark">{accueil.titre}</h1>
+        <VisiteGuidee ecran="accueil" />
         {accueil.poste && <p className="mt-0.5 text-[15px] font-semibold text-primary">{accueil.poste}</p>}
         <p className="mb-[20px] mt-1 text-sm text-ink-muted">Voici les rapports du moment et ce qu&apos;il vous reste à faire.</p>
 
@@ -412,7 +416,9 @@ export default async function DashboardPage() {
         )}
 
         <div className="grid grid-cols-1 items-start gap-[22px] lg:grid-cols-[1.15fr_.85fr]">
-          <NotificationsPanel />
+          <div data-visite="notifications-accueil">
+            <NotificationsPanel />
+          </div>
           {administration.length > 0 && (
             <div className="space-y-4">
               {administration.map((g) => (

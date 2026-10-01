@@ -9,6 +9,7 @@
  */
 
 import { useEffect, useState } from "react";
+import VisiteGuidee from "@/components/VisiteGuidee";
 
 interface Agent {
   id: string;
@@ -88,13 +89,14 @@ export default function AssignationsClient() {
 
   return (
     <div className="space-y-6">
+      <VisiteGuidee ecran="da-assignations" />
       {Array.from(groupes.entries()).map(([section, liste]) => {
         const codes = liste.map((t) => t.code);
         return (
           <div key={section} className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 bg-gray-50 px-4 py-2.5">
               <h2 className="font-semibold text-gray-800">Section {section}</h2>
-              <label className="flex items-center gap-2 text-xs text-gray-600">
+              <label data-visite="attribuer-section" className="flex items-center gap-2 text-xs text-gray-600">
                 Attribuer toute la section à :
                 <select
                   value=""
@@ -124,6 +126,7 @@ export default function AssignationsClient() {
                     </td>
                     <td className="border-b border-gray-100 px-4 py-2">
                       <select
+                        data-visite="attribuer-tableau"
                         value={t.agentId ?? ""}
                         onChange={(e) => changer(t.code, e.target.value || null)}
                         className="rounded border border-gray-300 px-2 py-1 text-sm"

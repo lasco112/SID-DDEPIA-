@@ -8,6 +8,7 @@
 
 import { useEffect, useState } from "react";
 import { definirPin, pinConfigure, supprimerPin } from "@/lib/pinLocal";
+import VisiteGuidee from "@/components/VisiteGuidee";
 
 export default function SecuriteAppareilClient() {
   const [configure, setConfigure] = useState<boolean | null>(null);
@@ -48,7 +49,8 @@ export default function SecuriteAppareilClient() {
   if (configure === null) return null;
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-5">
+    <div data-visite="code-pin" className="rounded-lg border border-gray-200 bg-white p-5">
+      <VisiteGuidee ecran="securite" />
       {configure ? (
         <>
           <p className="text-sm text-gray-700">Un code PIN est actuellement actif sur cet appareil.</p>

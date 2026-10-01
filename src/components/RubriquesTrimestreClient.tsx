@@ -22,6 +22,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { lireAvecCopie, envoyer, enAttente } from "@/lib/trimestreHorsLigne";
 import HorsLigneTrimestre from "@/components/HorsLigneTrimestre";
+import VisiteGuidee from "@/components/VisiteGuidee";
 
 interface Zone {
   cle: string;
@@ -218,9 +219,10 @@ export default function RubriquesTrimestreClient({
   return (
     <div className="max-w-4xl">
       <HorsLigneTrimestre username={username} copieDu={copieDu} onEnvoye={() => void charger(choix)} />
+      <VisiteGuidee ecran="rubriques" />
 
       {/* ---- La période, repliée en une bande ---- */}
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-line bg-white px-3 py-2 text-sm">
+      <div data-visite="periode-rubriques" className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-line bg-white px-3 py-2 text-sm">
         <span className="font-semibold text-primary-dark">
           {ORDINAL[choix.trimestre - 1]} trimestre {choix.annee}
           {etat?.pour === "arrondissement" ? " · votre arrondissement" : ""}
@@ -253,7 +255,7 @@ export default function RubriquesTrimestreClient({
       <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-gray-200">
         <div className="h-full bg-primary transition-all" style={{ width: ordre.length ? `${Math.round((pretes / ordre.length) * 100)}%` : "0%" }} />
       </div>
-      <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="Filtrer les rubriques">
+      <div data-visite="filtres-rubriques" className="mt-3 flex flex-wrap gap-2" role="group" aria-label="Filtrer les rubriques">
         {([
           ["toutes", `Toutes · ${ordre.length}`],
           ["a_rediger", `À rédiger · ${aRediger}`],
@@ -287,6 +289,7 @@ export default function RubriquesTrimestreClient({
                 setSectionsOuvertes(n);
               }}
               aria-expanded={ouverte}
+              data-visite="section-rubriques"
               className="flex min-h-[52px] w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-gray-50"
             >
               <span className="text-sm font-semibold text-primary-dark">{s.titre}</span>
@@ -313,6 +316,7 @@ export default function RubriquesTrimestreClient({
                           type="button"
                           onClick={() => setZoneOuverte(active ? null : z.cle)}
                           aria-expanded={active}
+                          data-visite="rubrique-item"
                           className={`flex min-h-[48px] w-full items-center gap-3 px-4 py-2 text-left ${active ? "bg-primary-light" : "hover:bg-gray-50"}`}
                         >
                           <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${statut.point}`} />
@@ -322,13 +326,15 @@ export default function RubriquesTrimestreClient({
 
                         {active && (
                           <div className="border-y border-primary/20 bg-white px-4 pb-4 pt-2">
-                            <p className="text-xs italic text-ink-muted">{z.consigne}</p>
+                            <VisiteGuidee ecran="rubrique-ouverte" />
+                            <p data-visite="consigne" className="text-xs italic text-ink-muted">{z.consigne}</p>
 
                             <div className="mt-2 flex flex-wrap gap-2">
                               {z.tableau && VOIENT_LES_TABLEAUX.includes(role) && (
                                 <button
                                   type="button"
                                   onClick={() => void voirTableau(z.cle, z.tableau!.numero)}
+                                  data-visite="voir-tableau-rubrique"
                                   className="rounded border border-primary px-2 py-1 text-xs font-medium text-primary hover:bg-primary-light"
                                 >
                                   Voir le tableau : {z.tableau.titre}
@@ -338,6 +344,7 @@ export default function RubriquesTrimestreClient({
                                 <button
                                   type="button"
                                   onClick={() => reprendre(z.cle, z.reference!)}
+                                  data-visite="texte-modele"
                                   className="rounded border border-primary px-2 py-1 text-xs text-primary hover:bg-primary hover:text-white"
                                 >
                                   Reprendre le texte modèle
@@ -347,6 +354,7 @@ export default function RubriquesTrimestreClient({
                                 <button
                                   type="button"
                                   onClick={() => reprendre(z.cle, z.precedent!)}
+                                  data-visite="texte-precedent"
                                   className="rounded border border-gray-400 px-2 py-1 text-xs text-gray-700 hover:bg-gray-100"
                                 >
                                   Reprendre le texte du trimestre précédent
@@ -359,7 +367,7 @@ export default function RubriquesTrimestreClient({
                                 <p className="mb-1 text-xs font-semibold text-green-800">
                                   Rédigée automatiquement à partir du rapport — elle suit les chiffres toute seule.
                                 </p>
-                                <p className="whitespace-pre-line rounded border border-green-200 bg-green-50 p-3 text-sm text-gray-900">{z.automatique}</p>
+                                <p data-visite="texte-automatique" className="whitespace-pre-line rounded border border-green-200 bg-green-50 p-3 text-sm text-gray-900">{z.automatique}</p>
                                 <button
                                   type="button"
                                   onClick={() => setSaisie({ ...saisie, [z.cle]: z.automatique! })}
@@ -383,6 +391,7 @@ export default function RubriquesTrimestreClient({
                                   </button>
                                 )}
                                 <textarea
+                                  data-visite="rubrique-texte"
                                   autoFocus
                                   className="mt-2 w-full rounded border border-gray-300 px-3 py-2 text-[15px] leading-relaxed focus:border-primary focus:outline-none"
                                   rows={Math.min(12, Math.max(5, Math.ceil((saisie[z.cle] ?? "").length / 70) + 2))}
@@ -405,6 +414,7 @@ export default function RubriquesTrimestreClient({
                                 type="button"
                                 disabled={enCours === z.cle}
                                 onClick={() => void enregistrerEtSuivante(z.cle)}
+                                data-visite="rubrique-suivante"
                                 className="w-full rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-white hover:bg-primary-dark disabled:opacity-60 sm:w-auto"
                               >
                                 {enCours === z.cle ? "Enregistrement…" : "Enregistrer et rubrique suivante →"}

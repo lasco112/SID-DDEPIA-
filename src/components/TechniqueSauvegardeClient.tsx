@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import VisiteGuidee from "@/components/VisiteGuidee";
 
 interface Sauvegarde {
   fichier: string;
@@ -43,7 +44,9 @@ export default function TechniqueSauvegardeClient() {
 
   return (
     <div>
+      <VisiteGuidee ecran="technique-sauvegarde" />
       <button
+        data-visite="declencher-sauvegarde"
         onClick={declencher}
         disabled={enCours}
         className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-hover disabled:cursor-not-allowed disabled:bg-gray-300"
@@ -52,7 +55,7 @@ export default function TechniqueSauvegardeClient() {
       </button>
       {message && <p className="mt-2 text-sm text-gray-700">{message}</p>}
 
-      <h2 className="mb-3 mt-6 text-sm font-semibold uppercase tracking-wide text-gray-500">Sauvegardes existantes</h2>
+      <h2 data-visite="liste-sauvegardes" className="mb-3 mt-6 text-sm font-semibold uppercase tracking-wide text-gray-500">Sauvegardes existantes</h2>
       {chargement ? (
         <p className="text-sm text-gray-500">Chargement…</p>
       ) : sauvegardes.length === 0 ? (

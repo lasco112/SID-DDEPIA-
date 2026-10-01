@@ -181,6 +181,188 @@ export const VISITES: Record<string, DefinitionVisite> = {
     ],
   },
 
+  // ------------------------------------------------------------ Accueil
+  accueil: {
+    version: 1,
+    etapes: [
+      { cible: "carte-rapport", titre: "Vos rapports du moment", texte: "Une carte par rapport en cours : le mensuel, le trimestriel… La carte marquée « À faire maintenant » passe en premier." },
+      { cible: "etat-rapport", titre: "Où vous en êtes", texte: "L'état du rapport en une phrase : ce qui est fait, ce qui reste, la date limite." },
+      { cible: "bouton-carte", titre: "Le bouton principal", texte: "Vous emmène directement là où il faut travailler." },
+      { cible: "etapes-carte", titre: "Les étapes", texte: "Le rapport trimestriel se fait en étapes numérotées, dans l'ordre. Touchez une étape pour l'ouvrir." },
+      { cible: "notifications-accueil", titre: "Les dernières notifications", texte: "Les messages récents : rapport renvoyé, validation, rappel de date limite…" },
+    ],
+  },
+
+  // ------------------------------------------------------------ Trimestre, étapes 3 à 5
+  rubriques: {
+    version: 1,
+    etapes: [
+      { cible: "periode-rubriques", titre: "Le trimestre", texte: "Le trimestre dont vous rédigez les textes. « changer de période » pour en choisir un autre." },
+      { cible: "filtres-rubriques", titre: "Toutes ou à rédiger", texte: "« À rédiger » ne montre que les rubriques encore vides. La barre au-dessus montre l'avancement." },
+      { cible: "section-rubriques", titre: "Une section", texte: "Touchez le titre pour ouvrir ou fermer la section. À droite : combien de rubriques restent à rédiger." },
+      { cible: "rubrique-item", titre: "Une rubrique", texte: "Touchez une rubrique pour l'écrire. Le point de couleur dit son état : à rédiger, rédigée, texte modèle, automatique." },
+    ],
+  },
+  "rubrique-ouverte": {
+    version: 1,
+    etapes: [
+      { cible: "consigne", titre: "La consigne", texte: "Ce qu'on attend dans cette rubrique." },
+      { cible: "voir-tableau-rubrique", titre: "Voir le tableau", texte: "Ouvre le tableau dont parle la rubrique, pour écrire avec les chiffres sous les yeux." },
+      { cible: "texte-modele", titre: "Reprendre le texte modèle", texte: "Met dans la case un texte type, à adapter." },
+      { cible: "texte-precedent", titre: "Reprendre le texte du trimestre précédent", texte: "Recopie ce que vous aviez écrit le trimestre dernier, à mettre à jour." },
+      { cible: "texte-automatique", titre: "Texte automatique", texte: "Le SID a rédigé cette rubrique à partir des chiffres ; elle suit les chiffres toute seule. « Modifier ce texte » pour l'écrire vous-même." },
+      { cible: "rubrique-texte", titre: "Votre texte", texte: "Écrivez ici. Le texte s'enregistre quand vous quittez la case. Laissée vide, la rubrique porte « Néant. » dans le rapport." },
+      { cible: "rubrique-suivante", titre: "Enregistrer et rubrique suivante", texte: "Enregistre, puis ouvre la rubrique suivante à rédiger." },
+    ],
+  },
+  circuit: {
+    version: 1,
+    etapes: [
+      { cible: "circuit-etapes", titre: "Le circuit du rapport", texte: "Qui fait quoi, dans l'ordre : les arrondissements transmettent, les chefs valident leur domaine, puis le DD produit le rapport." },
+      { cible: "circuit-sien", titre: "Votre rapport", texte: "L'état du rapport de votre arrondissement : en préparation, transmis, ou renvoyé — avec le motif." },
+      {
+        cible: "circuit-transmettre",
+        titre: "Transmettre au Délégué départemental",
+        texte: "Quand tableaux, analyses et textes sont prêts : transmet le rapport au DD. Il n'est plus modifiable ensuite, sauf renvoi.",
+      },
+      { cible: "circuit-arrondissements", titre: "Les six arrondissements", texte: "Où en est chaque arrondissement : transmis ou non, et quand." },
+      { cible: "circuit-renvoyer", titre: "Renvoyer pour correction", texte: "Rouvre le rapport d'un arrondissement, avec un motif : le DA est prévenu." },
+      { cible: "circuit-relais", titre: "En tant que DD", texte: "Si un DA ou un chef ne peut pas le faire, le DD transmet ou valide à sa place, avec un motif. C'est noté « par le DD »." },
+      { cible: "circuit-sections", titre: "Les quatre domaines", texte: "Chaque chef de section valide son domaine (analyses et textes) quand les six arrondissements ont transmis." },
+      { cible: "circuit-valider", titre: "Valider ma section", texte: "Valide votre domaine du rapport trimestriel. Ses analyses et textes ne seront plus modifiables." },
+    ],
+  },
+  "rapport-da": {
+    version: 1,
+    etapes: [
+      { cible: "choix-rapport", titre: "Quel rapport ?", texte: "Trimestriel, semestriel ou annuel, puis la période. Le semestriel et l'annuel se calculent seuls à partir de vos trimestres." },
+      { cible: "mois-periode", titre: "Les mois de la période", texte: "Chaque mois doit être transmis. Un mois manquant : seul un brouillon peut être produit." },
+      { cible: "generer-brouillon", titre: "Générer un brouillon", texte: "Produit le document à tout moment, pour le relire avant de transmettre." },
+      { cible: "generer-definitif", titre: "Générer mon rapport", texte: "Le document définitif, une fois le rapport transmis au DD (étape 5)." },
+    ],
+  },
+  "rapport-dd": {
+    version: 1,
+    etapes: [
+      { cible: "choix-rapport", titre: "Quel rapport ?", texte: "Trimestriel, semestriel ou annuel, puis la période." },
+      { cible: "mois-periode", titre: "Les mois de la période", texte: "Combien d'arrondissements ont transmis chaque mois. « Voir qui n'a pas transmis » ouvre la Supervision de ce mois." },
+      { cible: "faits-notables", titre: "Ce que le rapport dira", texte: "Les évolutions les plus marquantes, chacune avec son calcul." },
+      { cible: "generer-brouillon", titre: "Générer un brouillon", texte: "Un aperçu à tout moment, marqué provisoire." },
+      { cible: "generer-definitif", titre: "Générer le rapport trimestriel", texte: "Le document définitif, quand les mois sont complets et le circuit achevé." },
+      { cible: "finaliser-dd", titre: "Finaliser en tant que DD", texte: "Si un DA ou un chef fait défaut : vous finalisez à sa place, motif à l'appui, puis le rapport définitif est produit." },
+    ],
+  },
+
+  // ------------------------------------------------------------ Outils
+  "admin-comptes": {
+    version: 1,
+    etapes: [
+      { cible: "nouveau-compte", titre: "Nouveau compte", texte: "Crée un compte : nom, rôle, arrondissement ou section. Notez l'identifiant et le mot de passe temporaire affichés : ils ne s'affichent qu'une fois." },
+      { cible: "recherche-comptes", titre: "Rechercher", texte: "Retrouvez un compte par son nom, son identifiant, son rôle ou son rattachement." },
+      {
+        cible: "actions-compte",
+        titre: "Gérer un compte",
+        texte: "Autoriser ou désactiver, réinitialiser le mot de passe, révoquer l'appareil (téléphone perdu), supprimer.",
+      },
+    ],
+  },
+  "dd-periodes": {
+    version: 1,
+    etapes: [
+      { cible: "mois-suivant", titre: "Le mois suivant", texte: "Ouvrez le mois suivant ici : tant qu'il n'est pas ouvert, les arrondissements ne peuvent rien y saisir." },
+      { cible: "autre-mois", titre: "Créer un autre mois", texte: "Pour un mois passé à reconstituer, par exemple." },
+      { cible: "actions-periode", titre: "Les actions d'un mois", texte: "« Travailler sur ce mois » change votre mois de travail ; « Fermer la saisie » / « Rouvrir la saisie » bloque ou rouvre la saisie des arrondissements." },
+    ],
+  },
+  "dd-donnees": {
+    version: 1,
+    etapes: [
+      { cible: "choix-arrondissement", titre: "Quel arrondissement ?", texte: "La vue départementale montre les six côte à côte ; touchez un nom pour n'en voir qu'un." },
+      { cible: "choix-tableau-dd", titre: "Quel tableau ?", texte: "Choisissez un des 28 tableaux du mois." },
+      { cible: "valeur-corrigeable", titre: "Corriger une valeur", texte: "Touchez un chiffre pour le corriger. Le motif est obligatoire et la modification reste dans l'historique." },
+    ],
+  },
+  etablissements: {
+    version: 1,
+    etapes: [
+      { cible: "types-etablissement", titre: "Le type d'établissement", texte: "Choisissez la liste à gérer : fermes, marchés, abattoirs…" },
+      { cible: "ajouter-etablissement", titre: "Ajouter", texte: "Nom et localité sont obligatoires. Le nouvel établissement apparaît aussitôt dans les tableaux de saisie." },
+      { cible: "modifier-etablissement", titre: "Corriger", texte: "Touchez un nom ou une localité pour le corriger ; c'est enregistré quand vous quittez la case." },
+      { cible: "actif-etablissement", titre: "Actif / inactif", texte: "Un établissement fermé se désactive : il disparaît de la saisie mais son historique est gardé." },
+    ],
+  },
+  "da-assignations": {
+    version: 1,
+    etapes: [
+      { cible: "attribuer-section", titre: "Toute une section", texte: "Confie d'un coup tous les tableaux d'une section à un agent." },
+      { cible: "attribuer-tableau", titre: "Un tableau", texte: "Ou tableau par tableau. C'est indicatif : chacun peut toujours tout saisir." },
+    ],
+  },
+  "da-supervision-agents": {
+    version: 1,
+    etapes: [{ cible: "agent", titre: "Un agent", texte: "Combien de données il a saisies ce mois-ci, et quand. Touchez pour voir le détail, case par case." }],
+  },
+  synchronisation: {
+    version: 1,
+    etapes: [
+      { cible: "etat-synchro", titre: "L'état du téléphone", texte: "Ce qui est sur ce téléphone : saisies en attente, en erreur, dernier envoi réussi." },
+      { cible: "synchroniser", titre: "Synchroniser maintenant", texte: "Envoie tout de suite ce qui attend. Cela met vos données à l'abri, sans transmettre le rapport." },
+    ],
+  },
+  securite: {
+    version: 1,
+    etapes: [{ cible: "code-pin", titre: "Le code PIN", texte: "Sur un téléphone partagé, un code PIN protège vos données : il est demandé à l'ouverture de l'application." }],
+  },
+  "section-synthese": {
+    version: 1,
+    etapes: [
+      { cible: "synthese-texte", titre: "La synthèse de votre section", texte: "Faits marquants, difficultés, recommandations du mois. Le DD la valide avant qu'elle entre au rapport." },
+      { cible: "synthese-enregistrer", titre: "Enregistrer la synthèse", texte: "Enregistre le texte. Vous pouvez y revenir tant que le DD ne l'a pas validé." },
+    ],
+  },
+  "dd-thematique": {
+    version: 1,
+    etapes: [
+      { cible: "filtre-espece", titre: "Choisir le sujet", texte: "Espèce, domaine, arrondissement : touchez pour choisir. Rien de choisi = tout." },
+      { cible: "filtre-periode", titre: "Choisir les mois", texte: "Au moins un mois." },
+      { cible: "generer-thematique", titre: "Produire le rapport", texte: "En Excel, en Word ou en PDF." },
+    ],
+  },
+  "dd-referentiels": {
+    version: 1,
+    etapes: [{ cible: "decider-referentiel", titre: "Valider ou rejeter", texte: "Un agent a proposé un nouvel élément (une maladie, un vaccin…). Validé, il apparaît dans les listes de saisie." }],
+  },
+  "technique-sante": {
+    version: 1,
+    etapes: [
+      { cible: "sante-base", titre: "La base de données", texte: "Vert : la base répond." },
+      { cible: "sante-sauvegarde", titre: "La dernière sauvegarde", texte: "Quand a eu lieu la dernière sauvegarde de la base." },
+      { cible: "sante-actualiser", titre: "Actualiser", texte: "Relit l'état du système." },
+    ],
+  },
+  "technique-sauvegarde": {
+    version: 1,
+    etapes: [
+      { cible: "declencher-sauvegarde", titre: "Sauvegarder maintenant", texte: "Lance une sauvegarde de la base, en plus de celle de chaque nuit." },
+      { cible: "liste-sauvegardes", titre: "Les sauvegardes", texte: "Les sauvegardes existantes, avec leur date." },
+    ],
+  },
+  "technique-referentiels": {
+    version: 1,
+    etapes: [
+      { cible: "categories-referentiel", titre: "La liste", texte: "Choisissez la liste à gérer : maladies, vaccins, espèces…" },
+      { cible: "ajouter-referentiel", titre: "Ajouter un item", texte: "Le code ne doit plus changer ensuite ; le libellé, lui, se corrige." },
+    ],
+  },
+  "aide-questions": {
+    version: 1,
+    etapes: [{ cible: "marquer-traite", titre: "Marquer comme traité", texte: "Une fois la réponse donnée à la personne, rangez la question." }],
+  },
+  "journal-activite": {
+    version: 1,
+    etapes: [{ cible: "filtre-journal", titre: "Le journal", texte: "Qui a fait quoi, et quand. Filtrez par action pour retrouver un envoi, une correction, une validation…" }],
+  },
+
   // ------------------------------------------------------------ DD et chefs
   "dd-supervision": {
     version: 1,

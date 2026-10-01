@@ -41,6 +41,8 @@ async function attendreLeTour(ecran: string, annule: () => boolean): Promise<boo
 interface Etat {
   etapes: (EtapeVisite & { nouveau: boolean })[];
   i: number;
+  /** Bulles réellement montrées jusqu'ici (les étapes sans élément sont sautées). */
+  montrees: number;
 }
 
 export default function VisiteGuidee({ ecran, pret = true }: { ecran: string; pret?: boolean }) {
@@ -61,15 +63,18 @@ export default function VisiteGuidee({ ecran, pret = true }: { ecran: string; pr
       // attend que le nombre d'éléments à expliquer cesse d'augmenter.
       let trouves = -1;
       let stable = 0;
-      for (let i = 0; i < 30 && stable < 3 && !annule(); i++) {
+      // (2,5 s sans changement : une liste qui arrive du serveur a le temps de s'afficher.)
+      for (let i = 0; i < 40 && stable < 5 && !annule(); i++) {
         await pause(500);
         const n = def.etapes.filter((e) => elementDeVisite(e.cible)).length;
         stable = n === trouves && n > 0 ? stable + 1 : 0;
         trouves = n;
       }
-      const etapes = def.etapes
-        .filter((e) => toutes || vue === 0 || (e.depuis ?? 1) > vue)
-        .filter((e) => elementDeVisite(e.cible))
+      const aMontrer = def.etapes.filter((e) => toutes || vue === 0 || (e.depuis ?? 1) > vue);
+      // Les éléments présents, plus ceux qui peuvent encore arriver (une liste
+      // chargée du serveur) : ceux-là attendront leur tour (voir plus bas).
+      const presents = aMontrer.filter((e) => elementDeVisite(e.cible));
+      const etapes = (presents.length ? aMontrer : [])
         .map((e) => ({ ...e, nouveau: !toutes && vue > 0 }));
       // Rien à montrer (liste vide…) : la visite n'est PAS comptée comme vue,
       // elle se fera quand l'écran aura de quoi l'illustrer.
@@ -77,7 +82,7 @@ export default function VisiteGuidee({ ecran, pret = true }: { ecran: string; pr
         visiteEnCours = null;
         return;
       }
-      setEtat({ etapes, i: 0 });
+      setEtat({ etapes, i: 0, montrees: 0 });
     },
     [ecran, moi]
   );
@@ -110,20 +115,30 @@ export default function VisiteGuidee({ ecran, pret = true }: { ecran: string; pr
   // L'élément expliqué : amené à l'écran, puis mesuré (et remesuré si l'écran bouge).
   useEffect(() => {
     if (!etape) return;
-    const el = elementDeVisite(etape.cible);
-    if (!el) {
-      setEtat((e) => (e ? { ...e, i: e.i + 1 } : e));
-      return;
-    }
-    el.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
-    const mesurer = () => setRect(el.getBoundingClientRect());
-    const t = setTimeout(mesurer, 350);
-    const t2 = setTimeout(mesurer, 800);
+    let fini = false;
+    let el: HTMLElement | null = null;
+    const mesurer = () => el && setRect(el.getBoundingClientRect());
+    const minuteries: ReturnType<typeof setTimeout>[] = [];
+    // L'élément peut arriver un peu après (liste chargée du serveur) : on
+    // l'attend 3 secondes ; absent, l'étape est sautée (bouton absent pour ce
+    // rôle, tableau vide…).
+    const chercher = (essai: number) => {
+      if (fini) return;
+      el = elementDeVisite(etape.cible);
+      if (!el) {
+        if (essai < 10) minuteries.push(setTimeout(() => chercher(essai + 1), 300));
+        else setEtat((e) => (e ? { ...e, i: e.i + 1 } : e));
+        return;
+      }
+      el.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
+      minuteries.push(setTimeout(mesurer, 350), setTimeout(mesurer, 800));
+    };
+    chercher(0);
     window.addEventListener("resize", mesurer);
     window.addEventListener("scroll", mesurer, true);
     return () => {
-      clearTimeout(t);
-      clearTimeout(t2);
+      fini = true;
+      minuteries.forEach(clearTimeout);
       window.removeEventListener("resize", mesurer);
       window.removeEventListener("scroll", mesurer, true);
     };
@@ -144,10 +159,14 @@ export default function VisiteGuidee({ ecran, pret = true }: { ecran: string; pr
   if (!etat || !etape || typeof document === "undefined") return null;
 
   const suivante = () => {
+    if (!rect) return; // l'élément est encore cherché
     setRect(null);
-    setEtat((e) => (e ? { ...e, i: e.i + 1 } : e));
+    setEtat((e) => (e ? { ...e, i: e.i + 1, montrees: e.montrees + 1 } : e));
   };
-  const derniere = etat.i === etat.etapes.length - 1;
+  // Le compte ne retient que les bulles qui seront vraiment montrées.
+  const restantes = etat.etapes.slice(etat.i).filter((e) => elementDeVisite(e.cible)).length;
+  const total = etat.montrees + Math.max(restantes, 1);
+  const derniere = restantes <= 1;
   const texte = typeof etape.texte === "function" ? etape.texte(moi?.role ?? "") : etape.texte;
 
   // La bulle : sous l'élément s'il y a la place, sinon au-dessus.
@@ -184,10 +203,12 @@ export default function VisiteGuidee({ ecran, pret = true }: { ecran: string; pr
         <div className="pointer-events-none fixed inset-0 bg-slate-900/70" />
       )}
 
+      {/* Pas de bulle tant que l'élément n'est pas trouvé : jamais l'explication d'un bouton absent. */}
+      {rect && (
       <div className="fixed rounded-xl bg-white p-4 text-gray-900 shadow-2xl" style={style}>
         <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
           <span>
-            {etat.i + 1} / {etat.etapes.length}
+            {etat.montrees + 1} / {total}
           </span>
           {etape.nouveau && <span className="rounded bg-amber-100 px-1.5 py-0.5 text-amber-900">Nouveau</span>}
         </p>
@@ -211,6 +232,7 @@ export default function VisiteGuidee({ ecran, pret = true }: { ecran: string; pr
           )}
         </div>
       </div>
+      )}
     </div>,
     document.body
   );

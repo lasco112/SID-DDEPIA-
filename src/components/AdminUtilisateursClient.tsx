@@ -10,6 +10,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import ReinitialiserTousMotsDePasseButton from "@/components/ReinitialiserTousMotsDePasseButton";
+import VisiteGuidee from "@/components/VisiteGuidee";
 
 interface UserRow {
   id: string;
@@ -229,12 +230,14 @@ export default function AdminUtilisateursClient() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-[23px] font-bold text-primary-dark">Comptes utilisateurs</h1>
+          <VisiteGuidee ecran="admin-comptes" />
           <p className="mt-1 text-sm text-ink-muted">
             Créez un compte, autorisez-le, puis communiquez l'identifiant et le mot de passe temporaire une seule fois.
             La personne complète ensuite elle-même ses informations et choisit son mot de passe définitif.
           </p>
         </div>
         <button
+          data-visite="nouveau-compte"
           onClick={() => setFormulaireOuvert((v) => !v)}
           className="shrink-0 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-hover"
         >
@@ -332,6 +335,7 @@ export default function AdminUtilisateursClient() {
 
       <div className="mt-6">
         <input
+          data-visite="recherche-comptes"
           type="text"
           value={recherche}
           onChange={(e) => setRecherche(e.target.value)}
@@ -382,7 +386,7 @@ export default function AdminUtilisateursClient() {
                   )}
                 </td>
                 <td className="border-b border-[#eef1f5] px-4 py-3">
-                  <div className="flex justify-end gap-3 text-xs">
+                  <div data-visite="actions-compte" className="flex justify-end gap-3 text-xs">
                     {!u.actif && (
                       <button onClick={() => changerStatut(u.id, true)} className="font-semibold text-primary hover:underline">
                         {u.enAttente ? "Autoriser" : "Réactiver"}

@@ -8,6 +8,7 @@
  */
 
 import { useEffect, useState } from "react";
+import VisiteGuidee from "@/components/VisiteGuidee";
 
 interface AgentRow {
   id: string;
@@ -70,6 +71,7 @@ export default function SupervisionAgentsClient() {
 
   return (
     <div className="space-y-3">
+      <VisiteGuidee ecran="da-supervision-agents" />
       {periode && (
         <p className="text-xs text-gray-500">
           Période : {periode.mois}/{periode.annee}
@@ -78,6 +80,7 @@ export default function SupervisionAgentsClient() {
       {agents.map((agent) => (
         <div key={agent.id} className="rounded-lg border border-gray-200 bg-white">
           <button
+            data-visite="agent"
             onClick={() => basculer(agent.id)}
             className="flex w-full items-center justify-between px-4 py-3 text-left"
           >

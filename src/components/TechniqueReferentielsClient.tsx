@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import VisiteGuidee from "@/components/VisiteGuidee";
 
 interface Item {
   id: string;
@@ -90,7 +91,8 @@ export default function TechniqueReferentielsClient() {
 
   return (
     <div>
-      <div className="mb-4 flex flex-wrap gap-2">
+      <VisiteGuidee ecran="technique-referentiels" />
+      <div data-visite="categories-referentiel" className="mb-4 flex flex-wrap gap-2">
         {CATEGORIES.map((c) => (
           <button
             key={c.code}
@@ -110,7 +112,7 @@ export default function TechniqueReferentielsClient() {
           <strong>en attente de validation du DD</strong> avant de prendre effet dans la saisie et les rapports.
         </p>
       )}
-      <form onSubmit={ajouter} className="mb-5 rounded-lg border border-gray-200 bg-gray-50 p-4">
+      <form onSubmit={ajouter} data-visite="ajouter-referentiel" className="mb-5 rounded-lg border border-gray-200 bg-gray-50 p-4">
         <h3 className="mb-3 text-sm font-semibold text-gray-700">Ajouter un item</h3>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <input
