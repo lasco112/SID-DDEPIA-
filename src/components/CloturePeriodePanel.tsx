@@ -91,7 +91,7 @@ export default function CloturePeriodePanel({
   }
 
   return (
-    <section>
+    <section data-visite="cloture-dd">
       <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">Clôture de la période</h2>
 
       <div className={`rounded-lg border p-4 ${cloturee ? "border-gray-300 bg-gray-50" : "border-gray-200 bg-white"}`}>

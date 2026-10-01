@@ -23,6 +23,7 @@ import { lireAvecCopie, garderCopie, envoyer, enAttente } from "@/lib/trimestreH
 import HorsLigneTrimestre from "@/components/HorsLigneTrimestre";
 import ComparaisonMensuel, { type ControleCategories } from "@/components/ComparaisonMensuel";
 import { cibles, cibleTrimestrielle } from "@/lib/surlignage";
+import VisiteGuidee from "@/components/VisiteGuidee";
 
 type EtatCase = "saisie" | "calculee" | "total" | "lecture";
 
@@ -369,6 +370,7 @@ export default function SaisieTrimestrielleClient({
       <div className="max-w-full">
         <button
           type="button"
+          data-visite="retour-liste-trimestre"
           onClick={retourALaListe}
           className="mb-3 rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
         >
@@ -378,6 +380,7 @@ export default function SaisieTrimestrielleClient({
           {courant.section} · {liste.periode}
         </p>
         <h1 className="mt-1 text-xl font-bold text-primary-dark">{courant.titre}</h1>
+        <VisiteGuidee ecran="trimestre-saisie-tableau" pret={Boolean(grille && grille.numero === courant.numero)} />
         <p className="mt-1 text-sm text-gray-600">
           Tableau {rang} sur {liste.tableaux.length} ·{" "}
           <span className={courant.renseignees === courant.saisissables ? "text-green-700" : ""}>
@@ -436,6 +439,7 @@ export default function SaisieTrimestrielleClient({
   return (
     <div className="max-w-full">
       <HorsLigneTrimestre username={username} copieDu={copieDu} onEnvoye={() => void chargerListe()} />
+      <VisiteGuidee ecran="trimestre-saisie-liste" />
       <h1 className="text-2xl font-bold text-primary-dark">{titre}</h1>
       <p className="mt-1 max-w-3xl text-gray-600">
         {presentation ??
@@ -507,6 +511,7 @@ export default function SaisieTrimestrielleClient({
           {reprendre && (
             <button
               type="button"
+              data-visite="reprendre"
               onClick={() => ouvrir(reprendre.numero, true)}
               className="rounded-lg bg-primary px-4 py-3 text-left text-white hover:bg-primary-hover"
             >
@@ -519,6 +524,7 @@ export default function SaisieTrimestrielleClient({
           {prochain && prochain !== reprendre && (
             <button
               type="button"
+              data-visite="prochain"
               onClick={() => ouvrir(prochain.numero, true)}
               className="rounded-lg border-2 border-primary bg-white px-4 py-3 text-left text-primary-dark hover:bg-green-50"
             >
@@ -538,7 +544,7 @@ export default function SaisieTrimestrielleClient({
 
       {/* Filtre et dépliage */}
       {liste.tableaux.length > 0 && (
-        <div className="mt-5 flex flex-wrap items-center gap-2">
+        <div data-visite="filtres-trimestre" className="mt-5 flex flex-wrap items-center gap-2">
           {(["tous", "a_completer"] as const).map((f) => (
             <button
               key={f}
@@ -571,6 +577,7 @@ export default function SaisieTrimestrielleClient({
           <div key={s.titre} className="rounded-lg border border-gray-200 bg-gray-50">
             <button
               type="button"
+              data-visite="section-trimestre"
               onClick={() => basculerSection(s.titre)}
               aria-expanded={deplie}
               className="flex min-h-[48px] w-full items-center justify-between gap-3 px-3 py-2 text-left"
@@ -660,6 +667,7 @@ function Enchainement({
       {suivant ? (
         <button
           type="button"
+          data-visite="tableau-suivant-trimestre"
           onClick={() => onAller(suivant.numero)}
           disabled={occupe}
           className="rounded-md bg-primary disabled:opacity-50 px-3 py-2 text-left text-sm font-semibold text-white hover:bg-primary-hover"
@@ -711,6 +719,7 @@ function TableauSaisie({
     if (c.etat === "saisie") {
       return (
         <input
+          data-visite={c.colonne.startsWith("TOTAL ") ? "case-saisie case-an-passe" : "case-saisie"}
           value={valeurs[k] ?? ""}
           // Un nombre : le clavier numérique du téléphone s'ouvre directement.
           inputMode={c.texte ? "text" : "decimal"}
@@ -733,6 +742,7 @@ function TableauSaisie({
           : "Hors de votre ressort";
     return (
       <span
+        data-visite={c.etat === "calculee" || c.etat === "total" ? "case-grise" : undefined}
         title={titre}
         className={`block px-2 py-1 ${c.etat === "lecture" ? "text-gray-700" : "bg-gray-100 text-gray-600"} ${
           c.etat === "total" ? "italic" : ""

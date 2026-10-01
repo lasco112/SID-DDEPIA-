@@ -15,6 +15,7 @@ import { recalculerTousLesDerives } from "@/lib/derivationLocale";
 import ConfirmerTableauButton from "@/components/ConfirmerTableauButton";
 import { cibleMensuelle, cibles } from "@/lib/surlignage";
 import { repriseAffichee } from "@/lib/repriseAffichee";
+import VisiteGuidee from "@/components/VisiteGuidee";
 
 interface FormFieldDto {
   id: string;
@@ -219,6 +220,7 @@ export default function FormMatrice({ template, periodeId, username }: { templat
 
   return (
     <>
+    <VisiteGuidee ecran="mensuel-tableau" />
     <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
       <table className="w-full border-collapse text-sm">
         <thead>
@@ -228,7 +230,7 @@ export default function FormMatrice({ template, periodeId, username }: { templat
             <th className="border-b border-gray-200 px-4 py-2">Valeur</th>
             <th className="border-b border-gray-200 px-4 py-2">Non renseigné</th>
             <th className="border-b border-gray-200 px-4 py-2">Saisi par</th>
-            <th className="border-b border-gray-200 px-4 py-2">Statut</th>
+            <th data-visite="statut-case" className="border-b border-gray-200 px-4 py-2">Statut</th>
           </tr>
         </thead>
         <tbody>
@@ -272,6 +274,7 @@ export default function FormMatrice({ template, periodeId, username }: { templat
                     )
                   ) : (
                     <input
+                      data-visite="valeur"
                       type={texte ? "text" : "number"}
                       className={`${texte ? "w-56" : "w-28"} rounded border px-2 py-1 disabled:bg-gray-100 ${ligne?.reporte ? "border-amber-300 bg-amber-50 text-gray-400" : "border-gray-300"}`}
                       value={ligne?.nonRenseigne ? "" : ligne?.valeur ?? ""}
@@ -285,7 +288,7 @@ export default function FormMatrice({ template, periodeId, username }: { templat
                     <span className="text-xs text-gray-400">—</span>
                   ) : (
                     <>
-                      <label className="flex items-center gap-2">
+                      <label data-visite="nd" className="flex items-center gap-2">
                         <input
                           type="checkbox"
                           checked={ligne?.nonRenseigne ?? false}

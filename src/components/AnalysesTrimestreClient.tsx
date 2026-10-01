@@ -16,6 +16,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { trimestreARapporter } from "@/lib/trimestreEchu";
 import { lireAvecCopie, envoyer as envoyerOuGarder, enAttente } from "@/lib/trimestreHorsLigne";
 import HorsLigneTrimestre from "@/components/HorsLigneTrimestre";
+import VisiteGuidee from "@/components/VisiteGuidee";
 
 type Statut = "vide" | "a_valider" | "valide" | "a_revoir";
 
@@ -268,6 +269,7 @@ export default function AnalysesTrimestreClient({
         >
           ← Tous les tableaux
         </button>
+        <VisiteGuidee ecran="analyses-detail" />
         <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">{courant.section}</p>
         <h1 className="mt-1 text-xl font-bold text-primary-dark">{courant.titre}</h1>
         <p className="mt-2">
@@ -307,7 +309,7 @@ export default function AnalysesTrimestreClient({
             <div>
               <p className="text-sm font-semibold text-gray-700">Texte qui figurera sous le tableau</p>
               {correction == null ? (
-                <p className="mt-1 whitespace-pre-line rounded-md bg-gray-50 p-3 text-gray-900">{texteActuel}</p>
+                <p data-visite="texte-analyse" className="mt-1 whitespace-pre-line rounded-md bg-gray-50 p-3 text-gray-900">{texteActuel}</p>
               ) : (
                 <textarea
                   value={correction}
@@ -318,6 +320,7 @@ export default function AnalysesTrimestreClient({
               )}
               <button
                 type="button"
+                data-visite="voir-calcul"
                 onClick={() => setVoirCalcul((v) => !v)}
                 className="mt-1 text-sm text-primary underline"
               >
@@ -351,7 +354,7 @@ export default function AnalysesTrimestreClient({
               )}
             </div>
 
-            <label className="block">
+            <label data-visite="explication" className="block">
               <span className="text-sm font-semibold text-gray-700">Explication (facultatif)</span>
               <span className="block text-xs text-gray-500">
                 La cause d&apos;une hausse ou d&apos;une baisse, que les chiffres ne disent pas. Elle s&apos;ajoute à la fin du texte.
@@ -372,6 +375,7 @@ export default function AnalysesTrimestreClient({
                 onClick={() =>
                   void envoyer("PUT", { texte: correction ?? texteActuel, explication }, suivant(courant.numero))
                 }
+                data-visite="valider-analyse"
                 className="rounded-md bg-primary px-4 py-3 text-sm font-semibold text-white hover:bg-primary-dark disabled:opacity-50"
               >
                 {occupe ? "Enregistrement…" : "Valider et passer au suivant"}
@@ -379,6 +383,7 @@ export default function AnalysesTrimestreClient({
               {correction == null ? (
                 <button
                   type="button"
+                  data-visite="corriger-texte"
                   onClick={() => setCorrection(texteActuel)}
                   className="rounded-md border border-gray-300 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50"
                 >
@@ -443,6 +448,7 @@ export default function AnalysesTrimestreClient({
     <div className="max-w-3xl">
       <HorsLigneTrimestre username={username} copieDu={copieDu} onEnvoye={() => void charger()} />
       {info && <p className="mb-3 rounded-md bg-blue-50 p-3 text-sm text-blue-900">{info}</p>}
+      <VisiteGuidee ecran="analyses-liste" />
       <h1 className="text-2xl font-bold text-primary-dark">{titre}</h1>
       <p className="mt-1 text-gray-600">
         {presentation} Rapport de {ecran.portee}.
@@ -480,6 +486,7 @@ export default function AnalysesTrimestreClient({
       {premier && (
         <button
           type="button"
+          data-visite="commencer-relecture"
           onClick={() => setOuvert(premier.numero)}
           className="mt-2 w-full rounded-md bg-primary px-4 py-3 text-sm font-semibold text-white hover:bg-primary-dark sm:w-auto"
         >
@@ -489,7 +496,7 @@ export default function AnalysesTrimestreClient({
 
       {/* Le chiffre de l'an passé : sans lui, pas de comparaison sur un an. */}
       {sansChiffreAnPasse.length > 0 && (
-        <div className="mt-4 rounded-md border-2 border-red-300 bg-red-50 p-3">
+        <div data-visite="anpasse-compteur" className="mt-4 rounded-md border-2 border-red-300 bg-red-50 p-3">
           <p className="text-sm font-semibold text-red-900">
             {sansChiffreAnPasse.length} tableau{sansChiffreAnPasse.length > 1 ? "x" : ""} sans le chiffre de l&apos;an passé (
             T{trimestre} {annee - 1})
@@ -516,6 +523,7 @@ export default function AnalysesTrimestreClient({
               <li key={a.numero}>
                 <button
                   type="button"
+                  data-visite="analyse-item"
                   onClick={() => setOuvert(a.numero)}
                   className="flex w-full items-center justify-between gap-3 px-3 py-3 text-left hover:bg-gray-50"
                 >
@@ -595,7 +603,7 @@ function AnPasse({
   }
 
   return (
-    <div className="mt-3 rounded-md border-2 border-red-300 bg-red-50 p-3">
+    <div data-visite="anpasse-case" className="mt-3 rounded-md border-2 border-red-300 bg-red-50 p-3">
       <p className="text-sm font-semibold text-red-900">Il manque le chiffre de l&apos;an passé ({periodeN1})</p>
       <p className="mt-1 text-sm text-red-900">
         Le SID n&apos;a pas encore les chiffres de l&apos;année dernière dans sa base. Sans eux, l&apos;analyse ne peut pas dire si

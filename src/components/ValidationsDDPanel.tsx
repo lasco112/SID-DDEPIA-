@@ -69,7 +69,7 @@ export default function ValidationsDDPanel({
   }
 
   return (
-    <section>
+    <section data-visite="validations-dd">
       <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">
         Validations du rapport départemental
       </h2>

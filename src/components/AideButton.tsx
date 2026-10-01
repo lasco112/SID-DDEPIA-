@@ -13,6 +13,7 @@ import { usePathname } from "next/navigation";
 import { HelpCircle, X } from "lucide-react";
 import { offlineDB } from "@/lib/dexie";
 import { faqPertinente } from "@/lib/faq";
+import { revoirLaVisite } from "@/lib/visites";
 
 export default function AideButton({ role }: { role: string }) {
   const [ouvert, setOuvert] = useState(false);
@@ -86,6 +87,16 @@ export default function AideButton({ role }: { role: string }) {
             </div>
 
             <div className="flex-1 overflow-y-auto px-4 py-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setOuvert(false);
+                  revoirLaVisite();
+                }}
+                className="mb-4 w-full rounded-md border-2 border-primary px-3 py-2 text-sm font-semibold text-primary-dark hover:bg-green-50"
+              >
+                Revoir la visite de cet écran
+              </button>
               <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Questions fréquentes</p>
               <div className="space-y-3">
                 {faq.map((q, i) => (

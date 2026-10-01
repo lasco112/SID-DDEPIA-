@@ -15,6 +15,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { BookOpen, CalendarDays, ChevronDown, FileText, Home, Settings, Wrench, type LucideIcon } from "lucide-react";
 import { MENU_PAR_ROLE, entreeCourante, type CleGroupe, type NavItem } from "@/lib/navItems";
+import { revoirLaVisite } from "@/lib/visites";
 
 const ICONES: Record<CleGroupe, LucideIcon> = {
   accueil: Home,
@@ -124,6 +125,18 @@ export default function Sidebar({
 
       {/* Reprises du bandeau, masquées au-delà de `sm` où elles y figurent déjà. */}
       <div className="mt-3 border-t border-appbg pt-3 sm:hidden">
+        <button
+          type="button"
+          onClick={() => {
+            onNavigate?.();
+            // Le tiroir se referme d'abord : la visite montre l'écran, pas le menu.
+            setTimeout(revoirLaVisite, 300);
+          }}
+          className="flex min-h-[44px] w-full items-center gap-2.5 rounded-md pl-4 pr-3 text-left text-[14px] font-medium text-primary-dark hover:bg-appbg"
+        >
+          <span className="h-[7px] w-[7px] shrink-0 rounded-full bg-primary" />
+          Revoir la visite de cet écran
+        </button>
         <Link
           href="/mon-compte/securite"
           onClick={onNavigate}

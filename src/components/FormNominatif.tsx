@@ -16,6 +16,7 @@ import { creerEtablissement } from "@/lib/etablissementsLocal";
 import ConfirmerTableauButton from "@/components/ConfirmerTableauButton";
 import { cibleMensuelle, cibles } from "@/lib/surlignage";
 import { repriseAffichee } from "@/lib/repriseAffichee";
+import VisiteGuidee from "@/components/VisiteGuidee";
 
 interface FormFieldDto {
   code: string;
@@ -294,6 +295,7 @@ export default function FormNominatif({
 
   return (
     <>
+      <VisiteGuidee ecran="mensuel-tableau" />
       {boutonAjout}
       <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
       <table className="w-full border-collapse text-sm">
@@ -323,13 +325,14 @@ export default function FormNominatif({
                     className="border-b border-gray-100 px-4 py-2"
                   >
                     <input
+                      data-visite="valeur"
                       type={texte ? "text" : "number"}
                       className={`${texte ? "w-56" : "w-24"} rounded border px-2 py-1 disabled:bg-gray-100 ${cellule?.reporte ? "border-amber-300 bg-amber-50 text-gray-400" : "border-gray-300"}`}
                       value={cellule?.nonRenseigne ? "" : cellule?.valeur ?? ""}
                       disabled={cellule?.nonRenseigne}
                       onChange={(e) => sauvegarder(etab.id, f.code, texte, { valeur: e.target.value })}
                     />
-                    <label className="mt-1 flex items-center gap-1 text-xs">
+                    <label data-visite="nd" className="mt-1 flex items-center gap-1 text-xs">
                       <input
                         type="checkbox"
                         checked={cellule?.nonRenseigne ?? false}

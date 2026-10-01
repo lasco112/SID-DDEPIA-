@@ -10,6 +10,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { offlineDB } from "@/lib/dexie";
 import { cibleMensuelle } from "@/lib/surlignage";
+import VisiteGuidee from "@/components/VisiteGuidee";
 
 interface ChampSchema {
   key: string;
@@ -136,6 +137,7 @@ export default function FormEvenement({
 
   return (
     <div className="space-y-3">
+      <VisiteGuidee ecran="mensuel-tableau" />
       <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
         <table className="w-full border-collapse text-sm">
           <thead>
@@ -205,7 +207,7 @@ export default function FormEvenement({
           </tbody>
         </table>
       </div>
-      <button onClick={ajouterLigne} className="rounded border border-blue-700 px-3 py-1.5 text-sm font-medium text-blue-700 hover:bg-blue-50">
+      <button onClick={ajouterLigne} data-visite="ajouter-ligne" className="rounded border border-blue-700 px-3 py-1.5 text-sm font-medium text-blue-700 hover:bg-blue-50">
         + Ajouter un événement
       </button>
     </div>

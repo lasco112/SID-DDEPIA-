@@ -78,7 +78,7 @@ export default function ConfirmerTableauButton({
   }
 
   return (
-    <div data-cible={jeton("confirmer")} className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-3">
+    <div data-cible={jeton("confirmer")} data-visite="confirmer" className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-3">
       {etat !== "fait" && (
         <p className="text-sm text-amber-900">
           {nbReprises > 0 ? (

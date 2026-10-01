@@ -24,6 +24,8 @@ import AideButton from "@/components/AideButton";
 import FilEtapes from "@/components/FilEtapes";
 import { BadgeACorriger, ParcoursACorriger } from "@/components/ACorriger";
 import SurlignageCible from "@/components/SurlignageCible";
+import VisiteGuidee from "@/components/VisiteGuidee";
+import { FournisseurUtilisateur } from "@/components/UtilisateurContexte";
 
 const LIBELLES_ROLE: Record<string, string> = {
   DD: "Délégué Départemental",
@@ -60,12 +62,14 @@ export default function AppShellClient({
   const [menuOuvert, setMenuOuvert] = useState(false);
 
   return (
+    <FournisseurUtilisateur value={{ username, role }}>
     <PinGate>
     <div className="flex min-h-screen flex-col">
       <BootstrapPreload />
       <header className="flex h-[58px] shrink-0 items-center gap-1.5 bg-primary px-2 text-white shadow-[0_1px_0_rgba(0,0,0,.12)] sm:gap-4 sm:px-[18px]">
         <button
           type="button"
+          data-visite="menu"
           onClick={() => setMenuOuvert((v) => !v)}
           aria-label={menuOuvert ? "Fermer le menu" : "Ouvrir le menu"}
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md hover:bg-white/10 md:hidden"
@@ -88,9 +92,15 @@ export default function AppShellClient({
             faisait disparaître les derniers boutons à droite. */}
         <div className="ml-auto flex min-w-0 shrink items-center gap-1 sm:gap-4">
           <BadgeACorriger />
-          <SelecteurPeriode periodes={periodes} couranteId={couranteId} />
-          <ClocheNotifications />
-          <OnlineIndicator />
+          <span data-visite="periode" className="flex min-w-0 shrink">
+            <SelecteurPeriode periodes={periodes} couranteId={couranteId} />
+          </span>
+          <span data-visite="cloche" className="flex shrink-0">
+            <ClocheNotifications />
+          </span>
+          <span data-visite="en-ligne" className="flex shrink-0">
+            <OnlineIndicator />
+          </span>
           {/* Recherche, aide et sécurité disparaissent du bandeau sur
               téléphone : avec le sélecteur de période et la cloche ajoutés
               depuis, la rangée comptait huit éléments et les derniers
@@ -113,6 +123,7 @@ export default function AppShellClient({
           </Link>
           <a
             href="/api/auth/signout"
+            data-visite="deconnexion"
             title="Déconnexion"
             className="flex h-9 shrink-0 items-center gap-1.5 rounded-md border border-white/25 bg-white/10 px-2 text-[13px] font-semibold text-white hover:bg-white/20 sm:px-3"
           >
@@ -141,9 +152,11 @@ export default function AppShellClient({
           <FilEtapes role={role} position="bas" />
           <ParcoursACorriger />
           <SurlignageCible />
+          <VisiteGuidee ecran="bandeau" />
         </main>
       </div>
     </div>
     </PinGate>
+    </FournisseurUtilisateur>
   );
 }

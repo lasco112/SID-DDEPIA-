@@ -52,7 +52,7 @@ export default function RenvoyerAuDAButton({
   }
 
   return (
-    <div className="min-w-[180px]">
+    <div data-visite="renvoyer-da" className="min-w-[180px]">
       {demande && (
         <p className="mb-1 rounded bg-red-50 px-2 py-1 text-[11px] font-semibold leading-snug text-red-800">
           ⚠ Demande de renvoi du {new Date(demande.le).toLocaleDateString("fr-FR")}

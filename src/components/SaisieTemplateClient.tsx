@@ -96,7 +96,7 @@ export default function SaisieTemplateClient({
 
   return (
     <div className="max-w-5xl">
-      <Link href="/da/saisie" className="mb-4 inline-block text-primary hover:underline">
+      <Link href="/da/saisie" data-visite="retour-liste" className="mb-4 inline-block text-primary hover:underline">
         ← Tous les tableaux
       </Link>
 
@@ -130,6 +130,7 @@ export default function SaisieTemplateClient({
           <div className="mt-6 flex justify-end">
             {suivant ? (
               <Link
+                data-visite="tableau-suivant"
                 href={`/da/saisie/${suivant.code}`}
                 className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-hover"
               >

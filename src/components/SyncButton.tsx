@@ -217,6 +217,7 @@ export default function SyncButton({
       </span>
 
       <button
+        data-visite="envoyer"
         onClick={handleSync}
         disabled={state === "syncing" || (pending === 0 && !peutSoumettre)}
         className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-hover disabled:cursor-not-allowed disabled:bg-gray-300"
@@ -225,7 +226,7 @@ export default function SyncButton({
       </button>
 
       {pending > 0 && state !== "syncing" && (
-        <span className="text-xs font-medium text-amber-700">
+        <span data-visite="attente" className="text-xs font-medium text-amber-700">
           {pending} saisie{pending > 1 ? "s" : ""} en attente de synchronisation
         </span>
       )}

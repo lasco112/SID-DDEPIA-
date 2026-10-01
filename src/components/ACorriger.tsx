@@ -15,6 +15,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { AlertTriangle, ChevronLeft, ChevronRight, List, X, CheckCircle2, HelpCircle } from "lucide-react";
 import type { Guide } from "@/lib/guidesCorrection";
+import VisiteGuidee from "@/components/VisiteGuidee";
 import {
   pointsACorriger, allerAuPoint, demanderAuDD, lireParcours, ecrireParcours, oublierServeur,
   EVENEMENT_PARCOURS, type PointACorriger,
@@ -62,6 +63,7 @@ export function BadgeACorriger() {
   return (
     <Link
       href="/a-corriger"
+      data-visite="compteur-corriger"
       title={`${points.length} point${points.length > 1 ? "s" : ""} à corriger`}
       className={`flex h-9 shrink-0 items-center gap-1 rounded-md px-2 text-[13px] font-bold shadow-sm ${
         bloquants > 0 ? "bg-red-600 text-white hover:bg-red-700" : "bg-amber-400 text-amber-950 hover:bg-amber-300"
@@ -113,7 +115,9 @@ export function ListeACorriger() {
 
   return (
     <div>
+      <VisiteGuidee ecran="a-corriger" />
       <div className="mb-4 flex flex-wrap items-center gap-2">
+        <span data-visite="filtres-corriger" className="flex flex-wrap gap-2">
         {(["tous", "mensuel", "trimestriel"] as const).map((f) => {
           const n = f === "tous" ? points.length : points.filter((p) => p.rapport === f).length;
           return (
@@ -128,8 +132,10 @@ export function ListeACorriger() {
             </button>
           );
         })}
+        </span>
         {visibles.length > 0 && (
           <button
+            data-visite="tout-corriger"
             onClick={() => void aller(visibles[0])}
             className="ml-auto rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700"
           >
@@ -143,6 +149,7 @@ export function ListeACorriger() {
         {visibles.map((p, i) => (
           <li
             key={p.id}
+            data-visite="point-corriger"
             className={`rounded-lg border bg-white p-4 shadow-sm ${p.gravite === "bloquant" ? "border-l-4 border-l-red-600" : "border-l-4 border-l-amber-400"}`}
           >
             <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
@@ -154,9 +161,18 @@ export function ListeACorriger() {
               <span className="font-semibold">Que faire : </span>
               {p.faire}
             </p>
-            {p.guide && <GuidePasAPas guide={p.guide} />}
+            {/* Replié par défaut : les bulles de la visite expliquent l'écran ; le pas à pas s'ouvre au besoin. */}
+            {p.guide && (
+              <details data-visite="comment-faire" className="mt-2">
+                <summary className="cursor-pointer rounded-md bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-900">
+                  Comment faire, pas à pas
+                </summary>
+                <GuidePasAPas guide={p.guide} />
+              </details>
+            )}
             <div className="mt-3 flex flex-wrap gap-2">
               <button
+                data-visite="aller-corriger"
                 onClick={() => void aller(p)}
                 className="min-h-[44px] rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-hover"
               >
@@ -164,6 +180,7 @@ export function ListeACorriger() {
               </button>
               {p.demande && (
                 <button
+                  data-visite="demander-dd"
                   onClick={() => void demander(p)}
                   className="min-h-[44px] rounded-lg border border-red-600 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50"
                 >
@@ -204,11 +221,12 @@ export function GuidePasAPas({ guide, compact = false }: { guide: Guide; compact
   );
 }
 
-const CLE_GUIDE_REPLIE = "sid-guide-replie";
+// Replié par défaut (décision du Délégué : les bulles expliquent l'écran) ; on retient s'il a été OUVERT.
+const CLE_GUIDE_REPLIE = "sid-guide-ouvert";
 
 function guideReplie(id: string): boolean {
   try {
-    return sessionStorage.getItem(`${CLE_GUIDE_REPLIE}|${id}`) === "1";
+    return sessionStorage.getItem(`${CLE_GUIDE_REPLIE}|${id}`) !== "1";
   } catch {
     return false;
   }
@@ -216,8 +234,8 @@ function guideReplie(id: string): boolean {
 
 function memoriserGuide(id: string, replie: boolean) {
   try {
-    if (replie) sessionStorage.setItem(`${CLE_GUIDE_REPLIE}|${id}`, "1");
-    else sessionStorage.removeItem(`${CLE_GUIDE_REPLIE}|${id}`);
+    if (replie) sessionStorage.removeItem(`${CLE_GUIDE_REPLIE}|${id}`);
+    else sessionStorage.setItem(`${CLE_GUIDE_REPLIE}|${id}`, "1");
   } catch {
     // sans conséquence : le guide se rouvrira
   }
@@ -231,7 +249,7 @@ export function ParcoursACorriger() {
   const { points, recharger } = usePointsACorriger();
   const [erreur, setErreur] = useState<string | null>(null);
   /** Le guide du point courant est ouvert à l'arrivée ; replié si la personne l'a replié. */
-  const [guideOuvert, setGuideOuvert] = useState(true);
+  const [guideOuvert, setGuideOuvert] = useState(false);
   const [reponseDemande, setReponseDemande] = useState<string | null>(null);
 
   useEffect(() => {
@@ -301,6 +319,7 @@ export function ParcoursACorriger() {
   };
   return (
     <>
+    <VisiteGuidee ecran="parcours" />
     {/* La barre ne doit pas cacher le bas de la page. */}
     <div className={guideOuvert ? "h-[55vh]" : "h-20"} aria-hidden="true" />
     <div className="fixed inset-x-2 bottom-2 z-40 mx-auto max-w-2xl rounded-xl bg-gray-900 px-3 py-2 text-white shadow-2xl">
@@ -334,11 +353,12 @@ export function ParcoursACorriger() {
           onClick={() => void aller(precedent)}
           disabled={!precedent}
           aria-label="Point précédent"
+          data-visite="parcours-precedent"
           className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg hover:bg-white/15 disabled:opacity-30"
         >
           <ChevronLeft />
         </button>
-        <div className="min-w-0 flex-1">
+        <div data-visite="parcours-texte" className="min-w-0 flex-1">
           <p className="text-[11px] font-semibold uppercase tracking-wide text-white/60">
             {corrige ? (
               <span className="text-green-300">✓ Corrigé — reste {liste.length}</span>
@@ -351,6 +371,7 @@ export function ParcoursACorriger() {
         </div>
         <button
           onClick={() => void aller(suivant)}
+          data-visite="parcours-suivant"
           disabled={!suivant}
           className={`flex h-11 shrink-0 items-center gap-1 rounded-lg px-3 text-sm font-semibold disabled:opacity-30 ${
             corrige ? "bg-green-500 text-gray-900 hover:bg-green-400" : "bg-white/15 hover:bg-white/25"
@@ -361,16 +382,17 @@ export function ParcoursACorriger() {
         </button>
         <button
           onClick={basculerGuide}
+          data-visite="parcours-aide"
           aria-label={guideOuvert ? "Replier le guide" : "Comment faire ?"}
           title={guideOuvert ? "Replier le guide" : "Comment faire ?"}
           className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg ${guideOuvert ? "bg-blue-600" : "hover:bg-white/15"}`}
         >
           <HelpCircle size={20} />
         </button>
-        <Link href="/a-corriger" aria-label="Liste" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg hover:bg-white/15">
+        <Link href="/a-corriger" aria-label="Liste" data-visite="parcours-liste" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg hover:bg-white/15">
           <List size={20} />
         </Link>
-        <button onClick={fermer} aria-label="Fermer" className="flex h-11 w-9 shrink-0 items-center justify-center rounded-lg hover:bg-white/15">
+        <button onClick={fermer} aria-label="Fermer" data-visite="parcours-fermer" className="flex h-11 w-9 shrink-0 items-center justify-center rounded-lg hover:bg-white/15">
           <X size={18} />
         </button>
       </div>

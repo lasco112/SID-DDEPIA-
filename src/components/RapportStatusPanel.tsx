@@ -96,7 +96,7 @@ export default function RapportStatusPanel({
   return (
     <div className="mb-6 rounded-lg border border-gray-200 bg-white p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
+        <div data-visite="statut-rapport">
           <span className="text-sm text-gray-500">Statut du rapport : </span>
           <span className="font-semibold">{statut ? LIBELLES[statut] ?? statut : "…"}</span>
           {motifRejet && <p className="mt-1 text-sm text-red-700">Motif du rejet : {motifRejet}</p>}
@@ -137,7 +137,7 @@ export default function RapportStatusPanel({
         </div>
       )}
 
-      <div className="mt-3 border-t border-gray-100 pt-3">
+      <div data-visite="sauvegarde" className="mt-3 border-t border-gray-100 pt-3">
         <BackupLocalButton username={username} />
       </div>
       {message && <p className="mt-2 text-sm text-gray-700">{message}</p>}

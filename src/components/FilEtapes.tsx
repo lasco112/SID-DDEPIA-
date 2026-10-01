@@ -28,6 +28,7 @@ export default function FilEtapes({ role, position }: { role: string; position: 
       <div className="mt-8 flex justify-end border-t border-line pt-4">
         <Link
           href={suivante.href}
+          data-visite="etape-suivante"
           className="w-full rounded-md bg-primary px-4 py-3 text-center text-sm font-semibold text-white hover:bg-primary-dark sm:w-auto"
         >
           Étape suivante : {suivante.label} →
@@ -37,7 +38,7 @@ export default function FilEtapes({ role, position }: { role: string; position: 
   }
 
   return (
-    <nav aria-label="Étapes" className="mb-5 rounded-lg border border-line bg-white px-3 py-2.5">
+    <nav aria-label="Étapes" data-visite="fil-etapes" className="mb-5 rounded-lg border border-line bg-white px-3 py-2.5">
       <div className="text-xs text-ink-faint">
         <strong className="text-ink-muted">{courante.groupe.titre}</strong> · étape {rang + 1} sur {etapes.length}
       </div>

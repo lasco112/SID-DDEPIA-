@@ -15,6 +15,7 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { regleDuChamp, numeroTableau } from "@/lib/champsDerives";
 import { jeton } from "@/lib/surlignage";
+import VisiteGuidee from "@/components/VisiteGuidee";
 
 interface TemplateSummary {
   code: string;
@@ -222,9 +223,10 @@ export default function SectionControleClient() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-[23px] font-bold text-primary-dark">Contrôle sectoriel</h1>
+          <VisiteGuidee ecran="section-controle" pret={templates.length > 0} />
           <p className="mt-1 text-sm text-ink-muted">Vue croisée des 6 arrondissements. Cliquez une valeur pour la corriger (motif obligatoire, trace conservée).</p>
         </div>
-        <div data-cible={jeton("valider-section")} className="rounded-lg p-1 text-right">
+        <div data-cible={jeton("valider-section")} data-visite="valider-section" className="rounded-lg p-1 text-right">
           <button onClick={validerSection} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-hover">
             Valider ma section pour cette période
           </button>
@@ -301,7 +303,7 @@ export default function SectionControleClient() {
         {groupes.map(([nom, liste]) => {
           const ouvert = !groupesFermes.has(nom);
           return (
-            <div key={nom} className={`rounded-lg border border-gray-200 bg-white ${COULEUR_GROUPE[nom] ? `border-l-4 ${COULEUR_GROUPE[nom]}` : ""}`}>
+            <div key={nom} data-visite="liste-section" className={`rounded-lg border border-gray-200 bg-white ${COULEUR_GROUPE[nom] ? `border-l-4 ${COULEUR_GROUPE[nom]}` : ""}`}>
               <button
                 onClick={() => toggleGroupe(nom)}
                 className="flex w-full items-center justify-between px-4 py-3 text-left"

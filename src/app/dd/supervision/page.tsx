@@ -8,6 +8,7 @@ import AppShell from '@/components/AppShell';
 import DeverrouillerButton from '@/components/DeverrouillerButton';
 import RenvoyerAuDAButton from '@/components/RenvoyerAuDAButton';
 import { jeton } from '@/lib/surlignage';
+import VisiteGuidee from '@/components/VisiteGuidee';
 import SyntheseValidationRow from '@/components/SyntheseValidationRow';
 import GenererRapportDDButton from '@/components/GenererRapportDDButton';
 import PurgerDonneesTestButton from '@/components/PurgerDonneesTestButton';
@@ -125,6 +126,7 @@ export default async function DDSupervisionPage() {
     <AppShell allowedRoles={['DD']}>
       <div className="max-w-6xl">
         <h1 className="text-2xl font-bold text-primary-dark">Supervision départementale</h1>
+        <VisiteGuidee ecran="dd-supervision" />
 
         {periode ? (
           <div className="mt-4 space-y-8">
@@ -132,7 +134,7 @@ export default async function DDSupervisionPage() {
               <p className="text-sm text-gray-800">
                 <strong>Période :</strong> {periode.mois}/{periode.annee} <span className="text-gray-500">({periode.statut})</span>
               </p>
-              <div className="flex flex-wrap gap-3">
+              <div data-visite="generer-dd" className="flex flex-wrap gap-3">
                 {/* L'aperçu est disponible à tout moment (§11) : c'est justement
                     quand le rapport est incomplet qu'il sert à repérer ce qui
                     manque. Le définitif, lui, reste conditionné aux validations. */}
@@ -177,7 +179,7 @@ export default async function DDSupervisionPage() {
                   </a>
                 )}
               </div>
-              <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
+              <div data-visite="etat-arrondissements" className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
                 <table className="w-full border-collapse text-sm">
                   <thead>
                     <tr className="bg-gray-50 text-left">
