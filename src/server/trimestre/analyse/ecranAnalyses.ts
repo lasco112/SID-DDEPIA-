@@ -10,7 +10,7 @@ import type { PrismaClient } from "@prisma/client";
 import type { Periode } from "../../periodes/calendrier";
 import { preparer, fournisseur } from "../remplissage";
 import { champsMobilises } from "../liaison";
-import { contextePour, type Profil } from "../saisieTrimestrielle";
+import { contextePour, tableauDe, casesAnPasseManquantes, type CaseAnPasse, type Profil } from "../saisieTrimestrielle";
 import { listerArrondissements } from "@/lib/arrondissements";
 import { textesCalcules } from "./conclusion";
 import { propositions, lireAnalyses, statutDe, texteAuRapport, type Proposition, type StatutAnalyse } from "./analyses";
@@ -37,6 +37,11 @@ export interface AnalyseAEcran {
   /** Ce qui partira au rapport. */
   auRapport: string | null;
   sansComparaison: boolean;
+  /**
+   * Le chiffre de l'an passé qui manque à la comparaison, case par case — à
+   * saisir sur place quand le profil en a le droit.
+   */
+  anPasse: CaseAnPasse[];
 }
 
 export interface EcranAnalyses {
@@ -92,8 +97,16 @@ export async function ecranAnalyses(db: PrismaClient, periode: Periode, profil: 
     select: { id: true },
   });
   const enregistrees = await lireAnalyses(db, trimestre?.id ?? null, portee);
-  const analyses = (await propositionsPour(db, periode, profil)).map((p): AnalyseAEcran => {
+  // Une seule consolidation sert les propositions ET le repérage de l'an passé manquant.
+  const ctx = await contextePour(db, periode, profil);
+  const donnees = await preparer(db, periode, champsMobilises(), {
+    autoriserIncomplet: true,
+    arrondissementId: portee || undefined,
+  });
+  const valeur = fournisseur(donnees, ctx);
+  const analyses = propositions(ctx, valeur).filter((p) => concerne(p, profil)).map((p): AnalyseAEcran => {
     const e = enregistrees.get(p.numero);
+    const bloc = p.sansComparaison ? tableauDe(p.numero)?.bloc : undefined;
     return {
       numero: p.numero,
       titre: p.titre,
@@ -107,6 +120,7 @@ export async function ecranAnalyses(db: PrismaClient, periode: Periode, profil: 
       valideLe: e ? e.valideLe.toISOString() : null,
       auRapport: texteAuRapport(p, e),
       sansComparaison: p.sansComparaison,
+      anPasse: bloc ? casesAnPasseManquantes(bloc, ctx, profil, valeur) : [],
     };
   });
   return {

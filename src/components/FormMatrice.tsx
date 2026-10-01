@@ -14,6 +14,7 @@ import { regleDuChamp, contientDesChampsDerives, numeroTableau } from "@/lib/cha
 import { recalculerTousLesDerives } from "@/lib/derivationLocale";
 import ConfirmerTableauButton from "@/components/ConfirmerTableauButton";
 import { cibleMensuelle, cibles } from "@/lib/surlignage";
+import { repriseAffichee } from "@/lib/repriseAffichee";
 
 interface FormFieldDto {
   id: string;
@@ -82,7 +83,7 @@ export default function FormMatrice({ template, periodeId, username }: { templat
       }
 
       // 1. Valeurs déjà synchronisées côté serveur (hydrate si Dexie est vide)
-      let serveur: Array<{ fieldCode: string; valeur: string | null; valeurTexte: string | null; nonRenseigne: boolean; motifNonRenseigne: string | null; clientId: string; saisiPar: { nom: string; username: string } | null }> = [];
+      let serveur: Array<{ fieldCode: string; valeur: string | null; valeurTexte: string | null; nonRenseigne: boolean; motifNonRenseigne: string | null; clientId: string; reporte?: boolean; saisiPar: { nom: string; username: string } | null }> = [];
       try {
         const res = await fetch(`/api/rapports/mes-saisies?periodeId=${periodeId}&templateCode=${template.code}`);
         if (res.ok) {
@@ -99,6 +100,7 @@ export default function FormMatrice({ template, periodeId, username }: { templat
       for (const f of template.fields) {
         const texte = f.typeValeur === "TEXTE";
         const local = await trouverSaisieMatrice(username, periodeId, template.code, f.code);
+        const distant = serveur.find((s) => s.fieldCode === f.code);
         if (local) {
           initial[f.code] = {
             valeur: texte ? local.valeurTexte ?? "" : local.valeur == null ? "" : String(local.valeur),
@@ -108,11 +110,10 @@ export default function FormMatrice({ template, periodeId, username }: { templat
             savedAt: Date.now(),
             statutLocal: local.statutLocal,
             erreurSynchro: local.erreurSynchro,
-            reporte: local.reporte ?? false,
+            reporte: repriseAffichee(local, distant),
           };
           continue;
         }
-        const distant = serveur.find((s) => s.fieldCode === f.code);
         if (distant) {
           const clientId = distant.clientId;
           await offlineDB.saisies.put({
@@ -126,6 +127,7 @@ export default function FormMatrice({ template, periodeId, username }: { templat
             valeurTexte: texte ? distant.valeurTexte ?? null : null,
             nonRenseigne: distant.nonRenseigne,
             motifNonRenseigne: distant.motifNonRenseigne,
+            reporte: Boolean(distant.reporte),
             statutLocal: "SYNCHRONISE",
             updatedAt: new Date().toISOString(),
           });
@@ -136,6 +138,7 @@ export default function FormMatrice({ template, periodeId, username }: { templat
             clientId,
             savedAt: Date.now(),
             statutLocal: "SYNCHRONISE",
+            reporte: Boolean(distant.reporte),
           };
         } else {
           initial[f.code] = { valeur: "", nonRenseigne: false, motifNonRenseigne: "", clientId: crypto.randomUUID(), savedAt: null };
@@ -323,6 +326,7 @@ export default function FormMatrice({ template, periodeId, username }: { templat
     </div>
     <ConfirmerTableauButton
       templateCode={template.code}
+      periodeId={periodeId}
       nbReprises={nbReprises}
       onConfirme={() => setLignes((prev) => Object.fromEntries(Object.entries(prev).map(([k, v]) => [k, { ...v, reporte: false }])))}
     />

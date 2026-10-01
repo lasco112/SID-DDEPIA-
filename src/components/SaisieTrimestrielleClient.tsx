@@ -291,9 +291,34 @@ export default function SaisieTrimestrielleClient({
    * téléphone, voir plusieurs tableaux ouverts à la fois égarait les agents.
    */
   const dernierOuvert = useRef<number | null>(null);
+
+  // « Reprendre là où je me suis arrêté » : le dernier tableau ouvert, retenu
+  // sur l'appareil, par compte et par trimestre (demande du Délégué).
+  const cleDernier = `sid-trim-dernier|${username}|${annee}-${trimestre}`;
+  const [dernierTableau, setDernierTableau] = useState<number | null>(null);
+  useEffect(() => {
+    try {
+      setDernierTableau(Number(localStorage.getItem(cleDernier)) || null);
+    } catch {
+      setDernierTableau(null);
+    }
+  }, [cleDernier]);
+  /** Sections dépliées ; null tant que la liste n'a pas choisi celle où l'on travaille. */
+  const [sectionsOuvertes, setSectionsOuvertes] = useState<Set<string> | null>(null);
+  const [filtre, setFiltre] = useState<"tous" | "a_completer">("tous");
+
   useEffect(() => {
     if (ouvert != null) {
       dernierOuvert.current = ouvert;
+      try {
+        localStorage.setItem(cleDernier, String(ouvert));
+      } catch {
+        // sans conséquence : « Reprendre » proposera le prochain tableau à compléter
+      }
+      setDernierTableau(ouvert);
+      // De retour à la liste, la section de ce tableau doit être dépliée.
+      const section = liste?.tableaux.find((t) => t.numero === ouvert)?.section;
+      if (section) setSectionsOuvertes((s) => new Set([...Array.from(s ?? []), section]));
       window.scrollTo({ top: 0 });
     } else if (dernierOuvert.current != null) {
       // De retour à la liste : on la retrouve là où l'on avait quitté.
@@ -320,6 +345,21 @@ export default function SaisieTrimestrielleClient({
   }
   const total = liste.tableaux.reduce((n, t) => n + t.saisissables, 0);
   const faites = liste.tableaux.reduce((n, t) => n + t.renseignees, 0);
+  const estComplet = (t: ResumeTableau) => t.renseignees >= t.saisissables;
+  const aCompleter = liste.tableaux.filter((t) => !estComplet(t));
+  const reprendre = dernierTableau != null ? liste.tableaux.find((t) => t.numero === dernierTableau) : undefined;
+  // Le prochain tableau à compléter : après celui où l'on s'est arrêté, sinon depuis le début.
+  const rangReprise = reprendre ? liste.tableaux.indexOf(reprendre) : -1;
+  const prochain = aCompleter.find((t) => liste.tableaux.indexOf(t) > rangReprise) ?? aCompleter[0];
+  // Par défaut, seule la section où l'on travaille est dépliée.
+  const ouvertes =
+    sectionsOuvertes ?? new Set([(reprendre ?? prochain ?? liste.tableaux[0])?.section].filter((x): x is string => Boolean(x)));
+  const basculerSection = (titreSection: string) => {
+    const s = new Set(ouvertes);
+    if (s.has(titreSection)) s.delete(titreSection);
+    else s.add(titreSection);
+    setSectionsOuvertes(s);
+  };
 
   // ------------------------------------------------------------ un tableau seul
   const courant = ouvert == null ? null : liste.tableaux.find((t) => t.numero === ouvert) ?? null;
@@ -461,12 +501,95 @@ export default function SaisieTrimestrielleClient({
         <p className="mt-6 text-gray-600">Aucun tableau à saisir pour ce trimestre.</p>
       )}
 
-      <div className="mt-6 space-y-6">
-        {sections.map((s) => (
-          <div key={s.titre}>
-            <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-gray-500">{s.titre}</h2>
-            <div className="space-y-2">
-              {s.tableaux.map((t) => (
+      {/* Reprendre : le dernier tableau ouvert, et le prochain qui reste à compléter. */}
+      {(reprendre || prochain) && (
+        <div className="mt-5 grid gap-2 sm:grid-cols-2">
+          {reprendre && (
+            <button
+              type="button"
+              onClick={() => ouvrir(reprendre.numero, true)}
+              className="rounded-lg bg-primary px-4 py-3 text-left text-white hover:bg-primary-hover"
+            >
+              <span className="block text-sm font-semibold">Reprendre là où je me suis arrêté →</span>
+              <span className="block text-xs opacity-90">
+                {reprendre.titre} · {reprendre.renseignees}/{reprendre.saisissables} case(s)
+              </span>
+            </button>
+          )}
+          {prochain && prochain !== reprendre && (
+            <button
+              type="button"
+              onClick={() => ouvrir(prochain.numero, true)}
+              className="rounded-lg border-2 border-primary bg-white px-4 py-3 text-left text-primary-dark hover:bg-green-50"
+            >
+              <span className="block text-sm font-semibold">Prochain tableau à compléter →</span>
+              <span className="block text-xs text-gray-600">
+                {prochain.titre} · {prochain.renseignees}/{prochain.saisissables} case(s)
+              </span>
+            </button>
+          )}
+        </div>
+      )}
+      {aCompleter.length === 0 && liste.tableaux.length > 0 && (
+        <p className="mt-5 rounded-lg border border-green-200 bg-green-50 p-3 text-sm font-medium text-green-900">
+          ✓ Tous les tableaux sont complets. Passez à l&apos;étape suivante.
+        </p>
+      )}
+
+      {/* Filtre et dépliage */}
+      {liste.tableaux.length > 0 && (
+        <div className="mt-5 flex flex-wrap items-center gap-2">
+          {(["tous", "a_completer"] as const).map((f) => (
+            <button
+              key={f}
+              type="button"
+              onClick={() => setFiltre(f)}
+              className={`rounded-full border px-3 py-1.5 text-sm font-medium ${
+                filtre === f ? "border-primary bg-primary text-white" : "border-gray-300 bg-white text-gray-700"
+              }`}
+            >
+              {f === "tous" ? `Tous (${liste.tableaux.length})` : `À compléter (${aCompleter.length})`}
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={() => setSectionsOuvertes(ouvertes.size === sections.length ? new Set() : new Set(sections.map((s) => s.titre)))}
+            className="ml-auto text-sm font-semibold text-primary underline"
+          >
+            {ouvertes.size === sections.length ? "Tout replier" : "Tout déplier"}
+          </button>
+        </div>
+      )}
+
+      <div className="mt-4 space-y-3">
+        {sections.map((s) => {
+          const visibles = s.tableaux.filter((t) => filtre === "tous" || !estComplet(t));
+          if (visibles.length === 0) return null;
+          const complets = s.tableaux.filter(estComplet).length;
+          const deplie = ouvertes.has(s.titre);
+          return (
+          <div key={s.titre} className="rounded-lg border border-gray-200 bg-gray-50">
+            <button
+              type="button"
+              onClick={() => basculerSection(s.titre)}
+              aria-expanded={deplie}
+              className="flex min-h-[48px] w-full items-center justify-between gap-3 px-3 py-2 text-left"
+            >
+              <span className="text-sm font-semibold uppercase tracking-wide text-gray-700">{s.titre}</span>
+              <span className="flex shrink-0 items-center gap-2">
+                <span
+                  className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                    complets === s.tableaux.length ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-900"
+                  }`}
+                >
+                  {complets}/{s.tableaux.length} complet{s.tableaux.length > 1 ? "s" : ""}
+                </span>
+                <span className="text-gray-500">{deplie ? "▲" : "▼"}</span>
+              </span>
+            </button>
+            {deplie && (
+            <div className="space-y-2 px-2 pb-2">
+              {visibles.map((t) => (
                 <button
                   key={t.numero}
                   id={`tableau-${t.numero}`}
@@ -485,13 +608,16 @@ export default function SaisieTrimestrielleClient({
                   <span
                     className={`shrink-0 text-sm ${t.renseignees === t.saisissables ? "text-green-700" : "text-gray-600"}`}
                   >
+                    {estComplet(t) ? "✓ " : ""}
                     {t.renseignees}/{t.saisissables}
                   </span>
                 </button>
               ))}
             </div>
+            )}
           </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

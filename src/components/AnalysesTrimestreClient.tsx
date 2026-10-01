@@ -37,13 +37,45 @@ interface Analyse {
   valideLe: string | null;
   auRapport: string | null;
   sansComparaison: boolean;
+  /** Le chiffre de l'an passé qui manque à la comparaison, case par case. */
+  anPasse?: CaseAnPasse[];
   /** Validée ou retirée hors ligne : gardée sur le téléphone, pas encore envoyée. */
   surLeTelephone?: boolean;
+}
+
+interface CaseAnPasse {
+  ligne: string;
+  colonne: string;
+  territoire: string;
+  saisissable: boolean;
 }
 
 interface Ecran {
   portee: string;
   analyses: Analyse[];
+}
+
+/**
+ * « Je n'ai pas ce chiffre » : retenu sur l'appareil, par compte, trimestre et
+ * tableau. Rien n'est écrit au serveur — l'analyse dit déjà que la
+ * comparaison n'est pas possible ; on cesse seulement de le réclamer.
+ */
+const cleSansAnPasse = (username: string, annee: number, trimestre: number, numero: number) =>
+  `sid-anpasse-absent|${username}|${annee}-${trimestre}|${numero}`;
+function lireSansAnPasse(cle: string): boolean {
+  try {
+    return localStorage.getItem(cle) === "1";
+  } catch {
+    return false;
+  }
+}
+function ecrireSansAnPasse(cle: string, absent: boolean) {
+  try {
+    if (absent) localStorage.setItem(cle, "1");
+    else localStorage.removeItem(cle);
+  } catch {
+    // stockage indisponible : la case sera simplement redemandée
+  }
 }
 
 const LIBELLE: Record<Statut, { texte: string; classe: string }> = {
@@ -73,6 +105,10 @@ export default function AnalysesTrimestreClient({
   const [voirCalcul, setVoirCalcul] = useState(false);
   const [copieDu, setCopieDu] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+  /** Les chiffres de l'an passé en cours de frappe, par case. */
+  const [anPasseSaisi, setAnPasseSaisi] = useState<Record<string, string>>({});
+  /** Tableaux pour lesquels la personne a dit ne pas avoir le chiffre de l'an passé. */
+  const [sansAnPasse, setSansAnPasse] = useState<Record<number, boolean>>({});
 
   const charger = useCallback(async () => {
     setErreur(null);
@@ -102,7 +138,52 @@ export default function AnalysesTrimestreClient({
       }
     }
     setEcran(e);
+    setSansAnPasse(
+      Object.fromEntries(e.analyses.map((a) => [a.numero, lireSansAnPasse(cleSansAnPasse(username, annee, trimestre, a.numero))]))
+    );
   }, [annee, trimestre, username]);
+
+  /** Le chiffre de l'an passé reste à saisir pour ce tableau, par cette personne. */
+  const anPasseAFaire = (a: Analyse) => !sansAnPasse[a.numero] && (a.anPasse ?? []).some((c) => c.saisissable);
+
+  /** Enregistre le total de l'an passé d'un arrondissement : la case « TOTAL {P-1} » de la saisie. */
+  async function enregistrerAnPasse(a: Analyse, c: CaseAnPasse) {
+    const k = `${c.ligne}|${c.colonne}`;
+    const brut = (anPasseSaisi[k] ?? "").trim();
+    if (!brut) return;
+    setOccupe(true);
+    setErreur(null);
+    setInfo(null);
+    try {
+      const resultat = await envoyerOuGarder(username, {
+        cle: `saisie|${annee}|${trimestre}|${a.numero}|${c.ligne}|${c.colonne}`,
+        methode: "PUT",
+        url: "/api/trimestre/saisie",
+        corps: { annee, trimestre, numeroTableau: a.numero, ligne: c.ligne, colonne: c.colonne, valeur: brut },
+        libelle: `${a.titre} — ${c.territoire}, ${c.colonne}`,
+      });
+      if (resultat.statut === "refuse") {
+        setErreur(resultat.message);
+        return;
+      }
+      setAnPasseSaisi((x) => ({ ...x, [k]: "" }));
+      setInfo(
+        resultat.statut === "en_file"
+          ? "Pas de réseau : le chiffre est gardé sur ce téléphone et partira seul. L'analyse sera recalculée à ce moment-là."
+          : "Chiffre enregistré : l'analyse a été recalculée avec la comparaison sur un an. Relisez-la, puis validez."
+      );
+      await charger();
+    } catch {
+      setErreur("Enregistrement impossible sur ce téléphone.");
+    } finally {
+      setOccupe(false);
+    }
+  }
+
+  function basculerSansAnPasse(numero: number, absent: boolean) {
+    ecrireSansAnPasse(cleSansAnPasse(username, annee, trimestre, numero), absent);
+    setSansAnPasse((x) => ({ ...x, [numero]: absent }));
+  }
 
   useEffect(() => {
     setOuvert(null);
@@ -253,10 +334,20 @@ export default function AnalysesTrimestreClient({
                 </ul>
               )}
               {courant.sansComparaison && (
-                <p className="mt-2 text-sm text-amber-800">
-                  Pas de comparaison avec l&apos;an passé : le total de l&apos;année dernière n&apos;est pas renseigné. Vous
-                  pouvez le saisir dans la saisie trimestrielle (colonne « TOTAL » de l&apos;année dernière).
-                </p>
+                <AnPasse
+                  analyse={courant}
+                  periodeN1={`T${trimestre} ${annee - 1}`}
+                  absent={Boolean(sansAnPasse[courant.numero])}
+                  saisi={anPasseSaisi}
+                  occupe={occupe}
+                  onSaisir={(k, v) => setAnPasseSaisi((x) => ({ ...x, [k]: v }))}
+                  onEnregistrer={(c) => void enregistrerAnPasse(courant, c)}
+                  onAbsent={(absent) => basculerSansAnPasse(courant.numero, absent)}
+                  suivantSansAnPasse={
+                    ecran.analyses.slice(i + 1).find((a) => a.numero !== courant.numero && anPasseAFaire(a))?.numero ?? null
+                  }
+                  onSuivant={(n) => setOuvert(n)}
+                />
               )}
             </div>
 
@@ -339,6 +430,7 @@ export default function AnalysesTrimestreClient({
   }
 
   // ------------------------------------------------------------ la liste
+  const sansChiffreAnPasse = ecran.analyses.filter(anPasseAFaire);
   const sections: { titre: string; analyses: Analyse[] }[] = [];
   for (const a of ecran.analyses) {
     const s = sections.find((x) => x.titre === a.section);
@@ -395,6 +487,27 @@ export default function AnalysesTrimestreClient({
         </button>
       )}
 
+      {/* Le chiffre de l'an passé : sans lui, pas de comparaison sur un an. */}
+      {sansChiffreAnPasse.length > 0 && (
+        <div className="mt-4 rounded-md border-2 border-red-300 bg-red-50 p-3">
+          <p className="text-sm font-semibold text-red-900">
+            {sansChiffreAnPasse.length} tableau{sansChiffreAnPasse.length > 1 ? "x" : ""} sans le chiffre de l&apos;an passé (
+            T{trimestre} {annee - 1})
+          </p>
+          <p className="mt-1 text-sm text-red-900">
+            Le SID n&apos;a pas encore les chiffres de l&apos;année dernière : c&apos;est à vous de les donner, une fois, à partir
+            de vos rapports de l&apos;époque. Sans eux, l&apos;analyse ne peut pas dire si l&apos;activité a augmenté ou baissé.
+          </p>
+          <button
+            type="button"
+            onClick={() => setOuvert(sansChiffreAnPasse[0].numero)}
+            className="mt-2 min-h-[44px] w-full rounded-md bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800 sm:w-auto"
+          >
+            Les saisir un par un →
+          </button>
+        </div>
+      )}
+
       {sections.map((s) => (
         <section key={s.titre} className="mt-6">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">{s.titre}</h2>
@@ -407,8 +520,13 @@ export default function AnalysesTrimestreClient({
                   className="flex w-full items-center justify-between gap-3 px-3 py-3 text-left hover:bg-gray-50"
                 >
                   <span className="text-sm text-gray-900">{a.titre}</span>
-                  <span className={`shrink-0 rounded px-2 py-0.5 text-xs font-semibold ${LIBELLE[a.statut].classe}`}>
-                    {LIBELLE[a.statut].texte}
+                  <span className="flex shrink-0 flex-col items-end gap-1">
+                    <span className={`rounded px-2 py-0.5 text-xs font-semibold ${LIBELLE[a.statut].classe}`}>
+                      {LIBELLE[a.statut].texte}
+                    </span>
+                    {anPasseAFaire(a) && (
+                      <span className="rounded bg-red-100 px-2 py-0.5 text-[11px] font-semibold text-red-800">an passé à saisir</span>
+                    )}
                   </span>
                 </button>
               </li>
@@ -416,6 +534,137 @@ export default function AnalysesTrimestreClient({
           </ul>
         </section>
       ))}
+    </div>
+  );
+}
+
+/**
+ * Le chiffre de l'an passé, saisi SUR PLACE sous l'analyse (décision du
+ * Délégué : la mention est capitale, car la personne doit donner la donnée de
+ * l'an passé, qui n'est pas encore dans le système). Il s'enregistre dans la
+ * case « TOTAL » de l'an passé de la saisie trimestrielle, comme à l'étape 1 ;
+ * l'analyse se recalcule aussitôt.
+ */
+function AnPasse({
+  analyse,
+  periodeN1,
+  absent,
+  saisi,
+  occupe,
+  onSaisir,
+  onEnregistrer,
+  onAbsent,
+  suivantSansAnPasse,
+  onSuivant,
+}: {
+  analyse: Analyse;
+  periodeN1: string;
+  absent: boolean;
+  saisi: Record<string, string>;
+  occupe: boolean;
+  onSaisir: (cle: string, valeur: string) => void;
+  onEnregistrer: (c: CaseAnPasse) => void;
+  onAbsent: (absent: boolean) => void;
+  suivantSansAnPasse: number | null;
+  onSuivant: (numero: number) => void;
+}) {
+  const cases = analyse.anPasse ?? [];
+  const aSaisir = cases.filter((c) => c.saisissable);
+  const autres = cases.filter((c) => !c.saisissable);
+
+  // Aucune case à remplir : ne rien réclamer qu'on ne puisse pas faire.
+  if (cases.length === 0) {
+    return (
+      <p className="mt-2 rounded-md bg-gray-50 p-3 text-sm text-gray-700">
+        Pas de comparaison avec le {periodeN1} pour ce tableau : le SID n&apos;a pas encore ces chiffres, et ce tableau ne
+        prévoit pas de case pour les saisir. Rien à faire de votre part — la comparaison viendra d&apos;elle-même quand les
+        données de l&apos;an passé seront dans le système.
+      </p>
+    );
+  }
+
+  if (absent) {
+    return (
+      <p className="mt-2 rounded-md bg-gray-50 p-3 text-sm text-gray-700">
+        Vous avez indiqué ne pas avoir le chiffre de l&apos;an passé : l&apos;analyse dit que la comparaison n&apos;est pas possible.{" "}
+        <button type="button" onClick={() => onAbsent(false)} className="font-semibold text-primary underline">
+          Je l&apos;ai finalement
+        </button>
+      </p>
+    );
+  }
+
+  return (
+    <div className="mt-3 rounded-md border-2 border-red-300 bg-red-50 p-3">
+      <p className="text-sm font-semibold text-red-900">Il manque le chiffre de l&apos;an passé ({periodeN1})</p>
+      <p className="mt-1 text-sm text-red-900">
+        Le SID n&apos;a pas encore les chiffres de l&apos;année dernière dans sa base. Sans eux, l&apos;analyse ne peut pas dire si
+        l&apos;activité a augmenté ou baissé sur un an.
+      </p>
+
+      {aSaisir.length > 0 && (
+        <>
+          <ol className="mt-2 list-decimal space-y-0.5 pl-5 text-sm text-gray-800">
+            <li>Retrouvez votre rapport du {periodeN1} (papier ou fichier).</li>
+            <li>Relevez le TOTAL de ce tableau pour l&apos;arrondissement indiqué.</li>
+            <li>Tapez-le ci-dessous, puis « Enregistrer » : l&apos;analyse est recalculée aussitôt.</li>
+          </ol>
+          <div className="mt-3 space-y-2">
+            {aSaisir.map((c) => {
+              const k = `${c.ligne}|${c.colonne}`;
+              return (
+                <div key={k} className="flex flex-wrap items-end gap-2">
+                  <label className="flex-1 text-sm text-gray-800">
+                    <span className="block font-medium">
+                      Total de {c.territoire} au {periodeN1}
+                    </span>
+                    <input
+                      inputMode="decimal"
+                      value={saisi[k] ?? ""}
+                      onChange={(e) => onSaisir(k, e.target.value)}
+                      placeholder="ex. 1250"
+                      className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-base"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    disabled={occupe || !(saisi[k] ?? "").trim()}
+                    onClick={() => onEnregistrer(c)}
+                    className="min-h-[44px] rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-dark disabled:opacity-50"
+                  >
+                    {occupe ? "Enregistrement…" : "Enregistrer"}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+          <button
+            type="button"
+            onClick={() => onAbsent(true)}
+            className="mt-3 text-sm font-semibold text-gray-700 underline"
+          >
+            Je n&apos;ai pas ce chiffre
+          </button>
+        </>
+      )}
+
+      {autres.length > 0 && (
+        <p className="mt-2 text-sm text-gray-800">
+          Le chiffre manque pour : <strong>{autres.map((c) => c.territoire).join(", ")}</strong>. C&apos;est{" "}
+          {autres.length > 1 ? "aux arrondissements concernés" : "à l'arrondissement concerné"} de le saisir (étape « Compléter les
+          tableaux du trimestre », case « TOTAL {periodeN1} »).
+        </p>
+      )}
+
+      {suivantSansAnPasse != null && (
+        <button
+          type="button"
+          onClick={() => onSuivant(suivantSansAnPasse)}
+          className="mt-3 block text-sm font-semibold text-red-800 underline"
+        >
+          Tableau suivant sans chiffre de l&apos;an passé →
+        </button>
+      )}
     </div>
   );
 }

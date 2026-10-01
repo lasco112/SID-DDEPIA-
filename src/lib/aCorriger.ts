@@ -123,6 +123,16 @@ async function lireServeur(forcer = false): Promise<ReponseACorriger | null> {
   }
 }
 
+/**
+ * Le serveur dit-il que ce tableau, ce mois-ci, a des chiffres repris non
+ * confirmés ? Filet de sécurité du bouton « Confirmer ce tableau » : il doit
+ * apparaître dès que le serveur refuserait la transmission pour ce motif.
+ */
+export async function aConfirmerSelonServeur(periodeId: string, templateCode: string): Promise<boolean> {
+  const s = await lireServeur();
+  return Boolean(s?.mensuel.find((m) => m.periodeId === periodeId)?.aConfirmer.some((t) => t.code === templateCode));
+}
+
 /** Oublie la réponse du serveur : le prochain calcul la redemande (après une correction). */
 export function oublierServeur() {
   duServeur = null;

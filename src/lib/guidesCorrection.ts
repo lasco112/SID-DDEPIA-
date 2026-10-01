@@ -55,12 +55,13 @@ export function guideDe(nature: NaturePoint, c: ContexteGuide): Guide {
           "écrits en GRIS : ce ne sont PAS encore ceux de ce mois. Tant que vous ne les avez pas vérifiés et confirmés, le rapport ne " +
           "peut pas partir — sinon on déclarerait au DD les chiffres du mois dernier comme s'ils étaient ceux de ce mois.",
         etapes: [
-          "Dans le tableau qui s'ouvre, repérez les cases grises : à droite, il est écrit « repris du mois précédent ».",
+          "Dans le tableau qui s'ouvre, repérez les cases grises (encadrées en rouge) : il est écrit à côté « repris du mois précédent ».",
           "Pour chaque case grise, demandez-vous : ce chiffre a-t-il changé ce mois-ci ?",
           "S'il a changé, effacez-le et tapez le bon chiffre : la case redevient normale.",
           "S'il est toujours juste (un effectif qui n'a pas bougé, par exemple), n'y touchez pas.",
-          "Descendez en bas du tableau : dans l'encadré jaune, cliquez « Confirmer ce tableau ».",
-          "Le message « Tableau confirmé » apparaît : ce tableau est réglé. Cliquez « Suivant » dans la barre du bas pour passer au tableau suivant.",
+          "Descendez sous le tableau : dans l'encadré jaune (« … valeurs sont reprises du mois précédent… »), cliquez le bouton « Confirmer ce tableau ». Il faut du réseau.",
+          "Le message « Tableau confirmé » apparaît : ce tableau est réglé. Cliquez « Suivant » (la flèche, dans la barre du bas) pour passer au tableau suivant.",
+          "Vous ne voyez ni case grise ni encadré jaune ? Rechargez la page avec du réseau. Si rien n'apparaît encore, prévenez le DD avec une capture d'écran.",
           c.role === "AGENT_SAISIE"
             ? "Quand tous les tableaux sont confirmés, prévenez votre DA : c'est lui qui transmet le rapport."
             : `Quand tous les tableaux sont confirmés, cliquez ${envoyer(c)} en haut de l'écran.`,
@@ -111,9 +112,9 @@ export function guideDe(nature: NaturePoint, c: ContexteGuide): Guide {
           "Vous avez coché « N/D » (non disponible) sans dire pourquoi. Le SID distingue un vrai zéro d'un chiffre qu'on n'a pas pu " +
           "obtenir : pour ce second cas, le DD doit savoir la raison.",
         etapes: [
-          "Sur la ligne encadrée en rouge, regardez la colonne « Non renseigné » : la case « N/D » est cochée.",
-          "Dans la petite case « Motif obligatoire » en dessous, écrivez la raison (exemples : « marché fermé ce mois », « pas de visite du poste »).",
-          "Si en fait vous avez le chiffre : décochez « N/D » et tapez le chiffre dans la colonne « Valeur ». Zéro se tape 0.",
+          "Sur la case encadrée en rouge, la petite case « N/D » est cochée.",
+          "Juste en dessous, dans le champ « Motif obligatoire », écrivez la raison (exemples : « marché fermé ce mois », « pas de visite du poste »).",
+          "Si en fait vous avez le chiffre : décochez « N/D » et tapez le chiffre dans la case. Zéro se tape 0.",
           "La correction repart toute seule ; le point disparaît de la liste quelques instants après.",
         ],
       };
@@ -174,8 +175,8 @@ export function guideDe(nature: NaturePoint, c: ContexteGuide): Guide {
           "La date limite est passée, mais le rapport du département ne peut pas encore être produit : il manque des transmissions ou des validations.",
         etapes: [
           "Dans la Supervision, les lignes encadrées en rouge sont celles qui bloquent.",
-          "Arrondissement en retard : relancez le DA. Après le 28, « Déverrouiller exceptionnellement » lui permet de transmettre ; « Repousser l'échéance » décale la date pour tous.",
-          "Section non validée : relancez le chef, ou cliquez « Valider en tant que DD » sur sa ligne (motif conseillé).",
+          "Arrondissement en retard : relancez le DA. Si le mois est verrouillé, le bouton « Déverrouiller exceptionnellement » apparaît sur sa ligne (colonne « Action ») et lui permet de transmettre ; « Repousser l'échéance (tous les arrondissements) », plus haut, décale la date pour tous.",
+          "Section non validée : relancez le chef, ou, dans « Validations du rapport départemental », cliquez « Valider en tant que DD » sous le nom de la section (motif conseillé).",
           "Quand tout est vert, cliquez « Générer le rapport définitif (.docx) ».",
         ],
       };
@@ -256,7 +257,9 @@ export function guideDe(nature: NaturePoint, c: ContexteGuide): Guide {
         etapes: [
           "Lisez le motif du renvoi, écrit ci-dessus.",
           "Corrigez dans les étapes concernées (tableaux, analyses ou textes).",
-          "Revenez à l'étape « Transmettre mon rapport au DD » et transmettez à nouveau.",
+          c.role === "AGENT_SAISIE"
+            ? "Prévenez votre DA : c'est lui qui transmet de nouveau le rapport."
+            : "Ouvrez l'étape « Transmettre mon rapport au DD » (menu Rapport trimestriel) et transmettez à nouveau.",
         ],
       };
   }

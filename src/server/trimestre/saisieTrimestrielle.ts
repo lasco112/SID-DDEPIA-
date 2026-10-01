@@ -232,6 +232,55 @@ export function etatCase(
   return autorise(bloc, profil, ligne, colonne) ? "saisie" : "lecture";
 }
 
+/**
+ * Le chiffre de l'an passé qui MANQUE à l'analyse d'un tableau : la case
+ * « TOTAL {P-1} » de chaque arrondissement (ou structure) qui a des chiffres
+ * cette période, mais pas encore l'an passé — le SID ne l'a pas dans sa base.
+ * L'écran des analyses la fait saisir sur place (décision du Délégué : la
+ * personne doit remplir la donnée de l'an passé, qui n'est pas encore dans le
+ * système). `saisissable` : ce profil a-t-il le droit de la remplir ?
+ */
+export interface CaseAnPasse {
+  ligne: string;
+  colonne: string;
+  /** L'arrondissement (ou la structure) concerné. */
+  territoire: string;
+  saisissable: boolean;
+}
+
+export function casesAnPasseManquantes(
+  bloc: BlocTableau,
+  ctx: ContexteCanevas,
+  profil: Profil,
+  valeur: ReturnType<typeof fournisseur>
+): CaseAnPasse[] {
+  const axe = axeTerritorial(bloc);
+  if (!axe) return [];
+  const n1 = `TOTAL ${ctx.periodeCourtN1}`;
+  const courant = `TOTAL ${ctx.periodeCourt}`;
+  const [, ...colonnes] = colonnesDe(bloc, ctx);
+  const cles = clesLignes(bloc, ctx);
+  const surAxe = axe === "lignes" ? cles : colonnes;
+  const autres = axe === "lignes" ? colonnes : cles;
+  if (!autres.includes(n1)) return [];
+  const lire = (ligne: string, colonne: string) =>
+    valeur({ numeroTableau: bloc.numero, titreTableau: bloc.titre, bloc, ligne, colonne, indexColonne: colonnes.indexOf(colonne) + 1 });
+  const sortie: CaseAnPasse[] = [];
+  for (const terr of surAxe) {
+    if (estTotal(terr) || /^ÉCART/i.test(terr)) continue;
+    const [ligne, colonne] = axe === "lignes" ? [terr, n1] : [n1, terr];
+    if (!estCaseHistorique(bloc, ctx, ligne, colonne)) continue;
+    if (versNombre(lire(ligne, colonne)) != null) continue; // déjà connu
+    // Sans chiffre cette période, l'an passé ne sert à aucune comparaison.
+    if (autres.includes(courant)) {
+      const [lc, cc] = axe === "lignes" ? [terr, courant] : [courant, terr];
+      if (versNombre(lire(lc, cc)) == null) continue;
+    }
+    sortie.push({ ligne, colonne, territoire: terr, saisissable: etatCase(bloc, ctx, profil, ligne, colonne, valeur.sid) === "saisie" });
+  }
+  return sortie;
+}
+
 /** Les coordonnées d'un tableau : repères de ligne et colonnes saisissables. */
 function coordonnees(bloc: BlocTableau, ctx: ContexteCanevas) {
   const [enteteLigne, ...colonnes] = colonnesDe(bloc, ctx);

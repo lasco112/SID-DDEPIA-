@@ -15,6 +15,7 @@ import { regleAlimenteeParLeChamp, numeroTableau } from "@/lib/champsDerives";
 import { creerEtablissement } from "@/lib/etablissementsLocal";
 import ConfirmerTableauButton from "@/components/ConfirmerTableauButton";
 import { cibleMensuelle, cibles } from "@/lib/surlignage";
+import { repriseAffichee } from "@/lib/repriseAffichee";
 
 interface FormFieldDto {
   code: string;
@@ -112,6 +113,8 @@ export default function FormNominatif({
         nonRenseigne: boolean;
         motifNonRenseigne: string | null;
         clientId: string;
+        /** Reprise du mois précédent pas encore confirmée — le serveur fait foi. */
+        reporte?: boolean;
         saisiPar: { nom: string; username: string } | null;
       }> = [];
       try {
@@ -129,17 +132,17 @@ export default function FormNominatif({
           const texte = f.typeValeur === "TEXTE";
           const cle = `${etab.id}:${f.code}`;
           const local = await trouverSaisieNominatif(username, periodeId, template.code, etab.id, f.code);
+          const distant = serveur.find((s) => s.etablissementId === etab.id && s.fieldCode === f.code);
           if (local) {
             initial[cle] = {
               valeur: texte ? local.valeurTexte ?? "" : local.valeur == null ? "" : String(local.valeur),
               nonRenseigne: local.nonRenseigne,
               motifNonRenseigne: local.motifNonRenseigne ?? "",
               clientId: local.clientId,
-              reporte: local.reporte ?? false,
+              reporte: repriseAffichee(local, distant),
             };
             continue;
           }
-          const distant = serveur.find((s) => s.etablissementId === etab.id && s.fieldCode === f.code);
           if (distant) {
             await offlineDB.saisies.put({
               clientId: distant.clientId,
@@ -153,6 +156,7 @@ export default function FormNominatif({
               valeurTexte: texte ? distant.valeurTexte ?? null : null,
               nonRenseigne: distant.nonRenseigne,
               motifNonRenseigne: distant.motifNonRenseigne,
+              reporte: Boolean(distant.reporte),
               statutLocal: "SYNCHRONISE",
               updatedAt: new Date().toISOString(),
             });
@@ -161,6 +165,7 @@ export default function FormNominatif({
               nonRenseigne: distant.nonRenseigne,
               motifNonRenseigne: distant.motifNonRenseigne ?? "",
               clientId: distant.clientId,
+              reporte: Boolean(distant.reporte),
             };
           } else {
             initial[cle] = { valeur: "", nonRenseigne: false, motifNonRenseigne: "", clientId: crypto.randomUUID() };
@@ -341,7 +346,11 @@ export default function FormNominatif({
                         onChange={(e) => sauvegarder(etab.id, f.code, texte, { motifNonRenseigne: e.target.value })}
                       />
                     )}
-                    {auteurs[cle] && <div className="mt-0.5 text-[11px] text-gray-400">{auteurs[cle]}</div>}
+                    {cellule?.reporte ? (
+                      <div className="mt-0.5 text-[11px] text-amber-700">repris du mois précédent</div>
+                    ) : (
+                      auteurs[cle] && <div className="mt-0.5 text-[11px] text-gray-400">{auteurs[cle]}</div>
+                    )}
                   </td>
                 );
               })}
@@ -382,6 +391,7 @@ export default function FormNominatif({
       </div>
       <ConfirmerTableauButton
         templateCode={template.code}
+        periodeId={periodeId}
         nbReprises={Object.values(cellules).filter((c) => c.reporte).length}
         onConfirme={() => setCellules((prev) => Object.fromEntries(Object.entries(prev).map(([k, v]) => [k, { ...v, reporte: false }])))}
       />
