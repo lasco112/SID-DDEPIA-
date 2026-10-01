@@ -27,6 +27,8 @@ export const cibleMensuelle = {
   etablissement: (etablissementId: string) => jeton("e", etablissementId),
   /** Une ligne d'événement (vaccination, foyer…). */
   evenement: (clientId: string) => jeton("ev", clientId),
+  /** Une case reprise du mois précédent, pas encore confirmée (en gris). */
+  reprise: () => jeton("reprise"),
   /** Un tableau dans la liste des 28. */
   tableau: (templateCode: string) => jeton("t", templateCode),
 };

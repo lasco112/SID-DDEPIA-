@@ -50,7 +50,8 @@ export default function SurlignageCible() {
         els.forEach((e) => e.classList.add(CLASSE));
         if (els.length > 0 && !trouveLe) {
           trouveLe = Date.now();
-          els[0].scrollIntoView({ behavior: "smooth", block: "center" });
+          // En HAUT de l'écran : le bas est occupé par le guide et la barre du parcours.
+          els[0].scrollIntoView({ behavior: "smooth", block: "start" });
           const champ = els[0].matches("input, textarea, select") ? els[0] : els[0].querySelector<HTMLElement>("input:not([disabled]), textarea, select");
           champ?.focus({ preventScroll: true });
         }

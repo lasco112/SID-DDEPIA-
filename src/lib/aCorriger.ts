@@ -21,6 +21,7 @@ import { trimestreARapporter } from "@/lib/trimestreEchu";
 import { etapesTrimestrielles } from "@/lib/navItems";
 import { avecCible, cibleMensuelle, cibleTrimestrielle, jeton } from "@/lib/surlignage";
 import type { ReponseACorriger } from "@/app/api/a-corriger/route";
+import { guideDe, type Guide, type NaturePoint } from "@/lib/guidesCorrection";
 
 export type Gravite = "bloquant" | "a_verifier";
 
@@ -43,6 +44,10 @@ export interface PointACorriger {
   demande?: { periodeId: string; tableaux: string[]; libelle?: string };
   /** Clé de tri : l'ordre du travail. */
   ordre: (number | string)[];
+  /** La sorte de point : elle choisit le guide (lib/guidesCorrection.ts). */
+  nature: NaturePoint;
+  /** Pourquoi, et comment faire pas à pas — rempli à la fin du calcul. */
+  guide?: Guide;
 }
 
 const NOMS_MOIS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
@@ -210,6 +215,10 @@ async function pointsMensuels(username: string, periodeActiveId: string | null, 
           ? { periodeId, tableaux: [nomTableau], libelle: LIBELLE_DEMANDE[nature] }
           : undefined,
       ordre: [0, triMois(periodeId), t?.ordre ?? 999, nature === "ligne" ? 0 : 1],
+      nature: (
+        { soumis: "refus_soumis", verrou: "refus_verrou", cloture: "refus_cloture", reseau: "refus_reseau",
+          ligne: /sans motif/i.test(motif) ? "refus_motif" : "refus_ligne" } as const
+      )[nature],
     });
   }
 
@@ -234,6 +243,7 @@ async function pointsMensuels(username: string, periodeActiveId: string | null, 
       lien: "/da/saisie",
       periodeId: enAutreMois(m.periodeId),
       ordre: [0, m.annee * 100 + m.mois, -1, 0],
+      nature: "renvoi_mensuel",
     });
   }
 
@@ -263,9 +273,11 @@ async function pointsMensuels(username: string, periodeActiveId: string | null, 
         ou: `Mensuel · ${mois} · ${t ? `${t.numero} ${t.titre}` : code}`,
         quoi: "Des chiffres sont repris du mois précédent et attendent votre confirmation : le rapport ne peut pas partir avant.",
         faire: "Vérifiez les cases en gris, corrigez ce qui a changé, puis cliquez « Confirmer ce tableau ».",
-        lien: avecCible(`/da/saisie/${code}`, [jeton("confirmer")]),
+        // Les cases grises d'abord (on les vérifie), puis l'encadré « Confirmer ce tableau ».
+        lien: avecCible(`/da/saisie/${code}`, [cibleMensuelle.reprise(), jeton("confirmer")]),
         periodeId: enAutreMois(r.periodeId),
         ordre: [0, triMois(r.periodeId), t?.ordre ?? 999, 2],
+        nature: "reprise",
       });
     }
   }
@@ -317,6 +329,7 @@ async function pointsTrimestriels(username: string, role: string, serveur: Repon
       faire: "Ouvrez l'écran, refaites la modification si elle est encore permise, ou abandonnez-la dans la liste « en attente ».",
       lien,
       ordre: [1, nature === "saisie" ? 1 : nature === "analyse" ? 2 : 3, Number(numero) || 0, 0],
+      nature: "file_trimestre",
     });
   }
 
@@ -339,6 +352,13 @@ async function pointsTrimestriels(username: string, role: string, serveur: Repon
         faire: "Vérifiez la ligne encadrée en rouge et corrigez le chiffre faux.",
         lien: avecCible(`/trimestre/saisie?tableau=${g.numero}`, cibles),
         ordre: [1, 1, g.numero, i],
+        nature: /somme des catégories/.test(a.texte)
+          ? "grille_categories"
+          : /n'est pas un nombre/.test(a.texte)
+            ? "grille_lettres"
+            : /BAC/.test(a.texte)
+              ? "grille_bac"
+              : "grille_autre",
       });
     });
   }
@@ -356,6 +376,7 @@ async function pointsTrimestriels(username: string, role: string, serveur: Repon
       faire: "Relisez la nouvelle analyse et validez-la à nouveau.",
       lien: `/trimestre/analyses?tableau=${a.numero}`,
       ordre: [1, 2, a.numero, 0],
+      nature: "analyse",
     });
   }
 
@@ -371,6 +392,7 @@ async function pointsTrimestriels(username: string, role: string, serveur: Repon
       faire: "Corrigez, puis transmettez-le à nouveau au DD.",
       lien: "/trimestre/circuit",
       ordre: [1, 0, 0, 0],
+      nature: "renvoi_trimestre",
     });
   }
   return points;
@@ -388,6 +410,7 @@ function pointsDuDD(serveur: ReponseACorriger | null, periodeActiveId: string | 
     faire: "Dans la Supervision (sur ce mois), cliquez « Renvoyer au DA pour correction » — ou « Déverrouiller » — sur la ligne encadrée.",
     lien: avecCible("/dd/supervision", [jeton("arr", d.arrondissement)]),
     ordre: [0, d.annee * 100 + d.mois, d.arrondissement, 0],
+    nature: "demande_dd" as const,
   }));
 }
 
@@ -423,6 +446,7 @@ function pointsDeProduction(serveur: ReponseACorriger | null, role: string, peri
         lien: avecCible("/dd/supervision", [...m.daManquants.map((a) => jeton("arr", a)), ...m.sectionsNonValidees.map((s) => jeton("section", s))]),
         periodeId: autreMois(m.periodeId),
         ordre,
+        nature: "production_dd",
       });
     } else if (role === "DA") {
       // Un rapport renvoyé a déjà son point : pas deux fois.
@@ -442,6 +466,7 @@ function pointsDeProduction(serveur: ReponseACorriger | null, role: string, peri
         periodeId: autreMois(m.periodeId),
         demande: m.verrouille ? { periodeId: m.periodeId, tableaux: [], libelle: LIBELLE_DEMANDE.verrou } : undefined,
         ordre,
+        nature: "retard_da",
       });
     } else if (role.startsWith("CHEF_")) {
       points.push({
@@ -454,6 +479,7 @@ function pointsDeProduction(serveur: ReponseACorriger | null, role: string, peri
         lien: avecCible("/section/controle", [jeton("valider-section")]),
         periodeId: autreMois(m.periodeId),
         ordre,
+        nature: "validation_chef",
       });
     }
   }
@@ -503,6 +529,8 @@ async function calculer(options: { forcerServeur?: boolean }): Promise<PointACor
   if (moi.role === "DD") points.push(...pointsDuDD(serveur, moi.periodeActiveId));
   points.push(...pointsDeProduction(serveur, moi.role, moi.periodeActiveId, points));
   points.push(...(await pointsTrimestriels(moi.username, moi.role, serveur)));
+  // Chaque point porte son guide : pourquoi, et comment faire pas à pas.
+  for (const p of points) p.guide = guideDe(p.nature, { role: moi.role });
   return points.sort(comparer);
 }
 

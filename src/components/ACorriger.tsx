@@ -13,7 +13,8 @@
  */
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, ChevronLeft, ChevronRight, List, X, CheckCircle2 } from "lucide-react";
+import { AlertTriangle, ChevronLeft, ChevronRight, List, X, CheckCircle2, HelpCircle } from "lucide-react";
+import type { Guide } from "@/lib/guidesCorrection";
 import {
   pointsACorriger, allerAuPoint, demanderAuDD, lireParcours, ecrireParcours, oublierServeur,
   EVENEMENT_PARCOURS, type PointACorriger,
@@ -153,6 +154,7 @@ export function ListeACorriger() {
               <span className="font-semibold">Que faire : </span>
               {p.faire}
             </p>
+            {p.guide && <GuidePasAPas guide={p.guide} />}
             <div className="mt-3 flex flex-wrap gap-2">
               <button
                 onClick={() => void aller(p)}
@@ -178,12 +180,64 @@ export function ListeACorriger() {
 }
 
 // --------------------------------------------------------------------------
+// Le guide : pourquoi, et comment faire pas à pas (phase d'apprentissage)
+// --------------------------------------------------------------------------
+export function GuidePasAPas({ guide, compact = false }: { guide: Guide; compact?: boolean }) {
+  return (
+    <div className={`mt-2 rounded-md border border-blue-200 bg-blue-50 text-gray-900 ${compact ? "p-2.5" : "p-3"}`}>
+      <details open={!compact}>
+        <summary className="cursor-pointer text-sm font-semibold text-blue-900">Pourquoi ?</summary>
+        <p className="mt-1 text-sm leading-relaxed text-gray-800">{guide.pourquoi}</p>
+      </details>
+      <p className="mt-2 text-sm font-semibold text-blue-900">Comment faire, pas à pas :</p>
+      <ol className="mt-1 space-y-1.5">
+        {guide.etapes.map((e, i) => (
+          <li key={i} className="flex gap-2 text-sm leading-snug">
+            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-700 text-[11px] font-bold text-white">
+              {i + 1}
+            </span>
+            <span>{e}</span>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
+const CLE_GUIDE_REPLIE = "sid-guide-replie";
+
+function guideReplie(id: string): boolean {
+  try {
+    return sessionStorage.getItem(`${CLE_GUIDE_REPLIE}|${id}`) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function memoriserGuide(id: string, replie: boolean) {
+  try {
+    if (replie) sessionStorage.setItem(`${CLE_GUIDE_REPLIE}|${id}`, "1");
+    else sessionStorage.removeItem(`${CLE_GUIDE_REPLIE}|${id}`);
+  } catch {
+    // sans conséquence : le guide se rouvrira
+  }
+}
+
+// --------------------------------------------------------------------------
 // Le parcours, en bas de l'écran
 // --------------------------------------------------------------------------
 export function ParcoursACorriger() {
   const [parcours, setParcours] = useState<ReturnType<typeof lireParcours>>(null);
-  const { points } = usePointsACorriger();
+  const { points, recharger } = usePointsACorriger();
   const [erreur, setErreur] = useState<string | null>(null);
+  /** Le guide du point courant est ouvert à l'arrivée ; replié si la personne l'a replié. */
+  const [guideOuvert, setGuideOuvert] = useState(true);
+  const [reponseDemande, setReponseDemande] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (parcours?.courant) setGuideOuvert(!guideReplie(parcours.courant));
+    setReponseDemande(null);
+  }, [parcours?.courant]);
 
   useEffect(() => {
     const lire = () => setParcours(lireParcours());
@@ -233,11 +287,48 @@ export function ParcoursACorriger() {
   }
 
   const courant = corrige ? null : liste[iCourant];
+  const basculerGuide = () => {
+    const ouvrir = !guideOuvert;
+    setGuideOuvert(ouvrir);
+    memoriserGuide(parcours.courant, !ouvrir);
+  };
+  const demander = async () => {
+    if (!courant?.demande) return;
+    setReponseDemande("Envoi de la demande…");
+    setReponseDemande(await demanderAuDD(courant.demande));
+    oublierServeur();
+    void recharger(true);
+  };
   return (
     <>
     {/* La barre ne doit pas cacher le bas de la page. */}
-    <div className="h-20" aria-hidden="true" />
+    <div className={guideOuvert ? "h-[55vh]" : "h-20"} aria-hidden="true" />
     <div className="fixed inset-x-2 bottom-2 z-40 mx-auto max-w-2xl rounded-xl bg-gray-900 px-3 py-2 text-white shadow-2xl">
+      {/* Le guide du point courant, au-dessus de la barre : on lit les étapes en corrigeant. */}
+      {guideOuvert && (
+        <div className="mb-2 max-h-[45vh] overflow-y-auto rounded-lg bg-white p-3 text-gray-900">
+          {courant ? (
+            <>
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">{courant.ou}</p>
+              <p className="mt-1 text-sm font-medium text-gray-900">{courant.quoi}</p>
+              {courant.guide && <GuidePasAPas guide={courant.guide} compact />}
+              {courant.demande && (
+                <button
+                  onClick={() => void demander()}
+                  className="mt-2 min-h-[44px] w-full rounded-lg border border-red-600 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50"
+                >
+                  {courant.demande.libelle ?? "Demander au DD de me renvoyer ce rapport"}
+                </button>
+              )}
+              {reponseDemande && <p className="mt-1 text-sm text-gray-700">{reponseDemande}</p>}
+            </>
+          ) : (
+            <p className="text-sm font-medium text-green-800">
+              ✓ Ce point est réglé. Cliquez « Suivant » (la flèche à droite) pour passer au point suivant.
+            </p>
+          )}
+        </div>
+      )}
       <div className="flex items-center gap-2">
         <button
           onClick={() => void aller(precedent)}
@@ -267,6 +358,14 @@ export function ParcoursACorriger() {
         >
           <span className="hidden sm:inline">Suivant</span>
           <ChevronRight />
+        </button>
+        <button
+          onClick={basculerGuide}
+          aria-label={guideOuvert ? "Replier le guide" : "Comment faire ?"}
+          title={guideOuvert ? "Replier le guide" : "Comment faire ?"}
+          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg ${guideOuvert ? "bg-blue-600" : "hover:bg-white/15"}`}
+        >
+          <HelpCircle size={20} />
         </button>
         <Link href="/a-corriger" aria-label="Liste" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg hover:bg-white/15">
           <List size={20} />

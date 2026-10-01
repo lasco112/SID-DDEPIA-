@@ -14,7 +14,7 @@ import { recalculerDerivesLocaux } from "@/lib/derivationLocale";
 import { regleAlimenteeParLeChamp, numeroTableau } from "@/lib/champsDerives";
 import { creerEtablissement } from "@/lib/etablissementsLocal";
 import ConfirmerTableauButton from "@/components/ConfirmerTableauButton";
-import { cibleMensuelle } from "@/lib/surlignage";
+import { cibleMensuelle, cibles } from "@/lib/surlignage";
 
 interface FormFieldDto {
   code: string;
@@ -312,7 +312,11 @@ export default function FormNominatif({
                 const cellule = cellules[cle];
                 const texte = f.typeValeur === "TEXTE";
                 return (
-                  <td key={f.code} data-cible={cibleMensuelle.caseNominative(etab.id, f.code)} className="border-b border-gray-100 px-4 py-2">
+                  <td
+                    key={f.code}
+                    data-cible={cibles(cibleMensuelle.caseNominative(etab.id, f.code), ...(cellule?.reporte ? [cibleMensuelle.reprise()] : []))}
+                    className="border-b border-gray-100 px-4 py-2"
+                  >
                     <input
                       type={texte ? "text" : "number"}
                       className={`${texte ? "w-56" : "w-24"} rounded border px-2 py-1 disabled:bg-gray-100 ${cellule?.reporte ? "border-amber-300 bg-amber-50 text-gray-400" : "border-gray-300"}`}

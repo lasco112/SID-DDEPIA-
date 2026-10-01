@@ -46,6 +46,7 @@ body {
   outline-offset: -2px;
   background-color: #fef2f2 !important;
   animation: sidCible 0.9s ease-in-out 3;
+  scroll-margin-top: 1.5rem;
 }
 @keyframes sidCible {
   50% { outline-color: #fca5a5; }
