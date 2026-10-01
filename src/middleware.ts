@@ -100,6 +100,8 @@ const CHEMINS_SURS_DEMO = [
   "/api/syntheses",
   "/api/demo/reinitialiser",
   "/api/demo/etat", // lecture seule : indique si le mode démo global est actif (bandeau)
+  "/a-corriger", // lit l'appareil, et /api/a-corriger
+  "/api/a-corriger", // lecture seule, par user.db
 ];
 
 export async function middleware(req: NextRequest) {

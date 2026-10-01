@@ -10,6 +10,8 @@
  */
 
 import { useState } from "react";
+import { jeton } from "@/lib/surlignage";
+import { oublierServeur } from "@/lib/aCorriger";
 
 export default function ConfirmerTableauButton({
   templateCode,
@@ -37,6 +39,7 @@ export default function ConfirmerTableauButton({
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.message ?? "Confirmation impossible.");
       setEtat("fait");
+      oublierServeur(); // « À corriger » relit tout de suite ce qui reste à confirmer
       setMessage(
         data.tableauxRestants?.length
           ? `Tableau confirmé. Restent à confirmer : ${data.tableauxRestants.join(", ")}.`
@@ -54,7 +57,7 @@ export default function ConfirmerTableauButton({
   }
 
   return (
-    <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-3">
+    <div data-cible={jeton("confirmer")} className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-3">
       {etat !== "fait" && (
         <p className="text-sm text-amber-900">
           <strong>{nbReprises}</strong> valeur{nbReprises > 1 ? "s" : ""} {nbReprises > 1 ? "sont reprises" : "est reprise"} du

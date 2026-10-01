@@ -17,6 +17,8 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { offlineDB } from "@/lib/dexie";
 import { envoyerSaisiesEnAttente } from "@/lib/synchronisation";
 import { synchroniserEtablissements } from "@/lib/etablissementsLocal";
+import { avecCible, jeton } from "@/lib/surlignage";
+import { oublierServeur } from "@/lib/aCorriger";
 
 type SyncState = "idle" | "offline" | "syncing" | "done" | "error";
 
@@ -48,6 +50,10 @@ export default function SyncButton({
   const [pending, setPending] = useState(0);
   const [state, setState] = useState<SyncState>("idle");
   const [message, setMessage] = useState("");
+  /** Le dernier envoi a échoué : le lien vers « À corriger » reste affiché. */
+  const [enErreur, setEnErreur] = useState(false);
+  /** Tableaux à confirmer avant la transmission, tels que le serveur les a nommés. */
+  const [aConfirmer, setAConfirmer] = useState<{ nom: string; code: string | null }[]>([]);
   /** Horodatage du dernier échec, pour espacer les nouvelles tentatives automatiques. */
   const dernierEchecRef = useRef(0);
 
@@ -85,6 +91,17 @@ export default function SyncButton({
     if (res.ok) return { deja: false };
     const err = await res.json().catch(() => ({}));
     if (res.status === 423 && err.message === "Rapport déjà soumis") return { deja: true };
+    // Le serveur dit QUELS tableaux attendent une confirmation : on les garde
+    // pour en faire des liens, au lieu de ne montrer que le message.
+    if (Array.isArray(err.tableaux) && err.tableaux.length) {
+      const tous = await offlineDB.tableaux.toArray().catch(() => []);
+      setAConfirmer(
+        (err.tableaux as string[]).map((nom) => {
+          const t = tous.find((x) => nom.startsWith(`${x.numero} `));
+          return { nom, code: t?.code ?? null };
+        })
+      );
+    }
     throw new Error(err.message ?? "Échec de la finalisation du rapport.");
   }, [periodeId]);
 
@@ -113,12 +130,14 @@ export default function SyncButton({
     setMessage("Sauvegarde de vos saisies sur le serveur…");
     try {
       const confirmed = await envoyerFile();
+      setEnErreur(false);
       setState("done");
       setMessage(confirmed > 0 ? `${confirmed} saisie(s) mise(s) à l'abri sur le serveur.` : "");
       onSynced?.();
     } catch (e) {
       dernierEchecRef.current = Date.now();
       setState("error");
+      setEnErreur(true);
       setMessage(
         e instanceof Error
           ? `Sauvegarde automatique impossible (${e.message}). Vos données restent sur cet appareil.`
@@ -138,6 +157,8 @@ export default function SyncButton({
     }
     setState("syncing");
     setMessage(`Envoi au ${destinataire} en cours…`);
+    setAConfirmer([]);
+    setEnErreur(false);
 
     try {
       const confirmed = await envoyerFile();
@@ -163,8 +184,10 @@ export default function SyncButton({
     } catch (e) {
       dernierEchecRef.current = Date.now();
       setState("error");
+      setEnErreur(true);
       setMessage(e instanceof Error ? e.message : "Échec de l'envoi. Vos données restent sauvegardées sur cet appareil.");
     } finally {
+      oublierServeur(); // statut du rapport et reprises ont pu changer
       await refreshPending();
       setTimeout(() => setState("idle"), 5000);
     }
@@ -211,6 +234,31 @@ export default function SyncButton({
         <p className={`text-sm ${state === "error" ? "text-red-700" : "text-gray-600"}`} role="status">
           {message}
         </p>
+      )}
+
+      {/* Les tableaux à confirmer, chacun avec son lien : l'agent va droit au bouton « Confirmer ce tableau ». */}
+      {aConfirmer.length > 0 && (
+        <div className="w-full rounded-lg border border-red-200 bg-red-50 p-3">
+          <p className="text-sm font-semibold text-red-800">À confirmer avant la transmission :</p>
+          <ul className="mt-1 space-y-1">
+            {aConfirmer.map((t) => (
+              <li key={t.nom}>
+                {t.code ? (
+                  <a href={avecCible(`/da/saisie/${t.code}`, [jeton("confirmer")])} className="text-sm font-semibold text-red-800 underline">
+                    {t.nom} →
+                  </a>
+                ) : (
+                  <span className="text-sm text-red-800">{t.nom}</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {enErreur && aConfirmer.length === 0 && (
+        <a href="/a-corriger" className="text-sm font-semibold text-red-700 underline">
+          Voir où se trouvent les problèmes →
+        </a>
       )}
     </div>
   );

@@ -233,6 +233,16 @@ test("infrastructures : le BAC se recopie, et une divergence est signalée", asy
   g = await grille(base, P, DD, 15);
   assert.equal(ligne().affiche, "4", "la valeur saisie l'emporte");
   assert.ok(g!.avertissements.some((a) => /Fokoué.*4.*3/.test(a)), "la divergence avec le BAC est signalée");
+  // « À corriger » emmène à la case : l'avertissement dit laquelle.
+  const alerte = g!.alertes.find((a) => /Fokoué.*4.*3/.test(a.texte));
+  assert.deepEqual(
+    { ligne: alerte?.ligne, colonne: alerte?.colonne },
+    { ligne: "Infrastructures d'abattages", colonne: "Fokoué" },
+    "l'avertissement porte la case visée"
+  );
+  // Dans le tableau source (BAC), seul l'arrondissement est connu : pas de case à encadrer.
+  const source = (await grille(base, P, DD, 7))!.alertes.find((a) => /Fokoué.*4.*3/.test(a.texte));
+  assert.ok(source && source.ligne == null, "côté BAC, l'alerte est affichée sans case");
 });
 
 test("sans total mensuel, la somme des catégories ne peut pas être contrôlée : la saisie passe", async () => {

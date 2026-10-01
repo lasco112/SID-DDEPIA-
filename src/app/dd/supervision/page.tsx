@@ -6,6 +6,8 @@ import { contexteSession } from '@/lib/permissions';
 import { resoudrePeriode } from '@/server/periodes/courante';
 import AppShell from '@/components/AppShell';
 import DeverrouillerButton from '@/components/DeverrouillerButton';
+import RenvoyerAuDAButton from '@/components/RenvoyerAuDAButton';
+import { jeton } from '@/lib/surlignage';
 import SyntheseValidationRow from '@/components/SyntheseValidationRow';
 import GenererRapportDDButton from '@/components/GenererRapportDDButton';
 import PurgerDonneesTestButton from '@/components/PurgerDonneesTestButton';
@@ -53,6 +55,31 @@ export default async function DDSupervisionPage() {
     : [[], [], [], []];
 
   const arrondissements = await db.arrondissement.findMany({ orderBy: { ordre: 'asc' } });
+
+  // Demandes de renvoi (ou de déverrouillage) faites par les DA et encore
+  // d'actualité : le rapport est toujours transmis, ou le mois toujours
+  // verrouillé pour lui. Une demande antérieure à une nouvelle transmission
+  // est réglée.
+  const bloques = rapports.filter(
+    (r) => r.statut === 'SOUMIS' || (periode?.statut === 'VERROUILLEE_DA' && r.statut !== 'CLOTURE' && !r.deverrouillePar)
+  );
+  const journalDemandes = bloques.length
+    ? await db.auditLog.findMany({
+        where: { action: 'DEMANDE_RENVOI', entiteId: { in: bloques.map((r) => r.id) } },
+        orderBy: { createdAt: 'desc' },
+        select: { entiteId: true, createdAt: true, details: true },
+      })
+    : [];
+  const demandeParRapport = new Map<string, { le: string; tableaux: string[] }>();
+  for (const d of journalDemandes) {
+    const r = bloques.find((x) => x.id === d.entiteId);
+    if (!r || demandeParRapport.has(r.id) || (r.statut === 'SOUMIS' && r.dateSoumission && d.createdAt < r.dateSoumission)) continue;
+    const tableaux = (d.details as { tableaux?: unknown } | null)?.tableaux;
+    demandeParRapport.set(r.id, {
+      le: d.createdAt.toISOString(),
+      tableaux: Array.isArray(tableaux) ? tableaux.filter((t): t is string => typeof t === 'string') : [],
+    });
+  }
   const remplissage = periode ? await tauxRemplissageParArrondissement(db, periode.id) : new Map();
 
   // Dernière version du rapport transmis par chaque arrondissement. `contenu`
@@ -167,7 +194,7 @@ export default async function DDSupervisionPage() {
                     {arrondissements.map((arr) => {
                       const r = rapports.find((r) => r.arrondissementId === arr.id);
                       return (
-                        <tr key={arr.id}>
+                        <tr key={arr.id} data-cible={jeton('arr', arr.nom)}>
                           <td className="border-b border-gray-100 px-4 py-2 font-medium">{arr.nom}</td>
                           <td className="border-b border-gray-100 px-4 py-2">
                             <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${STATUT_STYLE[r?.statut ?? ''] ?? 'bg-gray-100 text-gray-600'}`}>
@@ -193,9 +220,22 @@ export default async function DDSupervisionPage() {
                           </td>
                           <td className="border-b border-gray-100 px-4 py-2">
                             {r && periode.statut === 'VERROUILLEE_DA' && r.statut !== 'SOUMIS' && r.statut !== 'CLOTURE' && !r.deverrouillePar && (
-                              <DeverrouillerButton rapportId={r.id} />
+                              <>
+                                {demandeParRapport.get(r.id) && (
+                                  <p className="mb-1 rounded bg-red-50 px-2 py-1 text-[11px] font-semibold text-red-800">
+                                    ⚠ Le DA demande un déverrouillage
+                                  </p>
+                                )}
+                                <DeverrouillerButton rapportId={r.id} />
+                              </>
                             )}
-                            {r?.deverrouillePar && <span className="text-xs text-amber-700">Déverrouillé exceptionnellement</span>}
+                            {r && r.statut === 'SOUMIS' && periode.statut !== 'ARCHIVEE' && (
+                              <RenvoyerAuDAButton rapportId={r.id} arrondissement={arr.nom} demande={demandeParRapport.get(r.id) ?? null} />
+                            )}
+                            {r?.statut === 'REJETE' && r.motifRejet && (
+                              <span className="block text-xs text-red-700">Renvoyé : {r.motifRejet}</span>
+                            )}
+                            {r?.deverrouillePar && <span className="block text-xs text-amber-700">Déverrouillé exceptionnellement</span>}
                           </td>
                         </tr>
                       );

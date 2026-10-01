@@ -22,6 +22,8 @@ import PinGate from "@/components/PinGate";
 import RechercheGlobale from "@/components/RechercheGlobale";
 import AideButton from "@/components/AideButton";
 import FilEtapes from "@/components/FilEtapes";
+import { BadgeACorriger, ParcoursACorriger } from "@/components/ACorriger";
+import SurlignageCible from "@/components/SurlignageCible";
 
 const LIBELLES_ROLE: Record<string, string> = {
   DD: "Délégué Départemental",
@@ -85,6 +87,7 @@ export default function AppShellClient({
             autres) où la rangée complète dépassait la largeur de l'écran et
             faisait disparaître les derniers boutons à droite. */}
         <div className="ml-auto flex min-w-0 shrink items-center gap-1 sm:gap-4">
+          <BadgeACorriger />
           <SelecteurPeriode periodes={periodes} couranteId={couranteId} />
           <ClocheNotifications />
           <OnlineIndicator />
@@ -136,6 +139,8 @@ export default function AppShellClient({
           <FilEtapes role={role} position="haut" />
           {children}
           <FilEtapes role={role} position="bas" />
+          <ParcoursACorriger />
+          <SurlignageCible />
         </main>
       </div>
     </div>

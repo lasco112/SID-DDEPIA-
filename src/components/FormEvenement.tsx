@@ -9,6 +9,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { offlineDB } from "@/lib/dexie";
+import { cibleMensuelle } from "@/lib/surlignage";
 
 interface ChampSchema {
   key: string;
@@ -148,7 +149,7 @@ export default function FormEvenement({
           </thead>
           <tbody>
             {evenements.map((evt) => (
-              <tr key={evt.clientId}>
+              <tr key={evt.clientId} data-cible={cibleMensuelle.evenement(evt.clientId)}>
                 {template.schemaEvenement.map((c) => (
                   <td key={c.key} className="border-b border-gray-100 px-3 py-2">
                     {c.type === "ref" ? (

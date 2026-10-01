@@ -22,6 +22,7 @@ import { trimestreARapporter } from "@/lib/trimestreEchu";
 import { lireAvecCopie, garderCopie, envoyer, enAttente } from "@/lib/trimestreHorsLigne";
 import HorsLigneTrimestre from "@/components/HorsLigneTrimestre";
 import ComparaisonMensuel, { type ControleCategories } from "@/components/ComparaisonMensuel";
+import { cibles, cibleTrimestrielle } from "@/lib/surlignage";
 
 type EtatCase = "saisie" | "calculee" | "total" | "lecture";
 
@@ -650,7 +651,11 @@ function TableauSaisie({
             const c = l.cases.find((x) => x.colonne === colonnesSaisies[0]);
             if (!c) return null;
             return (
-              <label key={l.cle} className="grid grid-cols-[1fr,8rem] items-center gap-3 text-sm">
+              <label
+                key={l.cle}
+                data-cible={cibles(cibleTrimestrielle.ligne(l.cle), cibleTrimestrielle.case(l.cle, c.colonne))}
+                className="grid grid-cols-[1fr,8rem] items-center gap-3 rounded text-sm"
+              >
                 <span className={c.etat === "saisie" ? "text-gray-800" : "font-medium text-gray-600"}>{l.libelle || l.cle}</span>
                 {champ(l, c, true)}
               </label>
@@ -658,9 +663,13 @@ function TableauSaisie({
           })}
         </div>
       ) : lignesSaisies.length === 1 ? (
-        <div className="grid max-w-xl gap-2">
+        <div data-cible={cibleTrimestrielle.ligne(lignesSaisies[0].cle)} className="grid max-w-xl gap-2 rounded p-1">
           {lignesSaisies[0].cases.map((c) => (
-            <label key={c.colonne} className="grid grid-cols-[1fr,10rem] items-center gap-3 text-sm">
+            <label
+              key={c.colonne}
+              data-cible={cibleTrimestrielle.case(lignesSaisies[0].cle, c.colonne)}
+              className="grid grid-cols-[1fr,10rem] items-center gap-3 rounded text-sm"
+            >
               <span className="text-gray-800">{c.colonne}</span>
               {champ(lignesSaisies[0], c, true)}
             </label>
@@ -684,11 +693,14 @@ function TableauSaisie({
             <tbody>
               {grille.lignes.map((l) => (
                 <tr key={l.cle}>
-                  <th className="sticky left-0 z-10 border border-gray-200 bg-white px-2 py-1 text-left font-normal text-gray-800">
+                  <th
+                    data-cible={cibleTrimestrielle.ligne(l.cle)}
+                    className="sticky left-0 z-10 border border-gray-200 bg-white px-2 py-1 text-left font-normal text-gray-800"
+                  >
                     {l.libelle || l.cle}
                   </th>
                   {l.cases.map((c) => (
-                    <td key={c.colonne} className="border border-gray-200 p-0">
+                    <td key={c.colonne} data-cible={cibleTrimestrielle.case(l.cle, c.colonne)} className="border border-gray-200 p-0">
                       {champ(l, c)}
                     </td>
                   ))}

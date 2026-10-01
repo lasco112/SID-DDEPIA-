@@ -13,6 +13,7 @@ import { offlineDB, trouverSaisieMatrice, type StatutLocal } from "@/lib/dexie";
 import { regleDuChamp, contientDesChampsDerives, numeroTableau } from "@/lib/champsDerives";
 import { recalculerTousLesDerives } from "@/lib/derivationLocale";
 import ConfirmerTableauButton from "@/components/ConfirmerTableauButton";
+import { cibleMensuelle } from "@/lib/surlignage";
 
 interface FormFieldDto {
   id: string;
@@ -236,7 +237,7 @@ export default function FormMatrice({ template, periodeId, username }: { templat
             // contredit le tableau source dans le rapport final.
             const derive = regleDuChamp(f.code);
             return (
-              <tr key={f.code} className="align-top">
+              <tr key={f.code} data-cible={cibleMensuelle.champ(f.code)} className="align-top">
                 <td className="border-b border-gray-100 px-4 py-2 font-medium">
                   {f.libelle}
                   {derive && (

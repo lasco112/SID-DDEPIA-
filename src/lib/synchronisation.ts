@@ -107,6 +107,8 @@ export async function envoyerSaisiesEnAttente(username: string, periodeId: strin
 
   let confirmees = 0;
   let refusees = 0;
+  /** Premier refus d'un mois entier : les AUTRES mois partent quand même. */
+  let refusDUnMois: string | null = null;
   for (const [periodeDuLot, file] of Array.from(parPeriode.entries())) {
   for (let i = 0; i < file.length; i += TAILLE_LOT) {
     const lot = file.slice(i, i + TAILLE_LOT);
@@ -129,13 +131,21 @@ export async function envoyerSaisiesEnAttente(username: string, periodeId: strin
           ? messageMetier ?? "Période verrouillée. Contactez le Délégué Départemental."
           : messageMetier ?? "Envoi impossible pour le moment. Vos données restent enregistrées sur cet appareil.";
       // Échec VISIBLE, jamais silencieux : la saisie reste sur l'appareil et
-      // sera reprise telle quelle à la tentative suivante.
+      // sera reprise telle quelle à la tentative suivante. Tout le reste du
+      // mois est marqué avec le même motif — « À corriger » le montre.
+      const restant = file.slice(i);
       await offlineDB.transaction("rw", offlineDB.saisies, async () => {
-        for (const s of lot) {
+        for (const s of restant) {
           await offlineDB.saisies.update(s.clientId, { statutLocal: "ERREUR_SYNCHRO", erreurSynchro: message });
         }
       });
-      throw new Error(message);
+      // Pas de réseau ou serveur en difficulté : inutile d'essayer les autres
+      // mois maintenant. Un mois verrouillé ou déjà transmis, lui, ne doit
+      // pas empêcher les autres de partir (constaté : un mois bloqué gardait
+      // tout le travail du mois suivant sur le téléphone).
+      if (res.status !== 423) throw new Error(message);
+      refusDUnMois ??= message;
+      break;
     }
 
     const { confirmedIds, echecs = [] } = (await res.json()) as {
@@ -164,6 +174,7 @@ export async function envoyerSaisiesEnAttente(username: string, periodeId: strin
 
   // « Dernier envoi réussi » ne doit être mis à jour que si TOUT est passé,
   // sans quoi l'écran de synchronisation affiche un succès trompeur.
+  if (refusDUnMois) throw new Error(refusDUnMois);
   if (refusees === 0) memoriserSynchroReussie();
   else throw new Error(`${refusees} saisie(s) refusée(s) par le serveur. Elles restent sur cet appareil.`);
   return confirmees;

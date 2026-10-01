@@ -12,7 +12,7 @@
  * liste d'abord, puis un tableau à la fois, avec « précédent » et « suivant ».
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { trimestreARapporter } from "@/lib/trimestreEchu";
 import { lireAvecCopie, envoyer as envoyerOuGarder, enAttente } from "@/lib/trimestreHorsLigne";
 import HorsLigneTrimestre from "@/components/HorsLigneTrimestre";
@@ -108,6 +108,17 @@ export default function AnalysesTrimestreClient({
     setOuvert(null);
     void charger();
   }, [charger]);
+
+  // `?tableau=16` : l'analyse ouverte d'emblée — « À corriger » y emmène.
+  const tableauDemande = useRef<number | null>(
+    typeof window === "undefined" ? null : Number(new URLSearchParams(window.location.search).get("tableau")) || null
+  );
+  useEffect(() => {
+    const n = tableauDemande.current;
+    if (n == null || !ecran?.analyses.some((a) => a.numero === n)) return;
+    tableauDemande.current = null;
+    setOuvert(n);
+  }, [ecran]);
 
   const courant = ecran?.analyses.find((a) => a.numero === ouvert) ?? null;
 

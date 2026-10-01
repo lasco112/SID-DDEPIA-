@@ -6,6 +6,7 @@ import { contexteSession } from "@/lib/permissions";
 import Link from "next/link";
 import AppShell from "@/components/AppShell";
 import RapportStatusPanel from "@/components/RapportStatusPanel";
+import { PastillesProvider, Pastille } from "@/components/PastillesTableaux";
 
 export default async function DASaisieIndexPage() {
   const session = await getServerSession(authOptions);
@@ -54,6 +55,7 @@ export default async function DASaisieIndexPage() {
           <RapportStatusPanel username={username} destinataire={destinataire} peutSoumettre={role === "DA"} />
         </div>
 
+        <PastillesProvider>
         <div className="mt-6 space-y-6">
           {Array.from(groupes.entries()).map(([section, liste]) => (
             <div key={section} className="rounded-lg border border-gray-200 bg-white p-4">
@@ -67,6 +69,7 @@ export default async function DASaisieIndexPage() {
                         {t.titre}
                       </span>
                       <span className="flex items-center gap-2">
+                        <Pastille code={t.code} />
                         {agentParTableau.get(t.code) && (
                           <span className="rounded-full bg-primary-light px-2 py-0.5 text-[11px] font-medium text-primary-dark">
                             {agentParTableau.get(t.code)}
@@ -81,6 +84,7 @@ export default async function DASaisieIndexPage() {
             </div>
           ))}
         </div>
+        </PastillesProvider>
       </div>
     </AppShell>
   );

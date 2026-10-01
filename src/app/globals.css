@@ -40,6 +40,20 @@ body {
   background-color: var(--color-background);
 }
 
+/* « À corriger » : l'endroit fautif, encadré (voir SurlignageCible.tsx). */
+.sid-cible {
+  outline: 3px solid #dc2626;
+  outline-offset: -2px;
+  background-color: #fef2f2 !important;
+  animation: sidCible 0.9s ease-in-out 3;
+}
+@keyframes sidCible {
+  50% { outline-color: #fca5a5; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sid-cible { animation: none; }
+}
+
 .sid-scroll::-webkit-scrollbar {
   width: 11px;
   height: 11px;

@@ -327,6 +327,13 @@ export interface CaseGrille {
   propose: string | null;
 }
 
+/** Un avertissement de la grille, et l'endroit qu'il vise (clé de ligne, colonne). */
+export interface AlerteGrille {
+  texte: string;
+  ligne?: string;
+  colonne?: string;
+}
+
 export interface GrilleSaisie {
   numero: number;
   titre: string;
@@ -335,6 +342,8 @@ export interface GrilleSaisie {
   lignes: { cle: string; libelle: string; cases: CaseGrille[] }[];
   /** Incohérences à signaler — somme des catégories ≠ total mensuel, reprise contredite. */
   avertissements: string[];
+  /** Les mêmes, avec la ligne (et la case) en cause : « À corriger » y emmène. */
+  alertes: AlerteGrille[];
   /** Ce qu'il faut saisir. */
   aide: string;
 }
@@ -409,17 +418,19 @@ function construireGrille(
     }),
   }));
 
+  const alertes = [
+    ...lettresDansLesNombres(lignes),
+    ...avertissements(bloc, ctx, lignes),
+    ...alertesReprises(numero, ctx, donnees.saisies),
+  ];
   return {
     numero,
     titre: bloc.titre,
     section,
     enteteLigne,
     lignes,
-    avertissements: [
-      ...lettresDansLesNombres(lignes),
-      ...avertissements(bloc, ctx, lignes),
-      ...alertesReprises(numero, ctx, donnees.saisies),
-    ],
+    avertissements: alertes.map((a) => a.texte),
+    alertes,
     aide: [AIDES[numero] ?? AIDE_PAR_DEFAUT, ...aideHistorique(bloc, ctx, lignes)].join(" "),
   };
 }
@@ -444,13 +455,13 @@ function aideHistorique(bloc: BlocTableau, ctx: ContexteCanevas, lignes: GrilleS
  * des catégories doit retomber sur le total. Sinon, on le dit — sans bloquer :
  * c'est au Délégué de trancher entre deux sources.
  */
-function avertissements(bloc: BlocTableau, ctx: ContexteCanevas, lignes: GrilleSaisie["lignes"]): string[] {
+function avertissements(bloc: BlocTableau, ctx: ContexteCanevas, lignes: GrilleSaisie["lignes"]): AlerteGrille[] {
   const liaison = liaisonDe(bloc.numero);
   if (!liaison?.total || liaison.orientation !== "lignes") return [];
   const categories = liaison.correspondances.filter((c) => !estLiee(c)).map((c) => c.libelle);
   const total = `TOTAL ${ctx.periodeCourt}`;
   const nombre = (s: string | null) => (s == null ? null : Number(s.replace(/\s| /g, "").replace(",", ".")));
-  const sortie: string[] = [];
+  const sortie: AlerteGrille[] = [];
   for (const l of lignes) {
     if (estTotal(l.cle)) continue;
     // Tant qu'une catégorie manque, la somme ne dit rien : on attend.
@@ -467,9 +478,10 @@ function avertissements(bloc: BlocTableau, ctx: ContexteCanevas, lignes: GrilleS
     if (somme == null) continue;
     const attendu = nombre(l.cases.find((c) => c.colonne === total)?.affiche ?? null);
     if (attendu != null && Number.isFinite(attendu) && Math.abs(somme - attendu) > 0.5) {
-      sortie.push(
-        `${l.libelle} : la somme des catégories (${somme.toLocaleString("fr-FR")}) ne retombe pas sur le total des rapports mensuels (${attendu.toLocaleString("fr-FR")}).`
-      );
+      sortie.push({
+        texte: `${l.libelle} : la somme des catégories (${somme.toLocaleString("fr-FR")}) ne retombe pas sur le total des rapports mensuels (${attendu.toLocaleString("fr-FR")}).`,
+        ligne: l.cle,
+      });
     }
   }
   return sortie;
@@ -480,13 +492,17 @@ function avertissements(bloc: BlocTableau, ctx: ContexteCanevas, lignes: GrilleS
  * règle ne les refuse. Elles ne comptent dans aucun total : on les signale
  * pour qu'elles soient remplacées.
  */
-function lettresDansLesNombres(lignes: GrilleSaisie["lignes"]): string[] {
-  const sortie: string[] = [];
+function lettresDansLesNombres(lignes: GrilleSaisie["lignes"]): AlerteGrille[] {
+  const sortie: AlerteGrille[] = [];
   for (const l of lignes) {
     for (const c of l.cases) {
       if (c.etat !== "saisie" || c.texte || c.saisi == null) continue;
       if (versNombre(c.saisi) != null) continue;
-      sortie.push(`${l.libelle || l.cle}, « ${c.colonne} » : « ${c.saisi} » n'est pas un nombre. Remplacez-le par un chiffre.`);
+      sortie.push({
+        texte: `${l.libelle || l.cle}, « ${c.colonne} » : « ${c.saisi} » n'est pas un nombre. Remplacez-le par un chiffre.`,
+        ligne: l.cle,
+        colonne: c.colonne,
+      });
     }
   }
   return sortie;
@@ -496,17 +512,19 @@ function lettresDansLesNombres(lignes: GrilleSaisie["lignes"]): string[] {
  * Les reprises CONTREDITES : une valeur saisie dans le tableau qui reçoit,
  * différente de ce que porte le tableau d'origine. Affichées des deux côtés.
  */
-function alertesReprises(numero: number, ctx: ContexteCanevas, saisies: Map<string, ValeurCellule>): string[] {
+function alertesReprises(numero: number, ctx: ContexteCanevas, saisies: Map<string, ValeurCellule>): AlerteGrille[] {
   const concernees = REPRISES.filter((r) => r.tableau === numero || r.source === numero);
-  const sortie: string[] = [];
+  const sortie: AlerteGrille[] = [];
   for (const r of concernees) {
     for (const arr of ctx.arrondissements) {
       const ici = saisies.get(cleCellule({ numeroTableau: r.tableau, ligne: r.ligne, colonne: arr }))?.valeur;
       const la = valeurReprise(saisies, r.tableau, r.ligne, arr);
       if (ici == null || la == null || ici === la) continue;
-      sortie.push(
-        `${arr}, « ${r.ligne} » : ${ici} au tableau des infrastructures d'exploitation, ${la} au tableau « Situation des infrastructures » du BAC (${r.lignesSource.join(" + ")}). Vérifiez lequel est juste.`
-      );
+      sortie.push({
+        texte: `${arr}, « ${r.ligne} » : ${ici} au tableau des infrastructures d'exploitation, ${la} au tableau « Situation des infrastructures » du BAC (${r.lignesSource.join(" + ")}). Vérifiez lequel est juste.`,
+        // Dans le tableau qui reçoit, la case est connue ; dans la source, seulement l'arrondissement.
+        ...(r.tableau === numero ? { ligne: r.ligne, colonne: arr } : {}),
+      });
     }
   }
   return sortie;
