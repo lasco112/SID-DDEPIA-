@@ -50,9 +50,20 @@ export default function ServiceWorkerRegister() {
       window.location.reload();
     });
 
-    navigator.serviceWorker.register("/sw.js").catch(() => {
-      // Échec silencieux : l'appli reste utilisable en ligne normalement.
-    });
+    navigator.serviceWorker
+      .register("/sw.js")
+      .then((enregistrement) => {
+        // Une application laissée ouverte en arrière-plan vérifie qu'il n'y a
+        // pas de nouvelle version quand on y revient (et non à intervalles
+        // fixes : un rechargement en pleine frappe perdrait la case en cours).
+        const verifier = () => {
+          if (document.visibilityState === "visible") void enregistrement.update().catch(() => {});
+        };
+        document.addEventListener("visibilitychange", verifier);
+      })
+      .catch(() => {
+        // Échec silencieux : l'appli reste utilisable en ligne normalement.
+      });
   }, []);
 
   if (!majAppliquee) return null;
