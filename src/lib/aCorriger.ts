@@ -40,6 +40,11 @@ export interface PointACorriger {
   lien: string;
   /** Le mois du mensuel à ouvrir d'abord, s'il n'est pas le mois de travail de l'appareil. */
   periodeId?: string;
+  /**
+   * Un geste possible sur place (observations) : « Le chiffre est juste »
+   * (avec une explication), « Clore l'observation ». Envoyé à /api/observations.
+   */
+  action?: { libelle: string; corps: Record<string, unknown>; demandeTexte?: string };
   /** Une demande au DD est possible (rapport transmis, mois verrouillé ou clôturé). */
   demande?: { periodeId: string; tableaux: string[]; libelle?: string };
   /** Clé de tri : l'ordre du travail. */
@@ -304,7 +309,7 @@ interface CopieGrille {
     titre: string;
     lignes: { cle: string; libelle: string }[];
     avertissements: string[];
-    alertes?: { texte: string; ligne?: string; colonne?: string }[];
+    alertes?: { texte: string; ligne?: string; colonne?: string; cases?: { ligne: string; colonne: string }[]; confirmable?: unknown }[];
   };
 }
 interface CopieAnalyses {
@@ -324,12 +329,16 @@ async function pointsTrimestriels(username: string, role: string, serveur: Repon
   for (const op of file) {
     if (!op.refusee) continue;
     const [nature, , , numero, ligne, colonne] = op.cle.split("|");
+    // Un texte : « texte|année|trimestre|clé de la rubrique » — la rubrique est ouverte d'emblée.
+    const zone = nature === "texte" ? op.cle.split("|").slice(3).join("|") : null;
     const lien =
       nature === "saisie"
         ? avecCible(`/trimestre/saisie?tableau=${numero}`, ligne != null && colonne != null ? [cibleTrimestrielle.case(ligne, colonne), cibleTrimestrielle.ligne(ligne)] : [])
         : nature === "analyse"
           ? `/trimestre/analyses?tableau=${numero}`
-          : lienTextes;
+          : zone
+            ? `${lienTextes}?zone=${encodeURIComponent(zone)}`
+            : lienTextes;
     points.push({
       id: `t-file|${op.id}`,
       gravite: "bloquant",
@@ -349,25 +358,31 @@ async function pointsTrimestriels(username: string, role: string, serveur: Repon
   for (const c of copies) {
     const g = (c.donnees as CopieGrille).grille;
     if (!g) continue;
-    const alertes = g.alertes ?? g.avertissements.map((texte) => ({ texte }) as { texte: string; ligne?: string; colonne?: string });
+    const alertes: NonNullable<NonNullable<CopieGrille["grille"]>["alertes"]> = g.alertes ?? g.avertissements.map((texte) => ({ texte }));
     alertes.forEach((a, i) => {
       const ligne = a.ligne != null ? g.lignes.find((l) => l.cle === a.ligne) : undefined;
-      const cibles = a.ligne != null ? [...(a.colonne ? [cibleTrimestrielle.case(a.ligne, a.colonne)] : []), cibleTrimestrielle.ligne(a.ligne)] : [];
+      const cibles = a.cases?.length
+        ? a.cases.map((c) => cibleTrimestrielle.case(c.ligne, c.colonne))
+        : a.ligne != null
+          ? [...(a.colonne ? [cibleTrimestrielle.case(a.ligne, a.colonne)] : []), cibleTrimestrielle.ligne(a.ligne)]
+          : [];
       points.push({
         id: `t-alerte|${g.numero}|${a.texte}`,
         gravite: "a_verifier",
         rapport: "trimestriel",
         ou: [`Trimestriel · ${T} · Tableau ${g.numero} ${g.titre}`, ligne ? ligne.libelle || ligne.cle : undefined].filter(Boolean).join(" · "),
         quoi: a.texte,
-        faire: "Vérifiez la ligne encadrée en rouge et corrigez le chiffre faux.",
+        faire: a.confirmable
+          ? "Comparez avec le chiffre de l'arrondissement : s'il est faux chez vous, corrigez la case encadrée ; sinon, touchez « Mon chiffre est juste » sous l'avertissement."
+          : "Vérifiez la ligne encadrée en rouge et corrigez le chiffre faux.",
         lien: avecCible(`/trimestre/saisie?tableau=${g.numero}`, cibles),
         ordre: [1, 1, g.numero, i],
-        nature: /somme des catégories/.test(a.texte)
-          ? "grille_categories"
-          : /n'est pas un nombre/.test(a.texte)
-            ? "grille_lettres"
-            : /BAC/.test(a.texte)
-              ? "grille_bac"
+        nature: a.confirmable
+          ? "grille_bac"
+          : /somme des catégories/.test(a.texte)
+            ? "grille_categories"
+            : /n'est pas un nombre/.test(a.texte)
+              ? "grille_lettres"
               : "grille_autre",
       });
     });
@@ -406,6 +421,85 @@ async function pointsTrimestriels(username: string, role: string, serveur: Repon
     });
   }
   return points;
+}
+
+/** Les observations des chefs de section sur une donnée précise (server/observations.ts). */
+/** « Observation du chef PSA ». */
+const DU_AUTEUR: Record<string, string> = {
+  DD: "du Délégué Départemental",
+  CHEF_BAC: "du chef BAC",
+  CHEF_SSV: "du chef SSV",
+  CHEF_PSA: "du chef PSA",
+  CHEF_SPAIH: "du chef SPAIH",
+};
+
+function cibleDObservation(o: ReponseACorriger["observations"][number]): string[] {
+  if (o.famille === "MATRICE" && o.fieldCode) return [cibleMensuelle.champ(o.fieldCode)];
+  if (o.famille === "NOMINATIF" && o.etablissementId && o.fieldCode)
+    return [cibleMensuelle.caseNominative(o.etablissementId, o.fieldCode), cibleMensuelle.etablissement(o.etablissementId)];
+  if (o.clientId) return [cibleMensuelle.evenement(o.clientId)];
+  return [];
+}
+
+function pointsObservations(serveur: ReponseACorriger | null, role: string, periodeActiveId: string | null): PointACorriger[] {
+  const autreMois = (id: string) => (id !== periodeActiveId ? id : undefined);
+  return (serveur?.observations ?? []).map((o): PointACorriger => {
+    const mois = libelleMois(o.annee, o.mois);
+    const ordreNumero = Number(o.numero.replace(/\D/g, "")) || 0;
+    if (role === "DA" || role === "AGENT_SAISIE") {
+      return {
+        id: `obs|${o.id}`,
+        gravite: "bloquant",
+        rapport: "mensuel",
+        ou: `Mensuel · ${mois} · ${o.numero} ${o.titre} · ${o.libelle}`,
+        quoi: `Observation ${DU_AUTEUR[o.auteurRole] ?? `de ${o.auteurNom}`} : « ${o.texte} » (valeur actuelle : ${o.valeur}).`,
+        faire: "Corrigez la case encadrée en rouge, puis renvoyez le rapport. Si le chiffre est juste, touchez « Le chiffre est juste » et expliquez pourquoi.",
+        lien: avecCible(`/da/saisie/${o.templateCode}`, cibleDObservation(o)),
+        periodeId: autreMois(o.periodeId),
+        action: { libelle: "Le chiffre est juste", corps: { action: "repondre", observationId: o.id }, demandeTexte: "Pourquoi ce chiffre est juste (le chef lira votre réponse)" },
+        ordre: [0, o.annee * 100 + o.mois, ordreNumero, 0],
+        nature: "observation",
+      };
+    }
+    // L'auteur (chef de section ou DD) : la réponse, ou la correction, à relire.
+    const lien =
+      role === "DD"
+        ? avecCible(`/dd/donnees?tableau=${o.templateCode}`, [jeton("vc", o.saisieId)])
+        : avecCible(`/section/controle?tableau=${o.templateCode}`, [jeton("vc", o.saisieId)]);
+    return {
+      id: `obsr|${o.id}`,
+      gravite: "a_verifier",
+      rapport: "mensuel",
+      ou: `Mensuel · ${mois} · ${o.arrondissement} · ${o.numero} ${o.titre} · ${o.libelle}`,
+      quoi: o.reponse
+        ? `${o.arrondissement} répond à votre observation (« ${o.texte} ») : « ${o.reponse.texte} ».`
+        : `${o.arrondissement} a modifié la donnée que vous aviez signalée (« ${o.texte} »).`,
+      faire: "Relisez la donnée. Si c'est réglé, touchez « Clore l'observation » ; sinon, corrigez-la ou signalez-la de nouveau.",
+      lien,
+      periodeId: autreMois(o.periodeId),
+      action: { libelle: "Clore l'observation", corps: { action: "clore", observationId: o.id } },
+      ordre: [0, o.annee * 100 + o.mois, ordreNumero, 1],
+      nature: "observation_relire",
+    };
+  });
+}
+
+/** Exécute le geste d'un point (observations). Rend le message à afficher. */
+export async function executerAction(p: PointACorriger, texte?: string): Promise<{ ok: boolean; message: string }> {
+  if (!p.action) return { ok: false, message: "" };
+  try {
+    const r = await fetch("/api/observations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...p.action.corps, ...(texte != null ? { texte } : {}) }),
+    });
+    const d = (await r.json().catch(() => ({}))) as { message?: string };
+    if (!r.ok) return { ok: false, message: d.message ?? "L'envoi a échoué." };
+    oublierServeur();
+    return { ok: true, message: p.action.corps.action === "clore" ? "Observation close." : "Réponse envoyée : le chef est prévenu." };
+  } catch {
+    return { ok: false, message: "Pas de réseau : réessayez une fois connecté." };
+  }
 }
 
 /** Pour le DD : les demandes de renvoi des DA. */
@@ -518,7 +612,12 @@ let dernierCalcul: { le: number; points: PointACorriger[] | null } | null = null
  */
 export async function pointsACorriger(options: { forcerServeur?: boolean } = {}): Promise<PointACorriger[] | null> {
   if (!options.forcerServeur && dernierCalcul && Date.now() - dernierCalcul.le < 3_000) return dernierCalcul.points;
-  if (calculEnCours) return calculEnCours;
+  if (calculEnCours) {
+    // Un calcul lancé AVANT une action (réponse, clôture) rendrait l'ancienne
+    // liste : quand on force, on l'attend, puis on recalcule.
+    if (!options.forcerServeur) return calculEnCours;
+    await calculEnCours.catch(() => null);
+  }
   calculEnCours = calculer(options)
     .then((points) => {
       dernierCalcul = { le: Date.now(), points };
@@ -538,6 +637,15 @@ async function calculer(options: { forcerServeur?: boolean }): Promise<PointACor
   if (moi.role === "DA" || moi.role === "AGENT_SAISIE") points.push(...(await pointsMensuels(moi.username, moi.periodeActiveId, serveur)));
   if (moi.role === "DD") points.push(...pointsDuDD(serveur, moi.periodeActiveId));
   points.push(...pointsDeProduction(serveur, moi.role, moi.periodeActiveId, points));
+  const observations = pointsObservations(serveur, moi.role, moi.periodeActiveId);
+  points.push(...observations);
+  // Un rapport renvoyé POUR des observations : chaque observation a son point,
+  // qui mène à la case ; le point « rapport renvoyé », générique, ferait doublon.
+  const moisObserves = new Set((serveur?.observations ?? []).map((o) => o.periodeId));
+  for (let i = points.length - 1; i >= 0; i--) {
+    const p = points[i];
+    if (p.id.startsWith("m-renvoi|") && moisObserves.has(p.id.slice("m-renvoi|".length)) && observations.some((o) => o.id.startsWith("obs|"))) points.splice(i, 1);
+  }
   points.push(...(await pointsTrimestriels(moi.username, moi.role, serveur)));
   // Chaque point porte son guide : pourquoi, et comment faire pas à pas.
   for (const p of points) p.guide = guideDe(p.nature, { role: moi.role });

@@ -45,7 +45,16 @@ interface Grille {
   enteteLigne: string;
   lignes: { cle: string; libelle: string; cases: CaseGrille[] }[];
   avertissements: string[];
+  /** Les mêmes, avec la case visée ; `confirmable` : le BAC peut confirmer son chiffre. */
+  alertes?: { texte: string; confirmable?: ConfirmationReprise }[];
   aide: string;
+}
+
+interface ConfirmationReprise {
+  ligne: string;
+  arrondissement: string;
+  ici: number;
+  la: number;
 }
 
 interface ResumeTableau {
@@ -327,6 +336,27 @@ export default function SaisieTrimestrielleClient({
     }
   }, [ouvert]);
 
+  /** Le BAC confirme son chiffre : l'avertissement disparaît (rien n'est modifié). */
+  async function confirmerReprise(c: ConfirmationReprise) {
+    setInfo(null);
+    try {
+      const r = await fetch("/api/trimestre/reprises", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ annee, trimestre, ...c }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        setErreur(d.message ?? "Confirmation impossible.");
+        return;
+      }
+      setInfo(`Votre chiffre est confirmé face à celui de ${c.arrondissement}.`);
+      if (grille) await Promise.all([chargerGrille(grille.numero), chargerListe()]);
+    } catch {
+      setErreur("Pas de réseau : la confirmation n'est pas partie.");
+    }
+  }
+
   function retourALaListe() {
     setOuvert(null);
     setGrille(null);
@@ -414,6 +444,7 @@ export default function SaisieTrimestrielleClient({
                 setValeurs((x) => ({ ...x, [k]: v }));
               }}
               onQuitter={enregistrer}
+              onConfirmerReprise={(c) => void confirmerReprise(c)}
             />
           )}
           <Enchainement
@@ -694,6 +725,7 @@ function TableauSaisie({
   enCours,
   onChange,
   onQuitter,
+  onConfirmerReprise,
 }: {
   refus: string | null;
   controle: ControleCategories | null;
@@ -705,6 +737,8 @@ function TableauSaisie({
   enCours: string | null;
   onChange: (cle: string, valeur: string) => void;
   onQuitter: (ligne: string, colonne: string, avant: string | null) => void;
+  /** Le BAC confirme son chiffre face à celui d'un arrondissement. */
+  onConfirmerReprise?: (c: ConfirmationReprise) => void;
 }) {
   const colonnes = grille.lignes[0]?.cases.map((c) => c.colonne) ?? [];
   const lignesSaisies = grille.lignes.filter((l) => l.cases.some((c) => c.etat === "saisie"));
@@ -765,10 +799,22 @@ function TableauSaisie({
           </p>
         )
       )}
-      {grille.avertissements.length > 0 && (
-        <ul className="mb-3 list-disc rounded-md bg-amber-50 p-3 pl-7 text-sm text-amber-900">
-          {grille.avertissements.map((a, i) => (
-            <li key={i}>{a}</li>
+      {(grille.alertes ?? grille.avertissements.map((texte) => ({ texte }))).length > 0 && (
+        <ul className="mb-3 space-y-2 rounded-md bg-amber-50 p-3 text-sm text-amber-900">
+          {(grille.alertes ?? grille.avertissements.map((texte) => ({ texte } as { texte: string; confirmable?: ConfirmationReprise }))).map((a, i) => (
+            <li key={i}>
+              ⚠ {a.texte}
+              {a.confirmable && onConfirmerReprise && (
+                <button
+                  type="button"
+                  data-visite="confirmer-reprise"
+                  onClick={() => onConfirmerReprise(a.confirmable!)}
+                  className="ml-2 mt-1 rounded border border-amber-700 bg-white px-2 py-1 text-xs font-semibold text-amber-900 hover:bg-amber-100"
+                >
+                  Mon chiffre est juste
+                </button>
+              )}
+            </li>
           ))}
         </ul>
       )}

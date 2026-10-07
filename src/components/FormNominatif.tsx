@@ -16,6 +16,7 @@ import { creerEtablissement } from "@/lib/etablissementsLocal";
 import ConfirmerTableauButton from "@/components/ConfirmerTableauButton";
 import { cibleMensuelle, cibles } from "@/lib/surlignage";
 import { repriseAffichee } from "@/lib/repriseAffichee";
+import { alignerSurServeur } from "@/lib/serveurFaitFoi";
 import VisiteGuidee from "@/components/VisiteGuidee";
 
 interface FormFieldDto {
@@ -132,8 +133,16 @@ export default function FormNominatif({
         for (const f of template.fields) {
           const texte = f.typeValeur === "TEXTE";
           const cle = `${etab.id}:${f.code}`;
-          const local = await trouverSaisieNominatif(username, periodeId, template.code, etab.id, f.code);
+          let local = await trouverSaisieNominatif(username, periodeId, template.code, etab.id, f.code);
           const distant = serveur.find((s) => s.etablissementId === etab.id && s.fieldCode === f.code);
+          // Corrigée sur le serveur (chef de section, DD) depuis le dernier envoi : le serveur fait foi.
+          if (local && distant && local.statutLocal === "SYNCHRONISE") {
+            const aligne = alignerSurServeur(local, distant, texte);
+            if (aligne) {
+              local = { ...local, ...aligne };
+              await offlineDB.saisies.update(local.clientId, aligne);
+            }
+          }
           if (local) {
             initial[cle] = {
               valeur: texte ? local.valeurTexte ?? "" : local.valeur == null ? "" : String(local.valeur),

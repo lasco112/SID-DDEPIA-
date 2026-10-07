@@ -15,6 +15,7 @@ import { recalculerTousLesDerives } from "@/lib/derivationLocale";
 import ConfirmerTableauButton from "@/components/ConfirmerTableauButton";
 import { cibleMensuelle, cibles } from "@/lib/surlignage";
 import { repriseAffichee } from "@/lib/repriseAffichee";
+import { alignerSurServeur } from "@/lib/serveurFaitFoi";
 import VisiteGuidee from "@/components/VisiteGuidee";
 
 interface FormFieldDto {
@@ -100,8 +101,19 @@ export default function FormMatrice({ template, periodeId, username }: { templat
 
       for (const f of template.fields) {
         const texte = f.typeValeur === "TEXTE";
-        const local = await trouverSaisieMatrice(username, periodeId, template.code, f.code);
+        let local = await trouverSaisieMatrice(username, periodeId, template.code, f.code);
         const distant = serveur.find((s) => s.fieldCode === f.code);
+        // Copie du téléphone identique au serveur au dernier envoi : si le
+        // serveur a changé depuis (correction d'un chef de section ou du DD),
+        // c'est lui qui fait foi — sans quoi l'agent voyait l'ancien chiffre.
+        // Une modification pas encore envoyée, elle, n'est jamais remplacée.
+        if (local && distant && local.statutLocal === "SYNCHRONISE") {
+          const aligne = alignerSurServeur(local, distant, texte);
+          if (aligne) {
+            local = { ...local, ...aligne };
+            await offlineDB.saisies.update(local.clientId, aligne);
+          }
+        }
         if (local) {
           initial[f.code] = {
             valeur: texte ? local.valeurTexte ?? "" : local.valeur == null ? "" : String(local.valeur),

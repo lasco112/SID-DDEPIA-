@@ -12,6 +12,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import VisiteGuidee from "@/components/VisiteGuidee";
+import { jeton } from "@/lib/surlignage";
 
 interface Arrondissement { id: string; code: string; nom: string }
 interface Template { code: string; numero: string; titre: string; type: string; section: string }
@@ -45,7 +46,10 @@ export default function DDDonneesClient({
   arrondissementInitial: string | null;
 }) {
   const [arrondissementId, setArrondissementId] = useState<string | null>(arrondissementInitial);
-  const [templateCode, setTemplateCode] = useState<string | null>(null);
+  // `?tableau=T13` : le tableau ouvert d'emblée (« À corriger » y mène).
+  const [templateCode, setTemplateCode] = useState<string | null>(() =>
+    typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("tableau")
+  );
   const [vue, setVue] = useState<any>(null);
   const [chargement, setChargement] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
@@ -213,6 +217,7 @@ export default function DDDonneesClient({
                         {cell ? (
                           <button
                             data-visite="valeur-corrigeable"
+                            data-cible={jeton("vc", cell.id)}
                             className="rounded px-2 py-1 hover:bg-blue-50"
                             onClick={() => ouvrirCorrection(cell.id, `${f.libelle} — ${a.nom}`, String(cell.valeur ?? ""), "MATRICE")}
                           >

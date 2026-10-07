@@ -6,6 +6,19 @@
  */
 import { NextResponse } from "next/server";
 import { requireUser, ROLES_CHEF, permissionErrorResponse, ForbiddenError, peutConsulterTableauSection } from "@/lib/permissions";
+import type { PrismaClient } from "@prisma/client";
+import { observationsDes } from "@/server/observations";
+
+/** Les observations déjà faites sur ce tableau ce mois-ci, par donnée : le chef voit où il en est. */
+async function observationsDuTableau(db: PrismaClient, periodeId: string, templateCode: string) {
+  const rapports = await db.rapportArrondissement.findMany({ where: { periodeId }, select: { id: true } });
+  const obs = (await observationsDes(db, rapports.map((r) => r.id))).filter((o) => o.templateCode === templateCode && !o.close);
+  const parSaisie: Record<string, { texte: string; etat: "en_attente" | "repondue" | "corrigee"; reponse: string | null }> = {};
+  for (const o of obs) {
+    parSaisie[o.saisieId] = { texte: o.texte, etat: o.corrigee ? "corrigee" : o.reponse ? "repondue" : "en_attente", reponse: o.reponse?.texte ?? null };
+  }
+  return parSaisie;
+}
 
 const SEUIL_VARIATION = 0.3;
 
@@ -84,6 +97,7 @@ export async function GET(req: Request, { params }: { params: { templateCode: st
         totaux,
         totauxPrecedent: totauxPrec,
         variationForte,
+        observations: await observationsDuTableau(db as PrismaClient, periodeId, template.code),
       });
     }
 
@@ -93,7 +107,7 @@ export async function GET(req: Request, { params }: { params: { templateCode: st
         include: { etablissement: true, rapport: { include: { arrondissement: true } } },
         orderBy: [{ etablissement: { arrondissementId: "asc" } }, { etablissement: { nom: "asc" } }],
       });
-      return NextResponse.json({ template, arrondissements, saisiesNominatives: saisies });
+      return NextResponse.json({ template, arrondissements, saisiesNominatives: saisies, observations: await observationsDuTableau(db as PrismaClient, periodeId, template.code) });
     }
 
     // EVENEMENT
@@ -113,7 +127,7 @@ export async function GET(req: Request, { params }: { params: { templateCode: st
     const refLibelle: Record<string, string> = {};
     for (const r of refItems) refLibelle[`${r.categorie}:${r.code}`] = r.libelle;
 
-    return NextResponse.json({ template, arrondissements, evenements, refLibelle });
+    return NextResponse.json({ template, arrondissements, evenements, refLibelle, observations: await observationsDuTableau(db as PrismaClient, periodeId, template.code) });
   } catch (e) {
     const { status, message } = permissionErrorResponse(e);
     return NextResponse.json({ message }, { status });

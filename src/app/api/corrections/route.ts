@@ -15,6 +15,12 @@ import { notifierEvenement } from "@/server/notifications/evenements";
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { recalculerDerivesPourTemplate } from "@/server/derivation/champsDerives";
 import { requireUser, assertProprietaireSection, permissionErrorResponse, type SessionUser } from "@/lib/permissions";
+import { jeton } from "@/lib/surlignage";
+
+const NOMS_MOIS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
+const moisDe = (p: { mois: number | null; annee: number }) => (p.mois ? `${NOMS_MOIS[p.mois - 1]} ${p.annee}` : String(p.annee));
+/** Une valeur, telle que le DA la lirait : un nombre, ou « N/D ». */
+const valeurLisible = (v: unknown, nonRenseigne: boolean) => (nonRenseigne ? "N/D" : v == null ? "vide" : String(v));
 
 /**
  * Le DD n'a pas de section propre : lui appliquer assertProprietaireSection
@@ -50,7 +56,7 @@ export async function POST(req: Request) {
     if (body.famille === "MATRICE") {
       const saisie = await db.saisieMatrice.findUnique({
         where: { id: body.saisieId },
-        include: { field: { include: { template: true } }, rapport: { select: { periodeId: true, arrondissementId: true } } },
+        include: { field: { include: { template: true } }, rapport: { select: { periodeId: true, arrondissementId: true, periode: { select: { mois: true, annee: true } } } } },
       });
       if (!saisie) return NextResponse.json({ message: "Saisie introuvable" }, { status: 404 });
       assertPeutCorriger(user, saisie.field.template.sectionId);
@@ -64,6 +70,9 @@ export async function POST(req: Request) {
           valeur: body.nonRenseigne ? null : body.valeur ?? null,
           nonRenseigne: Boolean(body.nonRenseigne),
           motifNonRenseigne: body.nonRenseigne ? body.motifNonRenseigne ?? null : null,
+          // Datée : une saisie plus ancienne restée sur un téléphone ne doit pas
+          // écraser la correction en arrivant plus tard (arbitrage par modifieLe).
+          modifieLe: new Date(),
         },
       });
       await db.correction.create({
@@ -82,8 +91,8 @@ export async function POST(req: Request) {
         { arrondissementId: saisie.rapport.arrondissementId, saufUserId: user.id },
         {
           declencheur: "CORRECTION",
-          message: `${user.username} a modifié une donnée de votre rapport (${saisie.field.libelle}). Motif : ${body.motif}`,
-          lien: "/da/saisie",
+          message: `${user.username} a corrigé votre rapport de ${moisDe(saisie.rapport.periode)} — tableau ${saisie.field.template.numero}, « ${saisie.field.libelle} » : ${valeurLisible(saisie.valeur, saisie.nonRenseigne)} → ${valeurLisible(updated.valeur, updated.nonRenseigne)}. Motif : ${body.motif}`,
+          lien: `/da/saisie/${saisie.field.template.code}?cible=${encodeURIComponent(jeton("m", saisie.fieldCode))}`,
         }
       );
 
@@ -93,7 +102,7 @@ export async function POST(req: Request) {
     if (body.famille === "NOMINATIF") {
       const saisie = await db.saisieNominative.findUnique({
         where: { id: body.saisieId },
-        include: { template: true, rapport: { select: { periodeId: true, arrondissementId: true } } },
+        include: { template: true, etablissement: { select: { nom: true } }, rapport: { select: { periodeId: true, arrondissementId: true, periode: { select: { mois: true, annee: true } } } } },
       });
       if (!saisie) return NextResponse.json({ message: "Saisie introuvable" }, { status: 404 });
       assertPeutCorriger(user, saisie.template.sectionId);
@@ -106,6 +115,7 @@ export async function POST(req: Request) {
         data: {
           valeur: body.nonRenseigne ? null : body.valeur ?? null,
           nonRenseigne: Boolean(body.nonRenseigne),
+          modifieLe: new Date(),
         },
       });
       await db.correction.create({
@@ -133,8 +143,8 @@ export async function POST(req: Request) {
         { arrondissementId: saisie.rapport.arrondissementId, saufUserId: user.id },
         {
           declencheur: "CORRECTION",
-          message: `${user.username} a modifié une donnée de votre rapport (tableau ${saisie.template.numero}). Motif : ${body.motif}`,
-          lien: "/da/saisie",
+          message: `${user.username} a corrigé votre rapport de ${moisDe(saisie.rapport.periode)} — tableau ${saisie.template.numero}, ${saisie.etablissement?.nom ?? "un établissement"} : ${valeurLisible(saisie.valeur, saisie.nonRenseigne)} → ${valeurLisible(updated.valeur, updated.nonRenseigne)}. Motif : ${body.motif}`,
+          lien: `/da/saisie/${saisie.template.code}?cible=${encodeURIComponent(jeton("n", saisie.etablissementId, saisie.fieldCode))}`,
         }
       );
 
@@ -144,7 +154,7 @@ export async function POST(req: Request) {
     if (body.famille === "EVENEMENT") {
       const saisie = await db.saisieEvenement.findUnique({
         where: { id: body.saisieId },
-        include: { template: true, rapport: { select: { periodeId: true, arrondissementId: true } } },
+        include: { template: true, rapport: { select: { periodeId: true, arrondissementId: true, periode: { select: { mois: true, annee: true } } } } },
       });
       if (!saisie) return NextResponse.json({ message: "Saisie introuvable" }, { status: 404 });
       assertPeutCorriger(user, saisie.template.sectionId);
@@ -154,7 +164,7 @@ export async function POST(req: Request) {
       const valeurAvant = JSON.stringify(saisie.payload);
       const updated = await db.saisieEvenement.update({
         where: { id: saisie.id },
-        data: { payload: (body.payload ?? {}) as Prisma.InputJsonValue },
+        data: { payload: (body.payload ?? {}) as Prisma.InputJsonValue, modifieLe: new Date() },
       });
       await db.correction.create({
         data: {
@@ -172,8 +182,8 @@ export async function POST(req: Request) {
         { arrondissementId: saisie.rapport.arrondissementId, saufUserId: user.id },
         {
           declencheur: "CORRECTION",
-          message: `${user.username} a modifié une donnée de votre rapport (tableau ${saisie.template.numero}). Motif : ${body.motif}`,
-          lien: "/da/saisie",
+          message: `${user.username} a corrigé une ligne de votre rapport de ${moisDe(saisie.rapport.periode)} — tableau ${saisie.template.numero}. Motif : ${body.motif}`,
+          lien: `/da/saisie/${saisie.template.code}?cible=${encodeURIComponent(jeton("ev", saisie.clientId))}`,
         }
       );
 

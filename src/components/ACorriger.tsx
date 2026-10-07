@@ -17,7 +17,7 @@ import { AlertTriangle, ChevronLeft, ChevronRight, List, X, CheckCircle2, HelpCi
 import type { Guide } from "@/lib/guidesCorrection";
 import VisiteGuidee from "@/components/VisiteGuidee";
 import {
-  pointsACorriger, allerAuPoint, demanderAuDD, lireParcours, ecrireParcours, oublierServeur,
+  pointsACorriger, allerAuPoint, demanderAuDD, lireParcours, ecrireParcours, oublierServeur, executerAction,
   EVENEMENT_PARCOURS, type PointACorriger,
 } from "@/lib/aCorriger";
 import { EVENEMENT_BOOTSTRAP_MAJ } from "@/lib/offlineStore";
@@ -187,11 +187,73 @@ export function ListeACorriger() {
                   {p.demande.libelle ?? "Demander au DD de me renvoyer ce rapport"}
                 </button>
               )}
+              <ActionPoint point={p} onFait={() => void recharger(true)} />
             </div>
             {messages[p.id] && <p className="mt-2 text-sm text-gray-700">{messages[p.id]}</p>}
           </li>
         ))}
       </ol>
+    </div>
+  );
+}
+
+// --------------------------------------------------------------------------
+// Le geste sur place d'un point : « Le chiffre est juste », « Clore l'observation »
+// --------------------------------------------------------------------------
+export function ActionPoint({ point, onFait }: { point: PointACorriger; onFait: () => void }) {
+  const [ouvert, setOuvert] = useState(false);
+  const [texte, setTexte] = useState("");
+  const [enCours, setEnCours] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  if (!point.action) return null;
+  const action = point.action;
+  const envoyer = async () => {
+    setEnCours(true);
+    const r = await executerAction(point, action.demandeTexte ? texte.trim() : undefined);
+    setEnCours(false);
+    setMessage(r.message);
+    if (r.ok) {
+      setOuvert(false);
+      onFait();
+    }
+  };
+  return (
+    <div className="w-full">
+      {!ouvert ? (
+        <button
+          type="button"
+          data-visite="action-point"
+          onClick={() => (action.demandeTexte ? setOuvert(true) : void envoyer())}
+          disabled={enCours}
+          className="min-h-[44px] rounded-lg border border-primary px-4 py-2 text-sm font-semibold text-primary-dark hover:bg-green-50 disabled:opacity-50"
+        >
+          {enCours ? "Envoi…" : action.libelle}
+        </button>
+      ) : (
+        <div className="mt-1 rounded-md border border-gray-300 bg-white p-2">
+          <label className="text-sm font-medium text-gray-800">{action.demandeTexte}</label>
+          <textarea
+            value={texte}
+            onChange={(e) => setTexte(e.target.value)}
+            rows={3}
+            className="mt-1 w-full rounded border border-gray-300 p-2 text-sm"
+          />
+          <div className="mt-1 flex gap-2">
+            <button
+              type="button"
+              onClick={() => void envoyer()}
+              disabled={enCours || !texte.trim()}
+              className="min-h-[44px] flex-1 rounded-md bg-primary px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
+            >
+              {enCours ? "Envoi…" : "Envoyer la réponse"}
+            </button>
+            <button type="button" onClick={() => setOuvert(false)} className="min-h-[44px] rounded-md border border-gray-300 px-3 py-2 text-sm">
+              Annuler
+            </button>
+          </div>
+        </div>
+      )}
+      {message && <p className="mt-1 text-sm text-gray-700">{message}</p>}
     </div>
   );
 }
@@ -340,6 +402,9 @@ export function ParcoursACorriger() {
                 </button>
               )}
               {reponseDemande && <p className="mt-1 text-sm text-gray-700">{reponseDemande}</p>}
+              <div className="mt-2">
+                <ActionPoint point={courant} onFait={() => void recharger(true)} />
+              </div>
             </>
           ) : (
             <p className="text-sm font-medium text-green-800">

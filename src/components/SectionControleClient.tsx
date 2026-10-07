@@ -12,7 +12,7 @@
  * comprendre ce que chaque DA avait déclaré.
  */
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { regleDuChamp, numeroTableau } from "@/lib/champsDerives";
 import { jeton } from "@/lib/surlignage";
 import VisiteGuidee from "@/components/VisiteGuidee";
@@ -49,7 +49,17 @@ export default function SectionControleClient() {
   const [periodeId, setPeriodeId] = useState<string | null>(null);
   const [vue, setVue] = useState<any>(null);
   const [erreur, setErreur] = useState<string | null>(null);
-  const [correction, setCorrection] = useState<{ id: string; famille: string; valeurActuelle: string } | null>(null);
+  /** La donnée touchée : la corriger soi-même, ou la SIGNALER au DA (observation). */
+  const [correction, setCorrection] = useState<{ id: string; famille: string; valeurActuelle: string; libelle: string } | null>(null);
+  const [mode, setMode] = useState<"signaler" | "corriger">("signaler");
+  const [observation, setObservation] = useState("");
+  const [messageAction, setMessageAction] = useState<string | null>(null);
+  const panneauRef = useRef<HTMLDivElement | null>(null);
+  // Le panneau s'ouvre sous les tableaux : on l'amène à l'écran, sinon sur
+  // téléphone le chef touchait une valeur et ne voyait rien se passer.
+  useEffect(() => {
+    if (correction) setTimeout(() => panneauRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
+  }, [correction]);
   const [nouvelleValeur, setNouvelleValeur] = useState("");
   const [payloadCorrige, setPayloadCorrige] = useState<Record<string, string>>({});
   const [motif, setMotif] = useState("");
@@ -79,6 +89,11 @@ export default function SectionControleClient() {
     }
     init();
   }, []);
+
+  // `?tableau=T13` : le tableau ouvert d'emblée (« À corriger » y mène).
+  const tableauDemande = useRef<string | null>(
+    typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("tableau")
+  );
 
   const groupes = useMemo(() => {
     const m = new Map<string, TemplateSummary[]>();
@@ -138,6 +153,13 @@ export default function SectionControleClient() {
     setVue(await res.json());
   }, [periodeId]);
 
+  useEffect(() => {
+    const code = tableauDemande.current;
+    if (!code || !periodeId || !templates.some((t) => t.code === code)) return;
+    tableauDemande.current = null;
+    void chargerVue(code);
+  }, [periodeId, templates, chargerVue]);
+
   async function validerSection() {
     if (!periodeId) return;
     setValidationMessage(null);
@@ -150,8 +172,11 @@ export default function SectionControleClient() {
     setValidationMessage(res.ok ? "Section validée pour cette période." : data.message ?? "Échec de la validation.");
   }
 
-  function ouvrirCorrectionValeur(id: string, valeurActuelle: string) {
-    setCorrection({ id, famille: vue.template.type, valeurActuelle });
+  function ouvrirCorrectionValeur(id: string, valeurActuelle: string, libelle: string) {
+    setCorrection({ id, famille: vue.template.type, valeurActuelle, libelle });
+    setMode("signaler");
+    setObservation("");
+    setMessageAction(null);
     setNouvelleValeur(valeurActuelle);
     setMotif("");
   }
@@ -160,7 +185,10 @@ export default function SectionControleClient() {
     const schema = (vue.template.schemaEvenement as Array<{ key: string; label: string }>) ?? [];
     const payload: Record<string, string> = {};
     for (const c of schema) payload[c.key] = e.payload?.[c.key] != null ? String(e.payload[c.key]) : "";
-    setCorrection({ id: e.id, famille: "EVENEMENT", valeurActuelle: JSON.stringify(e.payload) });
+    setCorrection({ id: e.id, famille: "EVENEMENT", valeurActuelle: JSON.stringify(e.payload), libelle: `${e.rapport.arrondissement.nom} · une ligne` });
+    setMode("signaler");
+    setObservation("");
+    setMessageAction(null);
     setPayloadCorrige(payload);
     setMotif("");
   }
@@ -194,6 +222,34 @@ export default function SectionControleClient() {
       setPayloadCorrige({});
       setMotif("");
       chargerVue(selection);
+    }
+  }
+
+  /** Signale la donnée au DA : il corrige, ou explique (server/observations.ts). */
+  async function envoyerObservation() {
+    if (!correction || !observation.trim()) return;
+    setMessageAction(null);
+    const res = await fetch("/api/observations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "signaler", famille: correction.famille, saisieId: correction.id, texte: observation }),
+    });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setMessageAction(d.message ?? "L'observation n'a pas pu partir.");
+      return;
+    }
+    setCorrection(null);
+    setObservation("");
+    setMessageAction(
+      d.renvoye
+        ? "Observation envoyée. Le rapport était transmis : il est renvoyé au DA pour correction."
+        : "Observation envoyée au DA."
+    );
+    if (selection) void chargerVue(selection);
+    if (periodeId) {
+      const rr = await fetch(`/api/rapports?periodeId=${periodeId}`);
+      if (rr.ok) setRapports((await rr.json()).rapports);
     }
   }
 
@@ -367,10 +423,13 @@ export default function SectionControleClient() {
                     return (
                       <td key={a.code} className="border-b px-3 py-2 text-center">
                         <button
+                          data-visite={cell ? "valeur-section" : undefined}
+                          data-cible={cell ? jeton("vc", cell.id) : undefined}
                           className="rounded px-2 py-1 hover:bg-blue-50"
-                          onClick={() => cell && ouvrirCorrectionValeur(cell.id, String(cell.valeur ?? ""))}
+                          onClick={() => cell && ouvrirCorrectionValeur(cell.id, String(cell.valeur ?? ""), `${a.nom ?? a.code} · ${f.libelle}`)}
                         >
                           {cell ? (cell.nonRenseigne ? "N/D" : cell.valeur ?? "—") : "—"}
+                          {cell && <MarqueObservation obs={vue.observations?.[cell.id]} />}
                         </button>
                       </td>
                     );
@@ -391,7 +450,7 @@ export default function SectionControleClient() {
           vue={vue}
           arrondissementFiltre={arrondissementFiltre}
           onFiltrer={setArrondissementFiltre}
-          onCorriger={(id, valeur) => ouvrirCorrectionValeur(id, valeur)}
+          onCorriger={(id, valeur, libelle) => ouvrirCorrectionValeur(id, valeur, libelle)}
         />
       )}
 
@@ -435,8 +494,8 @@ export default function SectionControleClient() {
                     const schema = vue.template.schemaEvenement as Array<{ key: string; label: string; type: string; ref?: string }>;
                     const payload = e.payload ?? {};
                     return (
-                      <tr key={e.id} className="cursor-pointer hover:bg-blue-50" onClick={() => ouvrirCorrectionEvenement(e)}>
-                        <td className="border-b px-3 py-2 font-medium">{e.rapport.arrondissement.code}</td>
+                      <tr key={e.id} data-cible={jeton("vc", e.id)} className="cursor-pointer hover:bg-blue-50" onClick={() => ouvrirCorrectionEvenement(e)}>
+                        <td className="border-b px-3 py-2 font-medium">{e.rapport.arrondissement.code}<MarqueObservation obs={vue.observations?.[e.id]} /></td>
                         {schema.map((c) => {
                           const raw = payload[c.key];
                           const texte = c.type === "ref" ? libelleRef(c.ref, raw, c.key, payload) : raw == null || raw === "" ? "—" : String(raw);
@@ -454,8 +513,73 @@ export default function SectionControleClient() {
         </div>
       )}
 
-      {correction && correction.famille !== "EVENEMENT" && (
-        <div className="mt-4 max-w-md rounded-lg border border-blue-200 bg-blue-50 p-4">
+      {messageAction && <p className="mt-4 rounded-md bg-green-50 p-3 text-sm text-green-900">{messageAction}</p>}
+
+      {/* La donnée touchée : la SIGNALER au DA (par défaut — c'est lui qui
+          connaît le terrain), ou la corriger soi-même. */}
+      {correction && (
+        <div ref={panneauRef} data-visite="panneau-donnee" className="mt-4 max-w-lg scroll-mt-4 rounded-lg border-2 border-primary bg-white p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Donnée choisie</p>
+          <p className="mt-0.5 font-semibold text-gray-900">{correction.libelle}</p>
+          {correction.famille !== "EVENEMENT" && (
+            <p className="text-sm text-gray-700">Valeur actuelle : <strong>{correction.valeurActuelle || "N/D"}</strong></p>
+          )}
+          {vue?.observations?.[correction.id] && (
+            <p className="mt-2 rounded bg-amber-50 p-2 text-sm text-amber-900">
+              Déjà signalée : « {vue.observations[correction.id].texte} »
+              {vue.observations[correction.id].reponse && <> — réponse du DA : « {vue.observations[correction.id].reponse} »</>}
+            </p>
+          )}
+          <div className="mt-3 grid grid-cols-2 gap-2" role="tablist">
+            {(["signaler", "corriger"] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                role="tab"
+                aria-selected={mode === m}
+                onClick={() => setMode(m)}
+                className={`min-h-[44px] rounded-md border px-3 py-2 text-sm font-semibold ${mode === m ? "border-primary bg-primary text-white" : "border-gray-300 bg-white text-gray-700"}`}
+              >
+                {m === "signaler" ? "Signaler au DA" : "Corriger moi-même"}
+              </button>
+            ))}
+          </div>
+          {mode === "signaler" && (
+            <div className="mt-3">
+              <label className="text-sm font-medium text-gray-800">
+                Ce qui ne va pas (le DA le lira, avec un lien vers cette donnée)
+              </label>
+              <textarea
+                rows={3}
+                value={observation}
+                onChange={(e) => setObservation(e.target.value)}
+                placeholder="Ex. : le nombre d'étangs n'est pas correct, il y en avait 8 le mois dernier."
+                className="mt-1 w-full rounded border border-gray-300 p-2 text-sm"
+              />
+              <p className="mt-1 text-xs text-gray-600">
+                Le DA corrige la case, ou répond que le chiffre est juste ; vous verrez sa réponse dans « À corriger ». Si le rapport
+                est déjà transmis, il lui est renvoyé.
+              </p>
+              <div className="mt-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => void envoyerObservation()}
+                  disabled={!observation.trim()}
+                  className="min-h-[44px] rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white disabled:bg-gray-300"
+                >
+                  Envoyer l&apos;observation au DA
+                </button>
+                <button type="button" onClick={() => setCorrection(null)} className="min-h-[44px] rounded-md border border-gray-300 px-3 py-2 text-sm">
+                  Annuler
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {correction && mode === "corriger" && correction.famille !== "EVENEMENT" && (
+        <div className="mt-2 max-w-lg rounded-lg border border-blue-200 bg-blue-50 p-4">
           <h3 className="font-semibold">Corriger la valeur</h3>
           <p className="text-sm text-gray-600">Valeur actuelle : {correction.valeurActuelle || "N/D"}</p>
           <input
@@ -483,8 +607,8 @@ export default function SectionControleClient() {
         </div>
       )}
 
-      {correction && correction.famille === "EVENEMENT" && vue?.template?.schemaEvenement && (
-        <div className="mt-4 max-w-lg rounded-lg border border-blue-200 bg-blue-50 p-4">
+      {correction && mode === "corriger" && correction.famille === "EVENEMENT" && vue?.template?.schemaEvenement && (
+        <div className="mt-2 max-w-lg rounded-lg border border-blue-200 bg-blue-50 p-4">
           <h3 className="font-semibold">Corriger l'événement</h3>
           <div className="mt-2 space-y-2">
             {(vue.template.schemaEvenement as Array<{ key: string; label: string; type: string; ref?: string }>).map((c) => (
@@ -549,6 +673,19 @@ export default function SectionControleClient() {
  * une colonne par champ, un TOTAL en bas — et un sous-total par arrondissement,
  * qui est l'unité de contrôle du chef de section.
  */
+/** La marque d'une donnée déjà signalée au DA : en attente, répondue, corrigée. */
+function MarqueObservation({ obs }: { obs?: { texte: string; etat: "en_attente" | "repondue" | "corrigee"; reponse: string | null } }) {
+  if (!obs) return null;
+  const style =
+    obs.etat === "corrigee" ? "bg-green-100 text-green-800" : obs.etat === "repondue" ? "bg-blue-100 text-blue-800" : "bg-amber-100 text-amber-900";
+  const libelle = obs.etat === "corrigee" ? "corrigée" : obs.etat === "repondue" ? "réponse" : "signalée";
+  return (
+    <span title={`Observation : ${obs.texte}${obs.reponse ? ` — réponse : ${obs.reponse}` : ""}`} className={`ml-1 rounded px-1 py-0.5 text-[10px] font-semibold ${style}`}>
+      {libelle}
+    </span>
+  );
+}
+
 function TableauNominatifCroise({
   vue,
   arrondissementFiltre,
@@ -558,7 +695,7 @@ function TableauNominatifCroise({
   vue: any;
   arrondissementFiltre: string | null;
   onFiltrer: (code: string | null) => void;
-  onCorriger: (id: string, valeur: string) => void;
+  onCorriger: (id: string, valeur: string, libelle: string) => void;
 }) {
   const champs = (vue.template.fields as Array<{ code: string; libelle: string; typeValeur?: string }>).filter(
     (f) => f.typeValeur !== "TEXTE"
@@ -652,8 +789,9 @@ function TableauNominatifCroise({
                   return (
                     <td key={f.code} className="border-b px-3 py-2 text-right">
                       {c ? (
-                        <button className="rounded px-2 py-1 hover:bg-blue-50" onClick={() => onCorriger(c.id, String(c.valeur ?? ""))}>
+                        <button data-visite="valeur-section" data-cible={jeton("vc", c.id)} className="rounded px-2 py-1 hover:bg-blue-50" onClick={() => onCorriger(c.id, String(c.valeur ?? ""), `${l.nom} (${l.arrNom}) · ${f.libelle}`)}>
                           {c.nonRenseigne ? "N/D" : c.valeur ?? "—"}
+                          <MarqueObservation obs={vue.observations?.[c.id]} />
                         </button>
                       ) : (
                         <span className="text-gray-300">—</span>

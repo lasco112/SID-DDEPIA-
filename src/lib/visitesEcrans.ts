@@ -33,7 +33,7 @@ export const VISITES: Record<string, DefinitionVisite> = {
 
   // ------------------------------------------------------------ À corriger
   "a-corriger": {
-    version: 1,
+    version: 2,
     etapes: [
       {
         cible: "compteur-corriger",
@@ -49,6 +49,12 @@ export const VISITES: Record<string, DefinitionVisite> = {
         cible: "demander-dd",
         titre: "Demander au DD",
         texte: "Quand seul le DD peut débloquer (rapport déjà transmis, mois verrouillé), ce bouton le prévient à votre place, avec le mois et le tableau.",
+      },
+      {
+        cible: "action-point",
+        titre: "Répondre sur place",
+        texte: "Une observation d'un chef : si le chiffre est juste, « Le chiffre est juste » et expliquez pourquoi. Pour un chef : « Clore l'observation » quand c'est réglé.",
+        depuis: 2,
       },
     ],
   },
@@ -136,7 +142,7 @@ export const VISITES: Record<string, DefinitionVisite> = {
     ],
   },
   "trimestre-saisie-tableau": {
-    version: 1,
+    version: 2,
     etapes: [
       {
         cible: "case-saisie",
@@ -148,6 +154,12 @@ export const VISITES: Record<string, DefinitionVisite> = {
         cible: "case-an-passe",
         titre: "Le chiffre de l'an passé",
         texte: "La case « TOTAL » de l'année dernière : le SID ne l'a pas encore, c'est à vous de la donner, à partir de vos rapports de l'époque. Sans elle, pas de comparaison sur un an.",
+      },
+      {
+        cible: "confirmer-reprise",
+        titre: "Mon chiffre est juste",
+        texte: "Un arrondissement a donné un autre chiffre que le vôtre. Si le vôtre est juste, confirmez-le ici : l'avertissement disparaît. Sinon, corrigez votre case.",
+        depuis: 2,
       },
       { cible: "tableau-suivant-trimestre", titre: "Tableau suivant", texte: "Passe au tableau suivant, sans revenir à la liste." },
       { cible: "retour-liste-trimestre", titre: "Tous les tableaux", texte: "Revient à la liste des tableaux du trimestre." },
@@ -391,9 +403,15 @@ export const VISITES: Record<string, DefinitionVisite> = {
     ],
   },
   "section-controle": {
-    version: 1,
+    version: 2,
     etapes: [
       { cible: "liste-section", titre: "Les tableaux de votre section", texte: "Choisissez un tableau : vous voyez les chiffres des six arrondissements côte à côte." },
+      {
+        cible: "valeur-section",
+        titre: "Une donnée qui ne va pas ?",
+        texte: "Touchez-la. « Signaler au DA » : écrivez ce qui ne va pas, le DA reçoit un lien direct vers la case et corrige ou explique. « Corriger moi-même » : vous changez le chiffre (motif obligatoire).",
+        depuis: 2,
+      },
       {
         cible: "valider-section",
         titre: "Valider ma section",

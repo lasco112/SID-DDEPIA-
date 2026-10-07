@@ -232,17 +232,31 @@ test("infrastructures : le BAC se recopie, et une divergence est signalée", asy
   await ecrire(15, "Infrastructures d'abattages", 4);
   g = await grille(base, P, DD, 15);
   assert.equal(ligne().affiche, "4", "la valeur saisie l'emporte");
-  assert.ok(g!.avertissements.some((a) => /Fokoué.*4.*3/.test(a)), "la divergence avec le BAC est signalée");
-  // « À corriger » emmène à la case : l'avertissement dit laquelle.
-  const alerte = g!.alertes.find((a) => /Fokoué.*4.*3/.test(a.texte));
+  // Décision du Délégué (7 octobre 2026) : l'écart n'est PAS une erreur de
+  // l'arrondissement — rien chez lui ; c'est au BAC de confirmer ou corriger.
+  assert.ok(!g!.avertissements.some((a) => /Fokoué/.test(a)), "rien côté arrondissement");
+  const bac = await grille(base, P, BAC, 7);
+  const alerte = bac!.alertes.find((a) => /Fokoué indique 4/.test(a.texte));
+  assert.ok(alerte, "l'écart est signalé dans le tableau du BAC");
   assert.deepEqual(
-    { ligne: alerte?.ligne, colonne: alerte?.colonne },
-    { ligne: "Infrastructures d'abattages", colonne: "Fokoué" },
-    "l'avertissement porte la case visée"
+    alerte!.cases,
+    ["Abattoir", "Aire d'abattage", "Tuerie"].map((ligne) => ({ ligne, colonne: "Fokoué" })),
+    "les cases du BAC qui s'additionnent sont désignées"
   );
-  // Dans le tableau source (BAC), seul l'arrondissement est connu : pas de case à encadrer.
-  const source = (await grille(base, P, DD, 7))!.alertes.find((a) => /Fokoué.*4.*3/.test(a.texte));
-  assert.ok(source && source.ligne == null, "côté BAC, l'alerte est affichée sans case");
+  assert.deepEqual(alerte!.confirmable, { ligne: "Infrastructures d'abattages", arrondissement: "Fokoué", ici: 4, la: 3 });
+
+  // Le BAC confirme son chiffre : l'avertissement disparaît…
+  const confirmation = await base.auditLog.create({
+    data: { action: "CONFIRMATION_REPRISE", entite: "Trimestre", entiteId: `${P.annee}-${P.rang}`, details: alerte!.confirmable! },
+  });
+  try {
+    assert.ok(!(await grille(base, P, BAC, 7))!.alertes.some((a) => /Fokoué indique/.test(a.texte)), "confirmé : plus d'avertissement");
+    // … et revient si un des deux chiffres change.
+    await ecrire(15, "Infrastructures d'abattages", 5);
+    assert.ok((await grille(base, P, BAC, 7))!.alertes.some((a) => /Fokoué indique 5/.test(a.texte)), "chiffre changé : l'avertissement revient");
+  } finally {
+    await base.auditLog.delete({ where: { id: confirmation.id } });
+  }
 });
 
 test("sans total mensuel, la somme des catégories ne peut pas être contrôlée : la saisie passe", async () => {

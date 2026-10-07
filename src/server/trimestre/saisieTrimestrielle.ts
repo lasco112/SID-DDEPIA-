@@ -381,6 +381,27 @@ export interface AlerteGrille {
   texte: string;
   ligne?: string;
   colonne?: string;
+  /** Toutes les cases en cause, quand il y en a plusieurs (lignes qui s'additionnent). */
+  cases?: { ligne: string; colonne: string }[];
+  /** Le BAC peut confirmer son chiffre : l'avertissement disparaît tant que les deux chiffres ne bougent pas. */
+  confirmable?: { ligne: string; arrondissement: string; ici: number; la: number };
+}
+
+/**
+ * Les écarts BAC / arrondissement que le BAC a confirmés (« mon chiffre est
+ * juste ») pour ce trimestre : « ligne|arrondissement|chiffre de l'arrondissement|chiffre du BAC ».
+ */
+export async function reprisesConfirmees(db: PrismaClient, periode: Periode): Promise<Set<string>> {
+  const lignes = await db.auditLog.findMany({
+    where: { action: "CONFIRMATION_REPRISE", entite: "Trimestre", entiteId: `${periode.annee}-${periode.rang}` },
+    select: { details: true },
+  });
+  return new Set(
+    lignes.map((l) => {
+      const d = l.details as { ligne?: string; arrondissement?: string; ici?: number; la?: number } | null;
+      return `${d?.ligne}|${d?.arrondissement}|${d?.ici}|${d?.la}`;
+    })
+  );
 }
 
 export interface GrilleSaisie {
@@ -414,7 +435,7 @@ export async function grille(db: PrismaClient, periode: Periode, profil: Profil,
     // Même un tableau purement saisi consolide ses saisies de l’an passé.
     sansAgregation: !automatique,
   });
-  return construireGrille(bloc, section, ctx, profil, donnees, fournisseur(donnees, ctx));
+  return construireGrille(bloc, section, ctx, profil, donnees, fournisseur(donnees, ctx), await reprisesConfirmees(db, periode));
 }
 
 /**
@@ -428,11 +449,12 @@ export async function grilles(db: PrismaClient, periode: Periode, profil: Profil
   const arrondissementId = await arrondissementIdDe(db, profil);
   const donnees = await preparer(db, periode, champsMobilises(), { autoriserIncomplet: true, arrondissementId });
   const valeur = fournisseur(donnees, ctx);
+  const confirmees = await reprisesConfirmees(db, periode);
   const sortie: GrilleSaisie[] = [];
   for (const { bloc, section } of tableaux()) {
     const { colonnes, cles } = coordonnees(bloc, ctx);
     const saisissable = cles.some((l) => colonnes.some((c) => etatCase(bloc, ctx, profil, l, c, valeur.sid) === "saisie"));
-    if (saisissable) sortie.push(construireGrille(bloc, section, ctx, profil, donnees, valeur));
+    if (saisissable) sortie.push(construireGrille(bloc, section, ctx, profil, donnees, valeur, confirmees));
   }
   return sortie;
 }
@@ -443,7 +465,8 @@ function construireGrille(
   ctx: ContexteCanevas,
   profil: Profil,
   donnees: Awaited<ReturnType<typeof preparer>>,
-  valeur: ReturnType<typeof fournisseur>
+  valeur: ReturnType<typeof fournisseur>,
+  confirmees: Set<string> = new Set()
 ): GrilleSaisie {
   const numero = bloc.numero!;
   const { enteteLigne, colonnes, cles, libelles } = coordonnees(bloc, ctx);
@@ -470,7 +493,7 @@ function construireGrille(
   const alertes = [
     ...lettresDansLesNombres(lignes),
     ...avertissements(bloc, ctx, lignes),
-    ...alertesReprises(numero, ctx, donnees.saisies),
+    ...alertesReprises(numero, ctx, donnees.saisies, confirmees),
   ];
   return {
     numero,
@@ -558,21 +581,38 @@ function lettresDansLesNombres(lignes: GrilleSaisie["lignes"]): AlerteGrille[] {
 }
 
 /**
- * Les reprises CONTREDITES : une valeur saisie dans le tableau qui reçoit,
- * différente de ce que porte le tableau d'origine. Affichées des deux côtés.
+ * Les reprises CONTREDITES : l'arrondissement donne, au tableau des
+ * infrastructures d'exploitation, un autre chiffre que le tableau du BAC.
+ *
+ * Décision du Délégué (7 octobre 2026) : ce n'est PAS une erreur de
+ * l'arrondissement. Son chiffre est enregistré et rien ne le bloque ; c'est au
+ * BAC de CONFIRMER son chiffre ou de le CORRIGER. L'avertissement ne s'affiche
+ * donc que dans le tableau du BAC, sur ses cases, avec « Mon chiffre est
+ * juste » ; une fois confirmé, il disparaît tant que les deux chiffres ne
+ * changent pas.
  */
-function alertesReprises(numero: number, ctx: ContexteCanevas, saisies: Map<string, ValeurCellule>): AlerteGrille[] {
-  const concernees = REPRISES.filter((r) => r.tableau === numero || r.source === numero);
+function alertesReprises(
+  numero: number,
+  ctx: ContexteCanevas,
+  saisies: Map<string, ValeurCellule>,
+  confirmees: Set<string> = new Set()
+): AlerteGrille[] {
+  const concernees = REPRISES.filter((r) => r.source === numero);
   const sortie: AlerteGrille[] = [];
   for (const r of concernees) {
     for (const arr of ctx.arrondissements) {
       const ici = saisies.get(cleCellule({ numeroTableau: r.tableau, ligne: r.ligne, colonne: arr }))?.valeur;
       const la = valeurReprise(saisies, r.tableau, r.ligne, arr);
       if (ici == null || la == null || ici === la) continue;
+      if (confirmees.has(`${r.ligne}|${arr}|${ici}|${la}`)) continue;
       sortie.push({
-        texte: `${arr}, « ${r.ligne} » : ${ici} au tableau des infrastructures d'exploitation, ${la} au tableau « Situation des infrastructures » du BAC (${r.lignesSource.join(" + ")}). Vérifiez lequel est juste.`,
-        // Dans le tableau qui reçoit, la case est connue ; dans la source, seulement l'arrondissement.
-        ...(r.tableau === numero ? { ligne: r.ligne, colonne: arr } : {}),
+        texte:
+          `${arr} indique ${ici} pour « ${r.ligne} » (tableau des infrastructures d'exploitation) ; votre tableau en porte ${la} ` +
+          `(${r.lignesSource.join(" + ")}). Confirmez votre chiffre ou corrigez-le.`,
+        ligne: r.lignesSource[0],
+        colonne: arr,
+        cases: r.lignesSource.map((l) => ({ ligne: l, colonne: arr })),
+        confirmable: { ligne: r.ligne, arrondissement: arr, ici, la },
       });
     }
   }

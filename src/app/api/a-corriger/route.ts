@@ -19,6 +19,7 @@ import { etatCircuit } from "@/server/trimestre/circuit";
 import { trimestreARapporter } from "@/lib/trimestreEchu";
 import { verifierCompletudeDD } from "@/server/export/rapport-docx";
 import type { PrismaClient } from "@prisma/client";
+import { observationsDes, aTraiterParLeDA, aRelireParLAuteur, type Observation } from "@/server/observations";
 
 export interface MoisACorriger {
   periodeId: string;
@@ -59,6 +60,8 @@ export interface ReponseACorriger {
   demandes: DemandeDeRenvoi[];
   /** Phase 2 — ce qui empêche de produire le rapport départemental du mois. */
   production: MoisBloque[];
+  /** DA : les observations des chefs à traiter. Chef / DD : celles qu'il a faites, à relire (réponse ou correction du DA). */
+  observations: Observation[];
 }
 
 /**
@@ -91,7 +94,24 @@ export async function GET() {
   try {
     const user = await requireUser();
     const db = user.db;
-    const reponse: ReponseACorriger = { mensuel: [], trimestreRenvoye: null, demandes: [], production: [] };
+    const reponse: ReponseACorriger = { mensuel: [], trimestreRenvoye: null, demandes: [], production: [], observations: [] };
+
+    // Les observations sur une donnée précise (server/observations.ts).
+    if ((user.role === "DA" || user.role === "AGENT_SAISIE") && user.arrondissementId) {
+      const siens = await db.rapportArrondissement.findMany({
+        where: { arrondissementId: user.arrondissementId, periode: { type: "MENSUEL", statut: { not: "ARCHIVEE" } } },
+        select: { id: true },
+      });
+      reponse.observations = (await observationsDes(db as PrismaClient, siens.map((r) => r.id))).filter(aTraiterParLeDA);
+    } else if (user.role === "DD" || user.role.startsWith("CHEF_")) {
+      const faites = await db.auditLog.findMany({
+        where: { action: "OBSERVATION", userId: user.id },
+        select: { entiteId: true },
+        distinct: ["entiteId"],
+      });
+      const ids = faites.map((f) => f.entiteId).filter((x): x is string => Boolean(x));
+      reponse.observations = (await observationsDes(db as PrismaClient, ids)).filter((o) => o.auteurId === user.id && aRelireParLAuteur(o));
+    }
 
     // Les mois en retard, vus par chacun : le DD voit tout ; le DA, son
     // arrondissement ; le chef, sa section — et seulement quand les six

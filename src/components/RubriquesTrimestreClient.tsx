@@ -206,6 +206,20 @@ export default function RubriquesTrimestreClient({
     setTimeout(() => document.getElementById(`rubrique-${suivante.cle}`)?.scrollIntoView({ block: "start", behavior: "smooth" }), 50);
   }
 
+  // `?zone=…` : la rubrique ouverte d'emblée (« À corriger » y mène).
+  const zoneDemandee = useRef<string | null>(
+    typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("zone")
+  );
+  useEffect(() => {
+    const cle = zoneDemandee.current;
+    const z = cle ? ordre.find((x) => x.cle === cle) : undefined;
+    if (!z) return;
+    zoneDemandee.current = null;
+    setSectionsOuvertes((s) => new Set(s).add(z.sectionCle));
+    setZoneOuverte(z.cle);
+    setTimeout(() => document.getElementById(`rubrique-${z.cle}`)?.scrollIntoView({ block: "start", behavior: "smooth" }), 100);
+  }, [ordre]);
+
   async function voirTableau(cle: string, numero: number) {
     await enregistrer(cle); // rien de ce qui est écrit ne se perd en changeant d'écran
     router.push(`/trimestre/saisie?tableau=${numero}`);

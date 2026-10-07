@@ -29,7 +29,9 @@ export type NaturePoint =
   | "grille_autre"
   | "analyse"
   | "file_trimestre"
-  | "renvoi_trimestre";
+  | "renvoi_trimestre"
+  | "observation"
+  | "observation_relire";
 
 export interface Guide {
   /** Pourquoi le SID le signale — en mots simples. */
@@ -215,12 +217,13 @@ export function guideDe(nature: NaturePoint, c: ContexteGuide): Guide {
     case "grille_bac":
       return {
         pourquoi:
-          "Le même chiffre est écrit à deux endroits du rapport : dans ce tableau et dans le tableau « Situation des infrastructures » du BAC. " +
-          "Les deux ne disent pas la même chose : un seul est juste.",
+          "Un arrondissement a donné, au tableau des infrastructures d'exploitation, un autre chiffre que votre tableau « Situation des infrastructures ». " +
+          "Son chiffre est enregistré : rien ne le bloque. C'est à vous de voir lequel est juste, et de confirmer le vôtre ou de le corriger.",
         etapes: [
-          "Lisez le message : il donne les deux chiffres.",
-          "Vérifiez sur le terrain (ou avec le chef BAC) lequel est juste.",
-          "Corrigez le chiffre faux, dans ce tableau ou demandez au chef BAC de corriger le sien.",
+          "Lisez l'avertissement : il donne le chiffre de l'arrondissement et le vôtre.",
+          "Vérifiez auprès de l'arrondissement, ou sur vos documents, lequel est juste.",
+          "Votre chiffre est faux : corrigez la case encadrée en rouge dans votre tableau ; l'avertissement disparaît quand les deux concordent.",
+          "Votre chiffre est juste : touchez « Mon chiffre est juste », sous l'avertissement. Il disparaît tant que les chiffres ne changent pas.",
         ],
       };
     case "grille_autre":
@@ -249,6 +252,31 @@ export function guideDe(nature: NaturePoint, c: ContexteGuide): Guide {
           "Ouvrez l'écran : si la modification est encore permise, refaites-la.",
           "Sinon, demandez au DD de vous renvoyer le rapport trimestriel.",
           "Pour retirer le message : en haut de l'écran, cliquez « … refusée(s) par le serveur — voir », puis « J'ai compris, retirer ».",
+        ],
+      };
+    case "observation":
+      return {
+        pourquoi:
+          "Un chef de section (ou le DD) a relu votre rapport et pense qu'une donnée n'est pas juste. Il ne l'a pas changée lui-même : " +
+          "c'est vous qui connaissez le terrain. Il attend votre correction, ou votre explication si le chiffre est bon.",
+        etapes: [
+          "Lisez l'observation, ci-dessus : ce que le chef a vu, et la valeur actuelle.",
+          "Touchez « Aller corriger » : le tableau s'ouvre, la case est encadrée en rouge.",
+          "Le chiffre est faux ? Tapez le bon chiffre dans la case : il part tout seul vers le serveur, et l'observation disparaît.",
+          "Le chiffre est juste ? Revenez ici, touchez « Le chiffre est juste » et écrivez pourquoi (exemple : « 3 étangs neufs ce mois-ci »). Le chef lira votre réponse.",
+          c.role === "AGENT_SAISIE"
+            ? "Quand toutes les observations sont traitées, prévenez votre DA : c'est lui qui renvoie le rapport."
+            : `Quand toutes les observations sont traitées, cliquez ${envoyer(c)} pour renvoyer le rapport.`,
+        ],
+      };
+    case "observation_relire":
+      return {
+        pourquoi: "Vous aviez signalé une donnée à l'arrondissement. Il a répondu, ou corrigé : c'est à vous de voir si c'est réglé.",
+        etapes: [
+          "Lisez la réponse ci-dessus.",
+          "Touchez « Aller corriger » : le tableau s'ouvre, la donnée est encadrée en rouge.",
+          "C'est réglé : revenez ici et touchez « Clore l'observation ».",
+          "Ce n'est pas réglé : corrigez la donnée vous-même (motif obligatoire), ou signalez-la de nouveau à l'arrondissement.",
         ],
       };
     case "renvoi_trimestre":
