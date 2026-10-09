@@ -31,6 +31,7 @@ export type NaturePoint =
   | "file_trimestre"
   | "renvoi_trimestre"
   | "observation"
+  | "observation_t"
   | "observation_relire";
 
 export interface Guide {
@@ -267,6 +268,19 @@ export function guideDe(nature: NaturePoint, c: ContexteGuide): Guide {
           c.role === "AGENT_SAISIE"
             ? "Quand toutes les observations sont traitées, prévenez votre DA : c'est lui qui renvoie le rapport."
             : `Quand toutes les observations sont traitées, cliquez ${envoyer(c)} pour renvoyer le rapport.`,
+        ],
+      };
+    case "observation_t":
+      return {
+        pourquoi:
+          "Le Délégué Départemental (ou le chef BAC) a relu le rapport trimestriel et pense que ce point n'est pas juste. Il attend votre correction, ou votre explication si c'est juste. " +
+          "Si le rapport (ou votre section) était déjà transmis ou validé, il vous est rouvert pour que vous puissiez corriger.",
+        etapes: [
+          "Lisez l'observation, ci-dessus.",
+          "Touchez « Aller corriger » : la case, l'analyse ou la rubrique s'ouvre directement.",
+          "C'est faux : corrigez (pour une analyse ou un texte, validez ou enregistrez de nouveau). L'observation disparaît d'elle-même.",
+          "C'est juste : revenez ici, touchez le bouton de réponse et expliquez pourquoi. L'auteur lira votre réponse.",
+          "Quand tout est réglé, transmettez de nouveau (ou validez de nouveau votre section) à l'étape du circuit.",
         ],
       };
     case "observation_relire":

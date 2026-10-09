@@ -16,6 +16,152 @@ import { requireUser, assertProprietaireSection, permissionErrorResponse, ROLES_
 import { assertPeriodeModifiable } from "@/server/periodes/gel";
 import { notifierEvenement } from "@/server/notifications/evenements";
 import type { DetailsObservation } from "@/server/observations";
+import type { DetailsObservationT, CibleTrimestre } from "@/server/observationsTrimestre";
+import { trimestrielle } from "@/server/periodes/calendrier";
+import { periodeTrimestrielle } from "@/server/trimestre/rubriques";
+import { tableauDe, grille } from "@/server/trimestre/saisieTrimestrielle";
+import { axeTerritorial } from "@/server/trimestre/canevas/structure";
+import { SECTIONS_CANEVAS, TABLEAUX_BAC, chefDeSection } from "@/server/trimestre/canevas/sections";
+import { zonesTexte } from "@/server/trimestre/rapportCanevas";
+import { arrondissementFige, renvoyer, sectionFigee, annulerValidationSection, codeSection } from "@/server/trimestre/circuit";
+import { listerArrondissements } from "@/lib/arrondissements";
+import type { SessionUser } from "@/lib/permissions";
+
+interface CorpsTrimestre {
+  type?: "case" | "analyse" | "texte";
+  annee?: number;
+  trimestre?: number;
+  numero?: number;
+  ligne?: string;
+  colonne?: string;
+  zone?: string;
+}
+
+/** Un chef de section, en toutes lettres. */
+const CHEF_LISIBLE: Record<string, string> = { CHEF_BAC: "chef BAC", CHEF_PSA: "chef PSA", CHEF_SPAIH: "chef SPAIH", CHEF_SSV: "chef SSV" };
+
+/**
+ * Signaler, au trimestre : une case à son arrondissement (DD, ou chef BAC sur
+ * ses tableaux), une analyse ou un texte du département à son chef de
+ * section (DD). Un rapport transmis est renvoyé ; une section validée
+ * retrouve la main — sinon le destinataire ne pourrait rien corriger.
+ */
+async function signalerTrimestre(user: SessionUser, c: CorpsTrimestre, texte: string) {
+  const db = user.db as PrismaClient;
+  if (!texte) return erreur("Écrivez ce qui ne va pas : le destinataire doit savoir quoi vérifier.", 400);
+  if (!c.annee || !c.trimestre) return erreur("Période non précisée.", 400);
+  const periode = trimestrielle(c.annee, c.trimestre);
+  const T = `T${c.trimestre} ${c.annee}`;
+  let cible: CibleTrimestre;
+  let destinataire: DetailsObservationT["destinataire"];
+
+  if (c.type === "case") {
+    assertRole(user, ["DD", "CHEF_BAC"]);
+    const t = c.numero ? tableauDe(c.numero) : undefined;
+    if (!t || c.ligne == null || !c.colonne) return erreur("Case inconnue.", 400);
+    if (user.role === "CHEF_BAC" && !TABLEAUX_BAC.has(c.numero!)) return erreur("Ce tableau n'est pas du ressort du BAC.", 403);
+    const axe = axeTerritorial(t.bloc);
+    const territoire = axe === "lignes" ? c.ligne : axe === "colonnes" ? c.colonne : null;
+    const arr = territoire ? (await listerArrondissements(db)).find((a) => a.nom === territoire) : undefined;
+    if (!arr) return erreur("Cette case relève du département, pas d'un arrondissement : corrigez-la vous-même.", 400);
+    const g = await grille(db, periode, { role: "DD" }, c.numero!);
+    const l = g?.lignes.find((x) => x.cle === c.ligne);
+    const k = l?.cases.find((x) => x.colonne === c.colonne);
+    if (!l || !k) return erreur("Case inconnue.", 400);
+    cible = {
+      type: "case", numero: c.numero!, titreTableau: t.bloc.titre, ligne: c.ligne, colonne: c.colonne,
+      libelle: `${l.libelle || l.cle} · ${c.colonne}`, valeur: k.saisi ?? k.affiche ?? "vide",
+    };
+    destinataire = { arrondissementId: arr.id, arrondissement: arr.nom };
+  } else if (c.type === "analyse" || c.type === "texte") {
+    assertRole(user, ["DD"]);
+    let chef: string;
+    if (c.type === "analyse") {
+      const t = c.numero ? tableauDe(c.numero) : undefined;
+      const section = t ? SECTIONS_CANEVAS.find((s) => s.blocs.includes(t.bloc)) : undefined;
+      if (!t || !section) return erreur("Tableau inconnu.", 400);
+      chef = chefDeSection(section.cle);
+      cible = { type: "analyse", numero: c.numero!, titreTableau: t.bloc.titre, libelle: `Analyse du tableau ${c.numero} — ${t.bloc.titre}` };
+    } else {
+      const z = zonesTexte({ arrondissement: false }).find((x) => x.cle === c.zone);
+      if (!z) return erreur("Rubrique inconnue.", 400);
+      chef = chefDeSection(z.sectionCle, z.cle);
+      cible = { type: "texte", zone: z.cle, libelle: `Rubrique « ${z.contexte} »` };
+    }
+    destinataire = { chef };
+  } else {
+    return erreur("Que signalez-vous ?", 400);
+  }
+
+  const details: DetailsObservationT = {
+    annee: c.annee, trimestre: c.trimestre, cible, destinataire, texte, auteurNom: user.username, auteurRole: user.role,
+  };
+  await db.auditLog.create({
+    data: { userId: user.id, action: "OBSERVATION_T", entite: "Trimestre", entiteId: `${c.annee}-${c.trimestre}`, details: details as object },
+  });
+
+  const periodeId = await periodeTrimestrielle(db, periode);
+  let rouvert = false;
+  if ("arrondissementId" in destinataire) {
+    if (await arrondissementFige(db, periode, destinataire.arrondissementId)) {
+      await renvoyer(db, user.transaction, periodeId, periode, destinataire.arrondissementId, `Observation — ${cible.libelle} : ${texte}`, user.id);
+      rouvert = true;
+    }
+    await notifierEvenement(db, { arrondissementId: destinataire.arrondissementId, saufUserId: user.id }, {
+      declencheur: "OBSERVATION",
+      message:
+        `Observation ${DU_ROLE[user.role] ?? `de ${user.username}`} sur votre rapport trimestriel ${T} — tableau ${cible.type === "case" ? cible.numero : ""}, « ${cible.libelle} » : ${texte}` +
+        (rouvert ? " Le rapport vous est renvoyé pour correction." : ""),
+      lien: "/a-corriger",
+    });
+  } else {
+    if (await sectionFigee(db, periode, destinataire.chef)) {
+      const code = codeSection(destinataire.chef);
+      if (code) await annulerValidationSection(user.transaction, periodeId, code);
+      rouvert = true;
+    }
+    await notifierEvenement(db, { roles: [destinataire.chef as never] }, {
+      declencheur: "OBSERVATION",
+      message:
+        `Observation du Délégué Départemental sur le rapport trimestriel ${T} — ${cible.libelle} : ${texte}` +
+        (rouvert ? " La validation de votre section est levée pour que vous puissiez corriger." : ""),
+      lien: "/a-corriger",
+    });
+  }
+  return NextResponse.json({ ok: true, rouvert });
+}
+
+/** Répondre (le destinataire) ou clore (l'auteur, ou le DD) une observation du trimestre. */
+async function suiteTrimestre(
+  user: SessionUser,
+  o: { id: string; userId: string | null; details: unknown },
+  action: "repondre" | "clore",
+  texte: string
+) {
+  const db = user.db as PrismaClient;
+  const d = o.details as DetailsObservationT;
+  if (action === "repondre") {
+    const pourMoi =
+      "arrondissementId" in d.destinataire
+        ? (user.role === "DA" || user.role === "AGENT_SAISIE") && user.arrondissementId === d.destinataire.arrondissementId
+        : user.role === d.destinataire.chef;
+    if (!pourMoi) return erreur("Cette observation ne vous est pas adressée.", 403);
+    if (!texte) return erreur("Expliquez votre réponse : l'auteur la lira.", 400);
+    await db.auditLog.create({ data: { userId: user.id, action: "OBSERVATION_REPONSE", entite: "Observation", entiteId: o.id, details: { texte } } });
+    if (o.userId) {
+      const qui = "arrondissement" in d.destinataire ? d.destinataire.arrondissement : `Le ${CHEF_LISIBLE[d.destinataire.chef] ?? d.destinataire.chef}`;
+      await notifierEvenement(db, { userIds: [o.userId] }, {
+        declencheur: "OBSERVATION_REPONSE",
+        message: `${qui} répond à votre observation (rapport trimestriel T${d.trimestre} ${d.annee}, « ${d.cible.libelle} ») : ${texte}`,
+        lien: "/a-corriger",
+      });
+    }
+    return NextResponse.json({ ok: true });
+  }
+  if (user.id !== o.userId && user.role !== "DD") return erreur("Seul l'auteur de l'observation (ou le DD) la clôt.", 403);
+  await db.auditLog.create({ data: { userId: user.id, action: "OBSERVATION_CLOSE", entite: "Observation", entiteId: o.id } });
+  return NextResponse.json({ ok: true });
+}
 
 const NOMS_MOIS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
 const moisDe = (p: { mois: number | null; annee: number }) => (p.mois ? `${NOMS_MOIS[p.mois - 1]} ${p.annee}` : String(p.annee));
@@ -133,9 +279,15 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, renvoye });
     }
 
+    // ------------------------------------------------------------ signaler (trimestre)
+    if (corps.action === "signaler_t") {
+      return await signalerTrimestre(user, corps as CorpsTrimestre, texte);
+    }
+
     // ------------------------------------------------------------ répondre / clore
     if (corps.action === "repondre" || corps.action === "clore") {
       const o = await db.auditLog.findUnique({ where: { id: corps.observationId ?? "" }, select: { id: true, action: true, entiteId: true, userId: true, details: true } });
+      if (o?.action === "OBSERVATION_T") return await suiteTrimestre(user, o, corps.action, texte);
       if (!o || o.action !== "OBSERVATION" || !o.entiteId) return erreur("Observation introuvable.", 404);
       const rapport = await db.rapportArrondissement.findUnique({
         where: { id: o.entiteId },

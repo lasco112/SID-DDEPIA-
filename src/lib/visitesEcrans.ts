@@ -142,7 +142,7 @@ export const VISITES: Record<string, DefinitionVisite> = {
     ],
   },
   "trimestre-saisie-tableau": {
-    version: 2,
+    version: 3,
     etapes: [
       {
         cible: "case-saisie",
@@ -160,6 +160,12 @@ export const VISITES: Record<string, DefinitionVisite> = {
         titre: "Mon chiffre est juste",
         texte: "Un arrondissement a donné un autre chiffre que le vôtre. Si le vôtre est juste, confirmez-le ici : l'avertissement disparaît. Sinon, corrigez votre case.",
         depuis: 2,
+      },
+      {
+        cible: "mode-signaler",
+        titre: "Signaler une case",
+        texte: "Une case d'un arrondissement vous paraît fausse ? Touchez ce bouton, puis la case : écrivez ce qui ne va pas, l'arrondissement reçoit un lien direct.",
+        depuis: 3,
       },
       { cible: "tableau-suivant-trimestre", titre: "Tableau suivant", texte: "Passe au tableau suivant, sans revenir à la liste." },
       { cible: "retour-liste-trimestre", titre: "Tous les tableaux", texte: "Revient à la liste des tableaux du trimestre." },
@@ -182,7 +188,7 @@ export const VISITES: Record<string, DefinitionVisite> = {
     ],
   },
   "analyses-detail": {
-    version: 1,
+    version: 2,
     etapes: [
       { cible: "texte-analyse", titre: "Le texte proposé", texte: "Écrit par le SID à partir des chiffres du tableau. C'est ce qui figurera dans le rapport." },
       { cible: "voir-calcul", titre: "Voir le calcul", texte: "Montre d'où vient chaque chiffre de la phrase, pour vérifier." },
@@ -190,6 +196,12 @@ export const VISITES: Record<string, DefinitionVisite> = {
       { cible: "explication", titre: "Explication", texte: "Facultatif : la cause d'une hausse ou d'une baisse, que les chiffres ne disent pas. Elle s'ajoute à la fin du texte." },
       { cible: "valider-analyse", titre: "Valider et passer au suivant", texte: "Le texte est juste : validez, et le SID ouvre l'analyse suivante." },
       { cible: "corriger-texte", titre: "Corriger le texte", texte: "Pour changer une tournure. Les chiffres, eux, viennent du tableau." },
+      {
+        cible: "signaler-analyse",
+        titre: "Signaler au chef de section",
+        texte: "L'analyse ne vous convient pas ? Écrivez ce qui manque : le chef qui la valide reçoit un lien direct, et retrouve la main si sa section était validée.",
+        depuis: 2,
+      },
     ],
   },
 
@@ -216,7 +228,7 @@ export const VISITES: Record<string, DefinitionVisite> = {
     ],
   },
   "rubrique-ouverte": {
-    version: 1,
+    version: 2,
     etapes: [
       { cible: "consigne", titre: "La consigne", texte: "Ce qu'on attend dans cette rubrique." },
       { cible: "voir-tableau-rubrique", titre: "Voir le tableau", texte: "Ouvre le tableau dont parle la rubrique, pour écrire avec les chiffres sous les yeux." },
@@ -225,6 +237,12 @@ export const VISITES: Record<string, DefinitionVisite> = {
       { cible: "texte-automatique", titre: "Texte automatique", texte: "Le SID a rédigé cette rubrique à partir des chiffres ; elle suit les chiffres toute seule. « Modifier ce texte » pour l'écrire vous-même." },
       { cible: "rubrique-texte", titre: "Votre texte", texte: "Écrivez ici. Le texte s'enregistre quand vous quittez la case. Laissée vide, la rubrique porte « Néant. » dans le rapport." },
       { cible: "rubrique-suivante", titre: "Enregistrer et rubrique suivante", texte: "Enregistre, puis ouvre la rubrique suivante à rédiger." },
+      {
+        cible: "signaler-rubrique",
+        titre: "Signaler au chef de section",
+        texte: "Le texte d'un chef ne vous convient pas ? Écrivez ce qui manque : il reçoit un lien direct vers la rubrique.",
+        depuis: 2,
+      },
     ],
   },
   circuit: {
@@ -287,11 +305,15 @@ export const VISITES: Record<string, DefinitionVisite> = {
     ],
   },
   "dd-donnees": {
-    version: 1,
+    version: 2,
     etapes: [
       { cible: "choix-arrondissement", titre: "Quel arrondissement ?", texte: "La vue départementale montre les six côte à côte ; touchez un nom pour n'en voir qu'un." },
       { cible: "choix-tableau-dd", titre: "Quel tableau ?", texte: "Choisissez un des 28 tableaux du mois." },
-      { cible: "valeur-corrigeable", titre: "Corriger une valeur", texte: "Touchez un chiffre pour le corriger. Le motif est obligatoire et la modification reste dans l'historique." },
+      {
+        cible: "valeur-corrigeable",
+        titre: "Signaler ou corriger une valeur",
+        texte: "Touchez un chiffre. « Signaler au DA » : il reçoit un lien vers la case et corrige ou explique. « Corriger moi-même » : motif obligatoire, la modification reste dans l'historique.",
+      },
     ],
   },
   etablissements: {

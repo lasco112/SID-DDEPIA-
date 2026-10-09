@@ -24,6 +24,8 @@ import HorsLigneTrimestre from "@/components/HorsLigneTrimestre";
 import ComparaisonMensuel, { type ControleCategories } from "@/components/ComparaisonMensuel";
 import { cibles, cibleTrimestrielle } from "@/lib/surlignage";
 import VisiteGuidee from "@/components/VisiteGuidee";
+import SignalerPanneau, { envoyerObservation } from "@/components/SignalerPanneau";
+import { useUtilisateur } from "@/components/UtilisateurContexte";
 
 type EtatCase = "saisie" | "calculee" | "total" | "lecture";
 
@@ -120,6 +122,11 @@ export default function SaisieTrimestrielleClient({
    * tape déjà dans la case suivante pendant que la précédente s'enregistre.
    */
   const enCoursDeFrappe = useRef(new Set<string>());
+  // Signaler une case à l'arrondissement qu'elle concerne (DD, chef BAC).
+  const moi = useUtilisateur();
+  const peutSignaler = moi?.role === "DD" || moi?.role === "CHEF_BAC";
+  const [modeSignaler, setModeSignaler] = useState(false);
+  const [aSignaler, setASignaler] = useState<{ ligne: string; colonne: string; libelle: string; valeur: string | null } | null>(null);
 
   const urlGrille = useCallback(
     (numero: number) => `/api/trimestre/saisie?annee=${annee}&trimestre=${trimestre}&tableau=${numero}`,
@@ -215,6 +222,8 @@ export default function SaisieTrimestrielleClient({
   }, [liste, chargerGrille]);
 
   function ouvrir(numero: number, forcer = false) {
+    setModeSignaler(false);
+    setASignaler(null);
     setRefus(null);
     setControle(null);
     enCoursDeFrappe.current.clear();
@@ -430,6 +439,42 @@ export default function SaisieTrimestrielleClient({
 
         <div className="mt-4 rounded-md border border-gray-200 bg-white p-3">
           {chargementGrille && !grille && <p className="text-sm text-gray-600">Chargement…</p>}
+          {peutSignaler && grille && grille.numero === courant.numero && (
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                data-visite="mode-signaler"
+                onClick={() => {
+                  setModeSignaler((v) => !v);
+                  setASignaler(null);
+                }}
+                className={`min-h-[44px] rounded-md border px-3 py-2 text-sm font-semibold ${
+                  modeSignaler ? "border-amber-600 bg-amber-600 text-white" : "border-amber-600 bg-white text-amber-800"
+                }`}
+              >
+                {modeSignaler ? "Terminer le signalement" : "Signaler une case à l'arrondissement"}
+              </button>
+              {modeSignaler && <span className="text-sm text-amber-900">Touchez la case qui ne va pas.</span>}
+            </div>
+          )}
+          {aSignaler && grille && (
+            <SignalerPanneau
+              titre={`Tableau ${grille.numero} · ${aSignaler.libelle}`}
+              valeur={aSignaler.valeur}
+              destinataire="l'arrondissement concerné"
+              onFermer={() => setASignaler(null)}
+              onEnvoyer={async (texte) => {
+                const { erreur: e, donnees } = await envoyerObservation({
+                  action: "signaler_t", type: "case", annee, trimestre, numero: grille.numero, ligne: aSignaler.ligne, colonne: aSignaler.colonne, texte,
+                });
+                if (e) return e;
+                setASignaler(null);
+                setModeSignaler(false);
+                setInfo(donnees.rouvert ? "Observation envoyée. Le rapport de l'arrondissement était transmis : il lui est renvoyé." : "Observation envoyée à l'arrondissement.");
+                return null;
+              }}
+            />
+          )}
           {grille && grille.numero === courant.numero && (
             <TableauSaisie
               refus={refus}
@@ -445,6 +490,8 @@ export default function SaisieTrimestrielleClient({
               }}
               onQuitter={enregistrer}
               onConfirmerReprise={(c) => void confirmerReprise(c)}
+              signalement={modeSignaler}
+              onSignaler={(l, c) => setASignaler({ ligne: l.cle, colonne: c.colonne, libelle: `${l.libelle || l.cle} · ${c.colonne}`, valeur: c.saisi ?? c.affiche })}
             />
           )}
           <Enchainement
@@ -726,6 +773,8 @@ function TableauSaisie({
   onChange,
   onQuitter,
   onConfirmerReprise,
+  signalement = false,
+  onSignaler,
 }: {
   refus: string | null;
   controle: ControleCategories | null;
@@ -739,6 +788,9 @@ function TableauSaisie({
   onQuitter: (ligne: string, colonne: string, avant: string | null) => void;
   /** Le BAC confirme son chiffre face à celui d'un arrondissement. */
   onConfirmerReprise?: (c: ConfirmationReprise) => void;
+  /** Mode « signaler » : toucher une case l'ouvre au signalement au lieu de la modifier. */
+  signalement?: boolean;
+  onSignaler?: (l: Grille["lignes"][number], c: CaseGrille) => void;
 }) {
   const colonnes = grille.lignes[0]?.cases.map((c) => c.colonne) ?? [];
   const lignesSaisies = grille.lignes.filter((l) => l.cases.some((c) => c.etat === "saisie"));
@@ -750,6 +802,18 @@ function TableauSaisie({
 
   const champ = (l: Grille["lignes"][number], c: CaseGrille, large = false) => {
     const k = cleCase(l.cle, c.colonne);
+    if (signalement) {
+      return (
+        <button
+          type="button"
+          data-visite="case-signalable"
+          onClick={() => onSignaler?.(l, c)}
+          className="block w-full rounded-sm px-2 py-1 text-left outline-dashed outline-1 outline-amber-400 hover:bg-amber-100"
+        >
+          {valeurs[k] || c.saisi || c.affiche || "—"}
+        </button>
+      );
+    }
     if (c.etat === "saisie") {
       return (
         <input

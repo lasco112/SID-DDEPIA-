@@ -13,6 +13,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import VisiteGuidee from "@/components/VisiteGuidee";
 import { jeton } from "@/lib/surlignage";
+import SignalerPanneau, { envoyerObservation } from "@/components/SignalerPanneau";
 
 interface Arrondissement { id: string; code: string; nom: string }
 interface Template { code: string; numero: string; titre: string; type: string; section: string }
@@ -104,8 +105,13 @@ export default function DDDonneesClient({
     chargerHistorique();
   }, [chargerHistorique]);
 
+  /** Signaler la donnée au DA (par défaut : c'est lui qui connaît le terrain), ou la corriger soi-même. */
+  const [mode, setMode] = useState<"signaler" | "corriger">("signaler");
+
   function ouvrirCorrection(id: string, libelle: string, valeurActuelle: string, famille: string) {
     setCible({ id, famille, libelle, valeurActuelle });
+    setMode("signaler");
+    setTimeout(() => document.getElementById("panneau-donnee-dd")?.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
     setNouvelleValeur(valeurActuelle);
     setMotif("");
     setMessage(null);
@@ -148,8 +154,9 @@ export default function DDDonneesClient({
       <h1 className="text-2xl font-bold text-primary-dark">Données par arrondissement</h1>
       <VisiteGuidee ecran="dd-donnees" />
       <p className="mt-1 text-sm text-ink-muted">
-        Période de travail : <strong>{MOIS[periode.mois]} {periode.annee}</strong>. Cliquez une valeur pour la corriger —
-        le motif est obligatoire et la modification est conservée dans l'historique.
+        Période de travail : <strong>{MOIS[periode.mois]} {periode.annee}</strong>. Touchez une valeur pour la signaler au DA
+        (il corrige ou explique), ou pour la corriger vous-même — le motif est alors obligatoire et la modification est
+        conservée dans l'historique.
       </p>
 
       <div data-visite="choix-arrondissement" className="mt-5 flex flex-wrap gap-2">
@@ -251,7 +258,40 @@ export default function DDDonneesClient({
       {vue?.template?.type === "EVENEMENT" && <TableEvenement vue={vue} arrondissement={arrondissement} />}
 
       {cible && (
-        <div className="mt-4 max-w-md rounded-lg border border-blue-200 bg-blue-50 p-4">
+        <div id="panneau-donnee-dd" className="mt-4 grid max-w-md grid-cols-2 gap-2 scroll-mt-4" role="tablist">
+          {(["signaler", "corriger"] as const).map((m) => (
+            <button
+              key={m}
+              type="button"
+              role="tab"
+              aria-selected={mode === m}
+              onClick={() => setMode(m)}
+              className={`min-h-[44px] rounded-md border px-3 py-2 text-sm font-semibold ${mode === m ? "border-primary bg-primary text-white" : "border-gray-300 bg-white text-gray-700"}`}
+            >
+              {m === "signaler" ? "Signaler au DA" : "Corriger moi-même"}
+            </button>
+          ))}
+        </div>
+      )}
+      {cible && mode === "signaler" && (
+        <div className="max-w-md">
+          <SignalerPanneau
+            titre={cible.libelle}
+            valeur={cible.valeurActuelle}
+            destinataire="le DA de l'arrondissement"
+            onFermer={() => setCible(null)}
+            onEnvoyer={async (texte) => {
+              const { erreur: e, donnees } = await envoyerObservation({ action: "signaler", famille: cible.famille, saisieId: cible.id, texte });
+              if (e) return e;
+              setCible(null);
+              setMessage(donnees.renvoye ? "Observation envoyée. Le rapport était transmis : il est renvoyé au DA." : "Observation envoyée au DA.");
+              return null;
+            }}
+          />
+        </div>
+      )}
+      {cible && mode === "corriger" && (
+        <div className="mt-2 max-w-md rounded-lg border border-blue-200 bg-blue-50 p-4">
           <h3 className="font-semibold text-primary-dark">Corriger une donnée</h3>
           <p className="mt-1 text-sm text-gray-700">{cible.libelle}</p>
           <p className="text-sm text-gray-600">Valeur actuelle : {cible.valeurActuelle || "Non renseigné"}</p>

@@ -23,6 +23,7 @@ import { useRouter } from "next/navigation";
 import { lireAvecCopie, envoyer, enAttente } from "@/lib/trimestreHorsLigne";
 import HorsLigneTrimestre from "@/components/HorsLigneTrimestre";
 import VisiteGuidee from "@/components/VisiteGuidee";
+import SignalerPanneau, { envoyerObservation } from "@/components/SignalerPanneau";
 
 interface Zone {
   cle: string;
@@ -86,6 +87,9 @@ export default function RubriquesTrimestreClient({
   const [chargement, setChargement] = useState(true);
   const [sectionsOuvertes, setSectionsOuvertes] = useState<Set<string>>(new Set());
   const [zoneOuverte, setZoneOuverte] = useState<string | null>(null);
+  /** Le DD signale une rubrique au chef de section qui la rédige. */
+  const [zoneASignaler, setZoneASignaler] = useState<string | null>(null);
+  const [infoSignal, setInfoSignal] = useState<string | null>(null);
   const [filtre, setFiltre] = useState<"toutes" | "a_rediger">("toutes");
   const [enCours, setEnCours] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -443,10 +447,36 @@ export default function RubriquesTrimestreClient({
                               >
                                 Fermer
                               </button>
+                              {role === "DD" && (
+                                <button
+                                  type="button"
+                                  data-visite="signaler-rubrique"
+                                  onClick={() => setZoneASignaler(z.cle)}
+                                  className="w-full rounded-lg border border-amber-600 px-4 py-3 text-sm font-semibold text-amber-800 sm:w-auto"
+                                >
+                                  Signaler au chef de section
+                                </button>
+                              )}
                               <span className="text-[11px] text-ink-muted sm:ml-auto">
                                 {(saisie[z.cle] ?? "").trim() ? `${(saisie[z.cle] ?? "").trim().length} caractères` : ""}
                               </span>
                             </div>
+                            {zoneASignaler === z.cle && (
+                              <SignalerPanneau
+                                titre={`Rubrique « ${z.contexte} »`}
+                                destinataire="le chef de section qui la rédige"
+                                exemple="Ex. : les perspectives ne parlent pas de la campagne de vaccination prévue."
+                                onFermer={() => setZoneASignaler(null)}
+                                onEnvoyer={async (texte) => {
+                                  const { erreur: e, donnees } = await envoyerObservation({ action: "signaler_t", type: "texte", annee: choix.annee, trimestre: choix.trimestre, zone: z.cle, texte });
+                                  if (e) return e;
+                                  setZoneASignaler(null);
+                                  setInfoSignal(donnees.rouvert ? "Observation envoyée. La section était validée : la main est rendue au chef." : "Observation envoyée au chef de section.");
+                                  return null;
+                                }}
+                              />
+                            )}
+                            {infoSignal && <p className="mt-2 rounded bg-green-50 p-2 text-sm text-green-900">{infoSignal}</p>}
                           </div>
                         )}
                       </li>

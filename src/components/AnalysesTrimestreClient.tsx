@@ -17,6 +17,8 @@ import { trimestreARapporter } from "@/lib/trimestreEchu";
 import { lireAvecCopie, envoyer as envoyerOuGarder, enAttente } from "@/lib/trimestreHorsLigne";
 import HorsLigneTrimestre from "@/components/HorsLigneTrimestre";
 import VisiteGuidee from "@/components/VisiteGuidee";
+import SignalerPanneau, { envoyerObservation } from "@/components/SignalerPanneau";
+import { useUtilisateur } from "@/components/UtilisateurContexte";
 
 type Statut = "vide" | "a_valider" | "valide" | "a_revoir";
 
@@ -110,6 +112,9 @@ export default function AnalysesTrimestreClient({
   const [anPasseSaisi, setAnPasseSaisi] = useState<Record<string, string>>({});
   /** Tableaux pour lesquels la personne a dit ne pas avoir le chiffre de l'an passé. */
   const [sansAnPasse, setSansAnPasse] = useState<Record<number, boolean>>({});
+  // Le DD signale une analyse du département au chef de section qui la valide.
+  const moi = useUtilisateur();
+  const [signaler, setSignaler] = useState(false);
 
   const charger = useCallback(async () => {
     setErreur(null);
@@ -209,6 +214,7 @@ export default function AnalysesTrimestreClient({
     setCorrection(null);
     setVoirCalcul(false);
     setExplication(courant?.explication ?? "");
+    setSignaler(false);
     if (courant) window.scrollTo({ top: 0 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ouvert]);
@@ -398,6 +404,16 @@ export default function AnalysesTrimestreClient({
                   Annuler la correction
                 </button>
               )}
+              {moi?.role === "DD" && (
+                <button
+                  type="button"
+                  data-visite="signaler-analyse"
+                  onClick={() => setSignaler(true)}
+                  className="rounded-md border border-amber-600 px-4 py-3 text-sm font-semibold text-amber-800 hover:bg-amber-50"
+                >
+                  Signaler au chef de section
+                </button>
+              )}
               {(courant.statut === "valide" || courant.statut === "a_revoir") && (
                 <button
                   type="button"
@@ -409,6 +425,21 @@ export default function AnalysesTrimestreClient({
                 </button>
               )}
             </div>
+            {signaler && (
+              <SignalerPanneau
+                titre={`Analyse du tableau ${courant.numero} — ${courant.titre}`}
+                destinataire="le chef de section qui la valide"
+                exemple="Ex. : l'analyse ne dit pas pourquoi les abattages ont baissé de 30 %."
+                onFermer={() => setSignaler(false)}
+                onEnvoyer={async (texte) => {
+                  const { erreur: e, donnees } = await envoyerObservation({ action: "signaler_t", type: "analyse", annee, trimestre, numero: courant.numero, texte });
+                  if (e) return e;
+                  setSignaler(false);
+                  setInfo(donnees.rouvert ? "Observation envoyée. La section était validée : la main est rendue au chef." : "Observation envoyée au chef de section.");
+                  return null;
+                }}
+              />
+            )}
           </div>
         )}
 

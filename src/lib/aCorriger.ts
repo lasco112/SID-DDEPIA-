@@ -484,6 +484,58 @@ function pointsObservations(serveur: ReponseACorriger | null, role: string, peri
   });
 }
 
+/** Les observations du TRIMESTRE : celles à traiter, et celles à relire par leur auteur. */
+function pointsObservationsT(serveur: ReponseACorriger | null, role: string): PointACorriger[] {
+  type O = ReponseACorriger["observationsTATraiter"][number];
+  const lienDe = (o: O) => {
+    const c = o.cible;
+    if (c.type === "case")
+      return avecCible(`/trimestre/saisie?tableau=${c.numero}`, [cibleTrimestrielle.case(c.ligne, c.colonne), cibleTrimestrielle.ligne(c.ligne)]);
+    if (c.type === "analyse") return `/trimestre/analyses?tableau=${c.numero}`;
+    return `${role === "DD" ? "/dd/trimestre/rubriques" : "/trimestre/textes"}?zone=${encodeURIComponent(c.zone)}`;
+  };
+  const ordre = (o: O) => [1, 0, o.cible.type === "texte" ? 999 : o.cible.numero, 0];
+  const T = (o: O) => `Trimestriel · T${o.trimestre} ${o.annee}`;
+  const qui = (o: O) => ("arrondissement" in o.destinataire ? o.destinataire.arrondissement : `le ${o.destinataire.chef.replace("CHEF_", "chef ")}`);
+
+  const aTraiter = (serveur?.observationsTATraiter ?? []).map((o): PointACorriger => ({
+    id: `obst|${o.id}`,
+    gravite: "bloquant",
+    rapport: "trimestriel",
+    ou: `${T(o)} · ${o.cible.type === "case" ? `Tableau ${o.cible.numero} ${o.cible.titreTableau} · ` : ""}${o.cible.libelle}`,
+    quoi:
+      `Observation ${DU_AUTEUR[o.auteurRole] ?? `de ${o.auteurNom}`} : « ${o.texte} »` +
+      (o.cible.type === "case" ? ` (valeur actuelle : ${o.cible.valeur}).` : "."),
+    faire:
+      o.cible.type === "case"
+        ? "Corrigez la case encadrée en rouge. Si le chiffre est juste, touchez « Le chiffre est juste » et expliquez pourquoi."
+        : "Ouvrez-la, corrigez le texte, puis validez de nouveau. Si elle est juste, répondez en expliquant pourquoi.",
+    lien: lienDe(o),
+    action: {
+      libelle: o.cible.type === "case" ? "Le chiffre est juste" : "Répondre sans modifier",
+      corps: { action: "repondre", observationId: o.id },
+      demandeTexte: o.cible.type === "case" ? "Pourquoi ce chiffre est juste (l'auteur lira votre réponse)" : "Votre réponse (l'auteur la lira)",
+    },
+    ordre: ordre(o),
+    nature: "observation_t",
+  }));
+  const aRelire = (serveur?.observationsTARelire ?? []).map((o): PointACorriger => ({
+    id: `obstr|${o.id}`,
+    gravite: "a_verifier",
+    rapport: "trimestriel",
+    ou: `${T(o)} · ${o.cible.type === "case" ? `Tableau ${o.cible.numero}` : qui(o)} · ${o.cible.libelle}`,
+    quoi: o.reponse
+      ? `${qui(o)} répond à votre observation (« ${o.texte} ») : « ${o.reponse.texte} ».`
+      : `${qui(o)} a modifié ce que vous aviez signalé (« ${o.texte} »).`,
+    faire: "Relisez. Si c'est réglé, touchez « Clore l'observation » ; sinon, corrigez vous-même ou signalez de nouveau.",
+    lien: lienDe(o),
+    action: { libelle: "Clore l'observation", corps: { action: "clore", observationId: o.id } },
+    ordre: [...ordre(o).slice(0, 3), 1],
+    nature: "observation_relire",
+  }));
+  return [...aTraiter, ...aRelire];
+}
+
 /** Exécute le geste d'un point (observations). Rend le message à afficher. */
 export async function executerAction(p: PointACorriger, texte?: string): Promise<{ ok: boolean; message: string }> {
   if (!p.action) return { ok: false, message: "" };
@@ -496,7 +548,7 @@ export async function executerAction(p: PointACorriger, texte?: string): Promise
     const d = (await r.json().catch(() => ({}))) as { message?: string };
     if (!r.ok) return { ok: false, message: d.message ?? "L'envoi a échoué." };
     oublierServeur();
-    return { ok: true, message: p.action.corps.action === "clore" ? "Observation close." : "Réponse envoyée : le chef est prévenu." };
+    return { ok: true, message: p.action.corps.action === "clore" ? "Observation close." : "Réponse envoyée : l'auteur de l'observation est prévenu." };
   } catch {
     return { ok: false, message: "Pas de réseau : réessayez une fois connecté." };
   }
@@ -637,6 +689,7 @@ async function calculer(options: { forcerServeur?: boolean }): Promise<PointACor
   if (moi.role === "DA" || moi.role === "AGENT_SAISIE") points.push(...(await pointsMensuels(moi.username, moi.periodeActiveId, serveur)));
   if (moi.role === "DD") points.push(...pointsDuDD(serveur, moi.periodeActiveId));
   points.push(...pointsDeProduction(serveur, moi.role, moi.periodeActiveId, points));
+  points.push(...pointsObservationsT(serveur, moi.role));
   const observations = pointsObservations(serveur, moi.role, moi.periodeActiveId);
   points.push(...observations);
   // Un rapport renvoyé POUR des observations : chaque observation a son point,

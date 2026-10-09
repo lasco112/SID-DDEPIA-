@@ -20,6 +20,7 @@ import { trimestreARapporter } from "@/lib/trimestreEchu";
 import { verifierCompletudeDD } from "@/server/export/rapport-docx";
 import type { PrismaClient } from "@prisma/client";
 import { observationsDes, aTraiterParLeDA, aRelireParLAuteur, type Observation } from "@/server/observations";
+import { observationsTrimestre, aTraiterT, aRelireT, type ObservationT } from "@/server/observationsTrimestre";
 
 export interface MoisACorriger {
   periodeId: string;
@@ -62,6 +63,9 @@ export interface ReponseACorriger {
   production: MoisBloque[];
   /** DA : les observations des chefs à traiter. Chef / DD : celles qu'il a faites, à relire (réponse ou correction du DA). */
   observations: Observation[];
+  /** Trimestre : les observations à traiter (destinataire), et celles à relire (auteur). */
+  observationsTATraiter: ObservationT[];
+  observationsTARelire: ObservationT[];
 }
 
 /**
@@ -94,7 +98,19 @@ export async function GET() {
   try {
     const user = await requireUser();
     const db = user.db;
-    const reponse: ReponseACorriger = { mensuel: [], trimestreRenvoye: null, demandes: [], production: [], observations: [] };
+    const reponse: ReponseACorriger = {
+      mensuel: [], trimestreRenvoye: null, demandes: [], production: [], observations: [], observationsTATraiter: [], observationsTARelire: [],
+    };
+
+    // Les observations du trimestre : celles qui me sont adressées, et celles que j'ai faites.
+    if ((user.role === "DA" || user.role === "AGENT_SAISIE") && user.arrondissementId) {
+      reponse.observationsTATraiter = (await observationsTrimestre(db as PrismaClient, { arrondissementId: user.arrondissementId })).filter(aTraiterT);
+    } else if (user.role.startsWith("CHEF_")) {
+      reponse.observationsTATraiter = (await observationsTrimestre(db as PrismaClient, { chef: user.role })).filter(aTraiterT);
+    }
+    if (user.role === "DD" || user.role === "CHEF_BAC") {
+      reponse.observationsTARelire = (await observationsTrimestre(db as PrismaClient, { auteurId: user.id })).filter(aRelireT);
+    }
 
     // Les observations sur une donnée précise (server/observations.ts).
     if ((user.role === "DA" || user.role === "AGENT_SAISIE") && user.arrondissementId) {
