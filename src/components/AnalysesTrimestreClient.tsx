@@ -18,7 +18,10 @@ import { lireAvecCopie, envoyer as envoyerOuGarder, enAttente } from "@/lib/trim
 import HorsLigneTrimestre from "@/components/HorsLigneTrimestre";
 import VisiteGuidee from "@/components/VisiteGuidee";
 import SignalerPanneau, { envoyerObservation } from "@/components/SignalerPanneau";
-import TableauConsolide from "@/components/TableauConsolide";
+import TableauConsolide, { GENRES } from "@/components/TableauConsolide";
+
+/** Les genres comptés dans la liste : ce qui demande un regard (la transmission se lit ailleurs). */
+const GENRES_LISTE = ["erreur", "ecart", "manque", "variation", "observation"] as const;
 import { useUtilisateur } from "@/components/UtilisateurContexte";
 
 type Statut = "vide" | "a_valider" | "valide" | "a_revoir";
@@ -43,6 +46,8 @@ interface Analyse {
   sansComparaison: boolean;
   /** Le chiffre de l'an passé qui manque à la comparaison, case par case. */
   anPasse?: CaseAnPasse[];
+  /** Département : les points à vérifier dans le tableau, comptés par genre. */
+  aVerifier?: Partial<Record<keyof typeof GENRES, number>>;
   /** Validée ou retirée hors ligne : gardée sur le téléphone, pas encore envoyée. */
   surLeTelephone?: boolean;
 }
@@ -300,10 +305,14 @@ export default function AnalysesTrimestreClient({
         </div>
 
         {courant.statut === "vide" ? (
-          <p className="mt-4 rounded-md border border-gray-200 bg-white p-4 text-sm text-gray-700">
-            Ce tableau n&apos;a aucune donnée pour cette période : il n&apos;y a rien à analyser. Remplissez-le d&apos;abord
-            (rapports mensuels ou saisie trimestrielle).
-          </p>
+          <div className="mt-4 space-y-4">
+            <p className="rounded-md border border-gray-200 bg-white p-4 text-sm text-gray-700">
+              Ce tableau n&apos;a aucune donnée pour cette période : il n&apos;y a rien à analyser. Remplissez-le d&apos;abord
+              (rapports mensuels ou saisie trimestrielle).
+            </p>
+            {/* Vide : c'est le manquement le plus fort — qui n'a pas rempli, se voit ici. */}
+            <TableauConsolide username={username} annee={annee} trimestre={trimestre} numero={courant.numero} />
+          </div>
         ) : (
           <div className="mt-4 space-y-4 rounded-md border border-gray-200 bg-white p-4">
             {courant.statut === "a_revoir" && (
@@ -478,6 +487,7 @@ export default function AnalysesTrimestreClient({
     else sections.push({ titre: a.section, analyses: [a] });
   }
   const premier = ecran.analyses.find((a) => a.statut === "a_valider" || a.statut === "a_revoir");
+  const aVoir = ecran.analyses.filter((a) => GENRES_LISTE.some((g) => a.aVerifier?.[g]));
 
   return (
     <div className="max-w-3xl">
@@ -518,6 +528,13 @@ export default function AnalysesTrimestreClient({
       <p className="mt-4 text-sm text-gray-700">
         <strong>{validees}</strong> analyse(s) validée(s), <strong>{aTraiter}</strong> à relire.
       </p>
+      {aVoir.length > 0 && (
+        <p className="mt-1 text-sm text-gray-700">
+          <strong>{aVoir.length}</strong> tableau{aVoir.length > 1 ? "x" : ""} avec des points à vérifier (
+          {aVoir.filter((a) => a.aVerifier?.erreur || a.aVerifier?.ecart).length} avec une erreur ou un écart) : ouvrez-les, la liste
+          est au-dessus du tableau.
+        </p>
+      )}
       {premier && (
         <button
           type="button"
@@ -569,6 +586,15 @@ export default function AnalysesTrimestreClient({
                     </span>
                     {anPasseAFaire(a) && (
                       <span className="rounded bg-red-100 px-2 py-0.5 text-[11px] font-semibold text-red-800">an passé à saisir</span>
+                    )}
+                    {GENRES_LISTE.some((g) => a.aVerifier?.[g]) && (
+                      <span data-visite="points-liste" className="flex flex-wrap justify-end gap-1">
+                        {GENRES_LISTE.filter((g) => a.aVerifier?.[g]).map((g) => (
+                          <span key={g} className={`rounded px-1.5 py-0.5 text-[11px] font-semibold ${GENRES[g].puce}`}>
+                            {a.aVerifier![g]} {a.aVerifier![g]! > 1 ? GENRES[g].pluriel : GENRES[g].libelle.toLowerCase()}
+                          </span>
+                        ))}
+                      </span>
                     )}
                   </span>
                 </button>

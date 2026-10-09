@@ -37,6 +37,28 @@ test("un DA ne voit que son arrondissement", async () => {
   assert.deepEqual(c!.versions, []);
 });
 
+test("les points à vérifier ne s'adressent qu'au département, et chaque case visée existe", async () => {
+  const [premier] = (await listerArrondissements(base)).map((a) => a.nom);
+  const da = await consulterTableau(base, periode, { role: "DA", arrondissement: premier }, 14);
+  assert.deepEqual(da!.points, [], "un DA a son propre écran de saisie et « À corriger »");
+  const c = await consulterTableau(base, periode, { role: "CHEF_PSA" }, 14);
+  const cles = new Set(c!.tableau.lignes.map((l) => l.cle));
+  for (const p of c!.points) {
+    for (const k of p.cases) {
+      assert.ok(cles.has(k.ligne), `ligne « ${k.ligne} » du point « ${p.texte} »`);
+      if (k.colonne) assert.ok(c!.tableau.colonnes.includes(k.colonne), `colonne « ${k.colonne} »`);
+    }
+  }
+});
+
+test("un tableau dont toutes les catégories sont calculées (viande) n'a pas d'erreur de somme", async () => {
+  for (const numero of [18, 40]) {
+    const c = await consulterTableau(base, periode, { role: "CHEF_PSA" }, numero);
+    const fausses = c!.points.filter((p) => p.genre === "erreur" && /somme des catégories \(0\)/.test(p.texte));
+    assert.deepEqual(fausses, [], `tableau ${numero}`);
+  }
+});
+
 test("un tableau inconnu ne rend rien", async () => {
   assert.equal(await consulterTableau(base, periode, { role: "CHEF_PSA" }, 9999), null);
 });

@@ -35,6 +35,8 @@ import { champsMobilises, liaisonDe, estLiee } from "./liaison";
 import { liaisonEvenementDe } from "./evenements";
 import { listerArrondissements, graphieCanevas } from "@/lib/arrondissements";
 import { identiteDepartement } from "@/lib/departement";
+import { observationsTrimestre } from "@/server/observationsTrimestre";
+import { etatCircuit } from "./circuit";
 import {
   type Periode, libelleCourt, memePeriodeAnneePrecedente, moisDeLaPeriode,
 } from "../periodes/calendrier";
@@ -420,6 +422,11 @@ export interface GrilleSaisie {
 
 /** La grille d'un tableau, telle que ce profil la voit et la remplit. */
 export async function grille(db: PrismaClient, periode: Periode, profil: Profil, numero: number): Promise<GrilleSaisie | null> {
+  return (await grilleEtContexte(db, periode, profil, numero))?.g ?? null;
+}
+
+/** La grille, avec ce qui a servi à la construire : de quoi la contrôler ensuite. */
+async function grilleEtContexte(db: PrismaClient, periode: Periode, profil: Profil, numero: number) {
   const t = tableauDe(numero);
   if (!t) return null;
   const { bloc, section } = t;
@@ -435,7 +442,9 @@ export async function grille(db: PrismaClient, periode: Periode, profil: Profil,
     // Même un tableau purement saisi consolide ses saisies de l’an passé.
     sansAgregation: !automatique,
   });
-  return construireGrille(bloc, section, ctx, profil, donnees, fournisseur(donnees, ctx), await reprisesConfirmees(db, periode));
+  const valeur = fournisseur(donnees, ctx);
+  const confirmees = await reprisesConfirmees(db, periode);
+  return { g: construireGrille(bloc, section, ctx, profil, donnees, valeur, confirmees), bloc, ctx, donnees, valeur, confirmees };
 }
 
 /**
@@ -513,7 +522,27 @@ function construireGrille(
 export interface TableauLu {
   enteteLigne: string;
   colonnes: string[];
-  lignes: { libelle: string; valeurs: (string | null)[] }[];
+  /** `cle` : le repère de la ligne, celui des points à vérifier. */
+  lignes: { cle: string; libelle: string; valeurs: (string | null)[] }[];
+}
+
+/**
+ * Ce qu'il faut regarder dans un tableau (demande du Délégué, 9 octobre 2026 :
+ * le chef de section doit voir les manquements, les erreurs et le reste) :
+ *  - erreur : une incohérence — catégories ≠ total mensuel, lettres dans un nombre ;
+ *  - ecart : deux tableaux qui se contredisent (BAC / arrondissement) ;
+ *  - manque : une case qu'un arrondissement doit remplir, encore vide ;
+ *  - variation : un total qui bouge fortement sur un an — erreur, ou cause à expliquer ;
+ *  - observation : un signalement du DD ou du BAC, pas encore clos ;
+ *  - circuit : des arrondissements qui n'ont pas transmis — leurs chiffres peuvent changer.
+ */
+export type GenrePoint = "erreur" | "ecart" | "manque" | "variation" | "observation" | "circuit";
+
+export interface PointAVerifier {
+  genre: GenrePoint;
+  texte: string;
+  /** Les cases en cause (colonne absente : toute la ligne). */
+  cases: { ligne: string; colonne?: string }[];
 }
 
 export interface ConsultationTableau {
@@ -529,39 +558,206 @@ export interface ConsultationTableau {
    * arrondissement en tient SA version. Celles qui portent au moins une saisie.
    */
   versions: { arrondissement: string; tableau: TableauLu }[];
+  /** Pour le département seulement (DD, chefs) : ce qu'il faut regarder. */
+  points: PointAVerifier[];
 }
 
 const enLecture = (g: GrilleSaisie): TableauLu => ({
   enteteLigne: g.enteteLigne,
   colonnes: g.lignes[0]?.cases.map((c) => c.colonne) ?? [],
-  lignes: g.lignes.map((l) => ({ libelle: l.libelle || l.cle, valeurs: l.cases.map((c) => c.affiche) })),
+  lignes: g.lignes.map((l) => ({ cle: l.cle, libelle: l.libelle || l.cle, valeurs: l.cases.map((c) => c.affiche) })),
 });
+
+/** Au-delà de 30 % sur un an, un total se vérifie — même seuil que le contrôle du mensuel. */
+const SEUIL_VARIATION = 0.3;
+
+const nf = (n: number) => n.toLocaleString("fr-FR");
+const quelques = (noms: string[]) => (noms.length > 4 ? `${noms.slice(0, 4).join(", ")}…` : noms.join(", "));
+
+/**
+ * Les points à vérifier d'une grille DÉPARTEMENTALE, calculés sur ses seules
+ * données : erreurs, écarts entre tableaux, manques, variations.
+ */
+function verifierGrille(
+  bloc: BlocTableau,
+  ctx: ContexteCanevas,
+  valeur: ReturnType<typeof fournisseur>,
+  saisies: Map<string, ValeurCellule>,
+  lignes: GrilleSaisie["lignes"],
+  confirmees: Set<string>
+): PointAVerifier[] {
+  const sortie: PointAVerifier[] = [];
+
+  // Erreurs : la somme des catégories, les lettres dans un nombre.
+  for (const a of avertissements(bloc, ctx, lignes)) sortie.push({ genre: "erreur", texte: a.texte, cases: [{ ligne: a.ligne! }] });
+  for (const l of lignes) {
+    for (const c of l.cases) {
+      if (c.texte || c.saisi == null || versNombre(c.saisi) != null) continue;
+      sortie.push({
+        genre: "erreur",
+        texte: `${l.libelle || l.cle}, « ${c.colonne} » : « ${c.saisi} » n'est pas un nombre — il ne compte dans aucun total.`,
+        cases: [{ ligne: l.cle, colonne: c.colonne }],
+      });
+    }
+  }
+
+  // Écarts BAC / arrondissement : ni l'un ni l'autre n'est bloqué ; le BAC tranche.
+  const numero = bloc.numero!;
+  for (const r of REPRISES.filter((x) => x.source === numero || x.tableau === numero)) {
+    for (const arr of ctx.arrondissements) {
+      const ici = saisies.get(cleCellule({ numeroTableau: r.tableau, ligne: r.ligne, colonne: arr }))?.valeur;
+      const la = valeurReprise(saisies, r.tableau, r.ligne, arr);
+      if (ici == null || la == null || ici === la || confirmees.has(`${r.ligne}|${arr}|${ici}|${la}`)) continue;
+      sortie.push({
+        genre: "ecart",
+        texte: `${arr} : ${nf(ici)} pour « ${r.ligne} » aux infrastructures d'exploitation, ${nf(la)} au tableau du BAC (${r.lignesSource.join(" + ")}). Le BAC doit confirmer son chiffre ou le corriger.`,
+        cases: numero === r.source ? r.lignesSource.map((l) => ({ ligne: l, colonne: arr })) : [{ ligne: r.ligne, colonne: arr }],
+      });
+    }
+  }
+
+  const axe = axeTerritorial(bloc);
+  if (!axe) return sortie;
+  const colonnes = lignes[0]?.cases.map((c) => c.colonne) ?? [];
+  const territoires = (axe === "lignes" ? lignes.map((l) => l.cle) : colonnes).filter((t) => ctx.arrondissements.includes(t));
+  const lire = (ligne: string, colonne: string) => versNombre(lignes.find((l) => l.cle === ligne)?.cases.find((c) => c.colonne === colonne)?.affiche);
+
+  for (const terr of territoires) {
+    // Manques : ce que CET arrondissement doit remplir, et qui est vide.
+    const cellules =
+      axe === "lignes"
+        ? (lignes.find((l) => l.cle === terr)?.cases ?? []).map((c) => ({ ligne: terr, libelle: c.colonne, c }))
+        : lignes.flatMap((l) => {
+            const c = l.cases.find((x) => x.colonne === terr);
+            return c ? [{ ligne: l.cle, libelle: l.libelle || l.cle, c }] : [];
+          });
+    const profilArr: Profil = { role: "DA", arrondissement: terr };
+    const vides = cellules.filter(
+      ({ ligne, c }) => c.saisi == null && c.affiche == null && etatCase(bloc, ctx, profilArr, ligne, c.colonne, valeur.sid) === "saisie"
+    );
+    const anPasse = vides.filter(({ ligne, c }) => estCaseHistorique(bloc, ctx, ligne, c.colonne));
+    const autres = vides.filter((v) => !anPasse.includes(v));
+    const rempli = cellules.some(({ c }) => c.etat !== "total" && (c.saisi != null || c.affiche != null));
+    if (autres.length) {
+      sortie.push({
+        genre: "manque",
+        texte: rempli
+          ? `${terr} : ${autres.length} case${autres.length > 1 ? "s" : ""} non remplie${autres.length > 1 ? "s" : ""} (${quelques(autres.map((v) => v.libelle))}).`
+          : `${terr} : rien n'est saisi dans ce tableau. Si l'activité est nulle, l'arrondissement doit inscrire 0 : une case vide se lit « non renseigné ».`,
+        cases: autres.map(({ ligne, c }) => ({ ligne, colonne: c.colonne })),
+      });
+    }
+    if (anPasse.length && rempli) {
+      sortie.push({
+        genre: "manque",
+        texte: `${terr} : le chiffre de l'an passé (${ctx.periodeCourtN1}) manque — pas de comparaison sur un an.`,
+        cases: anPasse.map(({ ligne, c }) => ({ ligne, colonne: c.colonne })),
+      });
+    }
+
+    // Variations : le total de l'arrondissement face à l'an passé.
+    const n = `TOTAL ${ctx.periodeCourt}`;
+    const n1 = `TOTAL ${ctx.periodeCourtN1}`;
+    const [a, b] = axe === "lignes" ? [lire(terr, n), lire(terr, n1)] : [lire(n, terr), lire(n1, terr)];
+    if (a != null && b != null && b > 0 && Math.abs(a - b) / b > SEUIL_VARIATION) {
+      const pct = Math.round(((a - b) / b) * 1000) / 10;
+      sortie.push({
+        genre: "variation",
+        texte: `${terr} : ${nf(a)} contre ${nf(b)} au ${ctx.periodeCourtN1}, soit ${pct > 0 ? "+" : "−"}${nf(Math.abs(pct))} % sur un an. Erreur de saisie, ou cause à expliquer dans l'analyse.`,
+        cases: axe === "lignes" ? [{ ligne: terr, colonne: n }] : [{ ligne: n, colonne: terr }],
+      });
+    }
+  }
+  return sortie;
+}
+
+/**
+ * Les points à vérifier de chaque tableau, d'une seule consolidation — pour
+ * les compter dans la liste des analyses.
+ */
+export async function pointsParTableau(
+  db: PrismaClient,
+  periode: Periode,
+  profil: Profil,
+  ctx: ContexteCanevas,
+  donnees: Awaited<ReturnType<typeof preparer>>,
+  valeur: ReturnType<typeof fournisseur>,
+  numeros: number[]
+): Promise<Map<number, PointAVerifier[]>> {
+  const sortie = new Map<number, PointAVerifier[]>();
+  if (estArrondissement(profil)) return sortie;
+  const confirmees = await reprisesConfirmees(db, periode);
+  for (const numero of numeros) {
+    const t = tableauDe(numero);
+    if (!t) continue;
+    const g = construireGrille(t.bloc, t.section, ctx, profil, donnees, valeur, confirmees);
+    sortie.set(numero, verifierGrille(t.bloc, ctx, valeur, donnees.saisies, g.lignes, confirmees));
+  }
+  return sortie;
+}
+
+const AUTEUR: Record<string, string> = { DD: "Le DD", CHEF_BAC: "Le chef BAC" };
 
 /**
  * Le tableau consolidé, en LECTURE (demande du Délégué, 9 octobre 2026) : les
  * chefs de section valident l'analyse d'un tableau qu'ils ne pouvaient pas
- * voir. Ils y lisent ce que chaque arrondissement a produit. Un DA ou un agent
- * n'y voit que son arrondissement, comme partout.
+ * voir. Ils y lisent ce que chaque arrondissement a produit, et ce qu'il faut
+ * y vérifier. Un DA ou un agent n'y voit que son arrondissement, comme partout.
  */
 export async function consulterTableau(db: PrismaClient, periode: Periode, profil: Profil, numero: number): Promise<ConsultationTableau | null> {
-  const t = tableauDe(numero);
-  if (!t) return null;
-  const g = await grille(db, periode, profil, numero);
-  if (!g) return null;
+  const r = await grilleEtContexte(db, periode, profil, numero);
+  if (!r) return null;
+  const { g, bloc, ctx, donnees, valeur, confirmees } = r;
+  const departement = !estArrondissement(profil);
   const versions: ConsultationTableau["versions"] = [];
-  if (!estArrondissement(profil) && numerosSansMaille().has(numero)) {
-    for (const a of await listerArrondissements(db)) {
-      const v = await grille(db, periode, { role: "DA", arrondissement: a.nom }, numero);
-      if (v?.lignes.some((l) => l.cases.some((c) => c.saisi != null))) versions.push({ arrondissement: a.nom, tableau: enLecture(v) });
+  const points: PointAVerifier[] = [];
+
+  if (departement) {
+    if (numerosSansMaille().has(numero)) {
+      for (const a of await listerArrondissements(db)) {
+        const v = await grille(db, periode, { role: "DA", arrondissement: a.nom }, numero);
+        if (v?.lignes.some((l) => l.cases.some((c) => c.saisi != null))) versions.push({ arrondissement: a.nom, tableau: enLecture(v) });
+      }
+    }
+    points.push(...verifierGrille(bloc, ctx, valeur, donnees.saisies, g.lignes, confirmees));
+
+    // Les signalements en cours sur ce tableau.
+    for (const o of await observationsTrimestre(db, {})) {
+      if (o.close || o.annee !== periode.annee || o.trimestre !== periode.rang) continue;
+      const c = o.cible;
+      if (c.type === "texte" || c.numero !== numero) continue;
+      const qui = AUTEUR[o.auteurRole] ?? o.auteurNom;
+      const suite = o.reponse ? `réponse : « ${o.reponse.texte} »` : o.corrigee ? "modifié depuis" : "en attente de correction ou de réponse";
+      points.push({
+        genre: "observation",
+        texte:
+          c.type === "case"
+            ? `${qui} a signalé ${c.libelle} : « ${o.texte} » — ${suite}.`
+            : `${qui} a signalé l'analyse : « ${o.texte} » — ${suite}.`,
+        cases: c.type === "case" ? [{ ligne: c.ligne, colonne: c.colonne }] : [],
+      });
+    }
+
+    // Les arrondissements qui n'ont pas transmis : leurs chiffres bougent encore.
+    if (axeTerritorial(bloc) || versions.length) {
+      const etat = await etatCircuit(db, periode);
+      const enCours = etat.arrondissements.filter((a) => a.statut === "EN_PREPARATION").map((a) => a.nom);
+      const renvoyes = etat.arrondissements.filter((a) => a.statut === "RENVOYE").map((a) => a.nom);
+      if (enCours.length)
+        points.push({ genre: "circuit", texte: `Pas encore transmis : ${enCours.join(", ")}. Leurs chiffres peuvent encore changer.`, cases: [] });
+      if (renvoyes.length)
+        points.push({ genre: "circuit", texte: `Renvoyé pour correction : ${renvoyes.join(", ")}.`, cases: [] });
     }
   }
+
   return {
     numero,
-    titre: t.bloc.titre,
-    axe: axeTerritorial(t.bloc),
-    arrondissement: estArrondissement(profil) ? profil.arrondissement ?? null : null,
+    titre: bloc.titre,
+    axe: axeTerritorial(bloc),
+    arrondissement: departement ? null : profil.arrondissement ?? null,
     tableau: enLecture(g),
     versions,
+    points,
   };
 }
 
@@ -596,8 +792,10 @@ function avertissements(bloc: BlocTableau, ctx: ContexteCanevas, lignes: GrilleS
     if (estTotal(l.cle)) continue;
     // Tant qu'une catégorie manque, la somme ne dit rien : on attend.
     let somme: number | null = 0;
+    let vues = 0;
     for (const c of l.cases) {
       if (!categories.includes(c.colonne)) continue;
+      vues++;
       const v = nombre(c.saisi);
       if (v == null || !Number.isFinite(v)) {
         somme = null;
@@ -605,7 +803,8 @@ function avertissements(bloc: BlocTableau, ctx: ContexteCanevas, lignes: GrilleS
       }
       somme += v;
     }
-    if (somme == null) continue;
+    // Aucune catégorie saisie dans cette ligne (viande : tout est calculé) : rien à comparer.
+    if (somme == null || vues === 0) continue;
     const attendu = nombre(l.cases.find((c) => c.colonne === total)?.affiche ?? null);
     if (attendu != null && Number.isFinite(attendu) && Math.abs(somme - attendu) > 0.5) {
       sortie.push({

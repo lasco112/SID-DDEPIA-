@@ -172,7 +172,7 @@ export const VISITES: Record<string, DefinitionVisite> = {
     ],
   },
   "analyses-liste": {
-    version: 1,
+    version: 2,
     etapes: [
       {
         cible: "anpasse-compteur",
@@ -185,6 +185,12 @@ export const VISITES: Record<string, DefinitionVisite> = {
         titre: "Une analyse",
         texte: "Le texte que le SID écrit sous chaque tableau, à partir des chiffres. « À valider » : à relire ; « Chiffres modifiés » : à relire de nouveau.",
       },
+      {
+        cible: "points-liste",
+        titre: "Les points à vérifier",
+        texte: "Ce que le SID a repéré dans le tableau : erreurs, cases que des arrondissements n'ont pas remplies, écarts avec le BAC, variations fortes sur un an, signalements en cours. Ouvrez d'abord les tableaux marqués « erreur ».",
+        depuis: 2,
+      },
     ],
   },
   "analyses-detail": {
@@ -194,6 +200,12 @@ export const VISITES: Record<string, DefinitionVisite> = {
         cible: "tableau-consolide",
         titre: "Le tableau",
         texte: "Les chiffres que l'analyse commente, tels qu'ils figureront au rapport : la ligne ou la colonne de chaque arrondissement, et les totaux en gras. Touchez le titre pour le replier.",
+        depuis: 3,
+      },
+      {
+        cible: "points-a-verifier",
+        titre: "À vérifier dans ce tableau",
+        texte: "Les manquements, erreurs et écarts repérés, arrondissement par arrondissement. Touchez un point : ses cases sont encadrées dans le tableau, et colorées selon leur genre.",
         depuis: 3,
       },
       { cible: "texte-analyse", titre: "Le texte proposé", texte: "Écrit par le SID à partir des chiffres du tableau. C'est ce qui figurera dans le rapport." },

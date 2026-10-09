@@ -187,7 +187,7 @@ export async function telechargerTrimestre(
     // Les chefs de section n'ont pas la saisie : le tableau de chacune de leurs
     // analyses, pour la relire chiffres en main sans réseau.
     if (saisit) return;
-    for (const a of d.analyses ?? []) if (a.statut !== "vide") await garder(`/api/trimestre/analyses?${q}&tableau=${a.numero}`);
+    for (const a of d.analyses ?? []) await garder(`/api/trimestre/analyses?${q}&tableau=${a.numero}`);
   });
   await etape(() => garder(`/api/trimestre/rubriques?${q}`));
   await etape(() => garder(`/api/trimestre/circuit?${q}`));

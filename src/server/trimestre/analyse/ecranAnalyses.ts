@@ -10,7 +10,7 @@ import type { PrismaClient } from "@prisma/client";
 import type { Periode } from "../../periodes/calendrier";
 import { preparer, fournisseur } from "../remplissage";
 import { champsMobilises } from "../liaison";
-import { contextePour, tableauDe, casesAnPasseManquantes, type CaseAnPasse, type Profil } from "../saisieTrimestrielle";
+import { contextePour, tableauDe, casesAnPasseManquantes, pointsParTableau, type CaseAnPasse, type GenrePoint, type Profil } from "../saisieTrimestrielle";
 import { listerArrondissements } from "@/lib/arrondissements";
 import { textesCalcules } from "./conclusion";
 import { propositions, lireAnalyses, statutDe, texteAuRapport, type Proposition, type StatutAnalyse } from "./analyses";
@@ -42,6 +42,8 @@ export interface AnalyseAEcran {
    * saisir sur place quand le profil en a le droit.
    */
   anPasse: CaseAnPasse[];
+  /** Département : combien de points à vérifier dans le tableau, par genre (manques, erreurs…). */
+  aVerifier: Partial<Record<GenrePoint, number>>;
 }
 
 export interface EcranAnalyses {
@@ -104,7 +106,9 @@ export async function ecranAnalyses(db: PrismaClient, periode: Periode, profil: 
     arrondissementId: portee || undefined,
   });
   const valeur = fournisseur(donnees, ctx);
-  const analyses = propositions(ctx, valeur).filter((p) => concerne(p, profil)).map((p): AnalyseAEcran => {
+  const retenues = propositions(ctx, valeur).filter((p) => concerne(p, profil));
+  const points = await pointsParTableau(db, periode, profil, ctx, donnees, valeur, retenues.map((p) => p.numero));
+  const analyses = retenues.map((p): AnalyseAEcran => {
     const e = enregistrees.get(p.numero);
     const bloc = p.sansComparaison ? tableauDe(p.numero)?.bloc : undefined;
     return {
@@ -121,6 +125,7 @@ export async function ecranAnalyses(db: PrismaClient, periode: Periode, profil: 
       auRapport: texteAuRapport(p, e),
       sansComparaison: p.sansComparaison,
       anPasse: bloc ? casesAnPasseManquantes(bloc, ctx, profil, valeur) : [],
+      aVerifier: (points.get(p.numero) ?? []).reduce<Partial<Record<GenrePoint, number>>>((n, x) => ({ ...n, [x.genre]: (n[x.genre] ?? 0) + 1 }), {}),
     };
   });
   return {
