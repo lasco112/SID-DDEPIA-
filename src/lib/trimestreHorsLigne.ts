@@ -179,7 +179,16 @@ export async function telechargerTrimestre(
     const d = (await r.json()) as { periode: string; grilles: { numero: number }[] };
     for (const g of d.grilles) await garderCopie(username, `/api/trimestre/saisie?${q}&tableau=${g.numero}`, { periode: d.periode, grille: g });
   });
-  await etape(() => garder(`/api/trimestre/analyses?${q}`));
+  await etape(async () => {
+    const r = await fetch(`/api/trimestre/analyses?${q}`);
+    if (!r.ok) return;
+    const d = (await r.json()) as { analyses?: { numero: number; statut: string }[] };
+    await garderCopie(username, `/api/trimestre/analyses?${q}`, d);
+    // Les chefs de section n'ont pas la saisie : le tableau de chacune de leurs
+    // analyses, pour la relire chiffres en main sans réseau.
+    if (saisit) return;
+    for (const a of d.analyses ?? []) if (a.statut !== "vide") await garder(`/api/trimestre/analyses?${q}&tableau=${a.numero}`);
+  });
   await etape(() => garder(`/api/trimestre/rubriques?${q}`));
   await etape(() => garder(`/api/trimestre/circuit?${q}`));
 

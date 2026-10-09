@@ -24,6 +24,7 @@ import { lireAvecCopie, envoyer, enAttente } from "@/lib/trimestreHorsLigne";
 import HorsLigneTrimestre from "@/components/HorsLigneTrimestre";
 import VisiteGuidee from "@/components/VisiteGuidee";
 import SignalerPanneau, { envoyerObservation } from "@/components/SignalerPanneau";
+import TableauConsolide from "@/components/TableauConsolide";
 
 interface Zone {
   cle: string;
@@ -90,6 +91,8 @@ export default function RubriquesTrimestreClient({
   /** Le DD signale une rubrique au chef de section qui la rédige. */
   const [zoneASignaler, setZoneASignaler] = useState<string | null>(null);
   const [infoSignal, setInfoSignal] = useState<string | null>(null);
+  /** La rubrique dont le tableau est déplié (chefs de section, en lecture). */
+  const [tableauVu, setTableauVu] = useState<string | null>(null);
   const [filtre, setFiltre] = useState<"toutes" | "a_rediger">("toutes");
   const [enCours, setEnCours] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -358,6 +361,18 @@ export default function RubriquesTrimestreClient({
                                   Voir le tableau : {z.tableau.titre}
                                 </button>
                               )}
+                              {/* Les chefs de section n'ouvrent pas la saisie : le tableau s'affiche ici, en lecture. */}
+                              {z.tableau && !VOIENT_LES_TABLEAUX.includes(role) && (
+                                <button
+                                  type="button"
+                                  onClick={() => setTableauVu(tableauVu === z.cle ? null : z.cle)}
+                                  aria-expanded={tableauVu === z.cle}
+                                  data-visite="voir-tableau-rubrique"
+                                  className="rounded border border-primary px-2 py-1 text-xs font-medium text-primary hover:bg-primary-light"
+                                >
+                                  {tableauVu === z.cle ? "Masquer le tableau" : `Voir le tableau : ${z.tableau.titre}`}
+                                </button>
+                              )}
                               {z.reference && (
                                 <button
                                   type="button"
@@ -379,6 +394,11 @@ export default function RubriquesTrimestreClient({
                                 </button>
                               )}
                             </div>
+                            {tableauVu === z.cle && z.tableau && (
+                              <div className="mt-2">
+                                <TableauConsolide username={username} annee={choix.annee} trimestre={choix.trimestre} numero={z.tableau.numero} />
+                              </div>
+                            )}
 
                             {z.automatique && !(saisie[z.cle] ?? "").trim() ? (
                               <div className="mt-2">

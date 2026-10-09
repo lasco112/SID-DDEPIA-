@@ -188,8 +188,14 @@ export const VISITES: Record<string, DefinitionVisite> = {
     ],
   },
   "analyses-detail": {
-    version: 2,
+    version: 3,
     etapes: [
+      {
+        cible: "tableau-consolide",
+        titre: "Le tableau",
+        texte: "Les chiffres que l'analyse commente, tels qu'ils figureront au rapport : la ligne ou la colonne de chaque arrondissement, et les totaux en gras. Touchez le titre pour le replier.",
+        depuis: 3,
+      },
       { cible: "texte-analyse", titre: "Le texte proposé", texte: "Écrit par le SID à partir des chiffres du tableau. C'est ce qui figurera dans le rapport." },
       { cible: "voir-calcul", titre: "Voir le calcul", texte: "Montre d'où vient chaque chiffre de la phrase, pour vérifier." },
       { cible: "anpasse-case", titre: "Le chiffre de l'an passé", texte: "Tapez ici le total de l'année dernière, puis « Enregistrer » : l'analyse est recalculée avec la comparaison." },

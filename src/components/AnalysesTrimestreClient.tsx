@@ -18,6 +18,7 @@ import { lireAvecCopie, envoyer as envoyerOuGarder, enAttente } from "@/lib/trim
 import HorsLigneTrimestre from "@/components/HorsLigneTrimestre";
 import VisiteGuidee from "@/components/VisiteGuidee";
 import SignalerPanneau, { envoyerObservation } from "@/components/SignalerPanneau";
+import TableauConsolide from "@/components/TableauConsolide";
 import { useUtilisateur } from "@/components/UtilisateurContexte";
 
 type Statut = "vide" | "a_valider" | "valide" | "a_revoir";
@@ -311,6 +312,9 @@ export default function AnalysesTrimestreClient({
                 et validez-le à nouveau.
               </p>
             )}
+
+            {/* Les chiffres d'abord, comme au rapport : l'analyse se relit tableau en main. */}
+            <TableauConsolide username={username} annee={annee} trimestre={trimestre} numero={courant.numero} />
 
             <div>
               <p className="text-sm font-semibold text-gray-700">Texte qui figurera sous le tableau</p>

@@ -507,6 +507,64 @@ function construireGrille(
   };
 }
 
+// ------------------------------------------------------------------ lecture
+
+/** Un tableau tel qu'il s'imprimera, en lecture seule : ce qu'on relit sous l'analyse. */
+export interface TableauLu {
+  enteteLigne: string;
+  colonnes: string[];
+  lignes: { libelle: string; valeurs: (string | null)[] }[];
+}
+
+export interface ConsultationTableau {
+  numero: number;
+  titre: string;
+  /** Où sont les arrondissements : une ligne chacun, une colonne chacun, ou nulle part. */
+  axe: "lignes" | "colonnes" | null;
+  /** Un DA ou un agent : son arrondissement, seul visible. Null : tout le département. */
+  arrondissement: string | null;
+  tableau: TableauLu;
+  /**
+   * Tableau sans maille territoriale (budget-programme, BIP…) : chaque
+   * arrondissement en tient SA version. Celles qui portent au moins une saisie.
+   */
+  versions: { arrondissement: string; tableau: TableauLu }[];
+}
+
+const enLecture = (g: GrilleSaisie): TableauLu => ({
+  enteteLigne: g.enteteLigne,
+  colonnes: g.lignes[0]?.cases.map((c) => c.colonne) ?? [],
+  lignes: g.lignes.map((l) => ({ libelle: l.libelle || l.cle, valeurs: l.cases.map((c) => c.affiche) })),
+});
+
+/**
+ * Le tableau consolidé, en LECTURE (demande du Délégué, 9 octobre 2026) : les
+ * chefs de section valident l'analyse d'un tableau qu'ils ne pouvaient pas
+ * voir. Ils y lisent ce que chaque arrondissement a produit. Un DA ou un agent
+ * n'y voit que son arrondissement, comme partout.
+ */
+export async function consulterTableau(db: PrismaClient, periode: Periode, profil: Profil, numero: number): Promise<ConsultationTableau | null> {
+  const t = tableauDe(numero);
+  if (!t) return null;
+  const g = await grille(db, periode, profil, numero);
+  if (!g) return null;
+  const versions: ConsultationTableau["versions"] = [];
+  if (!estArrondissement(profil) && numerosSansMaille().has(numero)) {
+    for (const a of await listerArrondissements(db)) {
+      const v = await grille(db, periode, { role: "DA", arrondissement: a.nom }, numero);
+      if (v?.lignes.some((l) => l.cases.some((c) => c.saisi != null))) versions.push({ arrondissement: a.nom, tableau: enLecture(v) });
+    }
+  }
+  return {
+    numero,
+    titre: t.bloc.titre,
+    axe: axeTerritorial(t.bloc),
+    arrondissement: estArrondissement(profil) ? profil.arrondissement ?? null : null,
+    tableau: enLecture(g),
+    versions,
+  };
+}
+
 /**
  * La consigne de la reprise d’historique, quand l’écran en porte une case à
  * saisir : que mettre, et pourquoi on ne le demandera plus.

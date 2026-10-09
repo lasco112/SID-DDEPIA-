@@ -2,6 +2,7 @@
  * Les analyses des tableaux du rapport trimestriel.
  *
  *   GET    /api/trimestre/analyses?annee=&trimestre=   → les analyses à relire
+ *   GET    /api/trimestre/analyses?annee=&trimestre=&tableau=N → le tableau consolidé, en lecture
  *   PUT    /api/trimestre/analyses                     → valider (ou corriger) une analyse
  *   DELETE /api/trimestre/analyses                     → retirer une validation
  *
@@ -12,7 +13,7 @@ import { NextResponse } from "next/server";
 import { requireUser, assertRole, permissionErrorResponse } from "@/lib/permissions";
 import { trimestrielle } from "@/server/periodes/calendrier";
 import { periodeTrimestrielle } from "@/server/trimestre/rubriques";
-import { nomArrondissement, type Profil } from "@/server/trimestre/saisieTrimestrielle";
+import { nomArrondissement, consulterTableau, type Profil } from "@/server/trimestre/saisieTrimestrielle";
 import { ecranAnalyses, porteeDe, propositionsPour, ROLES_ANALYSE } from "@/server/trimestre/analyse/ecranAnalyses";
 import { validerAnalyse, retirerAnalyse } from "@/server/trimestre/analyse/analyses";
 import { motifDeVerrou } from "@/server/trimestre/circuit";
@@ -43,6 +44,12 @@ export async function GET(req: Request) {
     if (!periode) return erreur("Période demandée invalide.", 400);
     const profil = await profilDe(user);
     if (!profil) return erreur("Votre compte n'est rattaché à aucun arrondissement.", 400);
+    // `&tableau=N` : le tableau lui-même, en lecture, pour relire l'analyse chiffres en main.
+    const numero = params.get("tableau");
+    if (numero) {
+      const t = await consulterTableau(user.db, periode, profil, Number(numero));
+      return t ? NextResponse.json(t) : erreur("Tableau inconnu.", 404);
+    }
     return NextResponse.json(await ecranAnalyses(user.db, periode, profil));
   } catch (e) {
     const { status, message } = permissionErrorResponse(e);
