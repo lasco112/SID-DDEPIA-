@@ -20,6 +20,7 @@ import {
   resoudre, adapterTitre, sansNiveauDepartemental,
 } from "./types";
 import { clesLignes } from "./structure";
+import { graphiqueDe, donneesGraphique, repereGraphique, type DonneesGraphique } from "./graphiques";
 
 /**
  * Fournit la valeur d'une case. Renvoie `null` quand le SID ne porte pas la
@@ -173,13 +174,59 @@ function numeroAffiche(numero: number | null, compteur?: CompteurLegendes): numb
   return compteur.tableaux;
 }
 
+/**
+ * Légende d'un graphique : même mécanisme que celle d'un tableau, avec le
+ * champ `SEQ Graphique` que la « LISTE DES GRAPHIQUES » collecte.
+ */
+export function legendeGraphique(titre: string, rang: number): Paragraph {
+  return new Paragraph({
+    style: "Caption",
+    alignment: AlignmentType.CENTER,
+    children: [
+      new TextRun({ text: "Graphique n° ", bold: true }),
+      new SimpleField("SEQ Graphique \\* ARABIC", String(rang)),
+      new TextRun({ text: ` : ${titre}`, bold: true }),
+    ],
+  });
+}
+
+/**
+ * Le graphique d'un tableau, s'il en a un au canevas et s'il porte des
+ * chiffres : un paragraphe-repère (remplacé par le dessin une fois le document
+ * produit, graphiquesWord.ts) et sa légende. Sans collecteur — une section
+ * rendue seule —, aucun graphique : le repère resterait imprimé.
+ */
+function rendreGraphique(
+  bloc: Extract<Bloc, { type: "tableau" }>,
+  ctx: ContexteCanevas,
+  valeur: FournisseurValeur,
+  colonnes: string[],
+  graphiques?: DonneesGraphique[]
+): Paragraph[] {
+  const g = graphiques ? graphiqueDe(bloc.numero) : undefined;
+  if (!g || !graphiques) return [];
+  const donnees = donneesGraphique(g, bloc, ctx, colonnes, (ligne, colonne, indexColonne) =>
+    valeur({ numeroTableau: bloc.numero, titreTableau: bloc.titre, bloc, ligne, colonne, indexColonne })
+  );
+  if (!donnees) return [];
+  graphiques.push(donnees);
+  const rang = graphiques.length;
+  return [
+    new Paragraph({ text: "" }),
+    new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: repereGraphique(rang) })] }),
+    legendeGraphique(donnees.titre, rang),
+  ];
+}
+
 function rendreTableau(
   bloc: Extract<Bloc, { type: "tableau" }>,
   ctx: ContexteCanevas,
   valeur: FournisseurValeur,
   compteur?: CompteurLegendes,
   /** L'analyse du tableau, placée sous lui. */
-  analyse?: string
+  analyse?: string,
+  /** Les graphiques du document, dans l'ordre : celui de ce tableau s'y ajoute. */
+  graphiques?: DonneesGraphique[]
 ): (Paragraph | Table)[] {
   const colonnes = colonnesDe(bloc, ctx);
   const lignes = lignesDe(bloc, ctx);
@@ -237,9 +284,11 @@ function rendreTableau(
   // Certains tableaux du canevas n'ont PAS de légende — ceux du
   // budget-programme, par exemple. Leur en inventer une les ferait apparaître
   // dans la liste des tableaux, où le canevas ne les met pas.
+  // Comme au canevas : le tableau, son graphique, puis le commentaire.
+  const graphique = rendreGraphique(bloc, ctx, valeur, colonnes, graphiques);
   return bloc.titre
-    ? [legendeTableau(bloc.titre, numeroAffiche(bloc.numero, compteur)), tableau, ...commentaire, new Paragraph({ text: "" })]
-    : [tableau, ...commentaire, new Paragraph({ text: "" })];
+    ? [legendeTableau(bloc.titre, numeroAffiche(bloc.numero, compteur)), tableau, ...graphique, ...commentaire, new Paragraph({ text: "" })]
+    : [tableau, ...graphique, ...commentaire, new Paragraph({ text: "" })];
 }
 
 /**
@@ -325,6 +374,12 @@ export interface OptionsRendu {
   textes?: Map<string, string>;
   /** L'analyse de chaque tableau, par numéro. */
   analyses?: Map<number, string>;
+  /**
+   * Le collecteur des graphiques du document. Présent : chaque tableau qui en
+   * a un au canevas pose son repère et y dépose ses données ; l'appelant DOIT
+   * alors passer le document à `insererGraphiques`. Absent : aucun graphique.
+   */
+  graphiques?: DonneesGraphique[];
 }
 
 /** Rend une section complète du canevas. */
@@ -344,7 +399,9 @@ export function rendreSection(section: SectionCanevas, o: OptionsRendu): (Paragr
     } else if (bloc.type === "zoneTexte") {
       sortie.push(...rendreZoneTexte(bloc, textes, o.ctx, suiviDUnTableau(section.blocs, i)));
     } else {
-      sortie.push(...rendreTableau(bloc, o.ctx, valeur, o.compteur, bloc.numero == null ? undefined : o.analyses?.get(bloc.numero)));
+      sortie.push(
+        ...rendreTableau(bloc, o.ctx, valeur, o.compteur, bloc.numero == null ? undefined : o.analyses?.get(bloc.numero), o.graphiques)
+      );
     }
   });
   return sortie;

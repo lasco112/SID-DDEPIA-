@@ -227,7 +227,11 @@ test("table des matières et liste des tableaux sont écrites d'avance, jamais b
     assert.equal(liens(tableaux), (xml.match(/<w:fldSimple w:instr="SEQ Tableau/g) ?? []).length);
     assert.ok(liens(tableaux) > 80);
     assert.match(tableaux, /Tableau n° 1 : Structures administratives/);
-    assert.match(graphiques ?? "", /Aucun graphique dans ce rapport/);
+    // La liste des graphiques : une ligne par graphique du rapport (13 octobre
+    // 2026 : les graphiques du canevas sont dessinés) ; sans graphique, elle le dit.
+    const nGraphiques = (xml.match(/<w:fldSimple w:instr="SEQ Graphique/g) ?? []).length;
+    assert.equal(liens(graphiques), nGraphiques);
+    if (nGraphiques === 0) assert.match(graphiques ?? "", /Aucun graphique dans ce rapport/);
     // Chaque lien mène à un signet qui existe.
     for (const [, cible] of Array.from(xml.matchAll(/w:anchor="([^"]+)"/g))) assert.ok(xml.includes(`w:name="${cible}"`), cible);
   }

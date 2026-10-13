@@ -17,6 +17,8 @@ import { SECTIONS_CANEVAS } from "./canevas/sections";
 import { rendreSection, champsAutomatiques } from "./canevas/rendu";
 import { pageDeGarde, tableauAcronymes } from "./canevas/pageDeGarde";
 import { preremplirTablesAutomatiques } from "./canevas/tablesAutomatiques";
+import { insererGraphiques } from "./canevas/graphiquesWord";
+import type { DonneesGraphique } from "./canevas/graphiques";
 import { analysesDuRapport } from "./analyse/analyses";
 import { textesCalcules } from "./analyse/conclusion";
 import { TEXTES_FIXES, TEXTES_COMMUNS } from "./canevas/textesFixes";
@@ -301,8 +303,10 @@ export async function genererRapportCanevas(
   const analyses = await analysesDuRapport(db, periodeEnBase, sien?.id ?? "", ctx, valeur);
 
   const compteur = { tableaux: 0 };
+  // Les graphiques du canevas, dessinés sous leur tableau (canevas/graphiques.ts).
+  const graphiques: DonneesGraphique[] = [];
   for (const section of SECTIONS_CANEVAS) {
-    enfants.push(...rendreSection(section, { ctx, valeur, textes, compteur, analyses }));
+    enfants.push(...rendreSection(section, { ctx, valeur, textes, compteur, analyses, graphiques }));
   }
 
   // La signature est portée par la page de garde, comme au rapport
@@ -336,7 +340,7 @@ export async function genererRapportCanevas(
 
   // Table des matières et listes écrites d’avance : jamais de page blanche,
   // même sans mise à jour des champs par Word (canevas/tablesAutomatiques.ts).
-  const buffer = preremplirTablesAutomatiques(Buffer.from(await Packer.toBuffer(document)));
+  const buffer = preremplirTablesAutomatiques(await insererGraphiques(Buffer.from(await Packer.toBuffer(document)), graphiques));
   const qui = options.arrondissement
     ? `DAEPIA-${options.arrondissement.replace(/[ ’']/g, "")}`
     : identite.sigle;
