@@ -108,7 +108,7 @@ export async function GET() {
     } else if (user.role.startsWith("CHEF_")) {
       reponse.observationsTATraiter = (await observationsTrimestre(db as PrismaClient, { chef: user.role })).filter(aTraiterT);
     }
-    if (user.role === "DD" || user.role === "CHEF_BAC") {
+    if (user.role === "DD" || user.role.startsWith("CHEF_")) {
       reponse.observationsTARelire = (await observationsTrimestre(db as PrismaClient, { auteurId: user.id })).filter(aRelireT);
     }
 

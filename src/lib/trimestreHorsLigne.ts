@@ -153,7 +153,9 @@ export async function telechargerTrimestre(
   }
 
   const q = `annee=${periode.annee}&trimestre=${periode.trimestre}`;
-  const saisit = ["DD", "CHEF_BAC", "DA", "AGENT_SAISIE"].includes(role);
+  const chefTechnique = ["CHEF_PSA", "CHEF_SPAIH", "CHEF_SSV"].includes(role);
+  // Les chefs techniques complètent ce qui manque dans les tableaux de leur section.
+  const saisit = chefTechnique || ["DD", "CHEF_BAC", "DA", "AGENT_SAISIE"].includes(role);
   let faites = 0;
   const etape = async (travail: () => Promise<void>) => {
     try {
@@ -184,9 +186,9 @@ export async function telechargerTrimestre(
     if (!r.ok) return;
     const d = (await r.json()) as { analyses?: { numero: number; statut: string }[] };
     await garderCopie(username, `/api/trimestre/analyses?${q}`, d);
-    // Les chefs de section n'ont pas la saisie : le tableau de chacune de leurs
-    // analyses, pour la relire chiffres en main sans réseau.
-    if (saisit) return;
+    // Les chefs des sections techniques relisent l'analyse tableau en main : le
+    // tableau de chacune, avec ses points à vérifier, pour le lire sans réseau.
+    if (!chefTechnique) return;
     for (const a of d.analyses ?? []) await garder(`/api/trimestre/analyses?${q}&tableau=${a.numero}`);
   });
   await etape(() => garder(`/api/trimestre/rubriques?${q}`));

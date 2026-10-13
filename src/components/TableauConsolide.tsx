@@ -33,6 +33,8 @@ interface Consultation {
   tableau: TableauLu;
   versions: { arrondissement: string; tableau: TableauLu }[];
   points?: Point[];
+  /** Ce compte peut y remplir une case, ou en signaler une : l'écran de saisie lui ouvre ce tableau. */
+  modifiable?: boolean;
 }
 
 /** Dans l'ordre de gravité : une case marquée deux fois prend la marque la plus grave. */
@@ -173,9 +175,22 @@ export default function TableauConsolide({
                         : c.versions.length > 0
                           ? "Version du département ; celle de chaque arrondissement est plus bas."
                           : "Tel qu'il figurera au rapport."
-                  } Lecture seule : un chiffre vous paraît faux ? Prévenez le DD, qui peut le signaler à l'arrondissement.`}
+                  } ${
+                    c.modifiable
+                      ? "Ici, lecture seule : pour remplir une case vide ou faire corriger un chiffre, ouvrez le tableau."
+                      : "Lecture seule : un chiffre vous paraît faux ? Prévenez le DD, qui peut le signaler à l'arrondissement."
+                  }`}
               {copieDu && ` Copie gardée sur ce téléphone, du ${new Date(copieDu).toLocaleString("fr-FR")}.`}
             </p>
+            {c.modifiable && (
+              <a
+                href={`/trimestre/saisie?tableau=${c.numero}`}
+                data-visite="ouvrir-tableau"
+                className="mb-2 inline-flex min-h-[44px] items-center rounded-md border border-primary px-3 py-2 text-sm font-semibold text-primary hover:bg-primary-light"
+              >
+                Compléter une case ou la signaler à l&apos;arrondissement →
+              </a>
+            )}
             <Grille t={c.tableau} axe={c.axe} marques={marques} encadrees={encadrees} />
             {marques.size > 0 && (
               <p className="mt-1 flex flex-wrap gap-1 text-[11px] text-gray-600">

@@ -28,7 +28,7 @@ import { colonnesDe, lignesDe, type FournisseurValeur } from "./canevas/rendu";
 import { axeTerritorial, clesLignes, estTotal } from "./canevas/structure";
 import type { Bloc, ContexteCanevas } from "./canevas/types";
 import { cleCellule, saisiesVues, type ValeurCellule } from "./saisieCanevas";
-import { numerosSansMaille, TABLEAUX_BAC } from "./canevas/sections";
+import { numerosSansMaille, TABLEAUX_BAC, chefDeSection } from "./canevas/sections";
 import { preparer, fournisseur, estCaseCalculee, estCaseHistorique, valeurReprise, versNombre } from "./remplissage";
 import { REPRISES, repriseDe } from "./canevas/reprises";
 import { champsMobilises, liaisonDe, estLiee } from "./liaison";
@@ -62,7 +62,29 @@ export interface Profil {
   arrondissement?: string;
 }
 
-export const ROLES_SAISIE = ["DD", "CHEF_BAC", "DA", "AGENT_SAISIE"] as const;
+export const ROLES_SAISIE = ["DD", "CHEF_BAC", "CHEF_PSA", "CHEF_SPAIH", "CHEF_SSV", "DA", "AGENT_SAISIE"] as const;
+
+/**
+ * Les chefs des sections techniques (décision du Délégué, 13 octobre 2026) :
+ * dans les tableaux de LEUR section, ils complètent ce qui manque — y compris
+ * le total de l'an passé — et font corriger le reste par l'arrondissement.
+ * Une case que l'arrondissement a remplie ne se modifie pas : elle se signale.
+ */
+const CHEFS_TECHNIQUES = ["CHEF_PSA", "CHEF_SPAIH", "CHEF_SSV"];
+export const estChefTechnique = (role: string) => CHEFS_TECHNIQUES.includes(role);
+
+/** Le chef de section dont relève ce tableau. */
+export function chefDuTableau(numero: number): string | null {
+  const s = SECTIONS_CANEVAS.find((x) => x.blocs.some((b) => b.type === "tableau" && b.numero === numero));
+  return s ? chefDeSection(s.cle) : null;
+}
+
+/** La case a-t-elle été remplie par l'arrondissement (DA ou agent) — ou par on ne sait qui ? */
+const remplieParLArrondissement = (s: ValeurCellule | undefined) =>
+  Boolean(s) && (s!.parRole == null || s!.parRole === "DA" || s!.parRole === "AGENT_SAISIE");
+
+export const MESSAGE_CASE_DE_L_ARRONDISSEMENT =
+  "Cette case a été remplie par l'arrondissement : vous ne la modifiez pas. Touchez « Signaler une case à l'arrondissement » pour la lui faire corriger.";
 
 const estArrondissement = (p: Profil) => p.role === "DA" || p.role === "AGENT_SAISIE";
 
@@ -107,6 +129,7 @@ export function tableauDe(numero: number): { bloc: BlocTableau; section: string 
 function autorise(bloc: BlocTableau, profil: Profil, ligne: string, colonne: string): boolean {
   if (profil.role === "DD") return true;
   if (profil.role === "CHEF_BAC") return TABLEAUX_BAC.has(bloc.numero!);
+  if (estChefTechnique(profil.role)) return chefDuTableau(bloc.numero!) === profil.role;
   if (!estArrondissement(profil) || !profil.arrondissement) return false;
   // Un DA ou un agent ne saisit que dans la maille de SON arrondissement…
   const axe = axeTerritorial(bloc);
@@ -376,6 +399,8 @@ export interface CaseGrille {
   texte: boolean;
   /** La valeur reprise d'un autre tableau, proposée tant que rien n'est saisi. */
   propose: string | null;
+  /** Chef de section : case remplie par l'arrondissement — à signaler, pas à modifier. */
+  reservee?: boolean;
 }
 
 /** Un avertissement de la grille, et l'endroit qu'il vise (clé de ligne, colonne). */
@@ -486,11 +511,15 @@ function construireGrille(
     cases: colonnes.map((colonne, i) => {
       const s = donnees.saisies.get(cleCellule({ numeroTableau: numero, ligne: cle, colonne }));
       const reprise = s ? null : valeurReprise(donnees.saisies, numero, cle, colonne);
+      const etat = etatCase(bloc, ctx, profil, cle, colonne, valeur.sid);
+      // Un chef de section complète ce qui manque ; ce que l'arrondissement a écrit se signale.
+      const reservee = etat === "saisie" && estChefTechnique(profil.role) && remplieParLArrondissement(s);
       return {
         colonne,
         texte: !attendUnNombre(colonne),
         propose: reprise == null ? null : String(reprise),
-        etat: etatCase(bloc, ctx, profil, cle, colonne, valeur.sid),
+        etat: reservee ? ("lecture" as const) : etat,
+        ...(reservee ? { reservee: true } : {}),
         affiche:
           texteFixe(bloc, ctx, cle, colonne) ??
           valeur({ numeroTableau: numero, titreTableau: bloc.titre, bloc, ligne: cle, colonne, indexColonne: i + 1 }),
@@ -512,7 +541,11 @@ function construireGrille(
     lignes,
     avertissements: alertes.map((a) => a.texte),
     alertes,
-    aide: [AIDES[numero] ?? AIDE_PAR_DEFAUT, ...aideHistorique(bloc, ctx, lignes)].join(" "),
+    aide: [
+      AIDES[numero] ?? AIDE_PAR_DEFAUT,
+      ...(bloc.kind === "arrondissements" && bloc.totalSansSomme ? [bloc.totalSansSomme] : []),
+      ...aideHistorique(bloc, ctx, lignes),
+    ].join(" "),
   };
 }
 
@@ -560,6 +593,8 @@ export interface ConsultationTableau {
   versions: { arrondissement: string; tableau: TableauLu }[];
   /** Pour le département seulement (DD, chefs) : ce qu'il faut regarder. */
   points: PointAVerifier[];
+  /** Ce profil peut y remplir une case ou en signaler une : l'écran de saisie lui ouvre ce tableau. */
+  modifiable: boolean;
 }
 
 const enLecture = (g: GrilleSaisie): TableauLu => ({
@@ -758,6 +793,7 @@ export async function consulterTableau(db: PrismaClient, periode: Periode, profi
     tableau: enLecture(g),
     versions,
     points,
+    modifiable: departement && g.lignes.some((l) => l.cases.some((c) => c.etat === "saisie" || c.reservee)),
   };
 }
 
@@ -1068,6 +1104,23 @@ export async function refusDeSaisie(
     case "lecture":
       return "Cette case n'est pas de votre ressort.";
     default:
-      return null;
+      break;
   }
+  // Un chef de section ne réécrit pas ce que l'arrondissement a saisi.
+  if (estChefTechnique(profil.role)) {
+    const p = await db.periodeReporting.findFirst({
+      where: { type: "TRIMESTRIEL", annee: periode.annee, trimestre: periode.rang },
+      select: { id: true },
+    });
+    const existante = p
+      ? await db.saisieCanevas.findFirst({
+          where: { periodeId: p.id, numeroTableau: numero, ligne, colonne, portee: "" },
+          select: { auteur: { select: { role: true } } },
+        })
+      : null;
+    if (existante && remplieParLArrondissement({ valeur: null, texte: null, parRole: existante.auteur?.role ?? null })) {
+      return MESSAGE_CASE_DE_L_ARRONDISSEMENT;
+    }
+  }
+  return null;
 }

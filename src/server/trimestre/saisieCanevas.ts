@@ -55,6 +55,8 @@ export function cleCellule(c: CelluleCanevas): string {
 export interface ValeurCellule {
   valeur: number | null;
   texte: string | null;
+  /** Le rôle de celui qui a écrit la case en dernier (null : inconnu). */
+  parRole?: string | null;
 }
 
 /**
@@ -69,7 +71,7 @@ export async function lireSaisiesCanevas(
 ): Promise<Map<string, ValeurCellule>> {
   const lignes = await db.saisieCanevas.findMany({
     where: { periodeId, portee },
-    select: { numeroTableau: true, ligne: true, colonne: true, valeur: true, valeurTexte: true },
+    select: { numeroTableau: true, ligne: true, colonne: true, valeur: true, valeurTexte: true, auteur: { select: { role: true } } },
   });
 
   const m = new Map<string, ValeurCellule>();
@@ -77,6 +79,7 @@ export async function lireSaisiesCanevas(
     m.set(cleCellule(l), {
       valeur: l.valeur == null ? null : Number(l.valeur),
       texte: l.valeurTexte,
+      parRole: l.auteur?.role ?? null,
     });
   }
   return m;

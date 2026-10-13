@@ -259,6 +259,66 @@ test("infrastructures : le BAC se recopie, et une divergence est signalée", asy
   }
 });
 
+test("infrastructures d'exploitation : la ligne TOTAL reste vide, les totaux de chaque ligne se calculent", async () => {
+  // Décision du Délégué (13 octobre 2026) : des abattoirs, des hectares et des
+  // kilomètres ne s'additionnent pas. La ligne du canevas reste, sans chiffre.
+  const dd = await base.user.findFirstOrThrow({ where: { role: "DD", actif: true }, select: { id: true } });
+  periodeId = periodeId ?? (await periodeTrimestrielle(base, P));
+  const ecrire = (ligne: string, colonne: string, valeur: number) =>
+    ecrireSaisieCanevas(base, transaction, periodeId!, { numeroTableau: 15, ligne, colonne }, { valeur }, dd.id);
+  await ecrire("Pistes à bétail en km", "Dschang", 12);
+  await ecrire("Pistes à bétail en km", "Santchou", 8);
+  await ecrire("Champs fourragers (en ha)", "Dschang", 30);
+  const g = await grille(base, P, DD, 15);
+  const ligne = (cle: string) => g!.lignes.find((l) => l.cle === cle)!;
+  assert.ok(ligne("TOTAL"), "la ligne TOTAL du canevas est conservée");
+  for (const c of ligne("TOTAL").cases) {
+    assert.equal(c.affiche, null, `TOTAL / ${c.colonne} ne porte aucun chiffre`);
+    assert.equal(c.etat, "total", "et ne se saisit pas");
+  }
+  assert.equal(ligne("Pistes à bétail en km").cases.find((c) => c.colonne === "TOTAL T1 2031")!.affiche, "20", "12 + 8 km : le total de la ligne reste calculé");
+  assert.match(g!.aide, /ligne TOTAL reste vide/);
+});
+
+test("un chef de section complète ce qui manque dans SA section, et ne réécrit pas l'arrondissement", async () => {
+  const PSA = { role: "CHEF_PSA" };
+  const SSV = { role: "CHEF_SSV" };
+  periodeId = periodeId ?? (await periodeTrimestrielle(base, P));
+  const da = await base.user.findFirstOrThrow({ where: { role: "DA", actif: true }, select: { id: true } });
+  const chef = await base.user.findFirstOrThrow({ where: { role: "CHEF_PSA", actif: true }, select: { id: true } });
+
+  // Sa section, et elle seule.
+  assert.equal(await refusDeSaisie(base, P, PSA, 23, "Nkong-Ni", "Brebis"), null, "cheptel ovin : section PSA, case vide");
+  assert.match((await refusDeSaisie(base, P, SSV, 23, "Nkong-Ni", "Brebis")) ?? "", /ressort/, "pas un chef d'une autre section");
+  assert.match((await refusDeSaisie(base, P, PSA, 13, "JANVIER", "Dschang")) ?? "", /ressort/, "pas un tableau du BAC");
+  // L'an passé manquant se saisit aussi ; le total du trimestre, jamais.
+  assert.equal(await refusDeSaisie(base, P, SSV, 64, "Fokoué", "TOTAL T1 2030"), null, "le total de l'an passé, que le SID ignore");
+  assert.match((await refusDeSaisie(base, P, SSV, 64, "TOTAL T1 2031", "TOTAL T1 2030")) ?? "", /calculés|rapports mensuels/);
+  assert.match((await refusDeSaisie(base, P, PSA, 14, "Nkong-Ni", "TOTAL T1 2031")) ?? "", /rapports mensuels/);
+
+  // Une case remplie par l'arrondissement : réservée — elle se signale.
+  const cellule = { numeroTableau: 23, ligne: "Nkong-Ni", colonne: "Brebis" };
+  await ecrireSaisieCanevas(base, transaction, periodeId, cellule, { valeur: 40 }, da.id);
+  assert.match((await refusDeSaisie(base, P, PSA, 23, "Nkong-Ni", "Brebis")) ?? "", /remplie par l'arrondissement/);
+  const lire = async () => (await grille(base, P, PSA, 23))!.lignes.find((l) => l.cle === "Nkong-Ni")!.cases.find((c) => c.colonne === "Brebis")!;
+  let c = await lire();
+  assert.equal(c.etat, "lecture");
+  assert.equal(c.reservee, true);
+  assert.equal(await refusDeSaisie(base, P, DD, 23, "Nkong-Ni", "Brebis"), null, "le DD, lui, garde la main");
+
+  // Une case que le chef a lui-même remplie reste la sienne : il peut la reprendre.
+  await ecrireSaisieCanevas(base, transaction, periodeId, cellule, { valeur: 41 }, chef.id);
+  assert.equal(await refusDeSaisie(base, P, PSA, 23, "Nkong-Ni", "Brebis"), null);
+  c = await lire();
+  assert.equal(c.etat, "saisie");
+  assert.ok(!c.reservee);
+
+  // La liste de ses tableaux : ceux de sa section, aucun du BAC ni de la santé.
+  const numeros = (await resumer(base, P, PSA)).map((t) => t.numero);
+  assert.ok(numeros.includes(14) && numeros.includes(23));
+  assert.ok(!numeros.includes(13) && !numeros.includes(64));
+});
+
 test("sans total mensuel, la somme des catégories ne peut pas être contrôlée : la saisie passe", async () => {
   // T1 2031 : aucun rapport mensuel, donc aucun total à comparer.
   assert.equal(await incoherenceCategories(base, P, DD, 14, "Dschang", "Veau", 3), null);

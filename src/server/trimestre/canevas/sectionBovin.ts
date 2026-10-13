@@ -119,6 +119,8 @@ export const SECTION_II_BOVIN: SectionCanevas = {
         "Champs fourragers (en ha)",
         "TOTAL",
       ],
+      totalSansSomme:
+        "La ligne TOTAL reste vide : les lignes n'ont pas la même unité (des nombres, des hectares, des kilomètres), leur somme ne voudrait rien dire.",
     },
     { type: "titre", niveau: 4, texte: "b) Les pâturages" },
     { type: "zoneTexte", cle: "II1.paturages", consigne: "Zones de pâturage, état, conflits agropastoraux." },

@@ -38,9 +38,10 @@ const PROTECTED_PREFIXES: Array<{ prefix: string; roles: string[] }> = [
   // chef de section pour son domaine ; le DA et le DD relisent et corrigent.
   { prefix: "/api/trimestre/rubriques", roles: ["DD", "DA", "AGENT_SAISIE", ...CHEF_ROLES] },
   // Saisie trimestrielle (décision D9) : les droits fins — son arrondissement
-  // pour un DA ou un agent, les tableaux du BAC pour le chef BAC — sont
-  // vérifiés case par case dans la route.
-  { prefix: "/api/trimestre/saisie", roles: ["DD", "CHEF_BAC", "DA", "AGENT_SAISIE"] },
+  // pour un DA ou un agent, les tableaux du BAC pour le chef BAC, ceux de sa
+  // section pour un chef technique (13 octobre 2026 : il complète ce qui
+  // manque) — sont vérifiés case par case dans la route.
+  { prefix: "/api/trimestre/saisie", roles: ["DD", "DA", "AGENT_SAISIE", ...CHEF_ROLES] },
   // Analyses du trimestre : l'agent valide pour son arrondissement, le chef de
   // section pour son domaine ; le DA et le DD relisent. Le ressort de chacun
   // est vérifié dans la route. AVANT la règle générale "/trimestre".
@@ -50,7 +51,7 @@ const PROTECTED_PREFIXES: Array<{ prefix: string; roles: string[] }> = [
   // Circuit du trimestre : chacun y franchit SON étape ; les droits fins sont dans la route.
   { prefix: "/api/trimestre/circuit", roles: ["DD", "DA", "AGENT_SAISIE", ...CHEF_ROLES] },
   { prefix: "/trimestre/circuit", roles: ["DD", "DA", "AGENT_SAISIE", ...CHEF_ROLES] },
-  { prefix: "/trimestre", roles: ["DD", "CHEF_BAC", "DA", "AGENT_SAISIE"] },
+  { prefix: "/trimestre", roles: ["DD", "DA", "AGENT_SAISIE", ...CHEF_ROLES] },
   { prefix: "/api/technique/audit", roles: ["DD", "ADMIN_TECH"] }, // AVANT la règle générale : Array.find prend la première correspondance
   { prefix: "/api/technique", roles: ["ADMIN_TECH"] },
   { prefix: "/api/sync", roles: ["DA", "AGENT_SAISIE"] },

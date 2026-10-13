@@ -19,7 +19,7 @@ import type { DetailsObservation } from "@/server/observations";
 import type { DetailsObservationT, CibleTrimestre } from "@/server/observationsTrimestre";
 import { trimestrielle } from "@/server/periodes/calendrier";
 import { periodeTrimestrielle } from "@/server/trimestre/rubriques";
-import { tableauDe, grille } from "@/server/trimestre/saisieTrimestrielle";
+import { tableauDe, grille, estChefTechnique, chefDuTableau } from "@/server/trimestre/saisieTrimestrielle";
 import { axeTerritorial } from "@/server/trimestre/canevas/structure";
 import { SECTIONS_CANEVAS, TABLEAUX_BAC, chefDeSection } from "@/server/trimestre/canevas/sections";
 import { zonesTexte } from "@/server/trimestre/rapportCanevas";
@@ -41,8 +41,8 @@ interface CorpsTrimestre {
 const CHEF_LISIBLE: Record<string, string> = { CHEF_BAC: "chef BAC", CHEF_PSA: "chef PSA", CHEF_SPAIH: "chef SPAIH", CHEF_SSV: "chef SSV" };
 
 /**
- * Signaler, au trimestre : une case à son arrondissement (DD, ou chef BAC sur
- * ses tableaux), une analyse ou un texte du département à son chef de
+ * Signaler, au trimestre : une case à son arrondissement (DD, ou chef de
+ * section sur les tableaux de sa section), une analyse ou un texte du département à son chef de
  * section (DD). Un rapport transmis est renvoyé ; une section validée
  * retrouve la main — sinon le destinataire ne pourrait rien corriger.
  */
@@ -56,10 +56,12 @@ async function signalerTrimestre(user: SessionUser, c: CorpsTrimestre, texte: st
   let destinataire: DetailsObservationT["destinataire"];
 
   if (c.type === "case") {
-    assertRole(user, ["DD", "CHEF_BAC"]);
+    assertRole(user, ["DD", ...ROLES_CHEF]);
     const t = c.numero ? tableauDe(c.numero) : undefined;
     if (!t || c.ligne == null || !c.colonne) return erreur("Case inconnue.", 400);
     if (user.role === "CHEF_BAC" && !TABLEAUX_BAC.has(c.numero!)) return erreur("Ce tableau n'est pas du ressort du BAC.", 403);
+    // Un chef de section technique : les tableaux de SA section seulement.
+    if (estChefTechnique(user.role) && chefDuTableau(c.numero!) !== user.role) return erreur("Ce tableau n'est pas de votre section.", 403);
     const axe = axeTerritorial(t.bloc);
     const territoire = axe === "lignes" ? c.ligne : axe === "colonnes" ? c.colonne : null;
     const arr = territoire ? (await listerArrondissements(db)).find((a) => a.nom === territoire) : undefined;

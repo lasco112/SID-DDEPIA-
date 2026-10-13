@@ -330,6 +330,8 @@ export function fournisseur(
     function total(l: string, c: string, n1: boolean): Resultat {
       if (estEcart(l) || estEcart(c)) return null;
       const surLigne = estTotal(l);
+      // Des lignes d'unités différentes ne s'additionnent pas : la ligne TOTAL reste vide.
+      if (surLigne && bloc.kind === "arrondissements" && bloc.totalSansSomme) return null;
       const axe = surLigne ? lignes : colonnes;
       const repere = surLigne ? l : c;
       const composantes = axe.slice(0, Math.max(0, axe.indexOf(repere))).filter((x) => !estTotal(x));

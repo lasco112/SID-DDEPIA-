@@ -38,6 +38,8 @@ interface CaseGrille {
   texte: boolean;
   /** Valeur reprise d'un autre tableau, proposée tant que rien n'est saisi. */
   propose: string | null;
+  /** Chef de section : case remplie par l'arrondissement — elle se signale, elle ne se modifie pas. */
+  reservee?: boolean;
 }
 
 interface Grille {
@@ -122,9 +124,11 @@ export default function SaisieTrimestrielleClient({
    * tape déjà dans la case suivante pendant que la précédente s'enregistre.
    */
   const enCoursDeFrappe = useRef(new Set<string>());
-  // Signaler une case à l'arrondissement qu'elle concerne (DD, chef BAC).
+  // Signaler une case à l'arrondissement qu'elle concerne (DD, chefs de section).
   const moi = useUtilisateur();
-  const peutSignaler = moi?.role === "DD" || moi?.role === "CHEF_BAC";
+  const peutSignaler = moi?.role === "DD" || Boolean(moi?.role.startsWith("CHEF_"));
+  /** Chef d'une section technique : il complète ce qui manque, et signale le reste. */
+  const chefTechnique = ["CHEF_PSA", "CHEF_SPAIH", "CHEF_SSV"].includes(moi?.role ?? "");
   const [modeSignaler, setModeSignaler] = useState(false);
   const [aSignaler, setASignaler] = useState<{ ligne: string; colonne: string; libelle: string; valeur: string | null } | null>(null);
 
@@ -490,6 +494,7 @@ export default function SaisieTrimestrielleClient({
               }}
               onQuitter={enregistrer}
               onConfirmerReprise={(c) => void confirmerReprise(c)}
+              entier={chefTechnique}
               signalement={modeSignaler}
               onSignaler={(l, c) => setASignaler({ ligne: l.cle, colonne: c.colonne, libelle: `${l.libelle || l.cle} · ${c.colonne}`, valeur: c.saisi ?? c.affiche })}
             />
@@ -518,10 +523,12 @@ export default function SaisieTrimestrielleClient({
     <div className="max-w-full">
       <HorsLigneTrimestre username={username} copieDu={copieDu} onEnvoye={() => void chargerListe()} />
       <VisiteGuidee ecran="trimestre-saisie-liste" />
-      <h1 className="text-2xl font-bold text-primary-dark">{titre}</h1>
+      <h1 className="text-2xl font-bold text-primary-dark">{chefTechnique ? "Compléter ou faire corriger un tableau de ma section" : titre}</h1>
       <p className="mt-1 max-w-3xl text-gray-600">
         {presentation ??
-          (liste.arrondissement
+          (chefTechnique
+            ? "Les tableaux de votre section, pour les six arrondissements. Remplissez une case restée vide, ou le total de l'an passé s'il manque. Une case déjà remplie par l'arrondissement ne se modifie pas : ouvrez le tableau et touchez « Signaler une case à l'arrondissement »."
+            : liste.arrondissement
             ? `Ce que les rapports mensuels ne collectent pas, pour l'arrondissement de ${liste.arrondissement}. Vous ne remplissez que sa ligne ; les cases grises se calculent seules.`
             : "Ce que les rapports mensuels ne collectent pas. Les cases grises se calculent seules : à partir du mensuel, ou comme totaux.")}{" "}
         Touchez un tableau pour le remplir ; chaque case s&apos;enregistre dès que vous la quittez.
@@ -775,7 +782,14 @@ function TableauSaisie({
   onConfirmerReprise,
   signalement = false,
   onSignaler,
+  entier = false,
 }: {
+  /**
+   * Toujours le tableau entier, jamais le formulaire d'une seule ligne : un
+   * chef de section doit voir les six arrondissements, même s'il ne reste
+   * qu'une case à remplir — et pouvoir signaler n'importe laquelle.
+   */
+  entier?: boolean;
   refus: string | null;
   controle: ControleCategories | null;
   /** DA ou agent : le bouton ouvre son rapport mensuel. */
@@ -832,17 +846,18 @@ function TableauSaisie({
         />
       );
     }
-    const titre =
-      c.etat === "calculee"
+    const titre = c.reservee
+      ? "Remplie par l'arrondissement : pour la faire corriger, touchez « Signaler une case à l'arrondissement »"
+      : c.etat === "calculee"
         ? "Calculé à partir des rapports mensuels"
         : c.etat === "total"
           ? "Total calculé"
           : "Hors de votre ressort";
     return (
       <span
-        data-visite={c.etat === "calculee" || c.etat === "total" ? "case-grise" : undefined}
+        data-visite={c.reservee ? "case-arrondissement" : c.etat === "calculee" || c.etat === "total" ? "case-grise" : undefined}
         title={titre}
-        className={`block px-2 py-1 ${c.etat === "lecture" ? "text-gray-700" : "bg-gray-100 text-gray-600"} ${
+        className={`block px-2 py-1 ${c.reservee ? "bg-blue-50 text-blue-900" : c.etat === "lecture" ? "text-gray-700" : "bg-gray-100 text-gray-600"} ${
           c.etat === "total" ? "italic" : ""
         }`}
       >
@@ -888,7 +903,7 @@ function TableauSaisie({
         arrondissement : un formulaire vertical se lit mieux sur un téléphone
         qu'un tableau de dix colonnes.
       */}
-      {lignesSaisies.length > 1 && colonnesSaisies.length === 1 ? (
+      {!entier && lignesSaisies.length > 1 && colonnesSaisies.length === 1 ? (
         // Une seule colonne à remplir : chaque ligne du tableau devient une
         // question, et les totaux de la colonne s'affichent en fin de liste.
         <div className="grid max-w-xl gap-2">
@@ -908,7 +923,7 @@ function TableauSaisie({
             );
           })}
         </div>
-      ) : lignesSaisies.length === 1 ? (
+      ) : !entier && lignesSaisies.length === 1 ? (
         <div data-cible={cibleTrimestrielle.ligne(lignesSaisies[0].cle)} className="grid max-w-xl gap-2 rounded p-1">
           {lignesSaisies[0].cases.map((c) => (
             <label
@@ -959,6 +974,8 @@ function TableauSaisie({
       <p className="mt-2 text-xs text-gray-500">
         Cases grises : calculées automatiquement — à partir des rapports mensuels, ou comme totaux. Elles ne se saisissent pas.
         Une valeur pâle dans une case vide est reprise d&apos;un autre tableau : elle compte telle quelle tant que vous ne la changez pas.
+        {grille.lignes.some((l) => l.cases.some((c) => c.reservee)) &&
+          " Cases bleutées : remplies par l'arrondissement — vous ne les modifiez pas ; touchez « Signaler une case à l'arrondissement » pour les lui faire corriger."}
       </p>
     </div>
   );

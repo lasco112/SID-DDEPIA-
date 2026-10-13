@@ -168,6 +168,14 @@ export interface TableauArrondissements {
   enteteLibelle: string;
   /** Libellés de ligne imposés, dans l'ordre, y compris la ligne TOTAL. */
   lignes: string[];
+  /**
+   * Les lignes n'ont pas la même unité (des nombres, des hectares, des
+   * kilomètres) : la ligne TOTAL du canevas reste imprimée, mais VIDE —
+   * additionner des pistes en km et des champs en ha ne veut rien dire
+   * (décision du Délégué, 13 octobre 2026). Les totaux de chaque ligne, eux,
+   * restent calculés. La valeur est la raison, dite à l'écran.
+   */
+  totalSansSomme?: string;
 }
 
 /** Un tableau dont les colonnes ne sont pas les arrondissements. */

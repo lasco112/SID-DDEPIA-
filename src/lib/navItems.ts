@@ -60,6 +60,7 @@ const AIDE = {
   bac: "Personnel, budget, recettes, infrastructures : ce que seul le BAC connaît.",
   suivre: "Qui a transmis, qui a validé ; prendre le relais au besoin.",
   produire: "Le document Word du département, définitif quand tout est validé.",
+  completerChef: "Remplir une case vide ou le total de l'an passé ; signaler à l'arrondissement une case à corriger.",
 };
 
 /** Les écrans des chefs de section pour le mensuel. */
@@ -107,6 +108,8 @@ const trimestrielChef = (chef: "CHEF_PSA" | "CHEF_SPAIH" | "CHEF_SSV"): NavGroup
     { href: "/trimestre/analyses", label: `${ANALYSE} de ma section`, etape: 1, aide: AIDE.analyses },
     { ...REDACTION_CHEF[chef], etape: 2 },
     { href: "/trimestre/circuit", label: "Valider ma section", etape: 3, aide: AIDE.valider },
+    // Hors étapes, comme pour le DD : on n'y va que s'il manque un chiffre.
+    { href: "/trimestre/saisie", label: "Compléter ou faire corriger un tableau de ma section", aide: AIDE.completerChef },
   ],
 });
 

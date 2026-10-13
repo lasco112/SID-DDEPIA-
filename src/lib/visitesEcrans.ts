@@ -142,7 +142,7 @@ export const VISITES: Record<string, DefinitionVisite> = {
     ],
   },
   "trimestre-saisie-tableau": {
-    version: 3,
+    version: 4,
     etapes: [
       {
         cible: "case-saisie",
@@ -150,6 +150,12 @@ export const VISITES: Record<string, DefinitionVisite> = {
         texte: "Tapez le chiffre, puis touchez ailleurs : la case s'enregistre seule. Les totaux se recalculent aussitôt.",
       },
       { cible: "case-grise", titre: "Case grise : calculée", texte: "Calculée par le SID, à partir de vos rapports mensuels ou comme total. Elle ne se saisit pas." },
+      {
+        cible: "case-arrondissement",
+        titre: "Case bleutée : remplie par l'arrondissement",
+        texte: "Vous ne la modifiez pas. Si le chiffre vous paraît faux, touchez « Signaler une case à l'arrondissement », puis cette case : il la corrige ou vous répond.",
+        depuis: 4,
+      },
       {
         cible: "case-an-passe",
         titre: "Le chiffre de l'an passé",
