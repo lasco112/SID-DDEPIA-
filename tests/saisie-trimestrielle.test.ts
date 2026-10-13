@@ -280,6 +280,53 @@ test("infrastructures d'exploitation : la ligne TOTAL reste vide, les totaux de 
   assert.match(g!.aide, /ligne TOTAL reste vide/);
 });
 
+test("produits connexes de l'aviculture : la ligne TOTAL reste vide (tonnes, cartons, nombres)", async () => {
+  const dd = await base.user.findFirstOrThrow({ where: { role: "DD", actif: true }, select: { id: true } });
+  periodeId = periodeId ?? (await periodeTrimestrielle(base, P));
+  for (const numero of [49, 50]) {
+    await ecrireSaisieCanevas(base, transaction, periodeId, { numeroTableau: numero, ligne: "Maïs (T)", colonne: "Dschang" }, { valeur: 4 }, dd.id);
+    await ecrireSaisieCanevas(base, transaction, periodeId, { numeroTableau: numero, ligne: "Œufs (cartons)", colonne: "Dschang" }, { valeur: 100 }, dd.id);
+    const g = await grille(base, P, DD, numero);
+    const total = g!.lignes.find((l) => l.cle === "TOTAL")!;
+    assert.ok(total.cases.every((c) => c.affiche == null), `tableau ${numero} : aucune somme de tonnes et de cartons`);
+    assert.equal(g!.lignes.find((l) => l.cle === "Maïs (T)")!.cases.find((c) => c.colonne === "TOTAL T1 2031")!.affiche, "4", "le total de la ligne reste calculé");
+  }
+});
+
+test("catégories de même unité : le total additionne ce que donne le mensuel et ce qui est saisi", async () => {
+  // Décision du Délégué (13 octobre 2026) : personne ne note une somme que la
+  // machine sait faire. Avant, ce total restait VIDE dès qu'une catégorie
+  // venait du mensuel et une autre de la saisie.
+  const dd = await base.user.findFirstOrThrow({ where: { role: "DD", actif: true }, select: { id: true } });
+  periodeId = periodeId ?? (await periodeTrimestrielle(base, P));
+  const nombre = (s: string | null) => (s == null ? null : Number(s.replace(/[\s  ]/g, "").replace(",", ".")));
+
+  // T1 2031 : aucun mensuel — le total est la somme des catégories saisies.
+  await ecrireSaisieCanevas(base, transaction, periodeId, { numeroTableau: 43, ligne: "Dschang", colonne: "Poussins chair" }, { valeur: 5 }, dd.id);
+  await ecrireSaisieCanevas(base, transaction, periodeId, { numeroTableau: 43, ligne: "Dschang", colonne: "Coquelets" }, { valeur: 3 }, dd.id);
+  const g = await grille(base, P, DD, 43);
+  const total = g!.lignes.find((l) => l.cle === "Dschang")!.cases.find((c) => c.colonne === "TOTAL T1 2031")!;
+  assert.equal(total.affiche, "8");
+  assert.equal(total.etat, "total", "calculé, jamais saisi");
+  // Le SID n'a pas ce trimestre de l'an passé : son total reste à donner par l'agent.
+  assert.equal(await refusDeSaisie(base, P, DA_DSCHANG, 43, "Dschang", "TOTAL T1 2030"), null);
+
+  // T3 2026 : le mensuel alimente une partie des catégories — le total les porte.
+  const T3 = trimestrielle(2026, 3);
+  for (const numero of [43, 33, 69]) {
+    const g3 = await grille(base, T3, DD, numero);
+    for (const l of g3!.lignes.filter((x) => !/^TOTAL|^ÉCART/.test(x.cle))) {
+      const categories = l.cases.filter((c) => !/^TOTAL/.test(c.colonne)).map((c) => nombre(c.affiche)).filter((v): v is number => v != null);
+      if (categories.length === 0) continue;
+      const attendu = categories.reduce((s, v) => s + v, 0);
+      assert.equal(nombre(l.cases.find((c) => c.colonne === "TOTAL T3 2026")!.affiche), attendu, `tableau ${numero}, ${l.cle}`);
+    }
+  }
+  // Animaux sur pied et tonnes de viande ne s'additionnent toujours pas.
+  const g19 = await grille(base, T3, DD, 19);
+  assert.ok(g19!.lignes.filter((l) => !/^TOTAL|^ÉCART/.test(l.cle)).every((l) => l.cases.find((c) => c.colonne === "TOTAL T3 2026")!.affiche == null));
+});
+
 test("un chef de section complète ce qui manque dans SA section, et ne réécrit pas l'arrondissement", async () => {
   const PSA = { role: "CHEF_PSA" };
   const SSV = { role: "CHEF_SSV" };

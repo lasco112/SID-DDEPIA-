@@ -229,6 +229,15 @@ export interface LiaisonTableau {
    * CALCULÉE à partir des abattages.
    */
   entierementCalcule?: boolean;
+  /**
+   * Toutes les catégories comptent LA MÊME CHOSE (des têtes, des oiseaux, des
+   * œufs) : le total additionne alors celles que le mensuel donne et celles
+   * qui se saisissent au trimestre. Sans cela, un total qui mêle les deux
+   * reste vide — additionner des animaux vendus et des tonnes de viande ne
+   * donnerait rien de juste. Décision du Délégué (13 octobre 2026) : personne
+   * n'a à noter une somme que la machine sait faire.
+   */
+  memeUnite?: boolean;
 }
 
 /**
@@ -243,6 +252,7 @@ export interface LiaisonTableau {
  */
 const ABATTAGES_CONTROLES: LiaisonTableau = {
   numero: 69,
+  memeUnite: true,
   titre: "Situation des abattages contrôlés",
   orientation: "lignes",
   correspondances: [
@@ -335,6 +345,7 @@ const CHEPTEL_CAPRIN: LiaisonTableau = {
  */
 const CHEPTEL_EQUIDES: LiaisonTableau = {
   numero: 33,
+  memeUnite: true,
   titre: "Situation des cheptels de camélidés et d’équidés",
   orientation: "lignes",
   correspondances: [
@@ -354,6 +365,7 @@ const CHEPTEL_EQUIDES: LiaisonTableau = {
  */
 const NON_CONVENTIONNELS: LiaisonTableau = {
   numero: 51,
+  memeUnite: true,
   titre: "Situation des cheptels d’élevage non conventionnels",
   orientation: "lignes",
   correspondances: [
@@ -370,6 +382,7 @@ const NON_CONVENTIONNELS: LiaisonTableau = {
 /** Tableau n° 54 — Cheptels canins, félins et animaux de compagnie. */
 const ANIMAUX_COMPAGNIE: LiaisonTableau = {
   numero: 54,
+  memeUnite: true,
   titre: "Situation des cheptels des élevages canins et félins et autres animaux de compagnie",
   orientation: "lignes",
   correspondances: [
@@ -596,6 +609,7 @@ const volailles = (espece: string) =>
 const PAS_AU_TABLEAU_12 = "Le tableau 1.2 du mensuel ne porte pas cette catégorie.";
 const BANDES: LiaisonTableau = {
   numero: 42,
+  memeUnite: true,
   titre: "Situation des bandes par arrondissement",
   orientation: "colonnes",
   correspondances: [
@@ -627,6 +641,7 @@ const PAS_AU_TABLEAU_55 = "Le tableau 5.5 du mensuel ne porte pas cette catégor
 /** Tableau n° 43 — Oiseaux vendus sur pied, par arrondissement. */
 const COMMERCE_OISEAUX: LiaisonTableau = {
   numero: 43,
+  memeUnite: true,
   titre: "Etat de la commercialisation des oiseaux sur pied par arrondissement",
   orientation: "lignes",
   correspondances: [
@@ -651,6 +666,7 @@ const COMMERCE_OISEAUX: LiaisonTableau = {
 /** Tableau n° 44 — Les mêmes ventes, catégories en lignes. */
 const COMMERCE_OISEAUX_CATEGORIES: LiaisonTableau = {
   numero: 44,
+  memeUnite: true,
   titre: "Etat de la commercialisation des oiseaux sur pied par arrondissement et par catégorie",
   orientation: "colonnes",
   correspondances: [
@@ -705,6 +721,7 @@ const VIANDE_VOLAILLE: LiaisonTableau = {
 /** Tableau n° 47 — Œufs : ceux des fermes de ponte, tableau 1.4. */
 const OEUFS: LiaisonTableau = {
   numero: 47,
+  memeUnite: true,
   titre: "Etat de la production des œufs par arrondissement",
   orientation: "lignes",
   correspondances: [

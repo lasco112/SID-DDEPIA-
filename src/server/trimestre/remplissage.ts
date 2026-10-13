@@ -314,15 +314,35 @@ export function fournisseur(
       const source = n1 ? donnees.saisiesN1 : donnees.saisies;
       return source.get(cleCellule({ numeroTableau: numero, ligne: l, colonne: c }))?.valeur ?? valeurReprise(source, numero, l, c);
     };
-    const mixtes = Boolean(liaisonEvenementDe(numero)?.totauxMixtes);
+    const liaison = liaisonDe(numero);
+    const mixtes = Boolean(liaisonEvenementDe(numero)?.totauxMixtes || liaison?.memeUnite);
+
+    /**
+     * L'an passé d'une case que le mensuel alimente — pour un tableau lié à des
+     * champs seulement : les listes du mensuel ne se recalculent pas par case.
+     */
+    // L'an passé ne se totalise que si ce trimestre-là a été rempli dans le SID
+    // pour ce tableau : sinon la somme ne porterait que la part du mensuel, et
+    // l'agent ne pourrait plus donner le vrai total (reprise d'historique).
+    let anPasseRempli: boolean | undefined;
+    const calculeeAnPasse = (l: string, c: string): Resultat => {
+      if (!liaison?.memeUnite) return IMPUR;
+      anPasseRempli ??= Array.from(donnees.saisiesN1.keys()).some((k) => k.startsWith(`${numero} | `));
+      if (!anPasseRempli) return IMPUR;
+      const [territoire, categorie] = liaison.orientation === "lignes" ? [l, c] : [c, l];
+      const corr = liaison.correspondances.find((x) => x.libelle === categorie);
+      const code = codeDe.get(territoire);
+      if (!corr || !estLiee(corr) || !code) return IMPUR;
+      return valeurDe(corr, code, true);
+    };
 
     const cellule = (l: string, c: string, n1: boolean): Resultat => {
       if (estTotal(l) || estTotal(c)) return total(l, c, n1);
       if (estCaseCalculee(numero, l, c, ctx)) {
         // Des cas comptés et des cas saisis sont de même nature : ils
         // s'additionnent. Des animaux et des tonnes, non.
-        if (!mixtes || n1) return IMPUR;
-        return versNombre(valeurCalculee(numero, l, c));
+        if (!mixtes) return IMPUR;
+        return n1 ? calculeeAnPasse(l, c) : versNombre(valeurCalculee(numero, l, c));
       }
       return saisi(l, c, n1);
     };

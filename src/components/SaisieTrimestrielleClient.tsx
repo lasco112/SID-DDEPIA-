@@ -129,6 +129,8 @@ export default function SaisieTrimestrielleClient({
   const peutSignaler = moi?.role === "DD" || Boolean(moi?.role.startsWith("CHEF_"));
   /** Chef d'une section technique : il complète ce qui manque, et signale le reste. */
   const chefTechnique = ["CHEF_PSA", "CHEF_SPAIH", "CHEF_SSV"].includes(moi?.role ?? "");
+  /** On saisit l'an passé d'un tableau : la période d'où l'on vient, pour y revenir. */
+  const [retourVers, setRetourVers] = useState<{ annee: number; trimestre: number } | null>(null);
   const [modeSignaler, setModeSignaler] = useState(false);
   const [aSignaler, setASignaler] = useState<{ ligne: string; colonne: string; libelle: string; valeur: string | null } | null>(null);
 
@@ -377,6 +379,26 @@ export default function SaisieTrimestrielleClient({
     enCoursDeFrappe.current.clear();
   }
 
+  /**
+   * L'an passé d'un tableau dont les arrondissements sont en COLONNES (bandes,
+   * produits connexes, infrastructures…) : il n'y a pas de case « an passé »
+   * par arrondissement. Ses chiffres se donnent en remplissant le même tableau
+   * pour le trimestre de l'an passé ; la colonne « TOTAL {an passé} » s'en
+   * déduit. On y va, et on en revient, d'un bouton (décision du Délégué,
+   * 13 octobre 2026 : l'an passé se saisit tant que le SID ne l'a pas).
+   */
+  function allerALAnPasse(numero: number) {
+    setRetourVers({ annee, trimestre });
+    tableauDemande.current = numero;
+    setPeriode({ annee: annee - 1, trimestre });
+  }
+  function revenirDeLAnPasse() {
+    if (!retourVers) return;
+    tableauDemande.current = ouvert;
+    setPeriode(retourVers);
+    setRetourVers(null);
+  }
+
   if (erreur && !liste) return <p className="rounded-md bg-red-50 p-4 text-sm text-red-800">{erreur}</p>;
   if (!liste) return <p className="text-gray-600">Chargement…</p>;
 
@@ -409,8 +431,38 @@ export default function SaisieTrimestrielleClient({
   const courant = ouvert == null ? null : liste.tableaux.find((t) => t.numero === ouvert) ?? null;
   if (courant) {
     const rang = liste.tableaux.findIndex((t) => t.numero === courant.numero) + 1;
+    // La colonne « TOTAL {an passé} », quand elle ne se saisit pas sur place :
+    // combien de lignes que l'on remplit ici n'ont pas leur chiffre de l'an passé.
+    const colonneAnPasse = `TOTAL T${trimestre} ${annee - 1}`;
+    const lignesSansAnPasse = (() => {
+      if (retourVers || !grille || grille.numero !== courant.numero) return 0;
+      const paires = grille.lignes.flatMap((l) => {
+        const c = l.cases.find((x) => x.colonne === colonneAnPasse);
+        return c ? [{ l, c }] : [];
+      });
+      if (paires.length === 0 || paires.some((p) => p.c.etat === "saisie")) return 0;
+      return paires.filter((p) => p.c.affiche == null && p.l.cases.some((x) => x.etat === "saisie" || x.reservee)).length;
+    })();
     return (
       <div className="max-w-full">
+        {retourVers && (
+          <div data-visite="bandeau-an-passe" className="mb-3 rounded-md border-2 border-amber-500 bg-amber-50 p-3">
+            <p className="text-sm font-semibold text-amber-900">
+              Vous saisissez le T{trimestre} {annee} : les chiffres de l&apos;an passé.
+            </p>
+            <p className="mt-1 text-sm text-amber-900">
+              Remplissez ce que vous aviez à l&apos;époque, à partir de vos rapports. Ces chiffres alimentent la colonne « TOTAL T
+              {trimestre} {annee} » du rapport du T{retourVers.trimestre} {retourVers.annee}.
+            </p>
+            <button
+              type="button"
+              onClick={revenirDeLAnPasse}
+              className="mt-2 min-h-[44px] rounded-md bg-amber-600 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-700"
+            >
+              ← Revenir au T{retourVers.trimestre} {retourVers.annee}
+            </button>
+          </div>
+        )}
         <button
           type="button"
           data-visite="retour-liste-trimestre"
@@ -499,6 +551,24 @@ export default function SaisieTrimestrielleClient({
               onSignaler={(l, c) => setASignaler({ ligne: l.cle, colonne: c.colonne, libelle: `${l.libelle || l.cle} · ${c.colonne}`, valeur: c.saisi ?? c.affiche })}
             />
           )}
+          {lignesSansAnPasse > 0 && (
+            <div data-visite="an-passe-colonne" className="mt-3 rounded-md border border-amber-300 bg-amber-50 p-3">
+              <p className="text-sm font-semibold text-amber-900">
+                « {colonneAnPasse} » est vide pour {lignesSansAnPasse} ligne{lignesSansAnPasse > 1 ? "s" : ""}
+              </p>
+              <p className="mt-1 text-sm text-amber-900">
+                Le SID n&apos;a pas encore les chiffres de l&apos;an passé de ce tableau. Pour les donner, remplissez ce même tableau
+                pour le T{trimestre} {annee - 1}, à partir de vos rapports de l&apos;époque : la colonne se calculera seule.
+              </p>
+              <button
+                type="button"
+                onClick={() => allerALAnPasse(courant.numero)}
+                className="mt-2 min-h-[44px] rounded-md border border-amber-600 bg-white px-4 py-2 text-sm font-semibold text-amber-900 hover:bg-amber-100"
+              >
+                Saisir les chiffres du T{trimestre} {annee - 1} →
+              </button>
+            </div>
+          )}
           <Enchainement
             liste={liste.tableaux}
             numero={courant.numero}
@@ -523,6 +593,20 @@ export default function SaisieTrimestrielleClient({
     <div className="max-w-full">
       <HorsLigneTrimestre username={username} copieDu={copieDu} onEnvoye={() => void chargerListe()} />
       <VisiteGuidee ecran="trimestre-saisie-liste" />
+      {retourVers && (
+        <div className="mb-3 rounded-md border-2 border-amber-500 bg-amber-50 p-3">
+          <p className="text-sm font-semibold text-amber-900">
+            Vous êtes sur le T{trimestre} {annee} : les chiffres de l&apos;an passé.
+          </p>
+          <button
+            type="button"
+            onClick={revenirDeLAnPasse}
+            className="mt-2 min-h-[44px] rounded-md bg-amber-600 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-700"
+          >
+            ← Revenir au T{retourVers.trimestre} {retourVers.annee}
+          </button>
+        </div>
+      )}
       <h1 className="text-2xl font-bold text-primary-dark">{chefTechnique ? "Compléter ou faire corriger un tableau de ma section" : titre}</h1>
       <p className="mt-1 max-w-3xl text-gray-600">
         {presentation ??

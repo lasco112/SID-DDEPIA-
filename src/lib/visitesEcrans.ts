@@ -157,6 +157,12 @@ export const VISITES: Record<string, DefinitionVisite> = {
         depuis: 4,
       },
       {
+        cible: "an-passe-colonne",
+        titre: "Les chiffres de l'an passé",
+        texte: "Ce tableau n'a pas de case « an passé » à remplir sur place. Touchez ce bouton : le même tableau s'ouvre pour le trimestre de l'an passé. Remplissez-le, puis revenez ; la colonne de l'an passé se calcule seule.",
+        depuis: 4,
+      },
+      {
         cible: "case-an-passe",
         titre: "Le chiffre de l'an passé",
         texte: "La case « TOTAL » de l'année dernière : le SID ne l'a pas encore, c'est à vous de la donner, à partir de vos rapports de l'époque. Sans elle, pas de comparaison sur un an.",

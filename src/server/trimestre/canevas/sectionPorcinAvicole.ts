@@ -64,6 +64,10 @@ const PRODUITS_CONNEXES = [
   "TOTAL",
 ];
 
+/** Décision du Délégué (13 octobre 2026) : des tonnes, des cartons d'œufs et des nombres de poulets ne s'additionnent pas. */
+const TOTAL_CONNEXES_VIDE =
+  "La ligne TOTAL reste vide : les lignes n'ont pas la même unité (des tonnes, des cartons d'œufs, des nombres de volailles), leur somme ne voudrait rien dire.";
+
 // ============================================================================
 // II-5. L'ÉLEVAGE PORCIN — tableaux n° 37 à 41
 // ============================================================================
@@ -326,6 +330,7 @@ export const SECTION_II_AVICOLE: SectionCanevas = {
       titre: "Etat de la consommation des produits connexes de l’aviculture en tonnes",
       enteteLibelle: "Produits \\Arrondissement",
       lignes: PRODUITS_CONNEXES,
+      totalSansSomme: TOTAL_CONNEXES_VIDE,
     },
 
     { type: "titre", niveau: 3, texte: "II-6-5. Mouvement des bandes, des produits dérivés et produits connexes" },
@@ -336,6 +341,7 @@ export const SECTION_II_AVICOLE: SectionCanevas = {
       titre: "Etat de la circulation des bandes, produits dérivés et produits connexes de l’aviculture",
       enteteLibelle: "Produits \\Arrondissement",
       lignes: PRODUITS_CONNEXES,
+      totalSansSomme: TOTAL_CONNEXES_VIDE,
     },
 
     ...rubrique("II-6-6. Exportation de la volaille et de ses produits dérivés", "II6.exportation"),
