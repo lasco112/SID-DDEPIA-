@@ -3,6 +3,8 @@
  * couleurs, les textes de l'évolution, l'ordre des diapositives. Un seul
  * endroit, pour que les trois documents disent la même chose.
  */
+import { readFileSync, existsSync } from "node:fs";
+import path from "node:path";
 import { nb, aLaPeriode, type FaitSaillant, type Indicateur, type NoteSituation } from "./noteSituation";
 
 export const COULEURS = {
@@ -17,12 +19,44 @@ export const COULEURS = {
   series: ["397781", "D9A84E", "609CC7", "B84F55", "5DAF91", "7F7F7F"],
 };
 
+/** Un événement ponctuel que le Délégué veut présenter : visite, inondation, campagne, conflit… */
+export interface EvenementParticulier {
+  titre: string;
+  texte: string;
+}
+
 /** Ce que le Délégué a retouché avant de télécharger. */
 export interface Retouches {
   /** Les faits saillants retenus, dans l'ordre, tels qu'il les a écrits. */
   faits?: FaitSaillant[];
   /** Ses remarques : le contexte que les chiffres ne disent pas. */
   remarques?: string;
+  /** Les événements particuliers de la période, écrits par lui. */
+  evenements?: EvenementParticulier[];
+}
+
+/** L'en-tête officiel, en français et en anglais, comme la page de garde des rapports. */
+export const ENTETE = {
+  fr: (n: NoteSituation) => [
+    "RÉPUBLIQUE DU CAMEROUN",
+    "Paix – Travail – Patrie",
+    "MINISTÈRE DE L'ÉLEVAGE, DES PÊCHES ET DES INDUSTRIES ANIMALES",
+    "DÉLÉGATION RÉGIONALE DE L'OUEST",
+    `DÉLÉGATION DÉPARTEMENTALE ${n.departement.nomAvecArticle.toUpperCase()}`,
+  ],
+  en: (n: NoteSituation) => [
+    "REPUBLIC OF CAMEROON",
+    "Peace – Work – Fatherland",
+    "MINISTRY OF LIVESTOCK, FISHERIES AND ANIMAL INDUSTRIES",
+    "REGIONAL DELEGATION OF WEST",
+    `DIVISIONAL DELEGATION OF ${n.departement.nom.toUpperCase()}`,
+  ],
+};
+
+/** Le logo du ministère, celui de la page de garde des rapports (templates/). */
+export function logoMinepia(): Buffer | null {
+  const fichier = path.join(process.cwd(), "templates", "armoiries-minepia.png");
+  return existsSync(fichier) ? readFileSync(fichier) : null;
 }
 
 export const faitsRetenus = (note: NoteSituation, r: Retouches) => r.faits ?? note.faits;

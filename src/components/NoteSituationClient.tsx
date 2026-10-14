@@ -41,6 +41,25 @@ export default function NoteSituationClient() {
   const [note, setNote] = useState<NoteSituation | null>(null);
   const [faits, setFaits] = useState<(FaitSaillant & { garde: boolean })[]>([]);
   const [remarques, setRemarques] = useState("");
+  /** Les événements ponctuels du Délégué ; gardés sur l'appareil, période par période. */
+  const [evenements, setEvenements] = useState<{ titre: string; texte: string }[]>([]);
+  const cleEvenements = `sid-note-evenements|${debut}|${fin}`;
+  useEffect(() => {
+    try {
+      const brut = localStorage.getItem(cleEvenements);
+      setEvenements(brut ? (JSON.parse(brut) as { titre: string; texte: string }[]) : []);
+    } catch {
+      setEvenements([]);
+    }
+  }, [cleEvenements]);
+  const changerEvenements = (liste: { titre: string; texte: string }[]) => {
+    setEvenements(liste);
+    try {
+      localStorage.setItem(cleEvenements, JSON.stringify(liste));
+    } catch {
+      // stockage indisponible : la liste vit le temps de la page
+    }
+  };
   const [chargement, setChargement] = useState(false);
   const [telechargement, setTelechargement] = useState<string | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
@@ -109,6 +128,7 @@ export default function NoteSituationClient() {
           format,
           faits: faits.filter((f) => f.garde && f.texte.trim()).map(({ texte, genre }) => ({ texte, genre })),
           remarques,
+          evenements: evenements.filter((e) => e.titre.trim() || e.texte.trim()),
         }),
       });
       if (!r.ok) throw new Error((await r.json().catch(() => ({}))).message ?? "Le fichier n'a pas pu être produit.");
@@ -242,6 +262,93 @@ export default function NoteSituationClient() {
             >
               + Ajouter un fait
             </button>
+          </section>
+
+          {/* Ce que la note dit en plus des chiffres de l'élevage */}
+          <section className="grid gap-3 md:grid-cols-2">
+            <div className="rounded-lg border border-gray-200 bg-white p-3">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">Épisodes épidémiques et leur gestion</h2>
+              {note.episodes.length ? (
+                <ul className="mt-1 space-y-1 text-sm text-gray-800">
+                  {note.episodes.slice(0, 5).map((e, k) => (
+                    <li key={k}>
+                      <strong>{e.maladie}</strong> — {e.arrondissement} : {nb(e.foyers)} foyer{e.foyers > 1 ? "s" : ""}
+                      {e.morts ? `, ${nb(e.morts)} morts` : ""}
+                      {e.mesures.length ? <span className="text-gray-600"> · {e.mesures.join(" ; ")}</span> : <span className="text-gray-400"> · mesures non précisées</span>}
+                    </li>
+                  ))}
+                  {note.episodes.length > 5 && <li className="text-gray-500">… et {note.episodes.length - 5} autre(s), dans la présentation.</li>}
+                </ul>
+              ) : (
+                <p className="mt-1 text-sm text-gray-600">Aucun foyer déclaré dans les rapports mensuels de la période.</p>
+              )}
+            </div>
+            <div className="rounded-lg border border-gray-200 bg-white p-3">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">Budget : recettes, crédits, marchés</h2>
+              {note.budget.recettes || note.budget.credits || note.budget.marches ? (
+                <ul className="mt-1 space-y-1 text-sm text-gray-800">
+                  {note.budget.recettes && <li>Recettes encaissées : <strong>{nb(note.budget.recettes.total ?? 0)} FCFA</strong></li>}
+                  {note.budget.credits?.fonctionnement != null && <li>Crédits de fonctionnement ({note.budget.credits.trimestre}) : {nb(note.budget.credits.fonctionnement)} FCFA</li>}
+                  {note.budget.credits?.investissement != null && <li>Crédits d&apos;investissement ({note.budget.credits.trimestre}) : {nb(note.budget.credits.investissement)} FCFA</li>}
+                  {note.budget.marches && (
+                    <li>
+                      {note.budget.marches.lignes.length} marché(s) du BIP : {note.budget.marches.parNiveau.map((p) => `${p.nombre} ${p.niveau.toLowerCase()}`).join(", ")}
+                    </li>
+                  )}
+                </ul>
+              ) : (
+                <p className="mt-1 text-sm text-gray-600">
+                  Rien n&apos;est encore saisi par le BAC pour ce trimestre (recettes, crédits, marchés du BIP) : cette page ne sera pas présentée.
+                </p>
+              )}
+            </div>
+          </section>
+
+          {/* Les événements particuliers, écrits par le Délégué */}
+          <section data-visite="evenements-note">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">Événements particuliers (facultatif)</h2>
+            <p className="text-xs text-gray-500">
+              Ce que les rapports mensuels ne disent pas : une visite officielle, une campagne, une inondation, un conflit agropastoral… Chacun aura sa place
+              dans la présentation. Gardés sur cet appareil pour cette période.
+            </p>
+            <div className="mt-2 space-y-2">
+              {evenements.map((e, k) => (
+                <div key={k} className="rounded-md border-l-4 border-amber-500 bg-white p-2 shadow-sm">
+                  <div className="flex gap-2">
+                    <input
+                      value={e.titre}
+                      onChange={(x) => changerEvenements(evenements.map((y, i) => (i === k ? { ...y, titre: x.target.value } : y)))}
+                      placeholder="Titre — ex. : Foyer de PPR maîtrisé à Santchou"
+                      className="min-h-[40px] flex-1 rounded border border-gray-300 px-2 text-sm font-semibold"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => changerEvenements(evenements.filter((_, i) => i !== k))}
+                      className="rounded border border-gray-300 px-3 text-sm text-gray-600 hover:bg-gray-50"
+                      aria-label="Retirer cet événement"
+                    >
+                      Retirer
+                    </button>
+                  </div>
+                  <textarea
+                    value={e.texte}
+                    onChange={(x) => changerEvenements(evenements.map((y, i) => (i === k ? { ...y, texte: x.target.value } : y)))}
+                    rows={2}
+                    placeholder="Ce qui s'est passé, ce qui a été fait, ce qui reste à faire."
+                    className="mt-2 w-full rounded border border-gray-300 p-2 text-sm"
+                  />
+                </div>
+              ))}
+            </div>
+            {evenements.length < 6 && (
+              <button
+                type="button"
+                onClick={() => changerEvenements([...evenements, { titre: "", texte: "" }])}
+                className="mt-2 rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+              >
+                + Ajouter un événement
+              </button>
+            )}
           </section>
 
           {/* Les remarques du Délégué */}

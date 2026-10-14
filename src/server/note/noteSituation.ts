@@ -16,6 +16,7 @@ import { agreger, STATUTS_TRANSMIS, type ValeurAgregee } from "@/server/trimestr
 import { mensuelle } from "@/server/periodes/calendrier";
 import { identiteDepartement } from "@/lib/departement";
 import type { DonneesGraphique } from "@/server/trimestre/canevas/graphiques";
+import { budgetDe, episodesDe, type Budget, type Episode } from "./budgetEtEpisodes";
 
 export interface MoisChoisi {
   annee: number;
@@ -127,6 +128,8 @@ export interface Indicateur {
   hausseFavorable: boolean;
   decimales: number;
   parArrondissement: { nom: string; valeur: number | null }[];
+  /** Un chiffre qui ne se compare pas (un crédit alloué) : pas de flèche. */
+  sansComparaison?: boolean;
 }
 
 export interface FaitSaillant {
@@ -163,9 +166,14 @@ export interface NoteSituation {
     vaccinations: { maladie: string; effectif: number }[];
     totalVaccines: number;
   };
+  /** Les foyers déclarés, maladie par maladie et arrondissement par arrondissement, avec les mesures prises. */
+  episodes: Episode[];
+  /** Recettes, crédits, marchés du budget d'investissement public (tableaux du BAC et du BIP). */
+  budget: Budget;
   faits: FaitSaillant[];
   graphiques: {
     cheptel: DonneesGraphique | null;
+    recettes: DonneesGraphique | null;
     abattages: DonneesGraphique | null;
     vaccinations: DonneesGraphique | null;
     ventes: DonneesGraphique | null;
@@ -243,7 +251,7 @@ async function santeAnimale(db: PrismaClient, mois: MoisChoisi[]) {
   const libelles = new Map(
     (await db.referentielItem.findMany({ where: { code: { in: Array.from(codes) } }, select: { code: true, libelle: true } })).map((r) => [r.code, r.libelle])
   );
-  const nomMaladie = (code: unknown) => (typeof code === "string" ? (libelles.get(code) ?? code.replace(/^MAL_/, "").replace(/_/g, " ")) : "Maladie non précisée");
+  const nomMaladie = nommerMaladie(libelles);
 
   const foyers = new Map<string, FoyerMaladie>();
   const vaccinations = new Map<string, number>();
@@ -272,6 +280,10 @@ async function santeAnimale(db: PrismaClient, mois: MoisChoisi[]) {
     aDesLignes: lignes.length > 0,
   };
 }
+
+/** Le nom d'une maladie, à partir de son code de référentiel. */
+const nommerMaladie = (libelles: Map<string, string>) => (code: unknown) =>
+  typeof code === "string" ? (libelles.get(code) ?? code.replace(/^MAL_/, "").replace(/_/g, " ")) : "Maladie non précisée";
 
 // ------------------------------------------------------------------ la note
 
@@ -340,6 +352,22 @@ export async function preparerNote(db: PrismaClient, debut: MoisChoisi, fin: Moi
   }
 
   const libelleRef = comparaison ? libellePlage(comparaison.mois) : null;
+
+  // --- Le budget, et les épisodes épidémiques.
+  const libellesMaladies = new Map(
+    (await db.referentielItem.findMany({ where: { code: { startsWith: "MAL_" } }, select: { code: true, libelle: true } })).map((r) => [r.code, r.libelle])
+  );
+  const [budget, episodes] = await Promise.all([
+    budgetDe(db, mois, comparaison?.mois ?? null, libelleRef, arrondissements),
+    episodesDe(db, mois, nommerMaladie(libellesMaladies)),
+  ]);
+  if (budget.recettes) {
+    const r = budget.recettes;
+    indicateurs.push({
+      cle: "recettes", libelle: "Recettes encaissées", unite: "FCFA", decimales: 0, hausseFavorable: true,
+      valeur: r.total, reference: r.reference, evolution: evolution(r.total, r.reference), parArrondissement: [],
+    });
+  }
   const note: NoteSituation = {
     departement: { nom: identite.nom, sigle: identite.sigle, nomAvecArticle: identite.nomAvecArticle },
     periode: { libelle: libellePlage(mois), debut: mois[0], fin: mois[mois.length - 1], nbMois: mois.length },
@@ -354,8 +382,10 @@ export async function preparerNote(db: PrismaClient, debut: MoisChoisi, fin: Moi
     },
     indicateurs,
     sante: { foyers: sante.foyers, totalFoyers: sante.totalFoyers, totalMorts: sante.totalMorts, vaccinations: sante.vaccinations, totalVaccines: sante.totalVaccines },
+    episodes,
+    budget,
     faits: [],
-    graphiques: { cheptel: null, abattages: null, vaccinations: null, ventes: null },
+    graphiques: { cheptel: null, recettes: null, abattages: null, vaccinations: null, ventes: null },
     produitLe: new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" }),
   };
   note.graphiques = graphiques(note, valeurs, valeursRef, arrondissements);
@@ -414,7 +444,18 @@ function graphiques(
         : []),
     ],
   });
-  return { cheptel, abattages, vaccinations, ventes };
+  const r = note.budget.recettes;
+  const recettes = r
+    ? garder({
+        titre: "Recettes encaissées par régie (FCFA)",
+        categories: r.parRegie.filter((x) => x.valeur != null || x.reference != null).map((x) => x.regie),
+        series: [
+          { nom: note.periode.libelle, valeurs: r.parRegie.filter((x) => x.valeur != null || x.reference != null).map((x) => x.valeur) },
+          ...(r.reference != null ? [{ nom: r.libelleReference?.startsWith("la même période") ? "Même période l'an passé" : (r.libelleReference ?? "Référence"), valeurs: r.parRegie.filter((x) => x.valeur != null || x.reference != null).map((x) => x.reference) }] : []),
+        ],
+      })
+    : null;
+  return { cheptel, recettes, abattages, vaccinations, ventes };
 }
 
 // ------------------------------------------------------------------ faits saillants
@@ -506,6 +547,15 @@ function faitsSaillants(note: NoteSituation): FaitSaillant[] {
         ` (${principal.arrondissements.join(", ")})` +
         (sante.totalMorts > 0 ? ` ; ${nb(sante.totalMorts)} animaux morts.` : "."),
     });
+    // Ce qui a été fait : les mesures déclarées avec les foyers.
+    const mesures: string[] = [];
+    for (const e of note.episodes) for (const m of e.mesures) if (!mesures.some((x) => x.toLowerCase() === m.toLowerCase())) mesures.push(m);
+    if (mesures.length) {
+      faits.push({
+        genre: "info",
+        texte: `Mesures prises face aux foyers : ${mesures.slice(0, 4).map((m) => enPhrase(m)).join(", ")}${mesures.length > 4 ? "…" : ""}.`,
+      });
+    }
   } else if (note.indicateurs.some((i) => i.cle === "foyers")) {
     faits.push({ genre: "info", texte: "Aucun foyer de maladie déclaré sur la période." });
   }
@@ -514,6 +564,18 @@ function faitsSaillants(note: NoteSituation): FaitSaillant[] {
     faits.push({
       genre: "info",
       texte: `${nb(sante.totalVaccines)} animaux vaccinés ; première maladie visée : ${enPhrase(v.maladie)} (${Math.round((v.effectif / sante.totalVaccines) * 100)} % des vaccinations).`,
+    });
+  }
+
+  // 5. Le budget : les marchés du budget d'investissement public.
+  const marches = note.budget.marches;
+  if (marches) {
+    faits.push({
+      genre: "info",
+      texte:
+        `${marches.lignes.length} marché${marches.lignes.length > 1 ? "s" : ""} du budget d'investissement public suivi${marches.lignes.length > 1 ? "s" : ""} au ${marches.trimestre}` +
+        (marches.montantTotal > 0 ? `, pour ${nb(marches.montantTotal)} FCFA` : "") +
+        ` : ${marches.parNiveau.map((p) => `${p.nombre} ${p.niveau.toLowerCase()}`).join(", ")}.`,
     });
   }
   return faits;

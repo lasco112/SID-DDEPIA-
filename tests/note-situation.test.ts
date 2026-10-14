@@ -70,22 +70,41 @@ test("le 3e trimestre 2026 : chiffres, comparaison à l'an passé, faits saillan
   assert.ok(n.graphiques.cheptel && n.graphiques.cheptel.categories.length === n.couverture.arrondissements.length);
 });
 
-test("la note sort en PowerPoint (8 diapositives au plus), en Word et en PDF", async () => {
+test("les épisodes épidémiques viennent des foyers déclarés, avec leurs mesures", async () => {
   const n = await preparerNote(base, m(2026, 7), m(2026, 9));
-  const retouches = { faits: [{ texte: "Fait écrit par le Délégué.", genre: "info" as const }], remarques: "Campagne PPR en novembre." };
+  const foyers = n.indicateurs.find((i) => i.cle === "foyers");
+  if (!foyers?.valeur) return; // pas de foyer déclaré dans cette base : rien à vérifier
+  assert.ok(n.episodes.length > 0, "un foyer déclaré fait au moins un épisode");
+  assert.equal(n.episodes.reduce((s, e) => s + e.foyers, 0), foyers.valeur, "les épisodes recomptent tous les foyers");
+  assert.ok(n.episodes.every((e, i) => i === 0 || n.episodes[i - 1].foyers >= e.foyers), "les plus gros épisodes d'abord");
+  assert.ok(n.episodes.every((e) => e.maladie && e.arrondissement));
+});
+
+test("la note sort en PowerPoint, en Word et en PDF, avec le logo et les événements particuliers", async () => {
+  const n = await preparerNote(base, m(2026, 7), m(2026, 9));
+  const retouches = {
+    faits: [{ texte: "Fait écrit par le Délégué.", genre: "info" as const }],
+    remarques: "Campagne PPR en novembre.",
+    evenements: [{ titre: "Visite du Délégué régional", texte: "Inspection du marché à bétail de Foto." }],
+  };
 
   const pptx = new PizZip(await rendreNotePptx(n, retouches));
   const diapos = Object.keys(pptx.files).filter((f) => /^ppt\/slides\/slide\d+\.xml$/.test(f));
-  assert.ok(diapos.length >= 4 && diapos.length <= 8, `${diapos.length} diapositives`);
+  // Couverture, plan, une diapositive par rubrique, conclusion : de quoi tenir en dix minutes.
+  assert.ok(diapos.length >= 5 && diapos.length <= 16, `${diapos.length} diapositives`);
   const texte = diapos.map((d) => pptx.file(d)!.asText()).join("");
   assert.ok(texte.includes("Fait écrit par le Délégué."), "les faits retouchés remplacent ceux du SID");
   assert.ok(texte.includes("Campagne PPR en novembre."), "les remarques terminent la présentation");
+  assert.ok(texte.includes("Visite du Délégué régional"), "les événements particuliers ont leur diapositive");
   assert.ok(Object.keys(pptx.files).some((f) => /^ppt\/charts\/chart\d+\.xml$/.test(f)), "de vrais graphiques PowerPoint");
+  assert.ok(Object.keys(pptx.files).some((f) => /^ppt\/media\/.+\.png$/.test(f)), "le logo du MINEPIA");
 
   const docx = new PizZip(await rendreNoteDocx(n, retouches));
   const doc = docx.file("word/document.xml")!.asText();
   assert.ok(!/@@SID-GRAPHIQUE/.test(doc));
+  assert.ok(doc.includes("Visite du Délégué régional"));
   assert.ok(Object.keys(docx.files).some((f) => /chartSid\d+\.xml$/.test(f)), "de vrais graphiques Word");
+  assert.ok(Object.keys(docx.files).some((f) => /^word\/media\/.+\.png$/.test(f)), "le logo du MINEPIA");
 
   const pdf = await rendreNotePdf(n, retouches);
   assert.equal(pdf.subarray(0, 4).toString(), "%PDF");

@@ -61,7 +61,7 @@ export async function POST(req: Request) {
   try {
     const user = await requireUser();
     assertRole(user, ["DD"]);
-    const body = (await req.json()) as { debut?: string; fin?: string; format?: string; faits?: unknown; remarques?: unknown };
+    const body = (await req.json()) as { debut?: string; fin?: string; format?: string; faits?: unknown; remarques?: unknown; evenements?: unknown };
     const format = FORMATS[body.format as keyof typeof FORMATS];
     if (!format) return erreur("Format attendu : pptx, docx ou pdf.", 400);
     const debut = lireMois(body.debut);
@@ -80,16 +80,23 @@ export async function POST(req: Request) {
       }
     }
     const remarques = typeof body.remarques === "string" ? body.remarques.slice(0, 3000) : undefined;
+    // Les événements particuliers : un titre et un texte, six au plus.
+    const evenements = Array.isArray(body.evenements)
+      ? (body.evenements as { titre?: unknown; texte?: unknown }[])
+          .slice(0, 6)
+          .map((e) => ({ titre: typeof e?.titre === "string" ? e.titre.trim().slice(0, 150) : "", texte: typeof e?.texte === "string" ? e.texte.trim().slice(0, 1200) : "" }))
+          .filter((e) => e.titre || e.texte)
+      : undefined;
 
     const note = await preparerNote(user.db, debut, fin);
-    const fichier = await format.rendre(note, { faits, remarques });
+    const fichier = await format.rendre(note, { faits, remarques, evenements });
 
     await user.db.auditLog.create({
       data: {
         userId: user.id,
         action: "EXPORT_NOTE_SITUATION",
         entite: "NoteSituation",
-        details: { debut: body.debut ?? null, fin: body.fin ?? null, format: body.format ?? null, faitsRetouches: faits?.length ?? null },
+        details: { debut: body.debut ?? null, fin: body.fin ?? null, format: body.format ?? null, faitsRetouches: faits?.length ?? null, evenements: evenements?.length ?? 0 },
       },
     });
 

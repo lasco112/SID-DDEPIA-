@@ -10,8 +10,8 @@ import PDFDocument from "pdfkit";
 import type { DonneesGraphique } from "@/server/trimestre/canevas/graphiques";
 import { nb, type NoteSituation } from "./noteSituation";
 import {
-  COULEURS, evolutionTexte, faitsRetenus, indicateursAffiches, phraseComparaison, phraseCouverture, sousTitreNote, titreNote,
-  valeurTexte, type Retouches,
+  COULEURS, ENTETE, evolutionTexte, faitsRetenus, indicateursAffiches, logoMinepia, phraseComparaison, phraseCouverture, sousTitreNote,
+  titreNote, valeurTexte, type Retouches,
 } from "./presentation";
 
 const MARGE = 40;
@@ -111,7 +111,7 @@ function dessinerTableau(
 
 export async function rendreNotePdf(note: NoteSituation, retouches: Retouches = {}): Promise<Buffer> {
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ margin: MARGE, size: "A4", info: { Title: `${titreNote} — ${note.periode.libelle}`, Author: note.departement.sigle } });
+    const doc = new PDFDocument({ margin: MARGE, size: "A4", bufferPages: true, info: { Title: `${titreNote} — ${note.periode.libelle}`, Author: note.departement.sigle } });
     const morceaux: Buffer[] = [];
     doc.on("data", (m: Buffer) => morceaux.push(m));
     doc.on("end", () => resolve(Buffer.concat(morceaux)));
@@ -125,22 +125,43 @@ export async function rendreNotePdf(note: NoteSituation, retouches: Retouches = 
         y = MARGE;
       }
     };
-    const titre = (t: string) => {
-      place(60);
+    let numero = 0;
+    // `bloc` : la hauteur à garder avec le titre (un petit tableau ne se coupe pas).
+    const titre = (t: string, bloc = 30) => {
+      place(30 + bloc);
+      numero += 1;
       doc.rect(MARGE, y, largeur, 22).fill(c(COULEURS.primaire));
-      doc.font("Helvetica-Bold").fontSize(12).fillColor("#FFFFFF").text(sur(t), MARGE + 8, y + 6, { width: largeur - 16 });
+      doc.font("Helvetica-Bold").fontSize(12).fillColor("#FFFFFF").text(sur(`${numero}. ${t}`), MARGE + 8, y + 6, { width: largeur - 16 });
       y += 30;
     };
+    const petit = (t: string) => {
+      doc.font("Helvetica-Oblique").fontSize(9);
+      place(doc.heightOfString(sur(t), { width: largeur }) + 6);
+      doc.fillColor(c(COULEURS.gris)).text(sur(t), MARGE, y, { width: largeur });
+      y = doc.y + 6;
+    };
 
-    // L'en-tête.
-    doc.rect(0, 0, doc.page.width, 118).fill(c(COULEURS.primaire));
-    doc.font("Helvetica").fontSize(8).fillColor("#E9F5F4").text("RÉPUBLIQUE DU CAMEROUN — Paix – Travail – Patrie", MARGE, 18);
-    doc.font("Helvetica-Bold").fontSize(8).text(`MINISTÈRE DE L'ÉLEVAGE, DES PÊCHES ET DES INDUSTRIES ANIMALES — ${note.departement.sigle}`, MARGE, 30);
-    doc.font("Helvetica-Bold").fontSize(18).fillColor("#FFFFFF").text(sur(titreNote), MARGE, 50, { width: largeur });
-    doc.font("Helvetica").fontSize(12).text(sur(`${sousTitreNote(note)} · note du ${note.produitLe}`), MARGE, 92, { width: largeur });
-    y = 132;
-    doc.font("Helvetica-Oblique").fontSize(9).fillColor(c(COULEURS.gris)).text(sur(`${phraseCouverture(note)} ${phraseComparaison(note)}`), MARGE, y, { width: largeur });
-    y = doc.y + 10;
+    // L'en-tête officiel : français, logo, anglais — comme la page de garde des rapports.
+    const colonne = (lignes: string[], x: number) => {
+      let yy = 24;
+      lignes.forEach((t, k) => {
+        doc.font(k === 1 ? "Helvetica-Oblique" : "Helvetica-Bold").fontSize(7.5).fillColor(c(COULEURS.fonce)).text(sur(t), x, yy, { width: 200, align: "center" });
+        yy = doc.y + (k >= 1 && k <= 3 ? 5 : 1);
+      });
+    };
+    colonne(ENTETE.fr(note), MARGE);
+    colonne(ENTETE.en(note), doc.page.width - MARGE - 200);
+    const logo = logoMinepia();
+    if (logo) doc.image(logo, doc.page.width / 2 - 38, 22, { width: 76 });
+    doc.rect(0, 120, doc.page.width, 96).fill(c(COULEURS.primaire));
+    doc.font("Helvetica-Bold").fontSize(10).fillColor("#D9A84E").text("NOTE DE SITUATION", MARGE, 132);
+    doc.font("Helvetica-Bold").fontSize(17).fillColor("#FFFFFF").text(sur(titreNote), MARGE, 148, { width: largeur });
+    doc.font("Helvetica").fontSize(12).text(sur(sousTitreNote(note)), MARGE, 190, { width: largeur });
+    doc.font("Helvetica-Bold").fontSize(10).fillColor(c(COULEURS.fonce)).text("LE DÉLÉGUÉ DÉPARTEMENTAL", MARGE, 226, { continued: true })
+      .font("Helvetica").fillColor(c(COULEURS.gris)).text(sur(`   ·   ${note.departement.sigle} · ${note.produitLe}`));
+    y = 244;
+    petit(`${phraseCouverture(note)} ${phraseComparaison(note)}`);
+    y += 4;
 
     // L'essentiel en chiffres : des tuiles, trois par ligne.
     titre("L'essentiel en chiffres");
@@ -177,17 +198,17 @@ export async function rendreNotePdf(note: NoteSituation, retouches: Retouches = 
       y += 6;
     }
 
-    // Les graphiques.
-    const graphique = (t: string, g: DonneesGraphique | null) => {
+    // Les graphiques : le titre ne reste jamais seul en bas de page.
+    const graphique = (t: string | null, g: DonneesGraphique | null) => {
       if (!g) return;
-      // Le titre ne reste jamais seul en bas de page : il part avec son graphique.
-      place(30 + 232);
-      titre(t);
+      place((t ? 30 : 0) + 232);
+      if (t) titre(t);
       dessinerGraphique(doc, g, MARGE, y, largeur, 220);
       y += 232;
     };
     graphique("Le cheptel", note.graphiques.cheptel);
     graphique("Abattages et productions", note.graphiques.abattages);
+    graphique("Commercialisation", note.graphiques.ventes);
 
     // La santé animale.
     titre("Santé animale");
@@ -203,16 +224,69 @@ export async function rendreNotePdf(note: NoteSituation, retouches: Retouches = 
       doc.font("Helvetica-Bold").fontSize(10).fillColor(c(COULEURS.vert)).text("Aucun foyer de maladie déclaré sur la période.", MARGE, y);
       y = doc.y + 8;
     }
-    if (note.graphiques.vaccinations) {
-      place(230);
-      dessinerGraphique(doc, note.graphiques.vaccinations, MARGE, y, largeur, 220);
-      y += 232;
+    graphique(null, note.graphiques.vaccinations);
+
+    // Les épisodes épidémiques et leur gestion.
+    if (note.episodes.length) {
+      titre("Épisodes épidémiques et leur gestion");
+      petit("Foyers déclarés dans les rapports mensuels : où, combien, et les mesures prises.");
+      y = dessinerTableau(doc, MARGE, y, [95, 120, 45, 50, 45, largeur - 355], [
+        { textes: ["Maladie", "Où", "Foyers", "Touchés", "Morts", "Mesures prises"], entete: true },
+        ...note.episodes.map((e) => ({
+          textes: [e.maladie, `${e.arrondissement}${e.localites.length ? ` — ${e.localites.join(", ")}` : ""}`, nb(e.foyers), e.touches ? nb(e.touches) : "—", e.morts ? nb(e.morts) : "—", e.mesures.length ? e.mesures.join(" ; ") : "Non précisées"],
+          droite: [false, false, true, true, true, false],
+          couleurs: [undefined, undefined, undefined, undefined, e.morts ? COULEURS.rouge : undefined, e.mesures.length ? undefined : COULEURS.gris],
+        })),
+      ]);
     }
-    graphique("Commercialisation", note.graphiques.ventes);
+
+    // Les événements particuliers, écrits par le Délégué.
+    const evenements = (retouches.evenements ?? []).filter((e) => e.titre.trim() || e.texte.trim());
+    if (evenements.length) {
+      titre("Événements particuliers");
+      for (const e of evenements) {
+        doc.font("Helvetica").fontSize(10);
+        const h = doc.heightOfString(sur(e.texte.trim()), { width: largeur - 14 }) + 22;
+        place(h);
+        doc.rect(MARGE, y, 3, h - 6).fill(c(COULEURS.ambre));
+        doc.font("Helvetica-Bold").fontSize(10.5).fillColor(c(COULEURS.primaire)).text(sur(e.titre.trim() || "Événement"), MARGE + 10, y, { width: largeur - 14 });
+        doc.font("Helvetica").fontSize(10).fillColor(c(COULEURS.fonce)).text(sur(e.texte.trim()), MARGE + 10, doc.y + 2, { width: largeur - 14, align: "justify" });
+        y = doc.y + 10;
+      }
+    }
+
+    // Le budget : recettes, crédits, marchés.
+    const { recettes, credits, marches } = note.budget;
+    if (recettes || credits) {
+      titre("Budget : recettes et crédits", 4 * 26 + 20);
+      const ind = note.indicateurs.find((i) => i.cle === "recettes");
+      const lignes: { textes: string[]; entete?: boolean; droite?: boolean[]; couleurs?: (string | undefined)[] }[] = [{ textes: ["Poste", "Montant (FCFA)", "Évolution"], entete: true }];
+      if (ind) {
+        const e = evolutionTexte(ind);
+        lignes.push({ textes: ["Recettes encaissées", valeurTexte(ind), e.texte], droite: [false, true, true], couleurs: [undefined, undefined, e.couleur] });
+      }
+      if (credits?.fonctionnement != null) lignes.push({ textes: [`Crédits de fonctionnement (${credits.trimestre})`, nb(credits.fonctionnement), "—"], droite: [false, true, true] });
+      if (credits?.investissement != null) lignes.push({ textes: [`Crédits d'investissement (${credits.trimestre})`, nb(credits.investissement), "—"], droite: [false, true, true] });
+      y = dessinerTableau(doc, MARGE, y, [largeur - 220, 130, 90], lignes);
+      if (recettes?.libelleReference) petit(`Recettes comparées à ${recettes.libelleReference}.`);
+      graphique(null, note.graphiques.recettes);
+    }
+    if (marches) {
+      titre("Marchés du budget d'investissement public", 20 + (Math.min(marches.lignes.length, 6) + 1) * 30);
+      petit(`${marches.lignes.length} marché(s) suivi(s) au ${marches.trimestre}${marches.montantTotal ? ` pour ${nb(marches.montantTotal)} FCFA` : ""} : ${marches.parNiveau.map((p) => `${p.nombre} ${p.niveau.toLowerCase()}`).join(", ")}.`);
+      y = dessinerTableau(doc, MARGE, y, [largeur - 330, 140, 100, 90], [
+        { textes: ["Infrastructure", "Arrondissement / commune", "Montant (FCFA)", "Exécution"], entete: true },
+        ...marches.lignes.map((m) => ({
+          textes: [m.infrastructure, m.lieu, m.montant != null ? nb(m.montant) : "—", m.niveau],
+          droite: [false, false, true, false],
+          couleurs: [undefined, undefined, undefined, m.niveau === "Construit" ? COULEURS.vert : m.niveau === "En cours" ? COULEURS.ambre : m.niveau === "Non précisé" ? COULEURS.gris : COULEURS.rouge],
+        })),
+      ]);
+    }
 
     // Ce que valent les chiffres.
     const cv = note.couverture;
-    titre("Fiabilité des chiffres");
+    titre("Fiabilité des chiffres", (cv.arrondissements.length + 1) * 26);
     const largeurMois = Math.min(60, (largeur - 120) / Math.max(1, cv.mois.length));
     y = dessinerTableau(doc, MARGE, y, [120, ...cv.mois.map(() => largeurMois)], [
       { textes: ["Arrondissement", ...cv.mois], entete: true },
@@ -230,6 +304,15 @@ export async function rendreNotePdf(note: NoteSituation, retouches: Retouches = 
       place(doc.heightOfString(sur(remarques), { width: largeur }) + 10);
       doc.fillColor(c(COULEURS.fonce)).text(sur(remarques), MARGE, y, { width: largeur, align: "justify" });
     }
-    doc.end();
+
+    // Le pied de chaque page : la note, et « page 2 / 4 ».
+    const pages = doc.bufferedPageRange();
+    for (let k = 0; k < pages.count; k++) {
+      doc.switchToPage(pages.start + k);
+      // Sous la marge du bas, pdfkit ouvrirait une page de plus : on la lève le temps du pied.
+      doc.page.margins.bottom = 0;
+      doc.font("Helvetica").fontSize(7.5).fillColor(c(COULEURS.gris))
+        .text(sur(`${note.departement.sigle} · Note de situation · ${note.periode.libelle} · page ${k + 1} / ${pages.count}`), MARGE, doc.page.height - 28, { width: largeur, align: "right", lineBreak: false });
+    }    doc.end();
   });
 }

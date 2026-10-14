@@ -352,6 +352,11 @@ export const VISITES: Record<string, DefinitionVisite> = {
       { cible: "periode-note", titre: "La période", texte: "Choisissez le premier et le dernier mois — un mois, un trimestre, plusieurs. Les raccourcis préparent les cas courants." },
       { cible: "preparer-note", titre: "Préparer la note", texte: "Le SID calcule les chiffres, les compare à l'an passé (ou à la période précédente) et écrit les faits saillants." },
       { cible: "faits-note", titre: "Les faits saillants", texte: "Décochez ce que vous ne voulez pas présenter, reformulez une phrase, ajoutez un fait. Les chiffres, eux, ne se retouchent pas." },
+      {
+        cible: "evenements-note",
+        titre: "Les événements particuliers",
+        texte: "Une visite, une campagne, une inondation, un conflit… Chaque événement a sa place dans la présentation, après la santé animale.",
+      },
       { cible: "remarques-note", titre: "Vos remarques", texte: "Le contexte que les chiffres ne disent pas : elles terminent la présentation." },
       { cible: "telecharger-note", titre: "Télécharger", texte: "PowerPoint pour projeter (huit diapositives, dix minutes), Word ou PDF pour imprimer et envoyer." },
     ],
