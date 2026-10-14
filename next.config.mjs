@@ -14,7 +14,9 @@ const nextConfig = {
     instrumentationHook: true,
     // web-push s'appuie sur des modules Node (http, agents proxy) : comme
     // pdfkit, on le laisse hors de l'empaquetage plutôt que de le compiler.
-    serverComponentsExternalPackages: ["pdfkit", "web-push", "node-cron"],
+    // pptxgenjs (la note de situation du DD en PowerPoint) : idem, un require()
+    // normal au runtime plutôt qu'une compilation de ses dépendances Node.
+    serverComponentsExternalPackages: ["pdfkit", "web-push", "node-cron", "pptxgenjs"],
   },
 
   // `serverComponentsExternalPackages` ne couvre pas le module

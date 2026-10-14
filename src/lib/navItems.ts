@@ -204,7 +204,10 @@ export const MENU_PAR_ROLE: Record<string, NavGroupe[]> = {
     {
       cle: "autres",
       titre: "Autres rapports",
-      items: [{ href: "/dd/rapports-thematiques", label: "Rapports thématiques" }],
+      items: [
+        { href: "/dd/note-situation", label: "Note de situation (présentation rapide)" },
+        { href: "/dd/rapports-thematiques", label: "Rapports thématiques" },
+      ],
     },
     {
       cle: "administration",

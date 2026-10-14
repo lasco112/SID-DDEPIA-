@@ -101,9 +101,10 @@ export async function inspecterPeriode(
    * cause du retard d'un collègue, alors que ses chiffres à lui sont complets.
    * Le rapport départemental, lui, attend bien les six.
    */
-  portee: { arrondissementId?: string } = {}
+  portee: { arrondissementId?: string; mois?: { annee: number; mois: number }[] } = {}
 ): Promise<EtatPeriode> {
-  const attendus = moisDeLaPeriode(p);
+  // Des mois choisis librement (note de situation du DD) : ils remplacent ceux de la période.
+  const attendus = portee.mois ?? moisDeLaPeriode(p);
   const nbArrondissements = portee.arrondissementId ? 1 : await db.arrondissement.count();
 
   const mois: MoisSource[] = [];
@@ -183,6 +184,13 @@ export interface OptionsAgregation {
    * trimestriel d'un DA. Voir `inspecterPeriode`.
    */
   arrondissementId?: string;
+  /**
+   * Des mois choisis librement, à la place de ceux de la période — la note de
+   * situation du DD couvre « de juillet à septembre », « d'avril à
+   * septembre »… Les règles restent les mêmes : un stock prend le dernier mois
+   * renseigné, un flux s'additionne.
+   */
+  mois?: { annee: number; mois: number }[];
 }
 
 /**
@@ -194,7 +202,7 @@ export async function agreger(
   p: Periode,
   options: OptionsAgregation = {}
 ): Promise<{ etat: EtatPeriode; valeurs: ValeurAgregee[] }> {
-  const etat = await inspecterPeriode(db, p, { arrondissementId: options.arrondissementId });
+  const etat = await inspecterPeriode(db, p, { arrondissementId: options.arrondissementId, mois: options.mois });
   if (!etat.calculable && !options.autoriserIncomplet) throw new PeriodeNonCalculableError(etat);
 
   const periodeIds = etat.mois.filter((m) => m.periodeId).map((m) => m.periodeId!);
