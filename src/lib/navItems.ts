@@ -268,6 +268,7 @@ export const MENU_ADMIN_SYSTEME: NavGroupe = {
     { href: "/admin-systeme", label: "Départements et lancements" },
     { href: "/admin-systeme/textes", label: "Textes permanents des départements" },
     { href: "/admin-systeme/especes", label: "Nouvelles espèces (nouvelles colonnes)" },
+    { href: "/admin-systeme/demonstration", label: "Démonstration (formation)" },
     { href: "/admin-systeme/donnees-essai", label: "Purger des données d'essai" },
     { href: "/admin-systeme/journal", label: "Journal de l'administration" },
   ],

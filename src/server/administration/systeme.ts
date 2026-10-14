@@ -311,6 +311,7 @@ export const ACTIONS_ADMINISTRATION = [
   "VALIDATION_REFERENTIEL",
   "REJET_REFERENTIEL",
   "TEXTE_DEPARTEMENT",
+  "DEMONSTRATION_REINITIALISEE",
 ] as const;
 
 /** Trace une action dans le journal de l'administrateur, avec le département visé. */

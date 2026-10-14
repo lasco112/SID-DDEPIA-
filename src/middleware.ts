@@ -107,6 +107,30 @@ const CHEMINS_SURS_DEMO = [
   "/api/demo/etat", // lecture seule : indique si le mode démo global est actif (bandeau)
   "/a-corriger", // lit l'appareil, et /api/a-corriger
   "/api/a-corriger", // lecture seule, par user.db
+  // Phase 2 (14 octobre 2026, pour former les départements qui rejoignent le
+  // SID) : tout le travail métier — mensuel, trimestriel, note de situation,
+  // autres rapports, établissements. Vérifié : plus aucune route de ces familles
+  // n'importe le client de production ; toutes passent par `user.db`, qui est la
+  // base de démonstration pour une session démo. Restent fermés : comptes
+  // (/admin), administration du système, espace technique, première connexion.
+  "/da",
+  "/dd",
+  "/section",
+  "/trimestre",
+  "/etablissements",
+  "/mon-compte/synchronisation",
+  "/mon-compte/securite",
+  "/api/bootstrap",
+  "/api/da",
+  "/api/dd",
+  "/api/section",
+  "/api/trimestre",
+  "/api/reports",
+  "/api/exports",
+  "/api/etablissements",
+  "/api/periodes",
+  "/api/observations",
+  "/api/aide",
 ];
 
 export async function middleware(req: NextRequest) {

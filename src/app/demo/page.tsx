@@ -18,8 +18,11 @@ const COMPTES_DEMO = [
   { username: "demo.chef.spaih", role: "Chef — Pêches et Aquaculture", acces: "Tableaux 1.6 et 1.7 sur les 6 arrondissements", actions: "Contrôler, corriger, valider sa section" },
   { username: "demo.chef.bac", role: "Chef — Affaires Communes", acces: "Aucun tableau propre (comme en production)", actions: "Consultation générale" },
   { username: "demo.da.dschang", role: "Délégué d'Arrondissement — Dschang", acces: "Uniquement les données de Dschang", actions: "Saisir, envoyer, générer son rapport" },
+  { username: "demo.agent.dschang", role: "Agent de saisie — Dschang", acces: "Les tableaux de Dschang ; son DA transmet", actions: "Saisir les tableaux du mois et du trimestre" },
+  { username: "demo.da.fokoue", role: "Délégué d'Arrondissement — Fokoué", acces: "Octobre encore en saisie (brouillon incomplet)", actions: "Compléter puis envoyer" },
+  { username: "demo.da.nkongni", role: "Délégué d'Arrondissement — Nkong-Ni", acces: "Octobre renvoyé par le DD, avec son motif", actions: "Corriger et renvoyer" },
   { username: "demo.da.fongotongo", role: "Délégué d'Arrondissement — Fongo-Tongo", acces: "Uniquement Fongo-Tongo (plusieurs acteurs et foyers ce mois-ci)", actions: "Saisir, envoyer, générer son rapport" },
-  { username: "demo.admin", role: "Administrateur", acces: "Ensemble du système de démonstration", actions: "Tout consulter, réinitialiser la démonstration" },
+  { username: "demo.admin", role: "Administrateur technique", acces: "Ensemble du système de démonstration", actions: "Tout consulter, réinitialiser la démonstration" },
 ];
 
 export default function DemoLoginPage() {
@@ -62,7 +65,8 @@ export default function DemoLoginPage() {
           <div className="rounded-card border border-line bg-surface p-[30px_30px_26px] shadow-card">
             <h1 className="mb-1 text-2xl font-bold text-primary">SID EPIA-O — Démonstration</h1>
             <p className="mb-6 text-[13.5px] text-ink-muted">
-              Données entièrement fictives, isolées de la production. Choisissez un identifiant ci-contre ou saisissez-le directement.
+              Données entièrement fictives, isolées de la production : d&apos;avril à septembre 2026 clos et complets, octobre en
+              cours. Choisissez un identifiant ci-contre ou saisissez-le directement.
             </p>
 
             {error && <div className="mb-4 rounded-input bg-statut-rejeteBg p-3 text-sm text-statut-rejeteText">{error}</div>}

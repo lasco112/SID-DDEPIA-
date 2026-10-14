@@ -20,6 +20,7 @@ const LIBELLES: Record<string, string> = {
   VALIDATION_REFERENTIEL: "Nouvelle espèce validée",
   REJET_REFERENTIEL: "Nouvelle espèce rejetée",
   TEXTE_DEPARTEMENT: "Texte permanent d'un département",
+  DEMONSTRATION_REINITIALISEE: "Démonstration remise à zéro",
 };
 
 function precision(l: Ligne): string {
@@ -27,8 +28,9 @@ function precision(l: Ligne): string {
   const morceaux: string[] = [];
   if (typeof d.departement === "string") morceaux.push(d.departement);
   if (Array.isArray(d.comptes)) morceaux.push(`${d.comptes.length} compte(s) : ${d.comptes.join(", ")}`);
-  if (typeof d.saisies === "number") morceaux.push(`${d.saisies} saisie(s), ${d.rapports ?? 0} rapport(s)`);
+  if (l.action === "PURGE_DONNEES_TEST" && typeof d.saisies === "number") morceaux.push(`${d.saisies} saisie(s), ${d.rapports ?? 0} rapport(s)`);
   if (typeof d.supprimes === "number") morceaux.push(`${d.supprimes} établissement(s)`);
+  if (l.action === "DEMONSTRATION_REINITIALISEE" && typeof d.mois === "number") morceaux.push(`${d.mois} mois, ${d.saisies} saisies`);
   if (typeof d.code === "string" && l.action.includes("REFERENTIEL")) morceaux.push(String(d.code));
   if (typeof d.cle === "string") morceaux.push(`zone ${d.cle}`);
   return morceaux.join(" · ");
