@@ -85,7 +85,8 @@ function Elaguer([string]$dossier) {
     Select-Object -Skip $Conserver | ForEach-Object { Remove-Item $_.FullName }
 }
 
-try {
+# Une copie complète : état du serveur, dernière sauvegarde, contrôle, Drive.
+function Recuperer() {
   $etat = Demander "etat"
   if ($etat -like "*CHEC*") { Noter "ATTENTION — la dernière sauvegarde du SERVEUR a échoué : $etat" }
 
@@ -121,8 +122,29 @@ try {
   } else {
     Noter "Google Drive pour ordinateur absent de ce PC : copie gardée sur le PC seulement."
   }
-  exit 0
-} catch {
-  Noter "ÉCHEC — $($_.Exception.Message)"
-  exit 1
+}
+
+# Les échecs constatés (septembre et octobre 2026) étaient des coupures
+# passagères du réseau du PC à l'heure de la tâche — « Connection timed out »,
+# « Unknown error » — et non une panne du serveur : la copie réussissait le
+# lendemain. Plutôt que de perdre la copie du jour, on réessaie après 2, 5 puis
+# 10 minutes. Une copie ABÎMÉE, elle, n'est pas réessayée en boucle : elle est
+# jetée et attend le passage suivant.
+$attentes = @(2, 5, 10)
+for ($essai = 0; $essai -le $attentes.Count; $essai++) {
+  try {
+    Recuperer
+    exit 0
+  } catch {
+    $message = $_.Exception.Message
+    $reseau = $message -match "ne répond pas|copie interrompue|timed out|Unknown error|banner|kex_exchange|Connection refused|Connection reset|Could not resolve"
+    $court = ($message -replace "\s+", " ").Trim()
+    if ($reseau -and $essai -lt $attentes.Count) {
+      Noter ("essai {0} sans réseau ({1}) : nouvel essai dans {2} min" -f ($essai + 1), $court.Substring(0, [Math]::Min(90, $court.Length)), $attentes[$essai])
+      Start-Sleep -Seconds (60 * $attentes[$essai])
+      continue
+    }
+    Noter "ÉCHEC — $message"
+    exit 1
+  }
 }
