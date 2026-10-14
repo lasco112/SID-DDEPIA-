@@ -21,7 +21,8 @@ import { insererGraphiques } from "./canevas/graphiquesWord";
 import type { DonneesGraphique } from "./canevas/graphiques";
 import { analysesDuRapport } from "./analyse/analyses";
 import { textesCalcules } from "./analyse/conclusion";
-import { TEXTES_FIXES, TEXTES_COMMUNS, textesFixesDe } from "./canevas/textesFixes";
+import { TEXTES_FIXES, TEXTES_COMMUNS } from "./canevas/textesFixes";
+import { textesDuDepartement, textesDeLArrondissement } from "./textesDepartement";
 import { TEXTES_ARRONDISSEMENTS } from "./canevas/textesArrondissements";
 import type { ContexteCanevas, SectionCanevas } from "./canevas/types";
 import { identiteDepartement } from "@/lib/departement";
@@ -271,17 +272,17 @@ export async function genererRapportCanevas(
    * vaut une consigne visible qu'un texte emprunté.
    */
   // Les présentations des programmes sont les mêmes pour tous.
+  // Les textes permanents du département, rédigés par son DD (ceux de la
+  // Menoua ont pour point de départ ses rapports réels) : voir textesDepartement.ts.
   const textes = new Map<string, string>([
     ...Array.from(TEXTES_COMMUNS),
-    ...(options.arrondissement ? [] : Array.from(textesFixesDe(identite.code))),
+    ...(options.arrondissement ? [] : Array.from(await textesDuDepartement(db, identite.code))),
   ]);
 
-  if (options.arrondissement) {
+  if (sien) {
     // Ses textes à LUI : présentation, pédologie, démographie, missions,
     // vision, organisation, introduction, bibliographie de ses sources.
-    for (const [cle, texte] of Object.entries(TEXTES_ARRONDISSEMENTS.get(options.arrondissement) ?? {})) {
-      if (texte?.trim()) textes.set(cle, texte);
-    }
+    for (const [cle, texte] of Array.from(await textesDeLArrondissement(db, identite.code, sien))) textes.set(cle, texte);
   }
 
   // Ce que le rédacteur a écrit pour CETTE période l'emporte sur le texte fixe :

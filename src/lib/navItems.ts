@@ -199,6 +199,8 @@ export const MENU_PAR_ROLE: Record<string, NavGroupe[]> = {
         { href: "/dd/trimestre", label: "Produire le rapport du département", etape: 4, aide: AIDE.produire },
         { href: "/trimestre/saisie", label: "Corriger un tableau du trimestre" },
         { href: "/section/bac", label: "Tableaux administratifs du BAC" },
+        // Rédigés une fois, repris à chaque période (décision du 14 octobre 2026).
+        { href: "/dd/textes-departement", label: "Textes permanents du département (présentation, géographie, missions…)" },
       ],
     },
     {
@@ -264,6 +266,7 @@ export const MENU_ADMIN_SYSTEME: NavGroupe = {
   titre: "Administration du système",
   items: [
     { href: "/admin-systeme", label: "Départements et lancements" },
+    { href: "/admin-systeme/textes", label: "Textes permanents des départements" },
     { href: "/admin-systeme/especes", label: "Nouvelles espèces (nouvelles colonnes)" },
     { href: "/admin-systeme/donnees-essai", label: "Purger des données d'essai" },
     { href: "/admin-systeme/journal", label: "Journal de l'administration" },

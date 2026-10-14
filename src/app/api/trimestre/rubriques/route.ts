@@ -20,14 +20,14 @@
 import { NextResponse } from "next/server";
 import { requireUser, assertRole, permissionErrorResponse } from "@/lib/permissions";
 import { trimestrielle, libelleOfficiel, periodePrecedente } from "@/server/periodes/calendrier";
-import { TEXTES_COMMUNS, textesFixesDe } from "@/server/trimestre/canevas/textesFixes";
+import { TEXTES_COMMUNS } from "@/server/trimestre/canevas/textesFixes";
+import { textesDuDepartement, textesDeLArrondissement } from "@/server/trimestre/textesDepartement";
 import { identiteDepartement } from "@/lib/departement";
 import { chefDeSection } from "@/server/trimestre/canevas/sections";
 import { textesCalculesPour } from "@/server/trimestre/analyse/ecranAnalyses";
 import { ZONES_AUTOMATIQUES } from "@/server/trimestre/analyse/conclusion";
 import { motifDeVerrou } from "@/server/trimestre/circuit";
 import { dateAppareil } from "@/server/trimestre/saisieCanevas";
-import { TEXTES_ARRONDISSEMENTS } from "@/server/trimestre/canevas/textesArrondissements";
 import { resoudre } from "@/server/trimestre/canevas/types";
 import { contextePour, nomArrondissement } from "@/server/trimestre/saisieTrimestrielle";
 import { zonesTexte } from "@/server/trimestre/rapportCanevas";
@@ -90,9 +90,16 @@ export async function GET(req: Request) {
     // Les conclusions, rédigées automatiquement à partir du rapport : le
     // relecteur les trouve prêtes (décision du Délégué, 24 septembre 2026).
     const automatiques = await textesCalculesPour(db, p, profil, ecrits);
+    // Les textes permanents du département ou de l'arrondissement, tels que
+    // son DD les a rédigés (voir server/trimestre/textesDepartement.ts).
+    const code = (await identiteDepartement(db)).code;
     const references = {
       ...Object.fromEntries(TEXTES_COMMUNS),
-      ...(nom ? TEXTES_ARRONDISSEMENTS.get(nom) ?? {} : Object.fromEntries(textesFixesDe((await identiteDepartement(db)).code))),
+      ...Object.fromEntries(
+        nom && arrondissementId
+          ? await textesDeLArrondissement(db, code, { id: arrondissementId, nom })
+          : await textesDuDepartement(db, code)
+      ),
     };
     const ctx = await contextePour(db, p, profil);
     const precedents = await lireRubriques(db, periodePrecedente(p), arrondissementId).catch(() => new Map<string, string>());

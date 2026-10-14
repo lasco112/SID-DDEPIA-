@@ -91,6 +91,7 @@ model User {
   assignationsRecues               AssignationSaisie[] @relation("AgentAssigne")
   assignationsFaites               AssignationSaisie[] @relation("AssignateurDA")
   demandesAide                     DemandeAide[]
+  textesDepartement                TexteDepartement[]  @relation("AuteurTexteDepartement")
 
   @@index([role, actif])
 }
@@ -146,6 +147,7 @@ model Departement {
   pointSIGs              PointSIG[]
   auditLogs              AuditLog[]
   demandeAides           DemandeAide[]
+  textesDepartement      TexteDepartement[]
 
   @@index([regionId])
 }
@@ -1081,6 +1083,31 @@ model DemandeAide {
 /// Paramètres système clé/valeur — table volontairement minimale, réservée aux
 /// réglages globaux pilotés par le Super Administrateur (correction n°10).
 /// Clé actuelle : "MODE_DEMO_GLOBAL" ("actif" | "inactif").
+/// Les textes PERMANENTS du rapport trimestriel d'un département : situation et
+/// relief, pédologie, démographie, missions, vision, organisation, introduction,
+/// bibliographie — pour le département et pour chacun de ses arrondissements.
+/// Rédigés par son DD, ou par l'administrateur du système (décision du Délégué,
+/// 14 octobre 2026) ; repris à chaque période. Pour la Menoua, les textes
+/// extraits de ses rapports réels restent le point de départ tant que rien
+/// n'est écrit ici.
+model TexteDepartement {
+  departementId String?
+  departement   Departement? @relation(fields: [departementId], references: [id])
+
+  id           String   @id @default(cuid())
+  /// "" pour le département, sinon l'identifiant de l'arrondissement.
+  portee       String   @default("")
+  /// La zone de texte du canevas : "I.geo.relief", "I1.missions"…
+  cle          String
+  texte        String
+  modifieParId String?
+  modifieLe    DateTime @updatedAt
+
+  modifiePar User? @relation("AuteurTexteDepartement", fields: [modifieParId], references: [id])
+
+  @@unique([departementId, portee, cle])
+}
+
 model ConfigSysteme {
   cle          String   @id
   valeur       String

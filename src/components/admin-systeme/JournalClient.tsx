@@ -19,6 +19,7 @@ const LIBELLES: Record<string, string> = {
   SUPPRESSION_ETABLISSEMENTS_DEMO: "Établissements de démonstration retirés",
   VALIDATION_REFERENTIEL: "Nouvelle espèce validée",
   REJET_REFERENTIEL: "Nouvelle espèce rejetée",
+  TEXTE_DEPARTEMENT: "Texte permanent d'un département",
 };
 
 function precision(l: Ligne): string {
@@ -29,6 +30,7 @@ function precision(l: Ligne): string {
   if (typeof d.saisies === "number") morceaux.push(`${d.saisies} saisie(s), ${d.rapports ?? 0} rapport(s)`);
   if (typeof d.supprimes === "number") morceaux.push(`${d.supprimes} établissement(s)`);
   if (typeof d.code === "string" && l.action.includes("REFERENTIEL")) morceaux.push(String(d.code));
+  if (typeof d.cle === "string") morceaux.push(`zone ${d.cle}`);
   return morceaux.join(" · ");
 }
 
