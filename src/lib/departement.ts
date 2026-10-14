@@ -25,6 +25,9 @@
 import type { PrismaClient } from "@prisma/client";
 import { departementDeClient } from "./dbCloisonne";
 
+/** Le nom du système d'information, pour toute la région de l'Ouest. */
+export const NOM_SYSTEME = "SID EPIA-O";
+
 export interface IdentiteDepartement {
   id: string;
   /** « MEN ». */
@@ -35,7 +38,7 @@ export interface IdentiteDepartement {
   nomAvecArticle: string;
   /** « DDEPIA-Menoua ». */
   sigle: string;
-  /** « SID DDEPIA-Menoua » — le nom de l'application, affiché et en métadonnée. */
+  /** « SID EPIA-O » — le nom du système, le même pour tous les départements. */
   application: string;
   /** « MINEPIA DDEPIA-Menoua » — l'expéditeur des relances. */
   expediteur: string;
@@ -70,7 +73,9 @@ export function composerIdentite(d: {
     nom: d.nom,
     nomAvecArticle,
     sigle,
-    application: `SID ${sigle}`,
+    // Le nom du système, commun à toute la région (décision du Délégué,
+    // 14 octobre 2026) ; le département se lit à côté, dans le bandeau.
+    application: NOM_SYSTEME,
     expediteur: `MINEPIA ${sigle}`,
     // L'apostrophe typographique de « L’ÉLEVAGE » est celle du document
     // officiel : ne pas la remplacer par une apostrophe droite.

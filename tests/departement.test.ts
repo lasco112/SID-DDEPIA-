@@ -18,7 +18,6 @@ import { composerIdentite, identiteDepartement } from "../src/lib/departement";
 
 /** Recopiés du code AVANT le lot 15, au caractère près. */
 const HISTORIQUE = {
-  application: "SID DDEPIA-Menoua",
   expediteur: "MINEPIA DDEPIA-Menoua",
   sigle: "DDEPIA-Menoua",
   intituleOfficiel:
@@ -65,7 +64,8 @@ test("sans article renseigné, on se rabat sur « de <nom> » — visible, jamai
 test("l'identité lue en base est celle du département de la session", async () => {
   const i = await identiteDepartement(base);
   assert.equal(i.code, "MEN");
-  assert.equal(i.application, HISTORIQUE.application);
+  // Le nom du système est commun à la région (décision du Délégué, 14 octobre 2026).
+  assert.equal(i.application, "SID EPIA-O");
   assert.equal(i.intituleOfficiel, HISTORIQUE.intituleOfficiel);
 });
 

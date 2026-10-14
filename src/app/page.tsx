@@ -51,7 +51,7 @@ export default function LoginPage() {
           <div className="mb-[22px] text-center">
             <img
               src="/icon-512.png?v=2"
-              alt="SID DDEPIA"
+              alt="SID EPIA-O"
               className="mx-auto mb-3.5 h-16 w-16 rounded-card shadow-[0_4px_14px_rgba(57,119,129,.28)]"
             />
             <div className="text-[13px] font-semibold uppercase tracking-[2px] text-ink-faint">
@@ -60,9 +60,9 @@ export default function LoginPage() {
           </div>
 
           <div className="rounded-card border border-line bg-surface p-[30px_30px_26px] shadow-card">
-            <h1 className="mb-1 text-2xl font-bold text-primary">SID DDEPIA-Menoua</h1>
+            <h1 className="mb-1 text-2xl font-bold text-primary">SID EPIA-O</h1>
             <p className="mb-6 text-[13.5px] text-ink-muted">
-              Système d'Information Décisionnel — Délégation Départementale de la Menoua
+              Système d'Information Décisionnel de l'Élevage, des Pêches et des Industries Animales — Ouest
             </p>
 
             {error && <div className="mb-4 rounded-input bg-statut-rejeteBg p-3 text-sm text-statut-rejeteText">{error}</div>}

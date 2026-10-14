@@ -1,7 +1,7 @@
 {
-  "name": "SID DDEPIA-Menoua",
-  "short_name": "DDEPIA",
-  "description": "Système d'Information Décisionnel de la Délégation Départementale de l'Élevage, des Pêches et des Industries Animales de la Menoua",
+  "name": "SID EPIA-O",
+  "short_name": "SID EPIA-O",
+  "description": "Système d'Information Décisionnel de l'Élevage, des Pêches et des Industries Animales de la région de l'Ouest",
   "start_url": "/dashboard",
   "display": "standalone",
   "background_color": "#f8fafb",

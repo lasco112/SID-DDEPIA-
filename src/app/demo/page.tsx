@@ -60,7 +60,7 @@ export default function DemoLoginPage() {
           </div>
 
           <div className="rounded-card border border-line bg-surface p-[30px_30px_26px] shadow-card">
-            <h1 className="mb-1 text-2xl font-bold text-primary">SID DDEPIA-Menoua — Démo</h1>
+            <h1 className="mb-1 text-2xl font-bold text-primary">SID EPIA-O — Démonstration</h1>
             <p className="mb-6 text-[13.5px] text-ink-muted">
               Données entièrement fictives, isolées de la production. Choisissez un identifiant ci-contre ou saisissez-le directement.
             </p>

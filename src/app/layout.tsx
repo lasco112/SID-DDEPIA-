@@ -10,7 +10,7 @@ import DemoBanner from '@/components/DemoBanner';
 const manrope = Manrope({ subsets: ['latin'], variable: '--font-manrope' });
 
 export const metadata = {
-  title: "SID DDEPIA-Menoua",
+  title: "SID EPIA-O",
   description: "Système d'Information Décisionnel de reporting mensuel",
 };
 

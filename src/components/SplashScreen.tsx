@@ -192,7 +192,7 @@ export default function SplashScreen() {
       className={`splash-screen is-playing${fermeture ? " hidden" : ""}`}
       onClick={fermer}
       role="presentation"
-      aria-label="Animation de démarrage SID DDEPIA"
+      aria-label="Animation de démarrage SID EPIA-O"
     >
       <div className="ambient-layer" aria-hidden="true">
         <span className="ambient-circle circle-one" />
@@ -207,7 +207,7 @@ export default function SplashScreen() {
 
       <div className="splash-content">
         <svg className="logo-svg" viewBox="0 0 360 350" role="img" aria-labelledby="splashLogoTitle splashLogoDesc">
-          <title id="splashLogoTitle">SID DDEPIA</title>
+          <title id="splashLogoTitle">SID EPIA-O</title>
           <desc id="splashLogoDesc">Trois fiches de données transfèrent leurs informations vers un serveur central.</desc>
 
           <defs>
@@ -310,7 +310,7 @@ export default function SplashScreen() {
           </g>
         </svg>
 
-        <div className="brand-text">SID DDEPIA</div>
+        <div className="brand-text">SID EPIA-O</div>
         <div className="splash-tagline-svg">Collecter • Centraliser • Décider</div>
       </div>
 
