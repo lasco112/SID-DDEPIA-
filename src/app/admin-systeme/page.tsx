@@ -19,7 +19,7 @@ export default function AdministrationSystemePage() {
           <li>Vérifier que le département est « Prêt » : arrondissements, compte du DD, modèles Word.</li>
           <li>Imprimer les fiches d&apos;identifiants (un nouveau mot de passe provisoire pour chaque compte jamais connecté).</li>
           <li>Lancer le département : ses comptes peuvent se connecter.</li>
-          <li>Son DD crée ensuite lui-même ses agents de saisie et ses chefs de section (Administration → Comptes utilisateurs).</li>
+          <li>Son DD crée ensuite lui-même ses agents de saisie et ses chefs de section (Administration de ma délégation → Comptes utilisateurs).</li>
         </ol>
         <div className="mt-6">
           <DepartementsClient />

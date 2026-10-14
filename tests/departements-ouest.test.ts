@@ -22,7 +22,7 @@ const CONFIRMES: Record<string, { article: string; dd: string; arrondissements: 
   BAM: { article: "des Bamboutos", dd: "dd.bamboutos", arrondissements: ["Babadjou", "Batcham", "Galim", "Mbouda"] },
   HNK: { article: "du Haut-Nkam", dd: "dd.hautnkam", arrondissements: ["Bafang", "Bakou", "Bana", "Bandja", "Banka", "Banwa", "Kékem"] },
   HPL: { article: "des Hauts-Plateaux", dd: "dd.hautsplateaux", arrondissements: ["Baham", "Bamendjou", "Bangou", "Batié"] },
-  KKH: { article: "du Koung-Khi", dd: "dd.koungkhi", arrondissements: ["Bandjoun", "Bayangam", "Djebem"] },
+  KKH: { article: "du Koung-Khi", dd: "dd.koungkhi", arrondissements: ["Poumougne", "Bayangam", "Djebem"] },
   MIF: { article: "de la Mifi", dd: "dd.mifi", arrondissements: ["Bafoussam I", "Bafoussam II", "Bafoussam III"] },
   NDE: { article: "du Ndé", dd: "dd.nde", arrondissements: ["Bangangté", "Bassamba", "Bazou", "Tonga"] },
   NOU: { article: "du Noun", dd: "dd.noun", arrondissements: ["Bangourain", "Foumban", "Foumbot", "Kouoptamo", "Koutaba", "Magba", "Malantouen", "Massangam", "Njimom"] },

@@ -213,7 +213,9 @@ export const MENU_PAR_ROLE: Record<string, NavGroupe[]> = {
     },
     {
       cle: "administration",
-      titre: "Administration",
+      // « de ma délégation » : à distinguer de l'administration du SYSTÈME,
+      // rangée à part (demande du Délégué, 14 octobre 2026).
+      titre: "Administration de ma délégation",
       items: [
         { href: "/admin/utilisateurs", label: "Comptes utilisateurs" },
         { href: "/etablissements", label: "Établissements" },
