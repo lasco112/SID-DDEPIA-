@@ -96,7 +96,9 @@ async function principal() {
   bloc("A. ACCÈS — chaque rôle n'atteint que ses routes");
   controle("DA refusé sur le rapport départemental (/api/dd/trimestre)", (await appel(DA_DSC, "GET", `/api/dd/trimestre?${q}`)).status === 403);
   controle("agent refusé sur la génération du rapport DA", (await appel(AGENT_NKN, "POST", "/api/da/trimestre", { ...P, apercu: true })).status === 403);
-  controle("chef de section refusé sur la saisie trimestrielle (sauf BAC)", (await appel(CHEF_PSA, "GET", `/api/trimestre/saisie?${q}`)).status === 403);
+  // Depuis le 13 octobre 2026 (décision du Délégué), un chef de section complète
+  // les cases vides de SA section et signale les autres : il est admis.
+  controle("chef de section admis sur la saisie trimestrielle de sa section", (await appel(CHEF_PSA, "GET", `/api/trimestre/saisie?${q}`)).status === 200);
   controle("chef BAC admis sur la saisie trimestrielle", (await appel(CHEF_BAC, "GET", `/api/trimestre/saisie?${q}`)).status === 200);
   for (const u of [DD, DA_DSC, AGENT_NKN, ...CHEFS]) {
     const a = await appel(u, "GET", `/api/trimestre/analyses?${q}`);
