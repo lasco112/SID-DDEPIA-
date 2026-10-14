@@ -14,6 +14,7 @@
 import { NextResponse } from "next/server";
 import { resoudrePeriode } from "@/server/periodes/courante";
 import { requireUser, permissionErrorResponse } from "@/lib/permissions";
+import { dernierePurge } from "@/lib/marqueurPurge";
 
 export async function GET() {
   try {
@@ -37,7 +38,12 @@ export async function GET() {
       }),
       db.referentielItem.findMany({ where: { actif: true }, orderBy: { ordre: "asc" } }),
       resoudrePeriode(db),
-      db.configSysteme.findUnique({ where: { cle: "donnees_purgees_le" } }),
+      // La purge de SON département seulement (voir lib/marqueurPurge.ts).
+      user.departementId
+        ? db.departement
+            .findUnique({ where: { id: user.departementId }, select: { code: true } })
+            .then((d) => (d ? dernierePurge(db, d.code) : null))
+        : null,
     ]);
 
     // LES SAISIES DÉJÀ ENREGISTRÉES SUR LE SERVEUR.
@@ -98,7 +104,7 @@ export async function GET() {
         // Date de la dernière purge des données décidée par le DD : l'appareil
         // compare avec la sienne et vide ses brouillons locaux si elle a changé
         // (voir lib/offlineStore.ts).
-        donneesPurgeesLe: marqueurPurge?.valeur ?? null,
+        donneesPurgeesLe: marqueurPurge,
       },
       tableaux: templates.map((t) => ({
         code: t.code,

@@ -14,7 +14,7 @@
  * exécute la suppression dans une transaction unique + trace un AuditLog.
  */
 import { NextResponse } from "next/server";
-import { requireUser, assertRole, permissionErrorResponse } from "@/lib/permissions";
+import { requireUser, assertRole, assertAdminSysteme, permissionErrorResponse } from "@/lib/permissions";
 
 /** Les jeux de démonstration sont tous suffixés « (DÉMO) » par prisma/seed-demo.ts. */
 const FILTRE_DEMO = {
@@ -28,6 +28,7 @@ export async function GET() {
   try {
     const user = await requireUser();
     assertRole(user, ["DD"]);
+    assertAdminSysteme(user);
 
     const etablissements = await user.db.etablissement.findMany({
       where: FILTRE_DEMO,
@@ -58,6 +59,7 @@ export async function POST(req: Request) {
   try {
     const user = await requireUser();
     assertRole(user, ["DD"]);
+    assertAdminSysteme(user);
 
     const { confirmation } = (await req.json().catch(() => ({}))) as { confirmation?: string };
     if (confirmation !== "SUPPRIMER") {

@@ -16,6 +16,7 @@ import type { PrismaClient, Role } from "@prisma/client";
 import { Prisma } from "@prisma/client";
 import { clientCloisonne, transactionCloisonnee, type Transactionnelle } from "./dbCloisonne";
 import { compteParId } from "./comptes";
+import { MESSAGE_DEPARTEMENT_ETEINT } from "./messagesConnexion";
 
 export interface SessionUser {
   id: string;
@@ -28,6 +29,12 @@ export interface SessionUser {
   departementId: string | null;
   /** Session de démonstration (correction n°10) : jamais vrai pour un compte réel. */
   isDemo: boolean;
+  /**
+   * Administrateur du système (décision du Délégué, 14 octobre 2026) : ouvre
+   * l'espace d'administration. Se cumule avec le rôle de DD. Jamais vrai en
+   * démonstration.
+   */
+  adminSysteme: boolean;
   /** Client Prisma à utiliser pour CETTE session — demoDb si isDemo, sinon la production.
    *  Les routes non encore migrées vers le mode démo continuent d'importer `db` directement
    *  (comportement inchangé) ; seules celles qui utilisent explicitement `user.db` deviennent
@@ -92,7 +99,30 @@ export async function modeDemoGlobalActif(): Promise<boolean> {
   return actif;
 }
 
-type IdentiteUtilisateur = { id: string; role: Role; username: string; arrondissementId: string | null; sectionId: string | null; departementId: string | null };
+// ---------------------------------------------------------------------------
+// Départements éteints (décision du Délégué, 14 octobre 2026)
+// ---------------------------------------------------------------------------
+// Un département préparé reste éteint jusqu'à son lancement : l'administrateur
+// du système l'allume. Lu à chaque requête, donc gardé en mémoire 10 s comme la
+// démonstration globale ; l'administrateur invalide le cache quand il bascule.
+
+let cacheDepartementsEteints: { ids: Set<string>; expire: number } | null = null;
+
+export function invaliderCacheDepartements() {
+  cacheDepartementsEteints = null;
+}
+
+/** Ce département est-il préparé mais pas encore lancé ? (`Departement` n'est pas cloisonnée.) */
+export async function departementEteint(departementId: string | null): Promise<boolean> {
+  if (!departementId) return false;
+  if (!cacheDepartementsEteints || cacheDepartementsEteints.expire <= Date.now()) {
+    const eteints = await db.departement.findMany({ where: { actif: false }, select: { id: true } });
+    cacheDepartementsEteints = { ids: new Set(eteints.map((d) => d.id)), expire: Date.now() + 10_000 };
+  }
+  return cacheDepartementsEteints.ids.has(departementId);
+}
+
+type IdentiteUtilisateur ={ id: string; role: Role; username: string; arrondissementId: string | null; sectionId: string | null; departementId: string | null };
 
 /** Retrouve, dans la base démo, le compte équivalent à un compte réel : même rôle et même
  *  périmètre (code d'arrondissement / code de section, stables entre les deux bases).
@@ -149,6 +179,9 @@ async function resoudreContexte(sessionUser: any): Promise<SessionUser> {
   // porte d'amorçage (voir lib/comptes.ts), et son seul usage hors auth.ts.
   const user = await compteParId(client, String(sessionUser?.id ?? ""));
   if (!user || !user.actif) throw new UnauthorizedError("Compte introuvable ou désactivé");
+  if (!sessionEstDemo && (await departementEteint(user.departementId))) {
+    throw new UnauthorizedError(MESSAGE_DEPARTEMENT_ETEINT);
+  }
 
   // L'ADMIN_TECH n'est jamais remappé : c'est lui qui pilote la démonstration et
   // il doit garder l'accès réel à son espace technique pour pouvoir l'arrêter.
@@ -159,11 +192,27 @@ async function resoudreContexte(sessionUser: any): Promise<SessionUser> {
       return {
         ...jumeau,
         isDemo: true,
+        adminSysteme: false,
         db: clientCloisonne(baseDemo, jumeau.departementId),
         transaction: (travail) => transactionCloisonnee(baseDemo, jumeau.departementId, travail),
       };
     }
   }
+
+  /*
+   * SECONDE barrière : chaque opération faite avec ce client déclare le
+   * département de l'utilisateur à la base, qui refuse les lignes des autres.
+   * La PREMIÈRE barrière reste le filtrage écrit dans les routes.
+   */
+  const cloisonne = clientCloisonne(client, user.departementId);
+
+  // La marque d'administrateur n'est pas lue par la porte d'amorçage (dont la
+  // signature ne doit jamais s'élargir) : une fois le département connu, une
+  // lecture cloisonnée suffit. Seul un DD peut la porter.
+  const adminSysteme =
+    !sessionEstDemo && user.role === "DD"
+      ? Boolean((await cloisonne.user.findUnique({ where: { id: user.id }, select: { adminSysteme: true } }))?.adminSysteme)
+      : false;
 
   return {
     id: user.id,
@@ -173,13 +222,8 @@ async function resoudreContexte(sessionUser: any): Promise<SessionUser> {
     sectionId: user.sectionId,
     departementId: user.departementId,
     isDemo: sessionEstDemo,
-    /*
-     * SECONDE barrière : chaque opération faite avec ce client déclare le
-     * département de l'utilisateur à la base, qui refusera les lignes des
-     * autres dès que les politiques seront posées. La PREMIÈRE barrière reste
-     * le filtrage écrit dans les routes.
-     */
-    db: clientCloisonne(client, user.departementId),
+    adminSysteme,
+    db: cloisonne,
     transaction: (travail) => transactionCloisonnee(client, user.departementId, travail),
   };
 }
@@ -208,7 +252,18 @@ export function assertRole(user: SessionUser, allowed: Role[]) {
   }
 }
 
-export const ROLES_CHEF: Role[] = ["CHEF_BAC", "CHEF_SSV", "CHEF_PSA", "CHEF_SPAIH"];
+/**
+ * Réservé à l'administrateur du système : purge des données d'essai, nouvelle
+ * espèce (nouvelles colonnes pour tous les départements), activation d'un
+ * département. Un DD ordinaire reçoit un refus net.
+ */
+export function assertAdminSysteme(user: SessionUser) {
+  if (!user.adminSysteme) {
+    throw new ForbiddenError("Action réservée à l'administrateur du système.");
+  }
+}
+
+export const ROLES_CHEF: Role[] =["CHEF_BAC", "CHEF_SSV", "CHEF_PSA", "CHEF_SPAIH"];
 
 /** Accès en lecture (vue croisée) à des tableaux d'une autre section, accordé au cas par cas sur
  *  demande explicite du DD — le chef garde le même usage (consultation par DA/arrondissement,

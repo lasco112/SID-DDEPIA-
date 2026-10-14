@@ -49,7 +49,7 @@ export const SECTION_I: SectionCanevas = {
       type: "zoneTexte",
       cle: "I1.organisation",
       consigne:
-        "Une DDEPIA, six DAEPIA (Dschang, Fokoué, Fongo-Tongo, Nkong-Ni, Penka-Michel, Santchou) et onze CZV.",
+        "Une DDEPIA, ses DAEPIA (une par arrondissement, à nommer), ses CZV et ses postes de contrôle.",
     },
     {
       // Tableau des structures, sans légende dans le régional, où il liste pour

@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { signIn, getSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import OnlineIndicator from '@/components/OnlineIndicator';
+import { MESSAGE_DEPARTEMENT_ETEINT } from '@/lib/messagesConnexion';
 
 export default function LoginPage() {
   const [username, setUsername] = useState('');
@@ -24,7 +25,9 @@ export default function LoginPage() {
     });
 
     if (result?.error) {
-      setError('Identifiants incorrects ou compte désactivé.');
+      // Seul le refus d'un département pas encore lancé est dit tel quel ;
+      // toute autre erreur garde le message générique.
+      setError(result.error === MESSAGE_DEPARTEMENT_ETEINT ? MESSAGE_DEPARTEMENT_ETEINT : 'Identifiants incorrects ou compte désactivé.');
       setLoading(false);
       return;
     }

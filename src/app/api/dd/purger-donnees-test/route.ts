@@ -13,7 +13,9 @@
  */
 import { NextResponse } from "next/server";
 import type { PrismaClient } from "@prisma/client";
-import { requireUser, assertRole, permissionErrorResponse } from "@/lib/permissions";
+import { requireUser, assertRole, assertAdminSysteme, permissionErrorResponse } from "@/lib/permissions";
+import { identiteDepartement } from "@/lib/departement";
+import { cleMarqueurPurge } from "@/lib/marqueurPurge";
 
 // Le client est reçu en paramètre : cette fonction est hors handler, aucune
 // session n en est visible. Lui faire importer `db` la laisserait en dehors du
@@ -46,6 +48,7 @@ export async function GET() {
   try {
     const user = await requireUser();
     assertRole(user, ["DD"]);
+    assertAdminSysteme(user);
     return NextResponse.json(await compter(user.db));
   } catch (e) {
     const { status, message } = permissionErrorResponse(e);
@@ -57,6 +60,7 @@ export async function POST(req: Request) {
   try {
     const user = await requireUser();
     assertRole(user, ["DD"]);
+    assertAdminSysteme(user);
 
     const { confirmation } = (await req.json().catch(() => ({}))) as { confirmation?: string };
     if (confirmation !== "SUPPRIMER") {
@@ -84,10 +88,15 @@ export async function POST(req: Request) {
     // attente de synchronisation » — qui étaient RENVOYÉS au serveur à la
     // reconnexion, recréant les données qu'on venait de purger. Les appareils
     // comparent cette date à la leur et vident leur base locale d'eux-mêmes.
+    //
+    // Le marqueur porte le CODE du département : `ConfigSysteme` est commune,
+    // et une clé unique aurait vidé les téléphones de TOUS les départements —
+    // saisies non envoyées comprises — pour la purge d'un seul.
     const purgeLe = new Date().toISOString();
+    const cle = cleMarqueurPurge((await identiteDepartement(user.db)).code);
     await user.db.configSysteme.upsert({
-      where: { cle: "donnees_purgees_le" },
-      create: { cle: "donnees_purgees_le", valeur: purgeLe, modifieParId: user.id },
+      where: { cle },
+      create: { cle, valeur: purgeLe, modifieParId: user.id },
       update: { valeur: purgeLe, modifieParId: user.id },
     });
 

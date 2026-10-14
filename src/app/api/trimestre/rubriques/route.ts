@@ -20,7 +20,8 @@
 import { NextResponse } from "next/server";
 import { requireUser, assertRole, permissionErrorResponse } from "@/lib/permissions";
 import { trimestrielle, libelleOfficiel, periodePrecedente } from "@/server/periodes/calendrier";
-import { TEXTES_FIXES, TEXTES_COMMUNS } from "@/server/trimestre/canevas/textesFixes";
+import { TEXTES_COMMUNS, textesFixesDe } from "@/server/trimestre/canevas/textesFixes";
+import { identiteDepartement } from "@/lib/departement";
 import { chefDeSection } from "@/server/trimestre/canevas/sections";
 import { textesCalculesPour } from "@/server/trimestre/analyse/ecranAnalyses";
 import { ZONES_AUTOMATIQUES } from "@/server/trimestre/analyse/conclusion";
@@ -91,7 +92,7 @@ export async function GET(req: Request) {
     const automatiques = await textesCalculesPour(db, p, profil, ecrits);
     const references = {
       ...Object.fromEntries(TEXTES_COMMUNS),
-      ...(nom ? TEXTES_ARRONDISSEMENTS.get(nom) ?? {} : Object.fromEntries(TEXTES_FIXES)),
+      ...(nom ? TEXTES_ARRONDISSEMENTS.get(nom) ?? {} : Object.fromEntries(textesFixesDe((await identiteDepartement(db)).code))),
     };
     const ctx = await contextePour(db, p, profil);
     const precedents = await lireRubriques(db, periodePrecedente(p), arrondissementId).catch(() => new Map<string, string>());

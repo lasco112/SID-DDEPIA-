@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { demoDb } from "@/lib/demoDb";
 import { clientCloisonne } from "@/lib/dbCloisonne";
 import { compteParUsername, compteParId } from "@/lib/comptes";
+import { MESSAGE_DEPARTEMENT_ETEINT } from "@/lib/messagesConnexion";
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -26,6 +27,14 @@ export const authOptions: NextAuthOptions = {
 
         const valid = await bcrypt.compare(credentials.password, user.passwordHash);
         if (!valid) return null;
+
+        // Un département préparé mais pas encore lancé : le refus est dit en
+        // clair — seulement APRÈS le bon mot de passe, pour ne rien apprendre à
+        // qui essaierait des identifiants au hasard.
+        if (user.departementId) {
+          const dep = await db.departement.findUnique({ where: { id: user.departementId }, select: { actif: true } });
+          if (dep && !dep.actif) throw new Error(MESSAGE_DEPARTEMENT_ETEINT);
+        }
 
         // Le département est connu : tout ce qui suit est cloisonné normalement.
         const base = clientCloisonne(db, user.departementId);

@@ -285,10 +285,10 @@ export const VISITES: Record<string, DefinitionVisite> = {
         titre: "Transmettre au Délégué départemental",
         texte: "Quand tableaux, analyses et textes sont prêts : transmet le rapport au DD. Il n'est plus modifiable ensuite, sauf renvoi.",
       },
-      { cible: "circuit-arrondissements", titre: "Les six arrondissements", texte: "Où en est chaque arrondissement : transmis ou non, et quand." },
+      { cible: "circuit-arrondissements", titre: "Les arrondissements", texte: "Où en est chaque arrondissement : transmis ou non, et quand." },
       { cible: "circuit-renvoyer", titre: "Renvoyer pour correction", texte: "Rouvre le rapport d'un arrondissement, avec un motif : le DA est prévenu." },
       { cible: "circuit-relais", titre: "En tant que DD", texte: "Si un DA ou un chef ne peut pas le faire, le DD transmet ou valide à sa place, avec un motif. C'est noté « par le DD »." },
-      { cible: "circuit-sections", titre: "Les quatre domaines", texte: "Chaque chef de section valide son domaine (analyses et textes) quand les six arrondissements ont transmis." },
+      { cible: "circuit-sections", titre: "Les quatre domaines", texte: "Chaque chef de section valide son domaine (analyses et textes) quand tous les arrondissements ont transmis." },
       { cible: "circuit-valider", titre: "Valider ma section", texte: "Valide votre domaine du rapport trimestriel. Ses analyses et textes ne seront plus modifiables." },
     ],
   },
@@ -337,7 +337,7 @@ export const VISITES: Record<string, DefinitionVisite> = {
   "dd-donnees": {
     version: 2,
     etapes: [
-      { cible: "choix-arrondissement", titre: "Quel arrondissement ?", texte: "La vue départementale montre les six côte à côte ; touchez un nom pour n'en voir qu'un." },
+      { cible: "choix-arrondissement", titre: "Quel arrondissement ?", texte: "La vue départementale les montre tous côte à côte ; touchez un nom pour n'en voir qu'un." },
       { cible: "choix-tableau-dd", titre: "Quel tableau ?", texte: "Choisissez un des 28 tableaux du mois." },
       {
         cible: "valeur-corrigeable",
@@ -449,7 +449,7 @@ export const VISITES: Record<string, DefinitionVisite> = {
       {
         cible: "generer-dd",
         titre: "Produire les documents du mois",
-        texte: "L'aperçu se produit à tout moment, pour voir ce qui manque. Le rapport définitif attend les six arrondissements et les quatre sections.",
+        texte: "L'aperçu se produit à tout moment, pour voir ce qui manque. Le rapport définitif attend tous les arrondissements et les quatre sections.",
       },
       {
         cible: "validations-dd",
@@ -458,7 +458,7 @@ export const VISITES: Record<string, DefinitionVisite> = {
       },
       {
         cible: "etat-arrondissements",
-        titre: "Les six arrondissements",
+        titre: "Les arrondissements",
         texte: "Pour chacun : l'état du rapport, son remplissage, ses données, et le rapport qu'il a transmis.",
       },
       {
@@ -472,7 +472,7 @@ export const VISITES: Record<string, DefinitionVisite> = {
   "section-controle": {
     version: 2,
     etapes: [
-      { cible: "liste-section", titre: "Les tableaux de votre section", texte: "Choisissez un tableau : vous voyez les chiffres des six arrondissements côte à côte." },
+      { cible: "liste-section", titre: "Les tableaux de votre section", texte: "Choisissez un tableau : vous voyez les chiffres de tous les arrondissements côte à côte." },
       {
         cible: "valeur-section",
         titre: "Une donnée qui ne va pas ?",

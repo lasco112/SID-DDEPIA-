@@ -56,7 +56,7 @@ const AIDE = {
   textes: "Section I, chaque filière d'élevage, pêche, santé animale ; les conclusions sont déjà écrites, à relire.",
   verifier: "Produire le document Word de l'arrondissement et le relire.",
   transmettre: "Envoyer le rapport au DD. Il n'est plus modifiable ensuite, sauf renvoi.",
-  valider: "Possible une fois les six arrondissements transmis.",
+  valider: "Possible une fois tous les arrondissements transmis.",
   bac: "Personnel, budget, recettes, infrastructures : ce que seul le BAC connaît.",
   suivre: "Qui a transmis, qui a validé ; prendre le relais au besoin.",
   produire: "Le document Word du département, définitif quand tout est validé.",

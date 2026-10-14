@@ -29,6 +29,8 @@ interface Etat {
   trimestresSansSaisie?: string[];
   comparaison?: { libelle: string; disponible: boolean };
   mois?: MoisEtat[];
+  /** Le nombre d'arrondissements du département (6 pour la Menoua). */
+  nbArrondissements?: number;
   calculable?: boolean;
   moisAbsents?: string[];
   moisIncomplets?: string[];
@@ -203,8 +205,8 @@ export default function TrimestreClient() {
                   {!m.present
                     ? "mois inexistant en base"
                     : m.complet
-                      ? "6 arrondissements sur 6 ont transmis"
-                      : `${m.transmis} arrondissement(s) sur 6 ont transmis`}
+                      ? `${etat.nbArrondissements ?? m.transmis} arrondissements sur ${etat.nbArrondissements ?? m.transmis} ont transmis`
+                      : `${m.transmis} arrondissement(s) sur ${etat.nbArrondissements ?? "?"} ont transmis`}
                 </span>
                 {/* Qui manque : la Supervision de CE mois, lignes en retard encadrées. */}
                 {m.present && !m.complet && m.periodeId && (

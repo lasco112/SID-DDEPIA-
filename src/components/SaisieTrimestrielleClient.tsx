@@ -611,7 +611,7 @@ export default function SaisieTrimestrielleClient({
       <p className="mt-1 max-w-3xl text-gray-600">
         {presentation ??
           (chefTechnique
-            ? "Les tableaux de votre section, pour les six arrondissements. Remplissez une case restée vide, ou le total de l'an passé s'il manque. Une case déjà remplie par l'arrondissement ne se modifie pas : ouvrez le tableau et touchez « Signaler une case à l'arrondissement »."
+            ? "Les tableaux de votre section, pour tous les arrondissements. Remplissez une case restée vide, ou le total de l'an passé s'il manque. Une case déjà remplie par l'arrondissement ne se modifie pas : ouvrez le tableau et touchez « Signaler une case à l'arrondissement »."
             : liste.arrondissement
             ? `Ce que les rapports mensuels ne collectent pas, pour l'arrondissement de ${liste.arrondissement}. Vous ne remplissez que sa ligne ; les cases grises se calculent seules.`
             : "Ce que les rapports mensuels ne collectent pas. Les cases grises se calculent seules : à partir du mensuel, ou comme totaux.")}{" "}

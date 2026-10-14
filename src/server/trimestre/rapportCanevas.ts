@@ -21,7 +21,7 @@ import { insererGraphiques } from "./canevas/graphiquesWord";
 import type { DonneesGraphique } from "./canevas/graphiques";
 import { analysesDuRapport } from "./analyse/analyses";
 import { textesCalcules } from "./analyse/conclusion";
-import { TEXTES_FIXES, TEXTES_COMMUNS } from "./canevas/textesFixes";
+import { TEXTES_FIXES, TEXTES_COMMUNS, textesFixesDe } from "./canevas/textesFixes";
 import { TEXTES_ARRONDISSEMENTS } from "./canevas/textesArrondissements";
 import type { ContexteCanevas, SectionCanevas } from "./canevas/types";
 import { identiteDepartement } from "@/lib/departement";
@@ -273,7 +273,7 @@ export async function genererRapportCanevas(
   // Les présentations des programmes sont les mêmes pour tous.
   const textes = new Map<string, string>([
     ...Array.from(TEXTES_COMMUNS),
-    ...(options.arrondissement ? [] : Array.from(TEXTES_FIXES)),
+    ...(options.arrondissement ? [] : Array.from(textesFixesDe(identite.code))),
   ]);
 
   if (options.arrondissement) {

@@ -280,7 +280,7 @@ export default function SectionControleClient() {
         <div>
           <h1 className="text-[23px] font-bold text-primary-dark">Contrôle sectoriel</h1>
           <VisiteGuidee ecran="section-controle" pret={templates.length > 0} />
-          <p className="mt-1 text-sm text-ink-muted">Vue croisée des 6 arrondissements. Cliquez une valeur pour la corriger (motif obligatoire, trace conservée).</p>
+          <p className="mt-1 text-sm text-ink-muted">Vue croisée des arrondissements du département. Cliquez une valeur pour la corriger (motif obligatoire, trace conservée).</p>
         </div>
         <div data-cible={jeton("valider-section")} data-visite="valider-section" className="rounded-lg p-1 text-right">
           <button onClick={validerSection} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-hover">

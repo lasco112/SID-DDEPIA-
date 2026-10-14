@@ -165,9 +165,9 @@ export function guideDe(nature: NaturePoint, c: ContexteGuide): Guide {
     case "validation_chef":
       return {
         pourquoi:
-          "Les six arrondissements ont transmis. Le rapport du département attend que chaque chef de section ait contrôlé et validé son domaine.",
+          "Tous les arrondissements ont transmis. Le rapport du département attend que chaque chef de section ait contrôlé et validé son domaine.",
         etapes: [
-          "Dans le Contrôle sectoriel, choisissez un à un les tableaux de votre section et parcourez les chiffres des six arrondissements.",
+          "Dans le Contrôle sectoriel, choisissez un à un les tableaux de votre section et parcourez les chiffres de tous les arrondissements.",
           "Un chiffre faux ? Cliquez dessus pour le corriger : le motif est obligatoire, la trace est gardée.",
           "Quand tout est vu, cliquez « Valider ma section pour cette période » (encadré en rouge, en haut à droite).",
         ],

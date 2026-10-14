@@ -58,8 +58,13 @@ model User {
   // utile si un appareil est perdu/volé. Ne bloque pas une reconnexion
   // légitime avec le bon mot de passe, seulement les jetons déjà en circulation.
   sessionRevoqueeLe  DateTime?
+  /// Administrateur du système (décision du Délégué, 14 octobre 2026) : ouvre
+  /// l'espace « Administration du système » — activer un département, purger
+  /// des données d'essai, valider une nouvelle espèce, rédiger les textes d'un
+  /// autre département. Se CUMULE avec le rôle ; ne vaut que pour un DD.
+  adminSysteme       Boolean   @default(false)
 
-  arrondissement Arrondissement? @relation(fields: [arrondissementId], references: [id])
+  arrondissement Arrondissement?@relation(fields: [arrondissementId], references: [id])
   section        Section?        @relation(fields: [sectionId], references: [id])
 
   rapportsSoumis     RapportArrondissement[] @relation("SoumisPar")
@@ -111,6 +116,9 @@ model Departement {
   /// « DE NOUN » dans un rapport transmis au MINEPIA. A defaut, le code se
   /// rabat sur « de <nom> ».
   nomAvecArticle String?
+  /// Un département préparé reste ÉTEINT jusqu'à son lancement : personne ne
+  /// s'y connecte, aucune relance ne part. L'administrateur du système l'allume.
+  actif          Boolean @default(true)
   regionId       String
   region         Region  @relation(fields: [regionId], references: [id])
 

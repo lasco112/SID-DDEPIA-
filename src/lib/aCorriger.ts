@@ -630,7 +630,7 @@ function pointsDeProduction(serveur: ReponseACorriger | null, role: string, peri
         gravite: "bloquant",
         rapport: "mensuel",
         ou: `Mensuel · ${mois} · Contrôle de ma section`,
-        quoi: "Les six arrondissements ont transmis et la date limite est passée : le rapport du département attend la validation de votre section.",
+        quoi: "Tous les arrondissements ont transmis et la date limite est passée : le rapport du département attend la validation de votre section.",
         faire: "Contrôlez les tableaux de votre section, puis cliquez « Valider ma section pour cette période ».",
         lien: avecCible("/section/controle", [jeton("valider-section")]),
         periodeId: autreMois(m.periodeId),

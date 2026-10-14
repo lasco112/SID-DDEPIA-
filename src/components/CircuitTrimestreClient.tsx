@@ -74,7 +74,7 @@ const BADGE_SECTION: Record<Section["statut"], { texte: string; classe: string }
 const ETAPES = [
   ["Agent de saisie", "prépare le rapport de son arrondissement : saisie trimestrielle, analyses, textes."],
   ["Délégué d'arrondissement", "relit l'ensemble, corrige s'il le juge utile, puis transmet au DD."],
-  ["Chef de section", "une fois les six arrondissements transmis, relit et valide son domaine du rapport départemental."],
+  ["Chef de section", "une fois tous les arrondissements transmis, relit et valide son domaine du rapport départemental."],
   ["Délégué départemental", "relit le document final et produit la version définitive."],
 ];
 

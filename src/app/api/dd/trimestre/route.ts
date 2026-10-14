@@ -93,6 +93,8 @@ export async function GET(req: Request) {
     return NextResponse.json({
       disponibles,
       periode: { annee, trimestre, type: p.type, rang: p.rang, libelle: etat.libelle, court: libelleCourt(p) },
+      // « 4 arrondissements sur 6 » : le total est celui du département.
+      nbArrondissements: await db.arrondissement.count(),
       // Semestre ou année : les trimestres dont aucun tableau n'a été saisi.
       trimestresSansSaisie: p.type === "TRIMESTRIEL" ? [] : await trimestresSansSaisie(db, p),
       comparaison: { libelle: libelleOfficiel(memePeriodeAnneePrecedente(p)), disponible: etatN1.mois.some((m) => m.periodeId) },

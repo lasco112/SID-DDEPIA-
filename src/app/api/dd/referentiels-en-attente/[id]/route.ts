@@ -9,13 +9,14 @@
  * Rejet : l'item est désactivé, jamais supprimé (§A.7 règle 1).
  */
 import { NextResponse } from "next/server";
-import { requireUser, assertRole, permissionErrorResponse } from "@/lib/permissions";
+import { requireUser, assertRole, assertAdminSysteme, permissionErrorResponse } from "@/lib/permissions";
 import { CATEGORIES_STRUCTURELLES, suffixeDepuisCode } from "@/lib/categoriesStructurelles";
 
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   try {
     const user = await requireUser();
     assertRole(user, ["DD"]);
+    assertAdminSysteme(user);
 
     const item = await user.db.referentielItem.findUnique({ where: { id: params.id } });
     if (!item) return NextResponse.json({ message: "Item introuvable" }, { status: 404 });

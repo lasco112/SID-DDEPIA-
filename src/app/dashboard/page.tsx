@@ -65,10 +65,14 @@ function phraseEcheance(cible: Date, verbe: string): { texte: string; proche: bo
 
 const ordinal = (n: number) => (n === 1 ? "1er" : `${n}e`);
 
-/** « Aucun arrondissement n'a encore transmis », « 1 arrondissement sur 6 a transmis », « 4 … ont transmis ». */
-function transmisSur6(n: number): string {
+/**
+ * « Aucun arrondissement n'a encore transmis », « 1 arrondissement sur 6 a
+ * transmis », « 4 … ont transmis ». Le total est celui du département : 6 pour
+ * la Menoua, 9 pour le Noun, 3 pour la Mifi.
+ */
+function transmisSur(n: number, total: number): string {
   if (n === 0) return "Aucun arrondissement n'a encore transmis";
-  return n === 1 ? "1 arrondissement sur 6 a transmis" : `${n} arrondissements sur 6 ont transmis`;
+  return n === 1 ? `1 arrondissement sur ${total} a transmis` : `${n} arrondissements sur ${total} ont transmis`;
 }
 
 /** « aucune section validée », « 1 section sur 4 validée », « 3 sections sur 4 validées ». */
@@ -142,17 +146,20 @@ async function carteMensuelle(
   }
 
   if (role === "DD") {
-    const rapports = await db.rapportArrondissement.findMany({ where: { periodeId: periode.id }, select: { statut: true } });
+    const [rapports, total] = await Promise.all([
+      db.rapportArrondissement.findMany({ where: { periodeId: periode.id }, select: { statut: true } }),
+      db.arrondissement.count(),
+    ]);
     const soumis = rapports.filter((r) => r.statut === "SOUMIS" || r.statut === "CLOTURE").length;
     const rejetes = rapports.filter((r) => r.statut === "REJETE").length;
     const e = phraseEcheance(periode.dateLimiteDD, "À clôturer");
     return {
       titre: TITRE_MENSUEL,
       periode: mois,
-      etat: `${transmisSur6(soumis)}${rejetes ? ` · ${rejetes} renvoyé${rejetes > 1 ? "s" : ""} pour correction` : ""}.`,
-      ton: soumis === 6 ? "fait" : "neutre",
+      etat: `${transmisSur(soumis, total)}${rejetes ? ` · ${rejetes} renvoyé${rejetes > 1 ? "s" : ""} pour correction` : ""}.`,
+      ton: soumis === total ? "fait" : "neutre",
       echeance: e.texte,
-      urgent: soumis < 6 && e.proche,
+      urgent: soumis < total && e.proche,
       bouton: { href: "/dd/supervision", label: "Suivre les arrondissements" },
       liens: [
         ...liens.filter((l) => l.href !== "/dd/supervision"),
@@ -216,7 +223,7 @@ async function carteTrimestrielle(
     fait = etat.complet;
     phrase = etat.complet
       ? "Tout est transmis et validé : la version définitive peut être produite."
-      : `${transmisSur6(transmis)} · ${valideesSur4(validees)}.`;
+      : `${transmisSur(transmis, etat.arrondissements.length)} · ${valideesSur4(validees)}.`;
   } else {
     const code = codeSection(role);
     const section = etat.sections.find((s) => s.code === code);
@@ -226,8 +233,8 @@ async function carteTrimestrielle(
       section?.statut === "VALIDE"
         ? `Votre section est validée${section.date ? ` depuis le ${le(section.date)}` : ""}.`
         : section?.statut === "A_VALIDER"
-          ? "Les six arrondissements ont transmis : terminez l'analyse et les rubriques de votre section, puis validez-la."
-          : `${role === "CHEF_BAC" ? "Complétez les tableaux du BAC, validez" : "Validez"} l'analyse des chiffres et rédigez les rubriques de votre section. Validation de la section possible quand les six auront transmis (${transmis} sur 6).`;
+          ? "Tous les arrondissements ont transmis : terminez l'analyse et les rubriques de votre section, puis validez-la."
+          : `${role === "CHEF_BAC" ? "Complétez les tableaux du BAC, validez" : "Validez"} l'analyse des chiffres et rédigez les rubriques de votre section. Validation de la section possible quand tous auront transmis (${transmis} sur ${etat.arrondissements.length}).`;
   }
 
   const renvoye = (role === "DA" || role === "AGENT_SAISIE") && phrase.startsWith("Renvoyé");

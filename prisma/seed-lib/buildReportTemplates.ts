@@ -65,6 +65,8 @@ const prisma = new PrismaClient();
  */
 let ARR_CODES: string[] = [];
 let ARR_NOMS: Record<string, string> = {};
+/** « MENOUA » : le nom du département en graphie canevas, lu en base comme les arrondissements. */
+let DEP_NOM_CANEVAS = "";
 
 
 function cell(text: string, opts: { bold?: boolean; width?: number } = {}): TableCell {
@@ -623,7 +625,7 @@ function buildDoc(mode: "DD" | "DA", templates: Awaited<ReturnType<typeof charge
   children.push(
     new Paragraph({
       alignment: AlignmentType.CENTER,
-      children: [new TextRun({ text: "Région : OUEST — Département : MENOUA" })],
+      children: [new TextRun({ text: `Région : OUEST — Département : ${DEP_NOM_CANEVAS}` })],
     })
   );
   children.push(
@@ -701,7 +703,7 @@ function buildDocExact(templates: Awaited<ReturnType<typeof chargerTemplates>>):
     })
   );
   children.push(new Paragraph({ children: [new TextRun({ text: "REGION : OUEST                                                                    Visa   DDEPIA" })] }));
-  children.push(new Paragraph({ children: [new TextRun({ text: "DEPARTEMENT : MENOUA" })] }));
+  children.push(new Paragraph({ children: [new TextRun({ text: `DEPARTEMENT : ${DEP_NOM_CANEVAS}` })] }));
   children.push(new Paragraph({ children: [new TextRun({ text: "MOIS : {MOIS_LIBELLE}          ANNEE : {ANNEE}" })] }));
   children.push(new Paragraph({ text: "" }));
 
@@ -789,6 +791,7 @@ async function main() {
       );
     }
     ARR_CODES = arrondissements.map((a) => a.code);
+    DEP_NOM_CANEVAS = departement.nom.toUpperCase();
     ARR_NOMS = Object.fromEntries(arrondissements.map((a) => [a.code, a.nomCanevas]));
 
     const produits: string[] = [];

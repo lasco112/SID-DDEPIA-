@@ -4,12 +4,13 @@
  * validation par le DD avant de créer de nouvelles colonnes dans le canevas.
  */
 import { NextResponse } from "next/server";
-import { requireUser, assertRole, permissionErrorResponse } from "@/lib/permissions";
+import { requireUser, assertRole, assertAdminSysteme, permissionErrorResponse } from "@/lib/permissions";
 
 export async function GET() {
   try {
     const user = await requireUser();
     assertRole(user, ["DD"]);
+    assertAdminSysteme(user);
 
     const items = await user.db.referentielItem.findMany({
       where: { enAttenteValidationDD: true },

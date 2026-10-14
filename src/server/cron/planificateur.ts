@@ -106,7 +106,9 @@ function cleMarqueurHeritee(code: string, annee: number, mois: number) {
 export async function verifierRelances(maintenant: Date = new Date()): Promise<void> {
   // `Departement` n'est pas une table cloisonnée : c'est l'unité de
   // cloisonnement elle-même, lisible sans réglage de session.
-  const departements = await db.departement.findMany({ orderBy: { code: "asc" } });
+  // Un département éteint (préparé, pas encore lancé) ne reçoit aucune relance :
+  // ses comptes ne peuvent pas encore se connecter pour y donner suite.
+  const departements = await db.departement.findMany({ where: { actif: true }, orderBy: { code: "asc" } });
 
   for (const relance of RELANCES) {
     const due = relance.echeance(maintenant);
