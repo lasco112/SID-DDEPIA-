@@ -28,6 +28,29 @@ import { departementDeClient } from "./dbCloisonne";
 /** Le nom du système d'information, pour toute la région de l'Ouest. */
 export const NOM_SYSTEME = "SID EPIA-O";
 
+/**
+ * L'abréviation de chaque département dans les mots de passe provisoires.
+ * Décision du Délégué (15 octobre 2026) : un mot de passe SIMPLE, facile à
+ * dicter au téléphone — l'abréviation du département suivie de 123 (« BTOS123 »,
+ * « KKH123 ») —, jamais une suite tirée au sort. Le titulaire le remplace de
+ * toute façon à sa première connexion.
+ */
+const ABREVIATIONS: Record<string, string> = {
+  MEN: "MEN",
+  BAM: "BTOS",
+  HNK: "HNK",
+  HPL: "HPL",
+  KKH: "KKH",
+  MIF: "MIFI",
+  NDE: "NDE",
+  NOU: "NOUN",
+};
+
+/** « BTOS123 » pour les Bamboutos : le mot de passe provisoire d'un département. */
+export function motDePasseProvisoire(codeDepartement: string): string {
+  return `${ABREVIATIONS[codeDepartement] ?? codeDepartement}123`;
+}
+
 export interface IdentiteDepartement {
   id: string;
   /** « MEN ». */

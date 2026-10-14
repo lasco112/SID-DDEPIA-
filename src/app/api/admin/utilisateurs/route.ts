@@ -10,7 +10,7 @@ import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { requireUser, assertRole, permissionErrorResponse } from "@/lib/permissions";
 import { genererIdentifiant, genererMotDePasseTemporaire } from "@/lib/generateCredentials";
-import { identiteDepartement } from "@/lib/departement";
+import { identiteDepartement, motDePasseProvisoire } from "@/lib/departement";
 
 export async function GET() {
   try {
@@ -26,6 +26,8 @@ export async function GET() {
     return NextResponse.json({
       arrondissements,
       sections,
+      // Le mot de passe provisoire du département (« BTOS123 »), proposé à chaque réinitialisation.
+      motDePasseProvisoire: motDePasseProvisoire((await identiteDepartement(user.db)).code),
       users: users.map((u) => ({
         id: u.id,
         nom: u.nom,
@@ -97,7 +99,7 @@ export async function POST(req: Request) {
       nom: body.nom,
       departementNom: (await identiteDepartement(admin.db)).nom,
     });
-    const motDePasseTemporaire = genererMotDePasseTemporaire();
+    const motDePasseTemporaire = genererMotDePasseTemporaire((await identiteDepartement(admin.db)).code);
     const passwordHash = await bcrypt.hash(motDePasseTemporaire, 10);
 
     const created = await admin.db.user.create({

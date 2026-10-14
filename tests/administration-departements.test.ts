@@ -19,6 +19,7 @@ import {
 } from "../src/server/administration/systeme";
 import { cleMarqueurPurge, dernierePurge } from "../src/lib/marqueurPurge";
 import { rendreFichesIdentifiants } from "../src/server/administration/fichesIdentifiants";
+import { motDePasseProvisoire } from "../src/lib/departement";
 
 const DEP = "dep_admin_dep_controle";
 const CODE = "ZZD";
@@ -86,6 +87,8 @@ test("un département pas prêt ne se lance pas ; le sien ne s'éteint pas", asy
 test("les identifiants ne touchent que les comptes jamais connectés, et le mot de passe remis fonctionne", async () => {
   const ids = await genererIdentifiants(DEP);
   assert.deepEqual(ids.map((i) => i.username), ["dd.zzd.controle", "da.zzd.controle"], "le DD d'abord, et jamais le compte déjà utilisé");
+  // Un mot de passe SIMPLE, propre au département (décision du 15 octobre 2026).
+  assert.deepEqual(ids.map((i) => i.motDePasse), ["ZZD123", "ZZD123"]);
   assert.equal(ids[0].fonction, "Délégué départemental du Controle");
   assert.equal(ids[1].fonction, "Délégué d'arrondissement d'Ebolowa-Controle");
   const comptes = await dans((tx) => tx.user.findMany({ select: { username: true, passwordHash: true, actif: true, mustChangePassword: true } }));
@@ -98,6 +101,13 @@ test("les identifiants ne touchent que les comptes jamais connectés, et le mot 
   assert.equal(comptes.find((u) => u.username === "agent.zzd.controle")!.passwordHash, "garde-le");
   const pdf = await rendreFichesIdentifiants(ids, { departement: "Controle", nomAvecArticle: "du Controle", adresse: "https://sid-menoua.xyz", eteint: true });
   assert.equal(pdf.subarray(0, 4).toString(), "%PDF");
+});
+
+test("le mot de passe provisoire : l'abréviation du département suivie de 123", () => {
+  assert.equal(motDePasseProvisoire("BAM"), "BTOS123");
+  assert.equal(motDePasseProvisoire("KKH"), "KKH123");
+  assert.equal(motDePasseProvisoire("NOU"), "NOUN123");
+  assert.equal(motDePasseProvisoire("MEN"), "MEN123");
 });
 
 test("les libellés de fonction suivent l'article du département", () => {

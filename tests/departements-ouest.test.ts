@@ -13,7 +13,7 @@ import path from "node:path";
 import bcrypt from "bcryptjs";
 import { baseBrute } from "../src/lib/baseDeTravail";
 import { clientCloisonne } from "../src/lib/dbCloisonne";
-import { composerIdentite } from "../src/lib/departement";
+import { composerIdentite, motDePasseProvisoire } from "../src/lib/departement";
 
 after(() => baseBrute.$disconnect());
 
@@ -53,7 +53,7 @@ test("un DD et un DA par arrondissement, éteints, sans mot de passe utilisable"
     if (!d.actif) {
       for (const c of comptes) {
         assert.equal(c.actif, false, `${c.username} doit rester inactif`);
-        assert.equal(await bcrypt.compare("password123", c.passwordHash).catch(() => false), false);
+        assert.equal(await bcrypt.compare(motDePasseProvisoire(code), c.passwordHash).catch(() => false), false, "pas encore de mot de passe : les fiches le donnent au lancement");
       }
     }
   }

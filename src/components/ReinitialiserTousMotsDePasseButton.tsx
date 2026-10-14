@@ -1,15 +1,15 @@
 "use client";
 
 /**
- * ReinitialiserTousMotsDePasseButton.tsx — remet le mot de passe temporaire
- * (password123) sur tous les comptes actifs sauf celui du DD connecté
+ * ReinitialiserTousMotsDePasseButton.tsx — remet le mot de passe temporaire du département
+ * (« BTOS123 » pour les Bamboutos) sur tous les comptes actifs sauf celui du DD connecté
  * (demande explicite du DD, réunion de service). Action IRRÉVERSIBLE :
  * nécessite de taper "REINITIALISER" avant que le bouton ne s'active.
  */
 
 import { useState } from "react";
 
-export default function ReinitialiserTousMotsDePasseButton() {
+export default function ReinitialiserTousMotsDePasseButton({ motDePasse }: { motDePasse: string }) {
   const [ouvert, setOuvert] = useState(false);
   const [saisie, setSaisie] = useState("");
   const [enCours, setEnCours] = useState(false);
@@ -18,7 +18,7 @@ export default function ReinitialiserTousMotsDePasseButton() {
   async function confirmer() {
     if (saisie !== "REINITIALISER") return;
     const ok = window.confirm(
-      "Tous les comptes actifs (sauf le vôtre) recevront le mot de passe temporaire « password123 » et devront le changer à leur prochaine connexion. Continuer ?"
+      `Tous les comptes actifs (sauf le vôtre) recevront le mot de passe temporaire « ${motDePasse} » et devront le changer à leur prochaine connexion. Continuer ?`
     );
     if (!ok) return;
     setEnCours(true);
@@ -31,7 +31,7 @@ export default function ReinitialiserTousMotsDePasseButton() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message ?? "Échec de la réinitialisation.");
-      setMessage(`${data.comptesAffectes} compte(s) réinitialisé(s) avec le mot de passe temporaire « password123 ».`);
+      setMessage(`${data.comptesAffectes} compte(s) réinitialisé(s) avec le mot de passe temporaire « ${data.motDePasse ?? motDePasse} ».`);
       setSaisie("");
     } catch (e) {
       setMessage(e instanceof Error ? e.message : "Erreur.");
@@ -44,7 +44,7 @@ export default function ReinitialiserTousMotsDePasseButton() {
     <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
       <p className="text-sm font-semibold text-amber-900">Réinitialiser tous les mots de passe</p>
       <p className="mt-1 text-xs text-amber-800">
-        Remet « password123 » comme mot de passe temporaire sur tous les comptes actifs (sauf le vôtre) ; chacun devra
+        Remet « {motDePasse} » comme mot de passe temporaire sur tous les comptes actifs (sauf le vôtre) ; chacun devra
         le changer à sa prochaine connexion.
       </p>
 

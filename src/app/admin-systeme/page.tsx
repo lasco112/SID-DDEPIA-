@@ -17,7 +17,7 @@ export default function AdministrationSystemePage() {
         </p>
         <ol className="mt-3 max-w-3xl list-decimal space-y-1 pl-5 text-[13.5px] text-ink-muted">
           <li>Vérifier que le département est « Prêt » : arrondissements, compte du DD, modèles Word.</li>
-          <li>Imprimer les fiches d&apos;identifiants (un nouveau mot de passe provisoire pour chaque compte jamais connecté).</li>
+          <li>Imprimer les fiches d&apos;identifiants (mot de passe provisoire du département, par exemple BTOS123 pour les Bamboutos).</li>
           <li>Lancer le département : ses comptes peuvent se connecter.</li>
           <li>Son DD crée ensuite lui-même ses agents de saisie et ses chefs de section (Administration de ma délégation → Comptes utilisateurs).</li>
         </ol>

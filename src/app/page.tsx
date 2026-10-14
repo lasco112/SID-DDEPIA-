@@ -1,10 +1,21 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { signIn, getSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import OnlineIndicator from '@/components/OnlineIndicator';
 import { MESSAGE_DEPARTEMENT_ETEINT } from '@/lib/messagesConnexion';
+
+const MESSAGE_IDENTIFIANTS = 'Identifiants incorrects ou compte désactivé. Vérifiez chaque caractère du mot de passe, majuscules comprises.';
+const MESSAGE_RESEAU = "La connexion n'a pas abouti : le réseau a sans doute coupé. Vérifiez votre connexion internet, puis réessayez.";
+
+/** Le message français d'une erreur de connexion, quelle qu'en soit l'origine. */
+function messageErreur(code: string | null | undefined): string {
+  if (!code) return MESSAGE_RESEAU;
+  if (code === MESSAGE_DEPARTEMENT_ETEINT) return MESSAGE_DEPARTEMENT_ETEINT;
+  if (code === 'CredentialsSignin') return MESSAGE_IDENTIFIANTS;
+  return MESSAGE_RESEAU;
+}
 
 export default function LoginPage() {
   const [username, setUsername] = useState('');
@@ -13,21 +24,38 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
+  // Une erreur de connexion qui a fait quitter la page (réseau coupé au milieu
+  // de la connexion) y revient avec « ?error=… » : on la dit en français, puis
+  // on nettoie l'adresse.
+  useEffect(() => {
+    const code = new URLSearchParams(window.location.search).get('error');
+    if (code) {
+      setError(messageErreur(code));
+      window.history.replaceState(null, '', window.location.pathname);
+    }
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
-    const result = await signIn('credentials', {
-      redirect: false,
-      username,
-      password,
-    });
+    let result: Awaited<ReturnType<typeof signIn>>;
+    try {
+      result = await signIn('credentials', {
+        redirect: false,
+        username: username.trim(),
+        password,
+      });
+    } catch {
+      // Le serveur n'a pas répondu : réseau coupé ou trop faible.
+      setError(MESSAGE_RESEAU);
+      setLoading(false);
+      return;
+    }
 
-    if (result?.error) {
-      // Seul le refus d'un département pas encore lancé est dit tel quel ;
-      // toute autre erreur garde le message générique.
-      setError(result.error === MESSAGE_DEPARTEMENT_ETEINT ? MESSAGE_DEPARTEMENT_ETEINT : 'Identifiants incorrects ou compte désactivé.');
+    if (!result || result.error) {
+      setError(messageErreur(result?.error));
       setLoading(false);
       return;
     }

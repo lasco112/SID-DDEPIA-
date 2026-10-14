@@ -4,6 +4,7 @@
  */
 import { db } from "@/lib/db";
 import { identifiantDisponible } from "@/lib/comptes";
+import { motDePasseProvisoire } from "@/lib/departement";
 import { randomInt } from "node:crypto";
 
 function slug(s: string): string {
@@ -46,13 +47,13 @@ const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789"; // s
 
 /**
  * Mot de passe temporaire proposé à la création d'un compte ou à une
- * réinitialisation. Simple et identique pour tous (demande explicite du DD
- * pour la phase MVP/pilote) : `mustChangePassword` reste actif, donc la
- * personne devra de toute façon le changer à sa première connexion — ce
- * n'est qu'un point de départ facile à communiquer oralement.
+ * réinitialisation. Simple, propre au département (« BTOS123 », décision du
+ * Délégué du 15 octobre 2026 ; auparavant « password123 » pour tous) :
+ * `mustChangePassword` reste actif, la personne le change à sa première
+ * connexion — ce n'est qu'un point de départ facile à dicter.
  */
-export function genererMotDePasseTemporaire(): string {
-  return "password123";
+export function genererMotDePasseTemporaire(codeDepartement: string): string {
+  return motDePasseProvisoire(codeDepartement);
 }
 
 /** Génère un mot de passe aléatoire lisible — conservé pour un usage futur si besoin d'un vrai secret (non utilisé par défaut). */

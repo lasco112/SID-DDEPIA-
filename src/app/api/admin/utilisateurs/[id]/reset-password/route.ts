@@ -1,7 +1,7 @@
 /**
  * POST /api/admin/utilisateurs/[id]/reset-password — le DD réinitialise le
  * mot de passe d'un compte (perdu/bloqué). Le mot de passe temporaire est
- * proposé par le système (password123, simple à communiquer) mais le DD
+ * proposé par le système (abréviation du département + 123, simple à dicter) mais le DD
  * peut l'écraser par un autre de son choix avant de valider — jamais
  * imposé. Le titulaire devra le changer à sa prochaine connexion.
  */
@@ -9,6 +9,7 @@ import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { requireUser, assertRole, permissionErrorResponse } from "@/lib/permissions";
 import { genererMotDePasseTemporaire } from "@/lib/generateCredentials";
+import { identiteDepartement } from "@/lib/departement";
 
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   try {
@@ -16,7 +17,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     assertRole(admin, ["DD"]);
 
     const { motDePasse } = (await req.json().catch(() => ({}))) as { motDePasse?: string };
-    const motDePasseTemporaire = motDePasse?.trim() || genererMotDePasseTemporaire();
+    const motDePasseTemporaire = motDePasse?.trim() || genererMotDePasseTemporaire((await identiteDepartement(admin.db)).code);
     if (motDePasseTemporaire.length < 4) {
       return NextResponse.json({ message: "Le mot de passe doit contenir au moins 4 caractères." }, { status: 400 });
     }

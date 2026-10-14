@@ -20,7 +20,7 @@ import type { PrismaClient, Role } from "@prisma/client";
 import { db } from "@/lib/db";
 import { clientCloisonne, transactionCloisonnee } from "@/lib/dbCloisonne";
 import { composerIdentite } from "@/lib/departement";
-import { genererMotDePasseAleatoire } from "@/lib/generateCredentials";
+import { motDePasseProvisoire } from "@/lib/departement";
 import { cleMarqueurPurge, dernierePurge } from "@/lib/marqueurPurge";
 
 export class ErreurAdministration extends Error {
@@ -157,13 +157,11 @@ export interface Identifiant {
 }
 
 /**
- * Donne un mot de passe provisoire, tiré au sort, aux comptes du département
- * qui ne se sont JAMAIS connectés, et les autorise. Un compte déjà utilisé
- * n'est jamais touché : son titulaire a choisi son mot de passe, et le lui
- * reprendre se fait compte par compte, par son DD.
- *
- * Les mots de passe ne sont rendus qu'ici, pour la fiche imprimée : ils ne
- * sont ni conservés en clair, ni écrits dans le journal.
+ * Donne le mot de passe provisoire du département (« BTOS123 », simple à
+ * dicter — décision du Délégué, 15 octobre 2026) aux comptes qui ne se sont
+ * JAMAIS connectés, et les autorise. Chacun le remplace à sa première
+ * connexion. Un compte déjà utilisé n'est jamais touché : son titulaire a
+ * choisi son mot de passe, et le lui reprendre se fait compte par compte.
  */
 export async function genererIdentifiants(departementId: string, ids?: string[]): Promise<Identifiant[]> {
   const d = await departementVise(departementId);
@@ -175,9 +173,9 @@ export async function genererIdentifiants(departementId: string, ids?: string[])
     // Le DD d'abord, puis les arrondissements dans l'ordre du canevas.
     comptes.sort((a, b) => (a.role === "DD" ? -1 : b.role === "DD" ? 1 : 0) || (a.arrondissement?.ordre ?? 99) - (b.arrondissement?.ordre ?? 99) || a.username.localeCompare(b.username));
 
+    const motDePasse = motDePasseProvisoire(d.code);
     const sortie: Identifiant[] = [];
     for (const u of comptes) {
-      const motDePasse = genererMotDePasseAleatoire(10);
       await tx.user.update({
         where: { id: u.id },
         data: { passwordHash: await bcrypt.hash(motDePasse, 10), mustChangePassword: true, actif: true },

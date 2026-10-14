@@ -71,8 +71,8 @@ function Fiche({ d, recharger }: { d: Etat; recharger: () => void }) {
       return;
     }
     const ok = window.confirm(
-      `${n} compte(s) qui ne se sont jamais connectés vont recevoir un NOUVEAU mot de passe provisoire.\n\n` +
-        "Les fiches imprimées avant ne vaudront plus. Continuer ?"
+      `${n} compte(s) qui ne se sont jamais connectés vont recevoir le mot de passe provisoire du département, ` +
+        "qu'ils changeront à leur première connexion. Continuer ?"
     );
     if (!ok) return;
     setEnCours(true);
@@ -86,7 +86,7 @@ function Fiche({ d, recharger }: { d: Etat; recharger: () => void }) {
       a.download = `identifiants-${d.code.toLowerCase()}.pdf`;
       a.click();
       setTimeout(() => URL.revokeObjectURL(lien), 10_000);
-      setMessage({ ok: true, texte: "Fiches téléchargées : à imprimer et à remettre en main propre. Les mots de passe ne sont gardés nulle part ailleurs." });
+      setMessage({ ok: true, texte: "Fiches téléchargées : à imprimer et à remettre en main propre. Chacun changera son mot de passe à sa première connexion." });
       recharger();
     } catch (e) {
       setMessage({ ok: false, texte: e instanceof Error ? e.message : "Échec." });

@@ -60,6 +60,8 @@ export default function AdminUtilisateursClient() {
   const [identifiantsGeneres, setIdentifiantsGeneres] = useState<{ username: string; motDePasseTemporaire: string } | null>(null);
   const [aSupprimer, setASupprimer] = useState<{ id: string; nom: string } | null>(null);
   const [messageSuppression, setMessageSuppression] = useState<string | null>(null);
+  /** « BTOS123 » : le mot de passe provisoire du département, proposé à chaque réinitialisation. */
+  const [motDePasseProvisoire, setMotDePasseProvisoire] = useState("");
 
   const charger = useCallback(async () => {
     const res = await fetch("/api/admin/utilisateurs");
@@ -68,6 +70,7 @@ export default function AdminUtilisateursClient() {
       setUsers(data.users);
       setArrondissements(data.arrondissements);
       setSections(data.sections);
+      setMotDePasseProvisoire(data.motDePasseProvisoire ?? "");
     }
     setChargement(false);
   }, []);
@@ -397,7 +400,7 @@ export default function AdminUtilisateursClient() {
                         Désactiver
                       </button>
                     )}
-                    <button onClick={() => setReinitialisation({ id: u.id, valeur: "password123" })} className="font-semibold text-ink-muted hover:underline">
+                    <button onClick={() => setReinitialisation({ id: u.id, valeur: motDePasseProvisoire })} className="font-semibold text-ink-muted hover:underline">
                       Réinitialiser le mot de passe
                     </button>
                     {u.actif && !u.enAttente && (
@@ -417,7 +420,7 @@ export default function AdminUtilisateursClient() {
       </div>
 
       <div className="mt-8">
-        <ReinitialiserTousMotsDePasseButton />
+        <ReinitialiserTousMotsDePasseButton motDePasse={motDePasseProvisoire} />
       </div>
     </div>
   );

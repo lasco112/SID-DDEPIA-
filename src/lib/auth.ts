@@ -161,6 +161,11 @@ export const authOptions: NextAuthOptions = {
   },
   pages: {
     signIn: '/',
+    // Toute erreur de connexion revient sur la page de connexion du SID, avec
+    // un message en français — et non sur la page « Error » anglaise de
+    // NextAuth, où atterrissait un DD dont le réseau avait coupé au moment de
+    // se connecter (15 octobre 2026). Voir app/page.tsx.
+    error: '/',
   },
   session: {
     strategy: "jwt",
