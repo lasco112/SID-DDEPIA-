@@ -35,6 +35,7 @@ import {
   ShadingType,
   Header,
   ImageRun,
+  BorderStyle,
 } from "docx";
 import { PrismaClient } from "@prisma/client";
 import fs from "node:fs/promises";
@@ -67,6 +68,9 @@ let ARR_CODES: string[] = [];
 let ARR_NOMS: Record<string, string> = {};
 /** « MENOUA » : le nom du département en graphie canevas, lu en base comme les arrondissements. */
 let DEP_NOM_CANEVAS = "";
+/** « MEN », et « du Noun » : pour l'en-tête officiel. */
+let DEP_CODE = "";
+let DEP_ARTICLE = "";
 
 
 function cell(text: string, opts: { bold?: boolean; width?: number } = {}): TableCell {
@@ -108,8 +112,17 @@ function mentionDemoHeader(): Header {
   });
 }
 
-/** En-tête officiel MINEPIA — image fournie par le DD, centrée sur la page. */
-function headerBlock(): Paragraph {
+/**
+ * En-tête officiel MINEPIA.
+ *
+ * Pour la Menoua : l'image fournie par le Délégué, inchangée. Elle porte
+ * « DEPARTEMENT DE LA MENOUA » et « MENOUA DIVISION » DANS l'image : servie à un
+ * autre département, elle l'aurait intitulé Menoua. Les autres reçoivent le même
+ * en-tête composé en texte — français à gauche, armoiries au centre, anglais à
+ * droite — avec leur propre nom.
+ */
+function headerBlock(): Paragraph | Table {
+  if (DEP_CODE !== "MEN") return enteteTexte();
   const width = 620;
   return new Paragraph({
     alignment: AlignmentType.CENTER,
@@ -118,6 +131,56 @@ function headerBlock(): Paragraph {
         type: "png",
         data: HEADER_IMAGE,
         transformation: { width, height: Math.round(width * HEADER_IMAGE_RATIO) },
+      }),
+    ],
+  });
+}
+
+const ARMOIRIES = readFileSync(path.join(__dirname, "..", "..", "templates", "armoiries-minepia.png"));
+const SANS_BORDURE = {
+  top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+  bottom: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+  left: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+  right: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+};
+
+/** « DEPARTEMENT DU NOUN » / « NOUN DIVISION » : l'en-tête officiel, composé pour le département. */
+function enteteTexte(): Table {
+  const colonne = (lignes: string[]) =>
+    new TableCell({
+      width: { size: 42, type: WidthType.PERCENTAGE },
+      borders: SANS_BORDURE,
+      children: lignes.map(
+        (l, i) =>
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            children: [new TextRun({ text: l, bold: !l.startsWith("-") && i !== 1, italics: i === 1, size: 18, font: "Times New Roman" })],
+          })
+      ),
+    });
+  const tirets = "---------------";
+  return new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    borders: { ...SANS_BORDURE, insideHorizontal: SANS_BORDURE.top, insideVertical: SANS_BORDURE.top },
+    rows: [
+      new TableRow({
+        children: [
+          colonne([
+            "RÉPUBLIQUE DU CAMEROUN", "Paix-Travail-Patrie", tirets, "REGION DE L’OUEST", tirets,
+            `DEPARTEMENT ${DEP_ARTICLE.toUpperCase()}`, tirets,
+            "DELEGATION DEPARTEMENTALE DE L’ELEVAGE, DES PECHES ET DES INDUSTRIES ANIMALES", tirets,
+          ]),
+          new TableCell({
+            width: { size: 16, type: WidthType.PERCENTAGE },
+            borders: SANS_BORDURE,
+            children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new ImageRun({ type: "png", data: ARMOIRIES, transformation: { width: 92, height: 84 } })] })],
+          }),
+          colonne([
+            "REPUBLIC OF CAMEROON", "Peace-Work-Fatherland", tirets, "WEST REGION", tirets,
+            `${DEP_NOM_CANEVAS} DIVISION`, tirets,
+            "DIVISIONAL DELEGATION OF LIVESTOCK, FISHERIES, AND ANIMAL INDUSTRIES", tirets,
+          ]),
+        ],
       }),
     ],
   });
@@ -792,6 +855,8 @@ async function main() {
     }
     ARR_CODES = arrondissements.map((a) => a.code);
     DEP_NOM_CANEVAS = departement.nom.toUpperCase();
+    DEP_CODE = departement.code;
+    DEP_ARTICLE = departement.nomAvecArticle?.trim() || `de ${departement.nom}`;
     ARR_NOMS = Object.fromEntries(arrondissements.map((a) => [a.code, a.nomCanevas]));
 
     const produits: string[] = [];

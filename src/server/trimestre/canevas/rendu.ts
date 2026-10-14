@@ -101,13 +101,13 @@ export function champsAutomatiques(): (Paragraph | TableOfContents)[] {
   ];
 }
 
-function cellule(texte: string, o: { gras?: boolean; fond?: string; droite?: boolean } = {}): TableCell {
+function cellule(texte: string, o: { gras?: boolean; fond?: string; droite?: boolean; taille?: number } = {}): TableCell {
   return new TableCell({
     shading: o.fond ? { fill: o.fond } : undefined,
     children: [
       new Paragraph({
         alignment: o.droite ? AlignmentType.RIGHT : AlignmentType.LEFT,
-        children: [new TextRun({ text: texte, bold: o.gras, size: 18 })],
+        children: [new TextRun({ text: texte, bold: o.gras, size: o.taille ?? 18 })],
       }),
     ],
   });
@@ -231,9 +231,14 @@ function rendreTableau(
   const colonnes = colonnesDe(bloc, ctx);
   const lignes = lignesDe(bloc, ctx);
 
+  // Au-delà de six arrondissements en colonnes (Haut-Nkam : 7, Noun : 9), le
+  // corps 9 coupait les noms au milieu (« Bangourai-n »). Le texte y passe en
+  // corps 7. Jusqu'à six — la Menoua —, rien ne change.
+  const taille = ctx.arrondissements.length > 6 && colonnes.length > 9 ? 14 : undefined;
+
   const entete = new TableRow({
     tableHeader: true,
-    children: colonnes.map((c) => cellule(c, { gras: true, fond: "E8E8E8" })),
+    children: colonnes.map((c) => cellule(c, { gras: true, fond: "E8E8E8", taille })),
   });
 
   const prerempli = bloc.kind === "libre" ? bloc.prerempli : undefined;
@@ -243,13 +248,13 @@ function rendreTableau(
     const estTotal = /^TOTAL|^ÉCART/i.test(lib);
     return new TableRow({
       children: colonnes.map((col, i) => {
-        if (i === 0) return cellule(lib, { gras: estTotal });
+        if (i === 0) return cellule(lib, { gras: estTotal, taille });
         // Case imposée par le canevas (action, activité du budget-programme) :
         // elle ne vient pas des données et n'est pas à ressaisir.
         const fixe = prerempli?.[r]?.[i - 1];
-        if (fixe) return cellule(resoudre(fixe, ctx));
+        if (fixe) return cellule(resoudre(fixe, ctx), { taille });
         const v = valeur({ numeroTableau: bloc.numero, titreTableau: bloc.titre, bloc, ligne: cles[r], colonne: col, indexColonne: i });
-        return cellule(v ?? "", { gras: estTotal, droite: true });
+        return cellule(v ?? "", { gras: estTotal, droite: true, taille });
       }),
     });
   });
