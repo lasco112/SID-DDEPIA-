@@ -11,7 +11,6 @@ import { jeton } from '@/lib/surlignage';
 import VisiteGuidee from '@/components/VisiteGuidee';
 import SyntheseValidationRow from '@/components/SyntheseValidationRow';
 import GenererRapportDDButton from '@/components/GenererRapportDDButton';
-import PurgerDonneesTestButton from '@/components/PurgerDonneesTestButton';
 import ReporterEcheanceButton from '@/components/ReporterEcheanceButton';
 import ValidationsDDPanel from '@/components/ValidationsDDPanel';
 import CloturePeriodePanel from '@/components/CloturePeriodePanel';
@@ -288,10 +287,9 @@ export default async function DDSupervisionPage() {
         ) : (
           <div className="mt-6 rounded-lg border border-red-200 bg-red-50 p-6 text-red-800">Aucune période n'est ouverte.</div>
         )}
-
-        <div className="mt-10">
-          <PurgerDonneesTestButton />
-        </div>
+        {/* La purge des données d'essai a quitté cet écran : elle est rangée dans
+            l'administration du système, réservée à son administrateur (décision
+            du Délégué, 14 octobre 2026 — « je peux le faire par erreur »). */}
       </div>
     </AppShell>
   );

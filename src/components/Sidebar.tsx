@@ -13,8 +13,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BookOpen, CalendarDays, ChevronDown, FileText, Home, Settings, Wrench, type LucideIcon } from "lucide-react";
-import { MENU_PAR_ROLE, entreeCourante, type CleGroupe, type NavItem } from "@/lib/navItems";
+import { BookOpen, CalendarDays, ChevronDown, FileText, Home, Settings, ShieldCheck, Wrench, type LucideIcon } from "lucide-react";
+import { menuDe, entreeCourante, type CleGroupe, type NavItem } from "@/lib/navItems";
 import { revoirLaVisite } from "@/lib/visites";
 
 const ICONES: Record<CleGroupe, LucideIcon> = {
@@ -24,6 +24,7 @@ const ICONES: Record<CleGroupe, LucideIcon> = {
   autres: FileText,
   outils: Wrench,
   administration: Settings,
+  systeme: ShieldCheck,
 };
 
 function Entree({ item, active, onNavigate }: { item: NavItem; active: boolean; onNavigate?: () => void }) {
@@ -54,16 +55,20 @@ function Entree({ item, active, onNavigate }: { item: NavItem; active: boolean; 
 
 export default function Sidebar({
   role,
+  adminSysteme = false,
   periodeLabel,
   onNavigate,
 }: {
   role: string;
+  /** Le compte administre le système : son menu reçoit l'administration, à part. */
+  adminSysteme?: boolean;
   periodeLabel?: string;
   onNavigate?: () => void;
 }) {
   const pathname = usePathname();
-  const groupes = MENU_PAR_ROLE[role] ?? [{ cle: "accueil" as const, items: [{ href: "/dashboard", label: "Accueil" }] }];
-  const courante = entreeCourante(role, pathname);
+  const menu = menuDe(role, adminSysteme);
+  const groupes = menu.length ? menu : [{ cle: "accueil" as const, items: [{ href: "/dashboard", label: "Accueil" }] }];
+  const courante = entreeCourante(role, pathname, adminSysteme);
   const [ouvert, setOuvert] = useState<CleGroupe | null>(courante?.groupe.cle ?? null);
 
   // En changeant d'écran, la rubrique de l'écran s'ouvre.

@@ -19,9 +19,12 @@ const MOIS_FR = [
 export default async function AppShell({
   children,
   allowedRoles,
+  exigeAdminSysteme = false,
 }: {
   children: React.ReactNode;
   allowedRoles?: string[];
+  /** Page de l'administration du système : réservée au compte qui en porte la marque. */
+  exigeAdminSysteme?: boolean;
 }) {
   const session = await getServerSession(authOptions);
   if (!session?.user) redirect("/");
@@ -36,6 +39,7 @@ export default async function AppShell({
   // l'inventaire du lot — il enveloppe pourtant toutes les pages authentifiées.
   const user = await contexteSession(session);
   if (!user) redirect("/");
+  if (exigeAdminSysteme && !user.adminSysteme) redirect("/dashboard");
 
   // Période de TRAVAIL (celle choisie par l'utilisateur), et non plus « la plus
   // récente » : c'est elle qui pilote ce que chaque page affiche et enregistre.
@@ -60,6 +64,7 @@ export default async function AppShell({
         cloturee: p.statut === "ARCHIVEE",
       }))}
       couranteId={periode?.id ?? null}
+      adminSysteme={user.adminSysteme}
     >
       {children}
     </AppShellClient>

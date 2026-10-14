@@ -46,6 +46,7 @@ export default function AppShellClient({
   periodeLabel,
   periodes = [],
   couranteId = null,
+  adminSysteme = false,
   children,
 }: {
   role: string;
@@ -57,6 +58,8 @@ export default function AppShellClient({
   periodeLabel?: string;
   periodes?: PeriodeOption[];
   couranteId?: string | null;
+  /** Le compte administre le système : menu et recherche reçoivent l'administration. */
+  adminSysteme?: boolean;
   children: React.ReactNode;
 }) {
   const [menuOuvert, setMenuOuvert] = useState(false);
@@ -107,7 +110,7 @@ export default function AppShellClient({
               sortaient du cadre. Les trois sont repris dans le tiroir de
               navigation, où ils restent atteignables. */}
           <div className="hidden items-center gap-1 sm:flex sm:gap-4">
-            <RechercheGlobale role={role} />
+            <RechercheGlobale role={role} adminSysteme={adminSysteme} />
             <AideButton role={role} />
           </div>
           <div className="hidden text-right leading-tight lg:block">
@@ -143,7 +146,7 @@ export default function AppShellClient({
             menuOuvert ? "translate-x-0" : ""
           }`}
         >
-          <Sidebar role={role} periodeLabel={periodeLabel} onNavigate={() => setMenuOuvert(false)} />
+          <Sidebar role={role} adminSysteme={adminSysteme} periodeLabel={periodeLabel} onNavigate={() => setMenuOuvert(false)} />
         </div>
 
         <main className="sid-scroll flex-1 min-w-0 overflow-auto bg-appbg p-6 md:p-[26px_30px]">

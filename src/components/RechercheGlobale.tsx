@@ -10,7 +10,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Search, X } from "lucide-react";
-import { NAV_PAR_ROLE } from "@/lib/navItems";
+import { NAV_PAR_ROLE, MENU_ADMIN_SYSTEME } from "@/lib/navItems";
 import { offlineDB } from "@/lib/dexie";
 
 interface Resultat {
@@ -19,7 +19,7 @@ interface Resultat {
   sousLabel?: string;
 }
 
-export default function RechercheGlobale({ role }: { role: string }) {
+export default function RechercheGlobale({ role, adminSysteme = false }: { role: string; adminSysteme?: boolean }) {
   const [ouvert, setOuvert] = useState(false);
   const [terme, setTerme] = useState("");
   const [tableaux, setTableaux] = useState<Resultat[]>([]);
@@ -56,9 +56,9 @@ export default function RechercheGlobale({ role }: { role: string }) {
   }, [ouvert]);
 
   const items: Resultat[] = useMemo(() => {
-    const pages = (NAV_PAR_ROLE[role] ?? []).map((i) => ({ href: i.href, label: i.label, sousLabel: "Page" }));
+    const pages = [...(NAV_PAR_ROLE[role] ?? []), ...(adminSysteme ? MENU_ADMIN_SYSTEME.items : [])].map((i) => ({ href: i.href, label: i.label, sousLabel: "Page" }));
     return [...pages, ...tableaux];
-  }, [role, tableaux]);
+  }, [role, adminSysteme, tableaux]);
 
   const filtres = useMemo(() => {
     const t = terme.trim().toLowerCase();

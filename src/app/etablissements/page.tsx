@@ -4,7 +4,6 @@ import { authOptions } from "@/lib/auth";
 import { contexteSession } from "@/lib/permissions";
 import AppShell from "@/components/AppShell";
 import EtablissementsClient from "@/components/EtablissementsClient";
-import SupprimerEtablissementsDemoButton from "@/components/SupprimerEtablissementsDemoButton";
 
 export default async function EtablissementsPage() {
   const session = await getServerSession(authOptions);
@@ -36,7 +35,8 @@ export default async function EtablissementsPage() {
             ownArrondissementId={ownArrondissementId}
           />
         </div>
-        {role === "DD" && <SupprimerEtablissementsDemoButton />}
+        {/* Retirer d'un coup les établissements de démonstration : rangé dans
+            l'administration du système, avec la purge des données d'essai. */}
       </div>
     </AppShell>
   );

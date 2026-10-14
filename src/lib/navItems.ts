@@ -25,7 +25,7 @@ export interface NavItem {
   aide?: string;
 }
 
-export type CleGroupe = "accueil" | "mensuel" | "trimestriel" | "autres" | "outils" | "administration";
+export type CleGroupe = "accueil" | "mensuel" | "trimestriel" | "autres" | "outils" | "administration" | "systeme";
 
 export interface NavGroupe {
   cle: CleGroupe;
@@ -215,7 +215,6 @@ export const MENU_PAR_ROLE: Record<string, NavGroupe[]> = {
       items: [
         { href: "/admin/utilisateurs", label: "Comptes utilisateurs" },
         { href: "/etablissements", label: "Établissements" },
-        { href: "/dd/referentiels", label: "Propositions de référentiel" },
         { href: "/technique/audit", label: "Journal d'activité" },
         { href: "/technique/aide", label: "Questions des utilisateurs" },
       ],
@@ -254,6 +253,29 @@ export const MENU_PAR_ROLE: Record<string, NavGroupe[]> = {
   ],
 };
 
+/**
+ * L'administration du système (décision du Délégué, 14 octobre 2026) : rangée
+ * à part du travail de DD — pour l'ordre, et pour qu'une purge ne se fasse pas
+ * par erreur depuis un écran courant. Elle ne s'affiche qu'au compte qui porte
+ * la marque d'administrateur.
+ */
+export const MENU_ADMIN_SYSTEME: NavGroupe = {
+  cle: "systeme",
+  titre: "Administration du système",
+  items: [
+    { href: "/admin-systeme", label: "Départements et lancements" },
+    { href: "/admin-systeme/especes", label: "Nouvelles espèces (nouvelles colonnes)" },
+    { href: "/admin-systeme/donnees-essai", label: "Purger des données d'essai" },
+    { href: "/admin-systeme/journal", label: "Journal de l'administration" },
+  ],
+};
+
+/** Le menu d'un compte : celui de son rôle, plus l'administration s'il en porte la marque. */
+export function menuDe(role: string, adminSysteme = false): NavGroupe[] {
+  const groupes = MENU_PAR_ROLE[role] ?? [];
+  return adminSysteme ? [...groupes, MENU_ADMIN_SYSTEME] : groupes;
+}
+
 /** Toutes les pages d'un rôle, à plat (recherche rapide, préchargement hors ligne). */
 export const NAV_PAR_ROLE: Record<string, NavItem[]> = Object.fromEntries(
   Object.entries(MENU_PAR_ROLE).map(([role, groupes]) => [role, groupes.flatMap((g) => g.items)])
@@ -263,10 +285,10 @@ export const NAV_PAR_ROLE: Record<string, NavItem[]> = Object.fromEntries(
  * L'entrée du menu qui correspond à une adresse : la plus précise gagne
  * (« /dd/trimestre/rubriques » n'est pas « /dd/trimestre »).
  */
-export function entreeCourante(role: string, pathname: string | null): { groupe: NavGroupe; item: NavItem } | null {
+export function entreeCourante(role: string, pathname: string | null, adminSysteme = false): { groupe: NavGroupe; item: NavItem } | null {
   if (!pathname) return null;
   let meilleur: { groupe: NavGroupe; item: NavItem } | null = null;
-  for (const groupe of MENU_PAR_ROLE[role] ?? []) {
+  for (const groupe of menuDe(role, adminSysteme)) {
     for (const item of groupe.items) {
       const correspond = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href + "/"));
       if (correspond && (!meilleur || item.href.length > meilleur.item.href.length)) meilleur = { groupe, item };
