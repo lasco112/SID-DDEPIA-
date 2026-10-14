@@ -84,12 +84,12 @@ export function rendreFichesIdentifiants(identifiants: Identifiant[], ctx: Conte
       champ("Mot de passe provisoire (à changer à la première connexion)", id.motDePasse);
 
       if (ctx.eteint) {
-        doc.rect(MARGE, y, largeur, 30).fill("#FBF3E4");
-        doc.font("Helvetica-Bold").fontSize(9.5).fillColor("#8A6420").text(
-          `Le SID n'est pas encore ouvert dans le département ${ctx.nomAvecArticle} : ces identifiants fonctionneront dès le lancement.`,
-          MARGE + 10, y + 9, { width: largeur - 20 }
-        );
-        y += 40;
+        const avis = `Le SID n'est pas encore ouvert dans le département ${ctx.nomAvecArticle} : ces identifiants fonctionneront dès le lancement.`;
+        doc.font("Helvetica-Bold").fontSize(9.5);
+        const h = doc.heightOfString(avis, { width: largeur - 20 }) + 16;
+        doc.rect(MARGE, y, largeur, h).fill("#FBF3E4");
+        doc.fillColor("#8A6420").text(avis, MARGE + 10, y + 8, { width: largeur - 20 });
+        y += h + 10;
       }
 
       // La marche à suivre.
