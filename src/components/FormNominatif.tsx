@@ -306,10 +306,10 @@ export default function FormNominatif({
     <>
       <VisiteGuidee ecran="mensuel-tableau" />
       {boutonAjout}
-      <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
+      <div className="overflow-x-auto rounded-card border border-line bg-white shadow-card">
       <table className="w-full border-collapse text-sm">
         <thead>
-          <tr className="bg-gray-50 text-left">
+          <tr className="bg-gray-100 text-left text-[13px] font-bold text-ink">
             <th className="border-b border-gray-200 px-4 py-2">Établissement</th>
             {template.fields.map((f) => (
               <th key={f.code} className="border-b border-gray-200 px-4 py-2">{f.libelle}</th>
@@ -336,7 +336,7 @@ export default function FormNominatif({
                     <input
                       data-visite="valeur"
                       type={texte ? "text" : "number"}
-                      className={`${texte ? "w-56" : "w-24"} rounded border px-2 py-1 disabled:bg-gray-100 ${cellule?.reporte ? "border-amber-300 bg-amber-50 text-gray-400" : "border-gray-300"}`}
+                      className={`${texte ? "w-56" : "w-24 text-right font-semibold tabular-nums"} min-h-[36px] rounded-input border px-2 py-1 focus:border-primary focus:shadow-focus focus:outline-none disabled:bg-gray-100 ${cellule?.reporte ? "border-amber-300 bg-amber-50 text-gray-400" : "border-gray-300"}`}
                       value={cellule?.nonRenseigne ? "" : cellule?.valeur ?? ""}
                       disabled={cellule?.nonRenseigne}
                       onChange={(e) => sauvegarder(etab.id, f.code, texte, { valeur: e.target.value })}

@@ -51,10 +51,10 @@ Légendes et crédits : inchangés (`src/lib/fondsDepartement.ts`). Le test
 | 1 | Thème : jetons de couleur, gammes accordées, rayons, ombres, Cormorant Garamond (titres), focus visible, chiffres tabulaires dans les tableaux, couleur du téléphone | ✔ fait |
 | 2 | Coque : menu latéral bleu nuit (repère or sur l'entrée active), bandeau indigo, frise ndop fine | ✔ fait |
 | 3 | Connexion : photo à gauche / panneau ivoire à droite, bandeau photo sur téléphone, frise ndop, libellés reliés aux champs | ✔ fait |
-| 4 | Tableaux de bord DD / DA / chefs : titres d'accueil, cartes, chiffres | à faire |
-| 5 | Saisie mensuelle, nominative, événements : en-têtes de tableau, alternance des lignes, focus, densité conservée | à faire |
-| 6 | Validation, observations, supervision : badges de statut avec pictogramme | à faire |
-| 7 | Rapports, statistiques, autres rapports | à faire |
+| 4 | Tableau de bord (page unique pour tous les rôles) : carte d'accueil (fonction en surtitre cuivre, salut en Cormorant, photo du département à droite — un média existant du même territoire), cartes de rapport, liens d'administration ; bandeau : fin du chevauchement « Période » / « En ligne » | ✔ fait |
+| 5 | Saisie mensuelle, nominative, événements : en-têtes ivoire, lignes alternées, valeurs à droite en chiffres tabulaires, motif « N/D » signalé en cuivre tant qu'il est vide ; densité et comportement inchangés | ✔ fait |
+| 6 | Validation, observations, supervision : harmonisées par le thème (vérifié sur la supervision DD) ; badges à pictogramme du prototype non ajoutés (voir conflits) | ✔ thème |
+| 7 | Rapports, statistiques : en-têtes et lignes alternées communs à tous les tableaux (`globals.css`, priorité nulle) | ✔ thème |
 | 8 | Administration, démonstration, harmonisation responsive, contrôle final | à faire |
 
 ## 4. Conflits signalés (aucun résolu par invention)
@@ -74,8 +74,13 @@ Légendes et crédits : inchangés (`src/lib/fondsDepartement.ts`). Le test
    rubrique, barre « X renseignés · Y restants ») : **non ajoutées**.
 5. **Monogramme « SID »** du prototype : remplacé par le logo existant (média
    à conserver).
+6. **Saisie sur téléphone en cartes empilées** (prototype) : non faite — ce
+   serait réorganiser l'écran de saisie, auquel le personnel est habitué
+   (consigne du DD : même organisation). Le tableau défile sur le côté, comme avant.
+7. **Pastille « – » à la place du champ vide « non renseigné »** : non faite,
+   le traitement du non-renseigné reste celui du SID.
 
-## 5. Non-régression — lots 1 à 3
+## 5. Non-régression — lots 1 à 7
 
 | Contrôle | Résultat |
 |---|---|
@@ -84,7 +89,9 @@ Légendes et crédits : inchangés (`src/lib/fondsDepartement.ts`). Le test
 | Connexion réelle (compte d'essai local) puis tableau de bord | ✔ |
 | Déconnexion en français | ✔ |
 | Menu : mêmes entrées, même visibilité par rôle (DA vérifié) | ✔ |
-| Saisie 1.1 : valeurs, cases N/O, statuts « Synchronisée » affichés | ✔ |
+| Saisie 1.1 : valeurs identiques (591, 2 375…), cases N/D, statuts « Synchronisée » | ✔ |
+| Supervision DD (démo Menoua) : boutons, états des arrondissements et sections | ✔ |
+| Gestionnaires d'événements des champs (saisie, N/D, motif) | inchangés (seules les classes CSS ont bougé) ; non cliqués pour ne pas modifier les données |
 | Téléphone 375 px : pas de défilement horizontal sur la connexion | ✔ |
 | `npm run build` | non lancé en local (fichier Prisma verrouillé par le serveur de développement) ; le serveur le lance à la mise à jour |
 

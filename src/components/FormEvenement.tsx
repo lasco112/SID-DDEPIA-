@@ -138,10 +138,10 @@ export default function FormEvenement({
   return (
     <div className="space-y-3">
       <VisiteGuidee ecran="mensuel-tableau" />
-      <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
+      <div className="overflow-x-auto rounded-card border border-line bg-white shadow-card">
         <table className="w-full border-collapse text-sm">
           <thead>
-            <tr className="bg-gray-50 text-left">
+            <tr className="bg-gray-100 text-left text-[13px] font-bold text-ink">
               {template.schemaEvenement.map((c) => (
                 <th key={c.key} className="border-b border-gray-200 px-3 py-2">{c.label}</th>
               ))}

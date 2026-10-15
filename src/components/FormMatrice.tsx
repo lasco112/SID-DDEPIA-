@@ -233,16 +233,16 @@ export default function FormMatrice({ template, periodeId, username }: { templat
   return (
     <>
     <VisiteGuidee ecran="mensuel-tableau" />
-    <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
+    <div className="overflow-x-auto rounded-card border border-line bg-white shadow-card">
       <table className="w-full border-collapse text-sm">
         <thead>
-          <tr className="bg-gray-50 text-left">
-            <th className="border-b border-gray-200 px-4 py-2">Indicateur</th>
-            <th className="border-b border-gray-200 px-4 py-2">Unité</th>
-            <th className="border-b border-gray-200 px-4 py-2">Valeur</th>
-            <th className="border-b border-gray-200 px-4 py-2">Non renseigné</th>
-            <th className="border-b border-gray-200 px-4 py-2">Saisi par</th>
-            <th data-visite="statut-case" className="border-b border-gray-200 px-4 py-2">Statut</th>
+          <tr className="bg-gray-100 text-left text-[13px] font-bold text-ink">
+            <th className="border-b border-gray-200 px-4 py-2.5">Indicateur</th>
+            <th className="border-b border-gray-200 px-4 py-2.5">Unité</th>
+            <th className="border-b border-gray-200 px-4 py-2.5">Valeur</th>
+            <th className="border-b border-gray-200 px-4 py-2.5">Non renseigné</th>
+            <th className="border-b border-gray-200 px-4 py-2.5">Saisi par</th>
+            <th data-visite="statut-case" className="border-b border-gray-200 px-4 py-2.5">Statut</th>
           </tr>
         </thead>
         <tbody>
@@ -288,7 +288,7 @@ export default function FormMatrice({ template, periodeId, username }: { templat
                     <input
                       data-visite="valeur"
                       type={texte ? "text" : "number"}
-                      className={`${texte ? "w-56" : "w-28"} rounded border px-2 py-1 disabled:bg-gray-100 ${ligne?.reporte ? "border-amber-300 bg-amber-50 text-gray-400" : "border-gray-300"}`}
+                      className={`${texte ? "w-56" : "w-28 text-right font-semibold tabular-nums"} min-h-[36px] rounded-input border px-2 py-1 focus:border-primary focus:shadow-focus focus:outline-none disabled:bg-gray-100 ${ligne?.reporte ? "border-amber-300 bg-amber-50 text-gray-400" : "border-gray-300"}`}
                       value={ligne?.nonRenseigne ? "" : ligne?.valeur ?? ""}
                       disabled={ligne?.nonRenseigne}
                       onChange={(e) => sauvegarder(f.code, texte, { valeur: e.target.value })}
@@ -312,7 +312,9 @@ export default function FormMatrice({ template, periodeId, username }: { templat
                         <input
                           type="text"
                           placeholder="Motif obligatoire"
-                          className="mt-1 w-full rounded border border-gray-300 px-2 py-1"
+                          className={`mt-1 min-h-[36px] w-full rounded-input border px-2 py-1 focus:border-primary focus:shadow-focus focus:outline-none ${
+                            ligne.motifNonRenseigne ? "border-gray-300" : "border-amber-400 bg-amber-50"
+                          }`}
                           value={ligne.motifNonRenseigne}
                           onChange={(e) => sauvegarder(f.code, texte, { motifNonRenseigne: e.target.value })}
                         />

@@ -39,8 +39,24 @@
 
 /* Les chiffres des tableaux s'alignent : même largeur pour chaque chiffre.
    Purement visuel, aucune valeur n'est touchée. */
-table {
+table,
+input[type="number"] {
   font-variant-numeric: tabular-nums;
+}
+
+/* Tableaux de l'application : en-têtes ivoire, lignes alternées très
+   discrètes. Placé dans la couche « base » : la moindre classe propre à un
+   écran (une ligne en rouge, un en-tête coloré…) garde toujours la priorité :
+   :where() ramène ces règles à une priorité nulle. */
+@layer base {
+  :where(main table thead th) {
+    background-color: #f2efe8;
+    color: #10253f;
+    font-weight: 700;
+  }
+  :where(main table tbody tr:nth-child(even)) {
+    background-color: #fbfaf7;
+  }
 }
 
 /* Le focus reste toujours visible au clavier, dans la couleur de la charte. */

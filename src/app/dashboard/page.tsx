@@ -21,6 +21,8 @@ import { MENU_PAR_ROLE, etapesTrimestrielles, TITRE_MENSUEL, TITRE_TRIMESTRIEL }
 import AppShell from "@/components/AppShell";
 import NotificationsPanel from "@/components/NotificationsPanel";
 import VisiteGuidee from "@/components/VisiteGuidee";
+import { identiteDepartement } from "@/lib/departement";
+import { fondDepartement } from "@/lib/fondsDepartement";
 
 interface Lien {
   href: string;
@@ -327,23 +329,23 @@ function CarteRapport({ c }: { c: Carte }) {
   return (
     <section
       data-visite="carte-rapport"
-      className={`rounded-xl border bg-white p-4 sm:p-5 ${c.urgent ? "border-primary shadow-[0_0_0_3px_rgba(47,98,108,.12)]" : "border-line"}`}
+      className={`rounded-card border bg-white p-4 shadow-card sm:p-5 ${c.urgent ? "border-primary/60 shadow-[0_0_0_3px_rgba(23,54,93,.10)]" : "border-line"}`}
     >
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <h2 className="text-[17px] font-bold text-primary-dark">
           {c.titre} <span className="font-semibold text-ink-muted">· {c.periode}</span>
         </h2>
-        {c.urgent && <span className="rounded-full bg-primary px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-white">À faire maintenant</span>}
+        {c.urgent && <span className="rounded-full bg-cuivre px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-white">À faire maintenant</span>}
       </div>
 
-      <p data-visite="etat-rapport" className={`mt-3 rounded-md px-3 py-2 text-sm ${TONS[c.ton]}`}>{c.etat}</p>
+      <p data-visite="etat-rapport" className={`mt-3 rounded-input px-3 py-2 text-sm ${TONS[c.ton]}`}>{c.etat}</p>
       {c.echeance && <p className="mt-2 text-sm font-medium text-ink-muted">⏱ {c.echeance}</p>}
 
       {c.bouton && (
         <a
           data-visite="bouton-carte"
           href={c.bouton.href}
-          className="mt-4 flex w-full items-center justify-center rounded-lg bg-primary px-4 py-3 text-center text-[15px] font-semibold text-white hover:bg-primary-dark"
+          className="mt-4 flex min-h-[46px] w-full items-center justify-center rounded-btn bg-primary px-4 py-3 text-center text-[15px] font-bold text-white hover:bg-primary-dark"
         >
           {c.bouton.label} →
         </a>
@@ -356,7 +358,7 @@ function CarteRapport({ c }: { c: Carte }) {
               <a href={e.href} className="flex items-start gap-2.5 rounded-md px-2 py-2 hover:bg-appbg">
                 <span
                   className={`mt-px flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
-                    c.etapesFaites ? "bg-green-100 text-green-800" : "bg-appbg text-ink-muted"
+                    c.etapesFaites ? "bg-green-100 text-green-800" : "bg-primary-light text-primary"
                   }`}
                 >
                   {c.etapesFaites ? "✓" : e.numero}
@@ -395,7 +397,8 @@ export default async function DashboardPage() {
   const db = moi.db as PrismaClient;
   const role = moi.role as string;
 
-  const [accueil, ...lesCartes] = await Promise.all([salutation(db, moi), carteMensuelle(db, moi), carteTrimestrielle(db, moi)]);
+  const [accueil, identite, ...lesCartes] = await Promise.all([salutation(db, moi), identiteDepartement(db), carteMensuelle(db, moi), carteTrimestrielle(db, moi)]);
+  const fond = fondDepartement(identite.code);
   const cartes = lesCartes.filter((c): c is Carte => c != null);
   const trimestre = cartes.find((c) => c.titre === TITRE_TRIMESTRIEL);
   if (trimestre) cartes.push(...cartesSemestreEtAnnee(role, trimestre.etapesFaites === true));
@@ -409,10 +412,27 @@ export default async function DashboardPage() {
   return (
     <AppShell>
       <div className="max-w-[1080px]">
-        <h1 className="text-[23px] font-bold leading-tight text-primary-dark">{accueil.titre}</h1>
-        <VisiteGuidee ecran="accueil" />
-        {accueil.poste && <p className="mt-0.5 text-[15px] font-semibold text-primary">{accueil.poste}</p>}
-        <p className="mb-[20px] mt-1 text-sm text-ink-muted">Voici les rapports du moment et ce qu&apos;il vous reste à faire.</p>
+        {/* L'accueil, en carte : la fonction en surtitre, le salut en grand, et
+            la photo du département à droite (la même que celle de son écran de
+            passage). Mêmes textes qu'avant, autrement présentés. */}
+        <section className="mb-[22px] grid overflow-hidden rounded-card border border-line bg-white shadow-card md:grid-cols-[1fr_300px]">
+          <div className="p-5 sm:p-6">
+            {accueil.poste && (
+              <p className="text-[12px] font-bold uppercase tracking-[1.4px] text-cuivre">{accueil.poste}</p>
+            )}
+            <h1 className="mt-1 font-titre text-[30px] font-semibold leading-[1.1] text-nuit sm:text-[34px]">{accueil.titre}</h1>
+            <VisiteGuidee ecran="accueil" />
+            <p className="mt-2 text-[15px] text-ink-muted">Voici les rapports du moment et ce qu&apos;il vous reste à faire.</p>
+          </div>
+          <div className="relative hidden min-h-[150px] md:block">
+            <img src={fond.src} alt="" aria-hidden="true" className="absolute inset-0 h-full w-full object-cover" />
+            <div className="absolute inset-0 bg-[linear-gradient(180deg,transparent_50%,rgba(16,37,63,.7)_100%)]" />
+            <p className="absolute inset-x-3 bottom-2 text-right text-[11px] leading-snug text-white/85">
+              {fond.legende}
+              {fond.credit && <span className="block text-[10px] text-white/60">{fond.credit}</span>}
+            </p>
+          </div>
+        </section>
 
         {cartes.length > 0 && (
           <div className="mb-[26px] grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
@@ -430,11 +450,11 @@ export default async function DashboardPage() {
             <div className="space-y-4">
               {administration.map((g) => (
                 <div key={g.cle}>
-                  <h2 className="mb-2 text-[15px] font-bold text-primary-dark">{g.titre}</h2>
+                  <h2 className="mb-2 text-[12px] font-bold uppercase tracking-[1.4px] text-cuivre">{g.titre}</h2>
                   <ul className="grid gap-1.5">
                     {g.items.map((i) => (
                       <li key={i.href}>
-                        <a href={i.href} className="block rounded-md border border-line bg-white px-3 py-2 text-sm text-ink-muted hover:border-primary hover:text-primary-dark">
+                        <a href={i.href} className="flex min-h-[40px] items-center rounded-input border border-line bg-white px-3 py-2 text-sm font-medium text-ink-muted shadow-[0_1px_2px_rgba(16,37,63,.04)] hover:border-primary/40 hover:bg-primary-light hover:text-primary-dark">
                           {i.label}
                         </a>
                       </li>

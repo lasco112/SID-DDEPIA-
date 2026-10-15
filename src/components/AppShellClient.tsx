@@ -128,7 +128,7 @@ export default function AppShellClient({
             <RechercheGlobale role={role} adminSysteme={adminSysteme} />
             <AideButton role={role} />
           </div>
-          <div className="hidden text-right leading-tight lg:block">
+          <div className="hidden text-right leading-tight xl:block">
             <div className="text-[13.5px] font-semibold">{username}</div>
             <div className="text-[11.5px] text-white/75">{LIBELLES_ROLE[role] ?? role}</div>
           </div>

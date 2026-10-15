@@ -79,19 +79,19 @@ export default function SelecteurPeriode({
 
   return (
     <label
-      className="flex items-center gap-1.5"
+      className="flex min-w-0 items-center gap-1.5"
       title={
         horsLigne
           ? "Hors ligne : le changement de mois est indisponible tant que la connexion n'est pas revenue."
           : "Période de travail : toutes les données affichées et saisies concernent ce mois."
       }
     >
-      <span className="hidden text-[11px] uppercase tracking-wide text-white/70 sm:inline">Période</span>
+      <span className="hidden text-[11px] uppercase tracking-wide text-white/70 xl:inline">Période</span>
       <select
         value={couranteId ?? ""}
         disabled={enCours || horsLigne}
         onChange={(e) => changer(e.target.value)}
-        className="max-w-[9.5rem] truncate rounded-md border border-white/30 bg-white/10 px-2 py-1 text-xs font-semibold text-white outline-none focus:border-white/70 disabled:opacity-60"
+        className="min-w-0 max-w-[9.5rem] truncate rounded-md border border-white/30 bg-white/10 px-2 py-1 text-xs font-semibold text-white outline-none focus:border-white/70 disabled:opacity-60"
       >
         {periodes.map((p) => (
           <option key={p.id} value={p.id} className="text-gray-900">
