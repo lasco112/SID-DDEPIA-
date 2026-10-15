@@ -2,25 +2,33 @@
 
 /**
  * La démonstration, vue de l'administration du système : est-elle branchée sur
- * ce serveur, que contient-elle, et la remettre à zéro avant une formation.
+ * ce serveur, que contient chaque département, et la remettre à zéro avant
+ * une formation — en arrière-plan, l'écran suit son avancement.
  */
 import { useCallback, useEffect, useState } from "react";
+
+interface Departement {
+  code: string;
+  nom: string;
+  comptes: number;
+  saisies: number;
+  periodes: { annee: number; mois: number; statut: string }[];
+}
 
 interface Etat {
   configuree: boolean;
   prete?: boolean;
   message?: string;
-  comptes?: { username: string; role: string }[];
-  periodes?: { annee: number; mois: number; statut: string }[];
-  saisies?: number;
+  departements?: Departement[];
   reinitialiseeLe?: string | null;
+  reinitialisation?: { enCours: boolean; debut?: string; fin?: string; erreur?: string; resultat?: { departements: number; saisies: number; duree: number } };
 }
 
 const MOIS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
+const nb = (n: number) => n.toLocaleString("fr-FR");
 
 export default function DemonstrationClient() {
   const [etat, setEtat] = useState<Etat | null>(null);
-  const [enCours, setEnCours] = useState(false);
   const [message, setMessage] = useState<{ ok: boolean; texte: string } | null>(null);
 
   const charger = useCallback(() => {
@@ -31,21 +39,21 @@ export default function DemonstrationClient() {
   }, []);
   useEffect(charger, [charger]);
 
+  const enCours = Boolean(etat?.reinitialisation?.enCours);
+  // Pendant une remise à zéro, l'écran se met à jour seul toutes les 5 secondes.
+  useEffect(() => {
+    if (!enCours) return;
+    const t = setInterval(charger, 5000);
+    return () => clearInterval(t);
+  }, [enCours, charger]);
+
   async function reinitialiser() {
-    if (!window.confirm("Remettre la démonstration à zéro ? Tout ce que les participants y ont saisi sera effacé. La production n'est pas touchée.")) return;
-    setEnCours(true);
+    if (!window.confirm("Remettre la démonstration à zéro, dans tous les départements ? Tout ce que les participants y ont saisi sera effacé. La production n'est pas touchée.")) return;
     setMessage(null);
-    try {
-      const r = await fetch("/api/admin-systeme/demonstration", { method: "POST" });
-      const j = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(j.message ?? "Échec.");
-      setMessage({ ok: true, texte: `Démonstration remise à zéro : ${j.mois} mois, ${j.saisies} saisies, en ${Math.round(j.duree / 1000)} s.` });
-      charger();
-    } catch (e) {
-      setMessage({ ok: false, texte: e instanceof Error ? e.message : "Échec." });
-    } finally {
-      setEnCours(false);
-    }
+    const r = await fetch("/api/admin-systeme/demonstration", { method: "POST" });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) setMessage({ ok: false, texte: j.message ?? "Échec." });
+    charger();
   }
 
   if (!etat) return <p className="text-ink-muted">Chargement…</p>;
@@ -61,30 +69,34 @@ export default function DemonstrationClient() {
     );
   }
 
+  const r = etat.reinitialisation;
+  const premier = etat.departements?.find((d) => d.periodes.length) ?? null;
   return (
     <div className="space-y-4">
       <div className="rounded-card border border-line bg-surface p-5 shadow-card">
-        <p className={`text-[15px] font-bold ${etat.prete ? "text-green-800" : "text-amber-800"}`}>
-          {etat.prete ? "La démonstration est prête." : etat.message ?? "La démonstration est branchée mais vide : remettez-la à zéro pour la remplir."}
+        <p className={`text-[15px] font-bold ${enCours ? "text-sky-800" : etat.prete ? "text-green-800" : "text-amber-800"}`}>
+          {enCours
+            ? "Remise à zéro en cours… (une à deux minutes ; cet écran se met à jour seul)"
+            : etat.prete
+              ? "La démonstration est prête."
+              : etat.message ?? "La démonstration est branchée mais vide : remettez-la à zéro pour la remplir."}
         </p>
+        {!enCours && r?.erreur && <p className="mt-1 text-[13.5px] font-semibold text-red-800">La dernière remise à zéro a échoué : {r.erreur}</p>}
+        {!enCours && r?.resultat && (
+          <p className="mt-1 text-[13.5px] text-green-800">
+            Dernière remise à zéro : {r.resultat.departements} départements, {nb(r.resultat.saisies)} saisies, en {Math.round(r.resultat.duree / 1000)} s.
+          </p>
+        )}
         <dl className="mt-3 grid gap-x-6 gap-y-2 text-[13.5px] sm:grid-cols-2">
           <div>
             <dt className="text-ink-faint">Mois disponibles</dt>
             <dd className="text-ink">
-              {(etat.periodes ?? []).map((p) => `${MOIS[p.mois - 1]}${p.statut === "OUVERTE" ? " (en cours)" : ""}`).join(", ") || "aucun"} {etat.periodes?.[0]?.annee ?? ""}
+              {premier ? `${premier.periodes.map((p) => `${MOIS[p.mois - 1]}${p.statut === "OUVERTE" ? " (en cours)" : ""}`).join(", ")} ${premier.periodes[0].annee}` : "aucun"}
             </dd>
-          </div>
-          <div>
-            <dt className="text-ink-faint">Saisies</dt>
-            <dd className="text-ink">{etat.saisies ?? 0}</dd>
           </div>
           <div>
             <dt className="text-ink-faint">Dernière remise à zéro</dt>
             <dd className="text-ink">{etat.reinitialiseeLe ? new Date(etat.reinitialiseeLe).toLocaleString("fr-FR", { dateStyle: "long", timeStyle: "short" }) : "jamais depuis cette version"}</dd>
-          </div>
-          <div>
-            <dt className="text-ink-faint">Comptes de démonstration</dt>
-            <dd className="text-ink">{etat.comptes?.length ?? 0} (mot de passe commun : Demo!2026)</dd>
           </div>
         </dl>
         <div className="mt-4 flex flex-wrap gap-2">
@@ -103,17 +115,26 @@ export default function DemonstrationClient() {
         {message && <p className={`mt-3 text-[13.5px] font-semibold ${message.ok ? "text-green-800" : "text-red-800"}`}>{message.texte}</p>}
       </div>
 
-      {etat.comptes && etat.comptes.length > 0 && (
-        <div className="rounded-card border border-line bg-surface p-5 shadow-card">
-          <h2 className="text-[15px] font-bold text-primary-dark">Comptes pour la formation</h2>
-          <p className="mt-1 text-[13px] text-ink-muted">Un compte par rôle : chacun voit exactement ce que verra son homologue réel.</p>
-          <ul className="mt-2 grid gap-x-6 text-[13.5px] sm:grid-cols-2">
-            {etat.comptes.map((c) => (
-              <li key={c.username} className="font-mono text-ink">
-                {c.username}
-              </li>
-            ))}
-          </ul>
+      {etat.departements && etat.departements.length > 0 && (
+        <div className="overflow-x-auto rounded-card border border-line bg-surface shadow-card">
+          <table className="w-full border-collapse text-[13.5px]">
+            <thead>
+              <tr className="bg-primary-light text-left">
+                <th className="px-3 py-2">Département</th>
+                <th className="px-3 py-2 text-right">Comptes de démonstration</th>
+                <th className="px-3 py-2 text-right">Saisies</th>
+              </tr>
+            </thead>
+            <tbody>
+              {etat.departements.map((d) => (
+                <tr key={d.code} className="border-t border-line">
+                  <td className="px-3 py-2 font-semibold text-ink">{d.nom}</td>
+                  <td className="px-3 py-2 text-right text-ink-muted">{d.comptes}</td>
+                  <td className="px-3 py-2 text-right text-ink-muted">{nb(d.saisies)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </div>

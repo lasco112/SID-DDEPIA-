@@ -49,8 +49,20 @@ function creerClientDemo(): PrismaClient {
   return new PrismaClient({ datasources: { db: { url: DEMO_URL } } });
 }
 
-/** Le département de la démonstration : la Menoua fictive (décision du Délégué, 14 octobre 2026). */
+/**
+ * Le département de départ de la démonstration : la Menoua fictive. Depuis le
+ * 15 octobre 2026 (demande du Délégué), CHAQUE département de l'Ouest a aussi
+ * sa démonstration, avec ses arrondissements et ses comptes : on y choisit son
+ * département, puis sa fonction, puis son arrondissement.
+ */
 const CODE_DEPARTEMENT_DEMO = "MEN";
+
+/** Le client brut de la base de démonstration : il ne sert qu'à se placer dans un département. */
+let brutDemo: PrismaClient | null = null;
+function clientBrut(): PrismaClient {
+  if (!brutDemo) brutDemo = creerClientDemo();
+  return brutDemo;
+}
 
 let clientDemo: PrismaClient | null = null;
 const prisma = new Proxy({} as PrismaClient, {
@@ -71,13 +83,28 @@ const prisma = new Proxy({} as PrismaClient, {
  */
 async function clientDeLaDemo(): Promise<PrismaClient> {
   if (clientDemo) return clientDemo;
-  const brut = creerClientDemo();
-  const departement = await brut.departement.findUnique({ where: { code: CODE_DEPARTEMENT_DEMO } });
+  await entrerDans(CODE_DEPARTEMENT_DEMO);
+  return clientDemo!;
+}
+
+/** Place le semis dans un département : toutes les écritures qui suivent lui appartiennent. */
+async function entrerDans(code: string) {
+  const departement = await clientBrut().departement.findUnique({ where: { code } });
   if (!departement) {
-    throw new Error(`Département « ${CODE_DEPARTEMENT_DEMO} » absent de la base de démonstration : appliquer les migrations avant le semis.`);
+    throw new Error(`Département « ${code} » absent de la base de démonstration : appliquer les migrations avant le semis.`);
   }
-  clientDemo = clientCloisonne(brut, departement.id);
-  return clientDemo;
+  clientDemo = clientCloisonne(clientBrut(), departement.id);
+  return departement;
+}
+
+/** « demo » pour la Menoua (ses comptes d'origine), « demo.bam » pour les Bamboutos. */
+function prefixeComptes(code: string): string {
+  return code === CODE_DEPARTEMENT_DEMO ? "demo" : `demo.${code.toLowerCase()}`;
+}
+
+/** « Fongo-Tongo » → « fongotongo » : la partie d'identifiant d'un arrondissement. */
+function slugArrondissement(nom: string): string {
+  return nom.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "");
 }
 
 const MOT_DE_PASSE_DEMO = "Demo!2026";
@@ -174,29 +201,43 @@ async function seedFormulaires() {
   console.log(`Formulaires : ${tableaux.length} tableaux.`);
 }
 
-/** Comptes de démonstration — identifiants et rôles distincts des comptes réels (§10.4). */
-async function seedComptesDemo() {
-  const passwordHash = await bcrypt.hash(MOT_DE_PASSE_DEMO, 10);
-  const arrondissements = await prisma.arrondissement.findMany();
-  const sections = await prisma.section.findMany();
-  const arrByCode = new Map(arrondissements.map((a) => [a.code, a]));
-  const secByCode = new Map(sections.map((s) => [s.code, s]));
+let empreinteDemo: string | null = null;
 
-  const comptes: Array<{ username: string; nom: string; role: string; arrondissementCode?: string; sectionCode?: string }> = [
-    { username: "demo.dd", nom: "Démo — Délégué Départemental", role: "DD" },
-    { username: "demo.admin", nom: "Démo — Administrateur", role: "ADMIN_TECH" },
-    { username: "demo.chef.bac", nom: "Démo — Chef BAC", role: "CHEF_BAC", sectionCode: "BAC" },
-    { username: "demo.chef.psa", nom: "Démo — Chef Productions Animales", role: "CHEF_PSA", sectionCode: "PSA" },
-    { username: "demo.chef.ssv", nom: "Démo — Chef Services Vétérinaires", role: "CHEF_SSV", sectionCode: "SSV" },
-    { username: "demo.chef.spaih", nom: "Démo — Chef Pêches/Aquaculture", role: "CHEF_SPAIH", sectionCode: "SPAIH" },
-    { username: "demo.da.dschang", nom: "Démo — DA Dschang", role: "DA", arrondissementCode: "DSC" },
-    { username: "demo.agent.dschang", nom: "Démo — Agent de saisie Dschang", role: "AGENT_SAISIE", arrondissementCode: "DSC" },
-    { username: "demo.da.fokoue", nom: "Démo — DA Fokoué", role: "DA", arrondissementCode: "FOK" },
-    { username: "demo.da.fongotongo", nom: "Démo — DA Fongo-Tongo", role: "DA", arrondissementCode: "FGT" },
-    { username: "demo.da.nkongni", nom: "Démo — DA Nkong-Ni", role: "DA", arrondissementCode: "NKN" },
-    { username: "demo.da.penkamichel", nom: "Démo — DA Penka-Michel", role: "DA", arrondissementCode: "PKM" },
-    { username: "demo.da.santchou", nom: "Démo — DA Santchou", role: "DA", arrondissementCode: "STC" },
+/**
+ * Comptes de démonstration d'UN département — identifiants et rôles distincts
+ * des comptes réels (§10.4) : son DD, ses quatre chefs de section, et pour
+ * CHAQUE arrondissement son DA et son agent de saisie / chef de CZV (demande
+ * du Délégué, 15 octobre 2026 : on choisit jusqu'à son arrondissement).
+ *
+ * La Menoua garde ses identifiants d'origine (demo.dd, demo.da.dschang…) ;
+ * les autres départements sont préfixés de leur code (demo.bam.da.mbouda).
+ */
+async function seedComptesDemo(departement: { code: string; nom: string; nomAvecArticle: string | null }) {
+  empreinteDemo ??= await bcrypt.hash(MOT_DE_PASSE_DEMO, 10);
+  const passwordHash = empreinteDemo;
+  const arrondissements = await prisma.arrondissement.findMany({ orderBy: { ordre: "asc" } });
+  const sections = await prisma.section.findMany();
+  const secByCode = new Map(sections.map((s) => [s.code, s]));
+  const p = prefixeComptes(departement.code);
+  const article = departement.nomAvecArticle?.trim() || `de ${departement.nom}`;
+
+  const comptes: Array<{ username: string; nom: string; role: string; arrondissementId?: string; sectionCode?: string }> = [
+    { username: `${p}.dd`, nom: `Démo — Délégué départemental ${article}`, role: "DD" },
+    { username: `${p}.chef.bac`, nom: `Démo — Chef BAC ${article}`, role: "CHEF_BAC", sectionCode: "BAC" },
+    { username: `${p}.chef.psa`, nom: `Démo — Chef PSA ${article}`, role: "CHEF_PSA", sectionCode: "PSA" },
+    { username: `${p}.chef.ssv`, nom: `Démo — Chef SSV ${article}`, role: "CHEF_SSV", sectionCode: "SSV" },
+    { username: `${p}.chef.spaih`, nom: `Démo — Chef SPAIH ${article}`, role: "CHEF_SPAIH", sectionCode: "SPAIH" },
   ];
+  if (departement.code === CODE_DEPARTEMENT_DEMO) {
+    comptes.push({ username: "demo.admin", nom: "Démo — Administrateur", role: "ADMIN_TECH" });
+  }
+  for (const a of arrondissements) {
+    const s = slugArrondissement(a.nom);
+    comptes.push(
+      { username: `${p}.da.${s}`, nom: `Démo — DA ${a.nom}`, role: "DA", arrondissementId: a.id },
+      { username: `${p}.agent.${s}`, nom: `Démo — Agent de saisie ${a.nom}`, role: "AGENT_SAISIE", arrondissementId: a.id }
+    );
+  }
 
   for (const c of comptes) {
     const data: any = {
@@ -206,7 +247,7 @@ async function seedComptesDemo() {
       role: c.role,
       mustChangePassword: false,
       actif: true,
-      arrondissementId: c.arrondissementCode ? arrByCode.get(c.arrondissementCode)?.id ?? null : null,
+      arrondissementId: c.arrondissementId ?? null,
       sectionId: c.sectionCode ? secByCode.get(c.sectionCode)?.id ?? null : null,
     };
     await prisma.user.upsert({
@@ -215,7 +256,7 @@ async function seedComptesDemo() {
       create: data,
     });
   }
-  console.log(`${comptes.length} comptes de démonstration créés (mot de passe : ${MOT_DE_PASSE_DEMO}).`);
+  console.log(`${departement.code} : ${comptes.length} comptes de démonstration.`);
 }
 
 /** Établissements NOMINATIF — 2 acteurs par arrondissement et par type, sauf Fongo-Tongo (4)
@@ -302,15 +343,32 @@ const SCENARIOS: ScenarioArr[] = [
   { code: "STC", statut: "SOUMIS" },
 ];
 
-async function seedRapports(periodeId: string, mois: number) {
-  const arrondissements = await prisma.arrondissement.findMany();
+/**
+ * Les autres départements reçoivent les mêmes situations, dans l'ordre de leurs
+ * arrondissements : transmis, encore en saisie, renvoyé par le DD, validé…
+ */
+const SITUATIONS_SUIVANTES: Omit<ScenarioArr, "code">[] = [
+  { statut: "SOUMIS" },
+  { statut: "EN_SAISIE" },
+  { statut: "REJETE", motifRejet: "Écart important sur les effectifs vaccinés par rapport au mois précédent — merci de vérifier le tableau 3.2 avant renvoi." },
+  { statut: "CLOTURE" },
+];
+
+function scenarioDuMoisEnCours(codeDepartement: string, arr: { code: string }, rang: number): ScenarioArr {
+  if (codeDepartement === CODE_DEPARTEMENT_DEMO) return SCENARIOS.find((x) => x.code === arr.code) ?? { code: arr.code, statut: "SOUMIS" };
+  return { code: arr.code, ...SITUATIONS_SUIVANTES[rang % SITUATIONS_SUIVANTES.length] };
+}
+
+async function seedRapports(periodeId: string, mois: number, codeDepartement: string) {
+  const arrondissements = await prisma.arrondissement.findMany({ orderBy: { ordre: "asc" } });
   const users = await prisma.user.findMany({ where: { role: "DA" } });
   const userByArrId = new Map(users.map((u) => [u.arrondissementId, u]));
   const enCours = mois === MOIS_EN_COURS;
 
-  const rapportsParCode = new Map<string, { id: string; arrondissementId: string }>();
-  for (const arr of arrondissements) {
-    const s: ScenarioArr = enCours ? SCENARIOS.find((x) => x.code === arr.code) ?? { code: arr.code, statut: "SOUMIS" } : { code: arr.code, statut: "CLOTURE" };
+  const rapportsParCode = new Map<string, { id: string; arrondissementId: string; statut: ScenarioArr["statut"] }>();
+  for (let rang = 0; rang < arrondissements.length; rang++) {
+    const arr = arrondissements[rang];
+    const s: ScenarioArr = enCours ? scenarioDuMoisEnCours(codeDepartement, arr, rang) : { code: arr.code, statut: "CLOTURE" };
     const da = userByArrId.get(arr.id);
     const rapport = await prisma.rapportArrondissement.create({
       data: {
@@ -322,7 +380,7 @@ async function seedRapports(periodeId: string, mois: number) {
         motifRejet: s.motifRejet ?? null,
       },
     });
-    rapportsParCode.set(arr.code, { id: rapport.id, arrondissementId: arr.id });
+    rapportsParCode.set(arr.code, { id: rapport.id, arrondissementId: arr.id, statut: s.statut });
   }
   return rapportsParCode;
 }
@@ -339,7 +397,7 @@ function valeurDuMois(arrCode: string, champ: { code: string; typeValeur: string
   return champ.typeValeur === "DECIMAL" ? Math.round(v * 100) / 100 : Math.round(v);
 }
 
-async function remplirMatrice(rapportId: string, fields: { code: string; typeValeur: string; libelle: string }[], arrCode: string, mois: number, incomplet: boolean) {
+function remplirMatrice(lot: Lot, rapportId: string, fields: { code: string; typeValeur: string; libelle: string }[], arrCode: string, mois: number, incomplet: boolean) {
   const rng = seededRng(`${arrCode}:${rapportId.slice(-6)}:${mois}`);
   const nbAFournir = incomplet ? Math.ceil(fields.length * 0.4) : fields.length;
   const lignes: any[] = [];
@@ -360,10 +418,10 @@ async function remplirMatrice(rapportId: string, fields: { code: string; typeVal
     const valeur = i === 0 && mois === MOIS_EN_COURS ? 0 : valeurDuMois(arrCode, f, mois);
     lignes.push({ rapportId, fieldCode: f.code, valeur, nonRenseigne: false, clientId });
   }
-  if (lignes.length) await prisma.saisieMatrice.createMany({ data: lignes });
+  lot.matrice.push(...lignes);
 }
 
-async function remplirNominatif(rapportId: string, templateId: string, fields: { code: string; typeValeur: string; libelle: string }[], arrCode: string, mois: number, etablissementIds: string[]) {
+function remplirNominatif(lot: Lot, rapportId: string, templateId: string, fields: { code: string; typeValeur: string; libelle: string }[], arrCode: string, mois: number, etablissementIds: string[]) {
   const lignes: any[] = [];
   for (const etabId of etablissementIds) {
     const rng = seededRng(`${arrCode}:${templateId}:${etabId}:${mois}`);
@@ -376,10 +434,11 @@ async function remplirNominatif(rapportId: string, templateId: string, fields: {
       lignes.push({ rapportId, templateId, etablissementId: etabId, fieldCode: f.code, valeur: valeurDuMois(`${arrCode}:${etabId}`, f, mois), nonRenseigne: false, clientId });
     }
   }
-  if (lignes.length) await prisma.saisieNominative.createMany({ data: lignes });
+  lot.nominative.push(...lignes);
 }
 
-async function remplirEvenements(
+function remplirEvenements(
+  lot: Lot,
   rapportId: string,
   templateId: string,
   schema: ChampEvenement[],
@@ -415,24 +474,26 @@ async function remplirEvenements(
     }
     lignes.push({ clientId: `demo-evt-${rapportId}-${templateId}-${i}`, rapportId, templateId, payload });
   }
-  if (lignes.length) await prisma.saisieEvenement.createMany({ data: lignes });
+  lot.evenements.push(...lignes);
 }
 
-async function seedSaisies(mois: number, rapportsParCode: Map<string, { id: string; arrondissementId: string }>, etablissements: Map<string, string[]>) {
+async function seedSaisies(mois: number, rapportsParCode: Map<string, { id: string; arrondissementId: string; statut: string }>, etablissements: Map<string, string[]>) {
   const templates = await prisma.formTemplate.findMany({ where: { actif: true }, include: { fields: { where: { actif: true }, orderBy: { ordre: "asc" } } } });
   const refs = await prisma.referentielItem.findMany({ where: { actif: true }, select: { categorie: true, code: true } });
   const references = new Map<string, string[]>();
   for (const r of refs) references.set(r.categorie, [...(references.get(r.categorie) ?? []), r.code]);
   const enCours = mois === MOIS_EN_COURS;
+  const lot: Lot = { matrice: [], nominative: [], evenements: [] };
 
   for (const [arrCode, rapport] of Array.from(rapportsParCode.entries())) {
-    const incomplet = enCours && arrCode === "FOK";
+    // Le rapport encore en saisie au mois en cours (Fokoué pour la Menoua) : un brouillon incomplet.
+    const incomplet = enCours && rapport.statut === "EN_SAISIE";
     for (const t of templates) {
       if (t.type === "MATRICE") {
-        await remplirMatrice(rapport.id, t.fields, arrCode, mois, incomplet);
+        remplirMatrice(lot, rapport.id, t.fields, arrCode, mois, incomplet);
       } else if (t.type === "NOMINATIF" && !incomplet) {
         const typeCode = NOMINATIF_ETABLISSEMENT_TYPE[t.code];
-        await remplirNominatif(rapport.id, t.id, t.fields, arrCode, mois, etablissements.get(`${arrCode}:${typeCode}`) ?? []);
+        remplirNominatif(lot, rapport.id, t.id, t.fields, arrCode, mois, etablissements.get(`${arrCode}:${typeCode}`) ?? []);
       } else if (t.type === "EVENEMENT" && !incomplet) {
         const schema = (t.schemaEvenement as ChampEvenement[] | null) ?? [];
         if (schema.length === 0) continue;
@@ -441,10 +502,27 @@ async function seedSaisies(mois: number, rapportsParCode: Map<string, { id: stri
         // Fongo-Tongo, au mois en cours : plusieurs foyers le même mois (§10.3).
         const count = enCours && arrCode === "FGT" && t.code === "T31" ? 5 : t.code.startsWith("T5") ? 0 : 1 + Math.floor(seededRng(`${arrCode}${t.code}${mois}`)() * 3);
         const forcerAutre = t.code === "T33" ? { key: "maladie", precision: "Suspicion de piroplasmose, prélèvement envoyé au laboratoire régional (démonstration)" } : undefined;
-        if (count > 0) await remplirEvenements(rapport.id, t.id, schema, arrCode, mois, count, references, forcerAutre);
+        if (count > 0) remplirEvenements(lot, rapport.id, t.id, schema, arrCode, mois, count, references, forcerAutre);
       }
     }
   }
+
+  // Une écriture groupée par mois, plutôt qu'une par tableau et par
+  // arrondissement : huit départements à remplir, sur un petit serveur.
+  await ecrireParPaquets(lot.matrice, (data) => prisma.saisieMatrice.createMany({ data }));
+  await ecrireParPaquets(lot.nominative, (data) => prisma.saisieNominative.createMany({ data }));
+  await ecrireParPaquets(lot.evenements, (data) => prisma.saisieEvenement.createMany({ data }));
+}
+
+/** Les saisies d'un mois, préparées avant d'être écrites d'un coup. */
+interface Lot {
+  matrice: any[];
+  nominative: any[];
+  evenements: any[];
+}
+
+async function ecrireParPaquets(lignes: any[], ecrire: (data: any[]) => Promise<unknown>, taille = 4000) {
+  for (let i = 0; i < lignes.length; i += taille) await ecrire(lignes.slice(i, i + taille));
 }
 
 async function seedValidationsEtSyntheses(periodeId: string, mois: number) {
@@ -466,7 +544,7 @@ async function seedValidationsEtSyntheses(periodeId: string, mois: number) {
     });
     if (valide && chef) {
       await prisma.syntheseSection.create({
-        data: { periodeId, sectionId: s.id, blocCode: "GENERAL", contenuFinal: `Section ${s.nom} : activité stable sur les 6 arrondissements ce mois-ci (démonstration).`, auteurId: chef.id, valideDD: mois !== MOIS_EN_COURS },
+        data: { periodeId, sectionId: s.id, blocCode: "GENERAL", contenuFinal: `Section ${s.nom} : activité stable dans les arrondissements ce mois-ci (démonstration).`, auteurId: chef.id, valideDD: mois !== MOIS_EN_COURS },
       });
     }
   }
@@ -506,23 +584,34 @@ export const CLE_DEMO_REINITIALISEE = "demo_reinitialisee_le";
  * seed complet ci-dessous. seedFormulaires() lit le dictionnaire .xlsx via
  * XLSX.readFile, ce qui ne fonctionne pas depuis une route Next.js.
  */
-export async function reinitialiserDonneesDemo(): Promise<{ mois: number; saisies: number; duree: number }> {
+export async function reinitialiserDonneesDemo(): Promise<{ departements: number; mois: number; saisies: number; duree: number }> {
   const debut = Date.now();
-  await clientDeLaDemo();
-  await viderDonneesDemo();
-  const etablissements = await seedEtablissements();
-  await seedComptesDemo();
-  const periodes = await seedPeriodes();
-  for (const [mois, periode] of Array.from(periodes.entries())) {
-    const rapports = await seedRapports(periode.id, mois);
-    await seedSaisies(mois, rapports, etablissements);
-    await seedValidationsEtSyntheses(periode.id, mois);
+  // Chaque département de l'Ouest, la Menoua en premier : chacun sa démonstration.
+  const departements = (await clientBrut().departement.findMany({ orderBy: { nom: "asc" } })).sort(
+    (a, b) => Number(b.code === CODE_DEPARTEMENT_DEMO) - Number(a.code === CODE_DEPARTEMENT_DEMO)
+  );
+  let saisies = 0;
+  let nbMois = 0;
+  for (const d of departements) {
+    await entrerDans(d.code);
+    if ((await prisma.arrondissement.count()) === 0) continue; // département sans arrondissement : rien à montrer
+    await viderDonneesDemo();
+    const etablissements = await seedEtablissements();
+    await seedComptesDemo(d);
+    const periodes = await seedPeriodes();
+    nbMois = periodes.size;
+    for (const [mois, periode] of Array.from(periodes.entries())) {
+      const rapports = await seedRapports(periode.id, mois, d.code);
+      await seedSaisies(mois, rapports, etablissements);
+      await seedValidationsEtSyntheses(periode.id, mois);
+    }
+    saisies += (await prisma.saisieMatrice.count()) + (await prisma.saisieNominative.count()) + (await prisma.saisieEvenement.count());
   }
+  await entrerDans(CODE_DEPARTEMENT_DEMO);
   const le = new Date().toISOString();
   await prisma.configSysteme.upsert({ where: { cle: CLE_DEMO_REINITIALISEE }, create: { cle: CLE_DEMO_REINITIALISEE, valeur: le }, update: { valeur: le } });
-  const saisies = (await prisma.saisieMatrice.count()) + (await prisma.saisieNominative.count()) + (await prisma.saisieEvenement.count());
-  console.log(`Démonstration prête : ${periodes.size} mois, ${saisies} saisies.`);
-  return { mois: periodes.size, saisies, duree: Date.now() - debut };
+  console.log(`Démonstration prête : ${departements.length} départements, ${nbMois} mois, ${saisies} saisies.`);
+  return { departements: departements.length, mois: nbMois, saisies, duree: Date.now() - debut };
 }
 
 /** Seed complet (CLI uniquement) : structure + données. */

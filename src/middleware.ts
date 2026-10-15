@@ -105,6 +105,7 @@ const CHEMINS_SURS_DEMO = [
   "/api/syntheses",
   "/api/demo/reinitialiser",
   "/api/demo/etat", // lecture seule : indique si le mode démo global est actif (bandeau)
+  "/api/demo/comptes", // lecture seule : les entrées de la démonstration (page /demo, « Changer de fonction »)
   "/a-corriger", // lit l'appareil, et /api/a-corriger
   "/api/a-corriger", // lecture seule, par user.db
   // Phase 2 (14 octobre 2026, pour former les départements qui rejoignent le

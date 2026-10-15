@@ -13,12 +13,18 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
+import { usePathname } from "next/navigation";
 
 export default function DemoBanner() {
   const { status } = useSession();
+  // La page de choix de la démonstration a déjà son bandeau : pas de doublon.
+  const surLaPageDeChoix = usePathname() === "/demo";
   const [demo, setDemo] = useState(false);
   const [enCours, setEnCours] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  // Seul l'administrateur de la démonstration la remet à zéro : elle est
+  // partagée par les départements en formation (15 octobre 2026).
+  const [administrateur, setAdministrateur] = useState(false);
 
   const rafraichir = useCallback(async () => {
     if (status !== "authenticated") {
@@ -29,6 +35,7 @@ export default function DemoBanner() {
       const res = await fetch("/api/demo/etat");
       const data = await res.json().catch(() => ({}));
       setDemo(Boolean(data.demo));
+      setAdministrateur(data.role === "ADMIN_TECH");
     } catch {
       // hors ligne : on garde le dernier état connu plutôt que de faire clignoter le bandeau
     }
@@ -45,7 +52,7 @@ export default function DemoBanner() {
     };
   }, [rafraichir]);
 
-  if (!demo) return null;
+  if (!demo || surLaPageDeChoix) return null;
 
   async function reinitialiser() {
     const confirme = window.confirm(
@@ -57,8 +64,7 @@ export default function DemoBanner() {
     try {
       const res = await fetch("/api/demo/reinitialiser", { method: "POST" });
       const data = await res.json().catch(() => ({}));
-      setMessage(res.ok ? "Démonstration réinitialisée." : data.message ?? "Échec de la réinitialisation.");
-      if (res.ok) setTimeout(() => window.location.reload(), 1200);
+      setMessage(data.message ?? (res.ok ? "Remise à zéro lancée." : "Échec de la réinitialisation."));
     } catch {
       setMessage("Échec de la réinitialisation (connexion).");
     } finally {
@@ -69,14 +75,19 @@ export default function DemoBanner() {
   return (
     <div className="sticky top-0 z-[100] flex flex-wrap items-center justify-center gap-x-3 gap-y-1 bg-alerte px-3 py-1.5 text-center text-xs font-bold uppercase tracking-wide text-white sm:text-sm">
       <span>Mode démonstration — Données fictives</span>
-      <button
-        type="button"
-        onClick={reinitialiser}
-        disabled={enCours}
-        className="rounded-full border border-white/60 px-2.5 py-0.5 text-[11px] font-semibold normal-case tracking-normal hover:bg-white/15 disabled:opacity-60"
-      >
-        {enCours ? "Réinitialisation…" : "Réinitialiser la démonstration"}
-      </button>
+      <a href="/demo" className="rounded-full border border-white/60 px-2.5 py-0.5 text-[11px] font-semibold normal-case tracking-normal hover:bg-white/15">
+        Changer de fonction
+      </a>
+      {administrateur && (
+        <button
+          type="button"
+          onClick={reinitialiser}
+          disabled={enCours}
+          className="rounded-full border border-white/60 px-2.5 py-0.5 text-[11px] font-semibold normal-case tracking-normal hover:bg-white/15 disabled:opacity-60"
+        >
+          {enCours ? "Réinitialisation…" : "Réinitialiser la démonstration"}
+        </button>
+      )}
       {message && <span className="text-[11px] font-normal normal-case tracking-normal opacity-90">{message}</span>}
     </div>
   );
