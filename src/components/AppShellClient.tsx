@@ -10,7 +10,7 @@
  * disparaît.
  */
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Menu, X, Lock, LogOut } from "lucide-react";
 import Link from "next/link";
 import Sidebar from "@/components/Sidebar";
@@ -63,9 +63,12 @@ export default function AppShellClient({
   children: React.ReactNode;
 }) {
   const [menuOuvert, setMenuOuvert] = useState(false);
+  // Le même objet tant que le compte ne change pas : un objet neuf à chaque
+  // rafraîchissement relançait les visites guidées de l'écran.
+  const utilisateur = useMemo(() => ({ username, role }), [username, role]);
 
   return (
-    <FournisseurUtilisateur value={{ username, role }}>
+    <FournisseurUtilisateur value={utilisateur}>
     <PinGate>
     <div className="flex min-h-screen flex-col">
       <BootstrapPreload />

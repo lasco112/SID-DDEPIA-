@@ -11,7 +11,7 @@
  *
  * Affichage seulement.
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useUtilisateur } from "@/components/UtilisateurContexte";
 import { VISITES } from "@/lib/visitesEcrans";
@@ -19,18 +19,46 @@ import {
   EVENEMENT_REVOIR_VISITE, elementDeVisite, marquerVue, versionVue, visitesCoupees, type EtapeVisite,
 } from "@/lib/visites";
 
-/** L'écran dont la visite est en cours : les autres attendent. */
-let visiteEnCours: string | null = null;
+/**
+ * Le ticket de la visite en cours : les autres attendent. Un TICKET, et non le
+ * nom de l'écran : une visite abandonnée (écran rafraîchi) rendait la place en
+ * partant alors qu'une autre la tenait — deux visites s'affichaient ensemble,
+ * et celle qu'on venait de passer semblait revenir (15 octobre 2026). Seul le
+ * détenteur peut rendre la place.
+ */
+let detenteur: object | null = null;
+
+function liberer(jeton: object | null) {
+  if (jeton && detenteur === jeton) detenteur = null;
+}
+
+/*
+ * Les visites présentes sur la page (le bandeau, l'écran, un panneau…).
+ *
+ * Un écran en porte souvent plusieurs, qui se suivent. « Passer la visite »
+ * ne marquait vue que celle affichée : la suivante, qui attendait son tour,
+ * démarrait aussitôt — « elle se réactive même quand on tape Passer »
+ * (constat du Délégué, 15 octobre 2026). Passer arrête désormais TOUTES les
+ * visites de la page et les marque vues ; « Revoir la visite » les rejoue.
+ */
+const visitesDeLaPage = new Map<string, { username: string; version: number }>();
+/** Change à chaque « Passer la visite » : les visites en attente le voient et renoncent. */
+let generation = 0;
+
+function passerToutesLesVisites() {
+  visitesDeLaPage.forEach((v, ecran) => marquerVue(v.username, ecran, v.version));
+  generation += 1;
+}
 
 const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** Attend que l'écran soit libre : pas d'autre visite, pas de préparation hors ligne en cours. */
-async function attendreLeTour(ecran: string, annule: () => boolean): Promise<boolean> {
+async function attendreLeTour(jeton: object, annule: () => boolean): Promise<boolean> {
   for (let i = 0; i < 240; i++) {
     if (annule()) return false;
     const preparation = /Préparation de l.utilisation hors ligne/.test(document.body?.innerText ?? "");
-    if (!visiteEnCours && !preparation) {
-      visiteEnCours = ecran;
+    if (!detenteur && !preparation) {
+      detenteur = jeton;
       return true;
     }
     await pause(500);
@@ -47,24 +75,41 @@ interface Etat {
 
 export default function VisiteGuidee({ ecran, pret = true }: { ecran: string; pret?: boolean }) {
   const moi = useUtilisateur();
+  // L'IDENTIFIANT, pas l'objet : l'objet du compte est recréé à chaque
+  // rafraîchissement de l'écran, et chaque nouvel objet relançait la visite —
+  // une visite passée revenait, une seconde démarrait sous la première
+  // (constat du Délégué, 15 octobre 2026).
+  const username = moi?.username ?? null;
+  const role = moi?.role ?? "";
   const [etat, setEtat] = useState<Etat | null>(null);
   const [rect, setRect] = useState<DOMRect | null>(null);
+  /** Le ticket de la visite affichée par CE composant. */
+  const jetonAffiche = useRef<object | null>(null);
 
   const lancer = useCallback(
     async (toutes: boolean, annule: () => boolean) => {
       const def = VISITES[ecran];
-      if (!def || !moi || visitesCoupees()) return;
-      const vue = versionVue(moi.username, ecran);
+      if (!def || !username || visitesCoupees()) return;
+      // Une visite passée pendant notre attente : on renonce, et on relit si
+      // la visite de cet écran a été marquée vue entre-temps.
+      const depart = generation;
+      const annuleOuPassee = () => annule() || (!toutes && generation !== depart);
+      const vue = versionVue(username, ecran);
       if (!toutes && vue >= def.version) return;
       // Le bandeau, commun à tous les écrans, passe en premier.
       if (ecran !== "bandeau" && !toutes) await pause(1500);
-      if (!(await attendreLeTour(ecran, annule))) return;
+      const jeton = {};
+      if (!(await attendreLeTour(jeton, annuleOuPassee))) return;
+      if (!toutes && versionVue(username, ecran) >= def.version) {
+        liberer(jeton);
+        return;
+      }
       // L'écran finit de s'afficher (un tableau se remplit après coup) : on
       // attend que le nombre d'éléments à expliquer cesse d'augmenter.
       let trouves = -1;
       let stable = 0;
       // (2,5 s sans changement : une liste qui arrive du serveur a le temps de s'afficher.)
-      for (let i = 0; i < 40 && stable < 5 && !annule(); i++) {
+      for (let i = 0; i < 40 && stable < 5 && !annuleOuPassee(); i++) {
         await pause(500);
         const n = def.etapes.filter((e) => elementDeVisite(e.cible)).length;
         stable = n === trouves && n > 0 ? stable + 1 : 0;
@@ -78,14 +123,24 @@ export default function VisiteGuidee({ ecran, pret = true }: { ecran: string; pr
         .map((e) => ({ ...e, nouveau: !toutes && vue > 0 }));
       // Rien à montrer (liste vide…) : la visite n'est PAS comptée comme vue,
       // elle se fera quand l'écran aura de quoi l'illustrer.
-      if (etapes.length === 0 || annule()) {
-        visiteEnCours = null;
+      if (etapes.length === 0 || annuleOuPassee()) {
+        liberer(jeton);
         return;
       }
+      jetonAffiche.current = jeton;
       setEtat({ etapes, i: 0, montrees: 0 });
     },
-    [ecran, moi]
+    [ecran, username]
   );
+
+  // Cette visite est sur la page : « Passer la visite » la comptera.
+  useEffect(() => {
+    if (!username || !VISITES[ecran]) return;
+    visitesDeLaPage.set(ecran, { username, version: VISITES[ecran].version });
+    return () => {
+      visitesDeLaPage.delete(ecran);
+    };
+  }, [ecran, username]);
 
   // À la première ouverture de l'écran.
   useEffect(() => {
@@ -93,10 +148,13 @@ export default function VisiteGuidee({ ecran, pret = true }: { ecran: string; pr
     let annule = false;
     void lancer(false, () => annule);
     return () => {
+      // La visite abandonnée rendra elle-même SA place, si elle l'a prise.
       annule = true;
-      if (visiteEnCours === ecran) visiteEnCours = null;
     };
-  }, [pret, lancer, ecran]);
+  }, [pret, lancer]);
+
+  // L'écran quitté pendant une visite : sa place est rendue.
+  useEffect(() => () => liberer(jetonAffiche.current), []);
 
   // « Revoir la visite de cet écran ».
   useEffect(() => {
@@ -144,12 +202,18 @@ export default function VisiteGuidee({ ecran, pret = true }: { ecran: string; pr
     };
   }, [etape]);
 
-  const terminer = useCallback(() => {
-    if (moi) marquerVue(moi.username, ecran, VISITES[ecran]?.version ?? 1);
-    visiteEnCours = null;
-    setEtat(null);
-    setRect(null);
-  }, [ecran, moi]);
+  /** `passer` : « Passer la visite » — toutes les visites de la page sont marquées vues. */
+  const terminer = useCallback(
+    (passer = false) => {
+      if (username) marquerVue(username, ecran, VISITES[ecran]?.version ?? 1);
+      if (passer) passerToutesLesVisites();
+      liberer(jetonAffiche.current);
+      jetonAffiche.current = null;
+      setEtat(null);
+      setRect(null);
+    },
+    [ecran, username]
+  );
 
   // Fin naturelle : toutes les étapes vues.
   useEffect(() => {
@@ -167,7 +231,7 @@ export default function VisiteGuidee({ ecran, pret = true }: { ecran: string; pr
   const restantes = etat.etapes.slice(etat.i).filter((e) => elementDeVisite(e.cible)).length;
   const total = etat.montrees + Math.max(restantes, 1);
   const derniere = restantes <= 1;
-  const texte = typeof etape.texte === "function" ? etape.texte(moi?.role ?? "") : etape.texte;
+  const texte = typeof etape.texte === "function" ? etape.texte(role) : etape.texte;
 
   // La bulle : sous l'élément s'il y a la place, sinon au-dessus.
   const marge = 8;
@@ -218,18 +282,19 @@ export default function VisiteGuidee({ ecran, pret = true }: { ecran: string; pr
           <span className="text-xs font-medium text-gray-500">
             {derniere ? "Touchez l'écran pour terminer" : "Touchez l'écran pour continuer"}
           </span>
-          {!derniere && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                terminer();
-              }}
-              className="rounded-md px-2 py-1 text-xs font-semibold text-gray-600 underline hover:bg-gray-100"
-            >
-              Passer la visite
-            </button>
-          )}
+          {/* Toujours présent, même sur la dernière bulle : sans lui, une
+              visite d'une seule bulle n'offrait aucun moyen d'arrêter celles
+              qui suivent sur la même page. */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              terminer(true);
+            }}
+            className="rounded-md px-2 py-1 text-xs font-semibold text-gray-600 underline hover:bg-gray-100"
+          >
+            Passer la visite
+          </button>
         </div>
       </div>
       )}

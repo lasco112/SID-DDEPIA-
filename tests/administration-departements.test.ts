@@ -107,7 +107,7 @@ test("le mot de passe provisoire : l'abréviation du département suivie de 123"
   assert.equal(motDePasseProvisoire("BAM"), "BTOS123");
   assert.equal(motDePasseProvisoire("KKH"), "KKH123");
   assert.equal(motDePasseProvisoire("NOU"), "NOUN123");
-  assert.equal(motDePasseProvisoire("MEN"), "MEN123");
+  assert.equal(motDePasseProvisoire("MEN"), "password123", "la Menoua garde le mot de passe que ses agents connaissent");
 });
 
 test("les libellés de fonction suivent l'article du département", () => {

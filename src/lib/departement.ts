@@ -36,7 +36,6 @@ export const NOM_SYSTEME = "SID EPIA-O";
  * toute façon à sa première connexion.
  */
 const ABREVIATIONS: Record<string, string> = {
-  MEN: "MEN",
   BAM: "BTOS",
   HNK: "HNK",
   HPL: "HPL",
@@ -46,8 +45,15 @@ const ABREVIATIONS: Record<string, string> = {
   NOU: "NOUN",
 };
 
+/**
+ * La Menoua garde « password123 », que ses agents connaissent déjà depuis le
+ * pilote (décision du Délégué, 15 octobre 2026 : « ne change rien »).
+ */
+const MOT_DE_PASSE_MENOUA = "password123";
+
 /** « BTOS123 » pour les Bamboutos : le mot de passe provisoire d'un département. */
 export function motDePasseProvisoire(codeDepartement: string): string {
+  if (codeDepartement === "MEN") return MOT_DE_PASSE_MENOUA;
   return `${ABREVIATIONS[codeDepartement] ?? codeDepartement}123`;
 }
 
