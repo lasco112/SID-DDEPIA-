@@ -151,6 +151,9 @@ export default function SectionControleClient() {
       return;
     }
     setVue(await res.json());
+    // La liste vient de se replier : l'écran se place sur le tableau ouvert,
+    // au lieu de rester plus bas, là où était la liste.
+    setTimeout(() => document.getElementById("barre-tableau-section")?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
   }, [periodeId]);
 
   useEffect(() => {
@@ -334,7 +337,7 @@ export default function SectionControleClient() {
           gauche rouvre la liste sans quitter la page, et le titre rappelle en
           permanence ce que l'on est en train de contrôler. */}
       {selection && vue?.template && (
-        <div className="mt-6 flex flex-wrap items-center gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2">
+        <div id="barre-tableau-section" className="mt-6 flex scroll-mt-20 flex-wrap items-center gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2">
           <button
             onClick={() => setListeOuverte((v) => !v)}
             className="flex items-center gap-2 rounded-md border border-gray-300 px-3 py-1.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"

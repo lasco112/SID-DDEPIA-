@@ -52,6 +52,10 @@ export default function DDDonneesClient({
     typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("tableau")
   );
   const [vue, setVue] = useState<any>(null);
+  // La liste des tableaux se replie dès qu'un tableau est choisi : le tableau
+  // s'affiche alors juste sous sa barre, sans avoir à descendre sous les 28
+  // boutons (constat du Délégué, 15 octobre 2026). « ☰ Tableaux » la rouvre.
+  const [listeOuverte, setListeOuverte] = useState(() => !templateCode);
   const [chargement, setChargement] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
   const [corrections, setCorrections] = useState<Correction[]>([]);
@@ -64,6 +68,16 @@ export default function DDDonneesClient({
   const [message, setMessage] = useState<string | null>(null);
 
   const arrondissement = arrondissements.find((a) => a.id === arrondissementId) ?? null;
+
+  /** Ouvre un tableau : la liste se replie et l'écran se place sur lui. */
+  function choisirTableau(code: string) {
+    setTemplateCode(code);
+    setListeOuverte(false);
+    setTimeout(() => document.getElementById("barre-tableau-dd")?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
+  }
+  const indexOuvert = templates.findIndex((t) => t.code === templateCode);
+  const templateSuivant = indexOuvert >= 0 ? templates[indexOuvert + 1] ?? null : null;
+  const templateOuvert = indexOuvert >= 0 ? templates[indexOuvert] : null;
 
   const parSection = useMemo(() => {
     const m = new Map<string, Template[]>();
@@ -177,7 +191,31 @@ export default function DDDonneesClient({
         ))}
       </div>
 
-      <div className="mt-5 space-y-3">
+      {/* La barre du tableau ouvert : « ☰ Tableaux » rouvre la liste, le titre
+          rappelle ce qu'on lit, « Tableau suivant » avance sans revenir. */}
+      {templateOuvert && (
+        <div id="barre-tableau-dd" className="mt-5 flex scroll-mt-20 flex-wrap items-center gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2">
+          <button
+            onClick={() => setListeOuverte((v) => !v)}
+            className="flex min-h-[40px] items-center gap-2 rounded-md border border-gray-300 px-3 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+          >
+            ☰ Tableaux
+          </button>
+          <span className="text-sm font-semibold text-primary-dark">
+            {templateOuvert.numero} {templateOuvert.titre}
+          </span>
+          {templateSuivant && (
+            <button
+              onClick={() => choisirTableau(templateSuivant.code)}
+              className="ml-auto min-h-[40px] rounded-md border border-primary px-3 text-sm font-semibold text-primary-dark hover:bg-green-50"
+            >
+              Tableau suivant : {templateSuivant.numero} →
+            </button>
+          )}
+        </div>
+      )}
+
+      <div className={`mt-5 space-y-3 ${listeOuverte ? "" : "hidden"}`}>
         {parSection.map(([section, liste]) => (
           <div key={section} data-visite="choix-tableau-dd" className="rounded-lg border border-gray-200 bg-white p-4">
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">{section}</p>
@@ -185,7 +223,7 @@ export default function DDDonneesClient({
               {liste.map((t) => (
                 <button
                   key={t.code}
-                  onClick={() => setTemplateCode(t.code)}
+                  onClick={() => choisirTableau(t.code)}
                   className={`rounded-full border px-3 py-1 text-sm ${
                     templateCode === t.code ? "border-blue-700 bg-primary text-white" : "border-gray-300 text-gray-700 hover:bg-gray-50"
                   }`}
