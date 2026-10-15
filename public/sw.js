@@ -168,6 +168,9 @@ self.addEventListener("push", (event) => {
       icon: "/icon-512.png?v=2",
       badge: "/icon-512.png?v=2",
       lang: "fr",
+      // Une vibration courte : sur Android, l'alerte descend alors en haut de
+      // l'écran comme celles des autres applications.
+      vibrate: [120, 60, 120],
       data: { lien: donnees.lien },
       // Regroupe les notifications successives au lieu d'empiler dix bandeaux
       // sur le téléphone d'un agent qui reçoit plusieurs corrections d'affilée.

@@ -13,6 +13,12 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Bell } from "lucide-react";
+import {
+  activerNotifications,
+  etatNotifications,
+  EVENEMENT_ETAT_NOTIFICATIONS,
+  type EtatNotifications,
+} from "@/lib/notificationsTelephone";
 
 interface NotifDto {
   id: string;
@@ -29,7 +35,7 @@ export default function ClocheNotifications() {
   const [ouvert, setOuvert] = useState(false);
   const [notifications, setNotifications] = useState<NotifDto[]>([]);
   const [nonLues, setNonLues] = useState(0);
-  const [pushEtat, setPushEtat] = useState<"inconnu" | "indisponible" | "proposable" | "actif" | "refuse">("inconnu");
+  const [pushEtat, setPushEtat] = useState<EtatNotifications | "inconnu">("inconnu");
 
   const charger = useCallback(async () => {
     if (typeof navigator !== "undefined" && !navigator.onLine) return;
@@ -50,52 +56,17 @@ export default function ClocheNotifications() {
     return () => clearInterval(t);
   }, [charger]);
 
-  // État de l'autorisation « notification système » sur CET appareil.
+  // État de l'autorisation « notification système » sur CET appareil ; relu
+  // quand l'invitation qui suit la connexion vient de l'activer.
   useEffect(() => {
-    async function etat() {
-      if (typeof window === "undefined" || !("Notification" in window) || !("serviceWorker" in navigator)) {
-        setPushEtat("indisponible");
-        return;
-      }
-      if (Notification.permission === "denied") return setPushEtat("refuse");
-      try {
-        const res = await fetch("/api/notifications/abonnement");
-        const { disponible } = await res.json();
-        if (!disponible) return setPushEtat("indisponible");
-        const reg = await navigator.serviceWorker.ready;
-        const abo = await reg.pushManager.getSubscription();
-        setPushEtat(abo ? "actif" : "proposable");
-      } catch {
-        setPushEtat("indisponible");
-      }
-    }
-    etat();
+    const relire = () => void etatNotifications().then(setPushEtat);
+    relire();
+    window.addEventListener(EVENEMENT_ETAT_NOTIFICATIONS, relire);
+    return () => window.removeEventListener(EVENEMENT_ETAT_NOTIFICATIONS, relire);
   }, []);
 
   async function activerPush() {
-    try {
-      const permission = await Notification.requestPermission();
-      if (permission !== "granted") return setPushEtat("refuse");
-
-      const { clePublique } = await (await fetch("/api/notifications/abonnement")).json();
-      if (!clePublique) return setPushEtat("indisponible");
-
-      const reg = await navigator.serviceWorker.ready;
-      const abo = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: base64EnTableau(clePublique),
-      });
-      const json = abo.toJSON();
-      await fetch("/api/notifications/abonnement", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ endpoint: json.endpoint, keys: json.keys, appareil: navigator.userAgent.slice(0, 120) }),
-      });
-      setPushEtat("actif");
-    } catch (e) {
-      console.error("[push] abonnement impossible", e);
-      setPushEtat("indisponible");
-    }
+    setPushEtat(await activerNotifications());
   }
 
   async function ouvrirPanneau() {
@@ -176,14 +147,4 @@ export default function ClocheNotifications() {
       )}
     </div>
   );
-}
-
-/** La clé VAPID voyage en base64url ; l'API du navigateur attend des octets. */
-function base64EnTableau(base64url: string): ArrayBuffer {
-  const padding = "=".repeat((4 - (base64url.length % 4)) % 4);
-  const base64 = (base64url + padding).replace(/-/g, "+").replace(/_/g, "/");
-  const brut = atob(base64);
-  const tableau = new Uint8Array(brut.length);
-  for (let i = 0; i < brut.length; i++) tableau[i] = brut.charCodeAt(i);
-  return tableau.buffer;
 }

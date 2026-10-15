@@ -57,8 +57,9 @@ async function attendreLeTour(jeton: object, annule: () => boolean): Promise<boo
   for (let i = 0; i < 240; i++) {
     if (annule()) return false;
     const preparation = /Préparation de l.utilisation hors ligne/.test(document.body?.innerText ?? "");
-    // L'écran de passage qui suit la connexion couvre tout : on attend qu'il parte.
-    const passage = Boolean(document.querySelector("[data-ecran-passage]"));
+    // L'écran de passage qui suit la connexion, puis l'invitation aux alertes
+    // sur le téléphone, passent avant : on attend qu'ils soient partis.
+    const passage = Boolean(document.querySelector("[data-ecran-passage], [data-bloque-visites]"));
     if (!detenteur && !preparation && !passage) {
       detenteur = jeton;
       return true;

@@ -27,6 +27,7 @@ import SurlignageCible from "@/components/SurlignageCible";
 import VisiteGuidee from "@/components/VisiteGuidee";
 import { FournisseurUtilisateur } from "@/components/UtilisateurContexte";
 import EcranPassage from "@/components/EcranPassage";
+import InvitationNotifications from "@/components/InvitationNotifications";
 import FriseNdop from "@/components/FriseNdop";
 
 const LIBELLES_ROLE: Record<string, string> = {
@@ -158,6 +159,7 @@ export default function AppShellClient({
         intitule={intituleDepartement}
         fonction={LIBELLES_ROLE[role] ?? role}
       />
+      <InvitationNotifications />
 
       <div className="flex min-h-0 flex-1">
         {menuOuvert && (

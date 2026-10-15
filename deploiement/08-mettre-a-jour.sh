@@ -49,6 +49,10 @@ sudo -u sid env HOME="$CIBLE" node --env-file="$CIBLE/.env" scripts/migrer.mjs d
 echo "  → Base de démonstration"
 bash "$CIBLE/deploiement/11-base-demonstration.sh" || echo "  ✖ Démonstration non installée cette fois (la production n'est pas touchée)."
 
+# Les clés des notifications sur les téléphones : créées si elles manquent,
+# jamais changées si elles existent. Même règle : un échec n'arrête rien.
+bash "$CIBLE/deploiement/12-cles-notifications.sh" || echo "  ✖ Clés des notifications non vérifiées cette fois."
+
 echo "  → Construction de l'application (quelques minutes)"
 sudo -u sid env HOME="$CIBLE" npm run build 2>&1 | tail -5
 
