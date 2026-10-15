@@ -93,6 +93,7 @@ const CHEMINS_SURS_DEMO = [
   "/section/controle",
   "/section/analyse",
   "/api/auth",
+  "/deconnexion", // la déconnexion en français : aucune donnée, seulement signOut()
   "/api/periodes/active",
   "/api/form-templates",
   "/api/rapports", // couvre aussi /rejeter, /mon-rapport, /mes-saisies, /submit

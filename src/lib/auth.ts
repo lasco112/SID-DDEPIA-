@@ -166,6 +166,9 @@ export const authOptions: NextAuthOptions = {
     // NextAuth, où atterrissait un DD dont le réseau avait coupé au moment de
     // se connecter (15 octobre 2026). Voir app/page.tsx.
     error: '/',
+    // La déconnexion aussi, en français et sans la question anglaise
+    // « Are you sure you want to sign out? » (voir app/deconnexion/page.tsx).
+    signOut: '/deconnexion',
   },
   session: {
     strategy: "jwt",

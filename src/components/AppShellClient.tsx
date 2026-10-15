@@ -128,7 +128,7 @@ export default function AppShellClient({
             <Lock size={17} />
           </Link>
           <a
-            href="/api/auth/signout"
+            href="/deconnexion"
             data-visite="deconnexion"
             title="Déconnexion"
             className="flex h-9 shrink-0 items-center gap-1.5 rounded-md border border-white/25 bg-white/10 px-2 text-[13px] font-semibold text-white hover:bg-white/20 sm:px-3"
