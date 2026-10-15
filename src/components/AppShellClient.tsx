@@ -27,7 +27,7 @@ import SurlignageCible from "@/components/SurlignageCible";
 import VisiteGuidee from "@/components/VisiteGuidee";
 import { FournisseurUtilisateur } from "@/components/UtilisateurContexte";
 import EcranPassage from "@/components/EcranPassage";
-import { MOTIF_NDOP } from "@/lib/fondsDepartement";
+import FriseNdop from "@/components/FriseNdop";
 
 const LIBELLES_ROLE: Record<string, string> = {
   DD: "Délégué Départemental",
@@ -149,12 +149,8 @@ export default function AppShellClient({
           </a>
         </div>
       </header>
-      {/* Le liseré ndop, signature de l'Ouest, sous le bandeau. */}
-      <div
-        aria-hidden="true"
-        className="h-1.5 shrink-0"
-        style={{ backgroundImage: `url(${MOTIF_NDOP})`, backgroundSize: "auto 80px", backgroundPosition: "center" }}
-      />
+      {/* La frise ndop, signature de l'Ouest, sous le bandeau. */}
+      <FriseNdop variante="fine" />
       <EcranPassage
         username={username}
         nom={nom}

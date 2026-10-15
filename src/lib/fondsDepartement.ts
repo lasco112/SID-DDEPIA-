@@ -30,6 +30,3 @@ const FONDS_DEPARTEMENTS: Record<string, FondPhoto> = {
 export function fondDepartement(code: string | null | undefined): FondPhoto {
   return (code && FONDS_DEPARTEMENTS[code]) || FOND_REGION;
 }
-
-/** Le tissu ndop, en liseré : la signature de l'Ouest, sous les bandeaux. */
-export const MOTIF_NDOP = "/fonds/ndop.webp";

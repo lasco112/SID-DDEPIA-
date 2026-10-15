@@ -1,9 +1,10 @@
 /**
  * Fond photographique des pages hors application (connexion, démonstration,
  * déconnexion) : la photo, un voile vert sombre qui garde le texte lisible,
- * et le liseré ndop en pied de page.
+ * et la frise ndop en pied de page.
  */
-import { FOND_REGION, MOTIF_NDOP } from "@/lib/fondsDepartement";
+import { FOND_REGION } from "@/lib/fondsDepartement";
+import FriseNdop from "@/components/FriseNdop";
 
 export default function FondPhoto({ src = FOND_REGION.src, children }: { src?: string; children: React.ReactNode }) {
   return (
@@ -12,12 +13,8 @@ export default function FondPhoto({ src = FOND_REGION.src, children }: { src?: s
           photo reste en place derrière les cartes au lieu de s'étirer. */}
       <img src={src} alt="" aria-hidden="true" decoding="async" className="fixed inset-0 h-full w-full object-cover" />
       <div className="fixed inset-0 bg-gradient-to-b from-[#0b3a3f]/55 via-[#0b3a3f]/30 to-[#0b3a3f]/85" />
-      <div className="relative flex min-h-screen flex-col pb-2">{children}</div>
-      <div
-        aria-hidden="true"
-        className="absolute inset-x-0 bottom-0 h-2"
-        style={{ backgroundImage: `url(${MOTIF_NDOP})`, backgroundSize: "auto 80px", backgroundPosition: "center" }}
-      />
+      <div className="relative flex min-h-screen flex-col pb-[30px]">{children}</div>
+      <FriseNdop variante="large" className="absolute inset-x-0 bottom-0" />
     </div>
   );
 }

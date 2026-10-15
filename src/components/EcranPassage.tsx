@@ -10,7 +10,8 @@
  * parti (voir VisiteGuidee.tsx).
  */
 import { useEffect, useState } from "react";
-import { fondDepartement, MOTIF_NDOP } from "@/lib/fondsDepartement";
+import { fondDepartement } from "@/lib/fondsDepartement";
+import FriseNdop from "@/components/FriseNdop";
 
 export const PREFIXE_MARQUE_PASSAGE = "sid-passage:";
 
@@ -75,11 +76,7 @@ export default function EcranPassage({
         </p>
         <p className="mt-5 text-[11.5px] text-white/65">{fond.legende}</p>
       </div>
-      <div
-        aria-hidden="true"
-        className="absolute inset-x-0 bottom-0 h-2"
-        style={{ backgroundImage: `url(${MOTIF_NDOP})`, backgroundSize: "auto 80px", backgroundPosition: "center" }}
-      />
+      <FriseNdop variante="large" className="absolute inset-x-0 bottom-0" />
     </div>
   );
 }
