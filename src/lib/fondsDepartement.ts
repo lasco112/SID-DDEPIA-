@@ -23,6 +23,8 @@ export const FOND_REGION: FondPhoto = {
 };
 
 const FONDS_DEPARTEMENTS: Record<string, FondPhoto> = {
+  BAM: { src: "/fonds/BAM.webp", legende: "Les monts Bamboutos" },
+  MEN: { src: "/fonds/MEN.webp", legende: "Musée des civilisations, Dschang" },
   MIF: { src: "/fonds/MIF.webp", legende: "Bafoussam" },
   NOU: { src: "/fonds/NOU.webp", legende: "Palais des rois Bamoun, Foumban" },
 };
