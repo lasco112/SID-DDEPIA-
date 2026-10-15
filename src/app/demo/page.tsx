@@ -19,6 +19,8 @@
 import { useEffect, useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import FondPhoto from "@/components/FondPhoto";
+import { fondDepartement } from "@/lib/fondsDepartement";
 import { ArrowLeft, Building2, ClipboardList, FileSpreadsheet, Fish, Landmark, MapPin, Stethoscope, Wheat, type LucideIcon } from "lucide-react";
 
 const MOT_DE_PASSE_DEMO = "Demo!2026";
@@ -127,21 +129,21 @@ export default function DemoLoginPage() {
   const titreFonction = fonction ? FONCTIONS.find((f) => f.cle === fonction)!.titre(departement!) : "";
 
   return (
-    <div className="flex min-h-screen flex-col bg-brand-gradient-soft">
+    <FondPhoto src={fondDepartement(departement?.code).src}>
       <div className="sticky top-0 z-50 bg-alerte py-2 text-center text-sm font-bold uppercase tracking-wide text-white">
         Mode démonstration — Données fictives
       </div>
 
       <div className="mx-auto w-full max-w-[880px] flex-1 p-4 sm:p-6">
         <div className="mb-5 text-center">
-          <img src="/icon-512.png?v=2" alt="SID EPIA-O" className="mx-auto mb-3 h-14 w-14 rounded-card shadow-[0_4px_14px_rgba(57,119,129,.28)]" />
-          <h1 className="text-2xl font-bold text-primary">SID EPIA-O — Démonstration</h1>
-          <p className="mx-auto mt-1 max-w-[560px] text-[14px] text-ink-muted">
+          <img src="/icon-512.png?v=2" alt="SID EPIA-O" className="mx-auto mb-3 h-14 w-14 rounded-card shadow-[0_4px_14px_rgba(0,0,0,.35)]" />
+          <h1 className="text-2xl font-bold text-white [text-shadow:0_1px_4px_rgba(0,0,0,.55)]">SID EPIA-O — Démonstration</h1>
+          <p className="mx-auto mt-1 max-w-[560px] text-[14px] text-white/90 [text-shadow:0_1px_3px_rgba(0,0,0,.6)]">
             {etape === 1 && "Choisissez votre département."}
             {etape === 2 && <>Département {departement!.nomAvecArticle} : quelle est votre fonction ?</>}
             {etape === 3 && <>{titreFonction} — choisissez votre arrondissement.</>}
           </p>
-          <p className="mt-1 text-[12px] font-semibold uppercase tracking-wide text-ink-faint">
+          <p className="mt-1 text-[12px] font-semibold uppercase tracking-wide text-white/75 [text-shadow:0_1px_3px_rgba(0,0,0,.6)]">
             {etape === 1 ? "Département" : etape === 2 ? "Département › Fonction" : "Département › Fonction › Arrondissement"}
           </p>
         </div>
@@ -149,12 +151,12 @@ export default function DemoLoginPage() {
         {erreur && <div className="mb-4 rounded-input bg-statut-rejeteBg p-3 text-center text-sm text-statut-rejeteText">{erreur}</div>}
 
         {etape > 1 && (
-          <button type="button" onClick={retour} className="mb-3 flex min-h-[40px] items-center gap-1.5 text-[14px] font-semibold text-primary hover:underline">
+          <button type="button" onClick={retour} className="mb-3 flex min-h-[40px] items-center gap-1.5 rounded-btn bg-black/30 px-3 text-[14px] font-semibold text-white backdrop-blur-sm hover:bg-black/40">
             <ArrowLeft size={16} /> Revenir
           </button>
         )}
 
-        {departements === null && <p className="text-center text-ink-muted">Chargement…</p>}
+        {departements === null && <p className="text-center text-white/90">Chargement…</p>}
         {departements !== null && !disponible && (
           <p className="rounded-card border border-amber-200 bg-amber-50 p-4 text-center text-[14px] text-amber-900">
             La démonstration n&apos;est pas encore disponible sur ce serveur. Prévenez l&apos;administrateur du SID.
@@ -199,15 +201,15 @@ export default function DemoLoginPage() {
           </div>
         )}
 
-        <p className="mt-5 text-center text-[13px] text-ink-faint">
+        <p className="mt-5 text-center text-[13px] text-white/85 [text-shadow:0_1px_3px_rgba(0,0,0,.6)]">
           D&apos;avril à septembre 2026 : mois clos et complets. Octobre 2026 : le mois en cours, pour s&apos;exercer.
         </p>
-        <div className="mt-2 text-center text-[13px] text-ink-faint">
+        <div className="mt-2 text-center text-[13px] font-semibold text-white [text-shadow:0_1px_3px_rgba(0,0,0,.6)]">
           <a href="/" className="hover:underline">
             ← Retour à la connexion réelle
           </a>
         </div>
       </div>
-    </div>
+    </FondPhoto>
   );
 }

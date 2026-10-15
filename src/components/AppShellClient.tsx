@@ -26,6 +26,8 @@ import { BadgeACorriger, ParcoursACorriger } from "@/components/ACorriger";
 import SurlignageCible from "@/components/SurlignageCible";
 import VisiteGuidee from "@/components/VisiteGuidee";
 import { FournisseurUtilisateur } from "@/components/UtilisateurContexte";
+import EcranPassage from "@/components/EcranPassage";
+import { MOTIF_NDOP } from "@/lib/fondsDepartement";
 
 const LIBELLES_ROLE: Record<string, string> = {
   DD: "Délégué Départemental",
@@ -41,8 +43,11 @@ const LIBELLES_ROLE: Record<string, string> = {
 export default function AppShellClient({
   role,
   username,
+  nom = null,
   application,
   departement,
+  codeDepartement,
+  intituleDepartement,
   periodeLabel,
   periodes = [],
   couranteId = null,
@@ -51,10 +56,16 @@ export default function AppShellClient({
 }: {
   role: string;
   username: string;
+  /** Le nom de la personne (écran de passage). */
+  nom?: string | null;
   /** « SID DDEPIA-Menoua » — composé depuis la base par AppShell, jamais écrit ici. */
   application: string;
   /** « Menoua ». */
   departement: string;
+  /** « BAM » : choisit la photo de l'écran de passage. */
+  codeDepartement: string;
+  /** « Délégation Départementale des Bamboutos ». */
+  intituleDepartement: string;
   periodeLabel?: string;
   periodes?: PeriodeOption[];
   couranteId?: string | null;
@@ -138,6 +149,19 @@ export default function AppShellClient({
           </a>
         </div>
       </header>
+      {/* Le liseré ndop, signature de l'Ouest, sous le bandeau. */}
+      <div
+        aria-hidden="true"
+        className="h-1.5 shrink-0"
+        style={{ backgroundImage: `url(${MOTIF_NDOP})`, backgroundSize: "auto 80px", backgroundPosition: "center" }}
+      />
+      <EcranPassage
+        username={username}
+        nom={nom}
+        codeDepartement={codeDepartement}
+        intitule={intituleDepartement}
+        fonction={LIBELLES_ROLE[role] ?? role}
+      />
 
       <div className="flex min-h-0 flex-1">
         {menuOuvert && (

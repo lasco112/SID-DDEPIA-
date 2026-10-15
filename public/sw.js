@@ -125,7 +125,10 @@ self.addEventListener("fetch", (event) => {
   // l'écran d'accueil des téléphones. On sert donc le cache immédiatement
   // (donc toujours disponible hors ligne, sans attente) TOUT EN rafraîchissant
   // en arrière-plan : la version suivante est à jour, sans aucune action.
-  if (url.pathname.startsWith("/icon-") || url.pathname === "/manifest.json") {
+  // Les photos des départements (public/fonds/) suivent la même règle : elles
+  // s'affichent hors ligne dès la première visite, et une photo remplacée
+  // arrive d'elle-même à la visite suivante.
+  if (url.pathname.startsWith("/icon-") || url.pathname === "/manifest.json" || url.pathname.startsWith("/fonds/")) {
     event.respondWith(
       caches.match(request, OPTIONS_CACHE).then((cached) => {
         const reseau = fetch(request)

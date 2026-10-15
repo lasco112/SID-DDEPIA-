@@ -180,9 +180,7 @@ export default function SplashScreen() {
   if (mode === "mini") {
     return (
       <div className="splash-mini" onClick={() => setVisible(false)} role="presentation">
-        <div className="flex h-16 w-16 items-center justify-center rounded-card bg-primary text-lg font-bold text-white shadow-card">
-          DD
-        </div>
+        <img src="/icon-512.png?v=2" alt="SID EPIA-O" className="h-16 w-16 rounded-card shadow-card" />
       </div>
     );
   }

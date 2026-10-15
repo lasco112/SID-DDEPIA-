@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { signIn, getSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import OnlineIndicator from '@/components/OnlineIndicator';
+import FondPhoto from '@/components/FondPhoto';
 import { MESSAGE_DEPARTEMENT_ETEINT } from '@/lib/messagesConnexion';
 
 const MESSAGE_IDENTIFIANTS = 'Identifiants incorrects ou compte désactivé. Vérifiez chaque caractère du mot de passe, majuscules comprises.';
@@ -69,7 +70,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-brand-gradient-soft">
+    <FondPhoto>
       <div className="flex justify-end p-5">
         <OnlineIndicator />
       </div>
@@ -80,9 +81,9 @@ export default function LoginPage() {
             <img
               src="/icon-512.png?v=2"
               alt="SID EPIA-O"
-              className="mx-auto mb-3.5 h-16 w-16 rounded-card shadow-[0_4px_14px_rgba(57,119,129,.28)]"
+              className="mx-auto mb-3.5 h-16 w-16 rounded-card shadow-[0_4px_14px_rgba(0,0,0,.35)]"
             />
-            <div className="text-[13px] font-semibold uppercase tracking-[2px] text-ink-faint">
+            <div className="text-[13px] font-semibold uppercase tracking-[2px] text-white/90 [text-shadow:0_1px_3px_rgba(0,0,0,.5)]">
               République du Cameroun · MINEPIA
             </div>
           </div>
@@ -132,18 +133,21 @@ export default function LoginPage() {
           </div>
 
           <div className="mt-4 text-center">
-            <a href="/demo" className="text-[13.5px] font-semibold text-primary hover:underline">
+            <a
+              href="/demo"
+              className="inline-block rounded-btn bg-black/25 px-3 py-1.5 text-[13.5px] font-semibold text-white backdrop-blur-sm hover:bg-black/35"
+            >
               Accéder à la démonstration →
             </a>
           </div>
 
-          <p className="mt-5 text-center text-xs leading-relaxed text-ink-faint">
+          <p className="mt-5 text-center text-xs leading-relaxed text-white/85 [text-shadow:0_1px_3px_rgba(0,0,0,.6)]">
             Ministère de l'Élevage, des Pêches et des Industries Animales
             <br />
             Usage réservé aux agents habilités · v1.0
           </p>
         </div>
       </div>
-    </div>
+    </FondPhoto>
   );
 }

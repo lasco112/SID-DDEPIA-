@@ -318,3 +318,10 @@ body {
     filter: none !important;
   }
 }
+
+/* Écran de passage après connexion (EcranPassage.tsx) : la photo du
+   département s'approche lentement, sans secousse. */
+@keyframes passage {
+  from { transform: scale(1.12); }
+  to { transform: scale(1.03); }
+}

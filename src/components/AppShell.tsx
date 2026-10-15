@@ -55,8 +55,11 @@ export default async function AppShell({
     <AppShellClient
       role={role}
       username={username}
+      nom={session.user.name ?? null}
       application={identite.application}
       departement={identite.nom}
+      codeDepartement={identite.code}
+      intituleDepartement={identite.intituleCourt}
       periodeLabel={periodeLabel}
       periodes={periodes.map((p) => ({
         id: p.id,
