@@ -155,7 +155,7 @@ self.addEventListener("fetch", (event) => {
 // SID.
 
 self.addEventListener("push", (event) => {
-  let donnees = { titre: "SID DDEPIA-Menoua", corps: "Vous avez une nouvelle notification.", lien: "/dashboard" };
+  let donnees = { titre: "SID EPIA-O", corps: "Vous avez une nouvelle notification.", lien: "/dashboard" };
   try {
     if (event.data) donnees = { ...donnees, ...event.data.json() };
   } catch {
