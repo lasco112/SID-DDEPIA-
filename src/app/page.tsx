@@ -4,7 +4,8 @@ import React, { useEffect, useState } from 'react';
 import { signIn, getSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import OnlineIndicator from '@/components/OnlineIndicator';
-import FondPhoto from '@/components/FondPhoto';
+import FriseNdop from '@/components/FriseNdop';
+import { FOND_REGION } from '@/lib/fondsDepartement';
 import { MESSAGE_DEPARTEMENT_ETEINT } from '@/lib/messagesConnexion';
 
 const MESSAGE_IDENTIFIANTS = 'Identifiants incorrects ou compte désactivé. Vérifiez chaque caractère du mot de passe, majuscules comprises.';
@@ -69,85 +70,104 @@ export default function LoginPage() {
     }
   };
 
+  // Mise en page « Indigo des Hautes Terres » (15 octobre 2026) : la photo de
+  // la région à gauche — la même qu'avant —, le panneau ivoire à droite ; sur
+  // téléphone, la photo devient un bandeau au-dessus du formulaire. Le
+  // formulaire, ses champs et sa logique sont inchangés.
   return (
-    <FondPhoto>
-      <div className="flex justify-end p-5">
-        <OnlineIndicator />
+    <div className="grid min-h-screen bg-appbg md:grid-cols-[1.15fr_minmax(420px,0.85fr)]">
+      <div className="relative h-[180px] overflow-hidden bg-nuit md:h-auto">
+        <img src={FOND_REGION.src} alt="" aria-hidden="true" className="absolute inset-0 h-full w-full object-cover" />
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(16,37,63,.15)_0%,transparent_45%,rgba(16,37,63,.85)_100%)]" />
+        <div className="absolute inset-x-5 bottom-4 md:inset-x-12 md:bottom-12">
+          <p className="text-[11px] font-bold uppercase tracking-[2.2px] text-or md:text-[13px] md:tracking-[2.4px]">
+            Hautes terres de l&apos;Ouest-Cameroun
+          </p>
+          <p className="mt-1 hidden max-w-[560px] font-titre text-[42px] font-semibold leading-[1.08] text-[#F7F5F0] md:block">
+            Les données de l&apos;élevage de l&apos;Ouest, au service du territoire.
+          </p>
+          <p className="mt-1 text-[11px] text-white/70 md:mt-3 md:text-[12px]">{FOND_REGION.legende}</p>
+        </div>
       </div>
 
-      <div className="flex flex-1 items-center justify-center p-5">
-        <div className="w-full max-w-[410px]">
-          <div className="mb-[22px] text-center">
-            <img
-              src="/icon-512.png?v=2"
-              alt="SID EPIA-O"
-              className="mx-auto mb-3.5 h-16 w-16 rounded-card shadow-[0_4px_14px_rgba(0,0,0,.35)]"
-            />
-            <div className="text-[13px] font-semibold uppercase tracking-[2px] text-white/90 [text-shadow:0_1px_3px_rgba(0,0,0,.5)]">
-              République du Cameroun · MINEPIA
-            </div>
-          </div>
+      <div className="flex min-h-[calc(100vh-180px)] flex-col md:min-h-screen">
+        <div className="flex justify-end px-5 pt-5">
+          <OnlineIndicator />
+        </div>
 
-          <div className="rounded-card border border-line bg-surface p-[30px_30px_26px] shadow-card">
-            <h1 className="mb-1 text-2xl font-bold text-primary">SID EPIA-O</h1>
-            <p className="mb-6 text-[13.5px] text-ink-muted">
+        <div className="flex flex-1 items-center justify-center px-5 py-6">
+          <div className="w-full max-w-[380px]">
+            <img src="/icon-512.png?v=2" alt="SID EPIA-O" className="mb-1 h-[54px] w-[54px] rounded-[10px] shadow-[0_4px_14px_rgba(16,37,63,.18)]" />
+            <div aria-hidden="true" className="mb-5 h-[3px] w-[30px] rounded-full bg-or" />
+            <p className="text-[13px] font-bold uppercase tracking-[1.4px] text-cuivre">République du Cameroun · MINEPIA</p>
+            <h1 className="mt-1 font-titre text-[46px] font-semibold leading-none text-nuit">SID EPIA-O</h1>
+            <p className="mb-7 mt-2 text-[15px] leading-snug text-ink-muted">
               Système d'Information Décisionnel de l'Élevage, des Pêches et des Industries Animales — Ouest
             </p>
 
-            {error && <div className="mb-4 rounded-input bg-statut-rejeteBg p-3 text-sm text-statut-rejeteText">{error}</div>}
+            {error && (
+              <div role="alert" className="mb-4 rounded-input border border-statut-rejeteBorder bg-statut-rejeteBg p-3 text-sm text-statut-rejeteText">
+                {error}
+              </div>
+            )}
 
             <form onSubmit={handleSubmit}>
-              <label className="mb-1.5 block text-[13px] font-semibold text-ink">Identifiant</label>
+              <label htmlFor="connexion-identifiant" className="mb-1.5 block text-[14px] font-bold text-ink">
+                Identifiant
+              </label>
               <input
+                id="connexion-identifiant"
                 type="text"
                 name="username"
                 placeholder="ex : da.dschang"
                 required
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="mb-4 min-h-[48px] w-full rounded-input border border-line px-[14px] py-[11px] text-[15px] text-ink focus:border-aqua focus:shadow-focus focus:outline-none"
+                className="mb-4 min-h-[46px] w-full rounded-input border border-gray-300 bg-white px-[14px] py-[10px] text-[15px] text-ink placeholder:text-gray-400 focus:border-primary focus:shadow-focus focus:outline-none"
               />
 
-              <label className="mb-1.5 block text-[13px] font-semibold text-ink">Mot de passe</label>
+              <label htmlFor="connexion-mot-de-passe" className="mb-1.5 block text-[14px] font-bold text-ink">
+                Mot de passe
+              </label>
               <input
+                id="connexion-mot-de-passe"
                 type="password"
                 name="password"
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="mb-[22px] min-h-[48px] w-full rounded-input border border-line px-[14px] py-[11px] text-[15px] text-ink focus:border-aqua focus:shadow-focus focus:outline-none"
+                className="mb-[22px] min-h-[46px] w-full rounded-input border border-gray-300 bg-white px-[14px] py-[10px] text-[15px] text-ink focus:border-primary focus:shadow-focus focus:outline-none"
               />
 
               <button
                 type="submit"
                 disabled={loading}
-                className="min-h-[46px] w-full rounded-btn bg-primary py-3 text-[15.5px] font-semibold text-white hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-60"
+                className="min-h-[48px] w-full rounded-btn bg-primary py-3 text-[15.5px] font-bold text-white hover:bg-primary-hover disabled:cursor-not-allowed disabled:bg-[#A9B6C6]"
               >
                 {loading ? 'Connexion…' : 'Se connecter'}
               </button>
             </form>
 
-            <div className="mt-4 text-center text-[13px] text-ink-faint">
-              Mot de passe oublié ? Contactez le Délégué Départemental.
-            </div>
-          </div>
+            <p className="mt-4 text-[13px] text-ink-faint">Mot de passe oublié ? Contactez le Délégué Départemental.</p>
 
-          <div className="mt-4 text-center">
             <a
               href="/demo"
-              className="inline-block rounded-btn bg-black/25 px-3 py-1.5 text-[13.5px] font-semibold text-white backdrop-blur-sm hover:bg-black/35"
+              className="mt-5 flex min-h-[44px] items-center justify-center rounded-btn border border-gray-300 bg-white text-[14px] font-bold text-primary hover:bg-gray-100"
             >
               Accéder à la démonstration →
             </a>
           </div>
+        </div>
 
-          <p className="mt-5 text-center text-xs leading-relaxed text-white/85 [text-shadow:0_1px_3px_rgba(0,0,0,.6)]">
+        <div>
+          <FriseNdop variante="large" />
+          <p className="px-5 py-3 text-center text-xs leading-relaxed text-ink-faint">
             Ministère de l'Élevage, des Pêches et des Industries Animales
             <br />
             Usage réservé aux agents habilités · v1.0
           </p>
         </div>
       </div>
-    </FondPhoto>
+    </div>
   );
 }

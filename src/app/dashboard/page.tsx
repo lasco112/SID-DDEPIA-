@@ -362,7 +362,7 @@ function CarteRapport({ c }: { c: Carte }) {
                   {c.etapesFaites ? "✓" : e.numero}
                 </span>
                 <span>
-                  <span className="block text-sm font-semibold text-[#28323d]">{e.label}</span>
+                  <span className="block text-sm font-semibold text-ink">{e.label}</span>
                   {e.aide && <span className="mt-0.5 block text-xs leading-snug text-ink-faint">{e.aide}</span>}
                 </span>
               </a>

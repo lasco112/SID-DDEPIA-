@@ -61,12 +61,12 @@ export default function EcranPassage({
       data-ecran-passage
       role="status"
       onClick={() => setEtat("cache")}
-      className={`fixed inset-0 z-[200] cursor-pointer overflow-hidden bg-[#0b3a3f] transition-opacity duration-500 ${
+      className={`fixed inset-0 z-[200] cursor-pointer overflow-hidden bg-[#10253f] transition-opacity duration-500 ${
         etat === "sortie" ? "opacity-0" : "opacity-100"
       }`}
     >
       <img src={fond.src} alt="" aria-hidden="true" className="absolute inset-0 h-full w-full scale-105 object-cover motion-safe:animate-[passage_2.3s_ease-out_forwards]" />
-      <div className="absolute inset-0 bg-gradient-to-b from-[#0b3a3f]/45 via-[#0b3a3f]/25 to-[#0b3a3f]/90" />
+      <div className="absolute inset-0 bg-gradient-to-b from-[#10253f]/45 via-[#10253f]/25 to-[#10253f]/90" />
       <div className="absolute inset-x-0 bottom-0 flex flex-col items-center px-6 pb-16 text-center text-white [text-shadow:0_1px_4px_rgba(0,0,0,.6)]">
         <img src="/icon-512.png?v=2" alt="" aria-hidden="true" className="mb-4 h-12 w-12 rounded-[10px] shadow-[0_4px_14px_rgba(0,0,0,.35)]" />
         <p className="text-[12px] font-semibold uppercase tracking-[2px] text-white/80">SID EPIA-O</p>

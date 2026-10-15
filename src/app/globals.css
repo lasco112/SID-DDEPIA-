@@ -3,35 +3,50 @@
 @tailwind utilities;
 
 :root {
-  /* Charte graphique officielle SID DDEPIA — voir tailwind.config.js pour les
-     classes utilitaires équivalentes ; ces variables servent aux endroits
-     (dégradés, ombres) où une classe Tailwind seule ne suffit pas. */
-  --color-primary: #397781;
-  --color-primary-hover: #2f6871;
-  --color-primary-light: #e9f5f4;
-  --color-mint: #b8e8d5;
-  --color-aqua: #a8dfe5;
-  --color-sky: #bbd8f3;
-  --color-lavender: #d4d5f5;
-  --color-text: #2f4147;
-  --color-text-secondary: #667a80;
-  --color-text-disabled: #aab8bc;
-  --color-background: #f8fafb;
+  /* Charte « Indigo des Hautes Terres » (15 octobre 2026) — mêmes noms de
+     variables qu'avant, nouvelles valeurs ; voir tailwind.config.js pour les
+     classes utilitaires équivalentes. */
+  --color-primary: #17365d;
+  --color-primary-hover: #10253f;
+  --color-primary-light: #e6ecf4;
+  --color-nuit: #10253f;
+  --color-cuivre: #a8663f;
+  --color-or: #d0ae73;
+  --color-mint: #e5efe8;
+  --color-aqua: #b9c8dc;
+  --color-sky: #e6ecf4;
+  --color-lavender: #e6ecf4;
+  --color-text: #10253f;
+  --color-text-secondary: #4e5a68;
+  --color-text-disabled: #9aa0a8;
+  --color-background: #f7f5f0;
   --color-surface: #ffffff;
-  --color-border: #dce7e9;
-  --color-success: #5daf91;
-  --color-info: #609cc7;
-  --color-warning: #d9a84e;
-  --color-danger: #d96c72;
-  --color-offline: #74868b;
-  --radius-small: 8px;
-  --radius-input: 10px;
-  --radius-button: 12px;
-  --radius-card: 16px;
-  --shadow-card: 0 6px 20px rgba(47, 65, 71, 0.06);
-  --shadow-focus: 0 0 0 3px rgba(92, 163, 171, 0.15);
-  --gradient-brand: linear-gradient(135deg, #b8e8d5 0%, #a8dfe5 50%, #bbd8f3 100%);
-  --gradient-brand-soft: linear-gradient(135deg, #e9f7f1 0%, #edf7f8 50%, #eef2fb 100%);
+  --color-border: #e6e1d6;
+  --color-success: #32684d;
+  --color-info: #2a4c78;
+  --color-warning: #a8663f;
+  --color-danger: #b53d3d;
+  --color-offline: #6b7480;
+  --radius-small: 7px;
+  --radius-input: 8px;
+  --radius-button: 8px;
+  --radius-card: 12px;
+  --shadow-card: 0 1px 2px rgba(16, 37, 63, 0.04), 0 4px 14px rgba(16, 37, 63, 0.04);
+  --shadow-focus: 0 0 0 3px rgba(23, 54, 93, 0.22);
+  --gradient-brand: linear-gradient(135deg, #17365d 0%, #10253f 100%);
+  --gradient-brand-soft: linear-gradient(135deg, #f7f5f0 0%, #efebe2 100%);
+}
+
+/* Les chiffres des tableaux s'alignent : même largeur pour chaque chiffre.
+   Purement visuel, aucune valeur n'est touchée. */
+table {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Le focus reste toujours visible au clavier, dans la couleur de la charte. */
+:focus-visible {
+  outline: 2px solid rgba(23, 54, 93, 0.45);
+  outline-offset: 2px;
 }
 
 body {
@@ -60,9 +75,14 @@ body {
   height: 11px;
 }
 .sid-scroll::-webkit-scrollbar-thumb {
-  background: #c3ccd6;
+  background: #cfc9bc;
   border-radius: 6px;
-  border: 2px solid #f4f6f9;
+  border: 2px solid #f7f5f0;
+}
+/* Le menu bleu nuit : une barre de défilement discrète, accordée au fond. */
+.sid-scroll-sombre {
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+  scrollbar-width: thin;
 }
 
 /* ---------------------------------------------------------------------------

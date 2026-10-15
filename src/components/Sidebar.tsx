@@ -34,19 +34,20 @@ function Entree({ item, active, onNavigate }: { item: NavItem; active: boolean; 
       onClick={onNavigate}
       aria-current={active ? "page" : undefined}
       className={`relative flex min-h-[44px] items-center gap-2.5 rounded-md py-2 pl-3 pr-2 text-[14px] leading-snug ${
-        active ? "bg-primary-light font-bold text-primary-dark" : "font-medium text-ink-muted hover:bg-appbg"
+        active ? "bg-white/10 font-bold text-white" : "font-medium text-white/75 hover:bg-white/5 hover:text-white"
       }`}
     >
+      {active && <span aria-hidden="true" className="absolute inset-y-1.5 left-0 w-[3px] rounded-full bg-or" />}
       {item.etape != null ? (
         <span
           className={`flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
-            active ? "bg-primary text-white" : "bg-appbg text-ink-muted"
+            active ? "bg-or text-nuit" : "bg-white/10 text-white/70"
           }`}
         >
           {item.etape}
         </span>
       ) : (
-        <span className={`mx-[7.5px] h-[7px] w-[7px] shrink-0 rounded-full ${active ? "bg-primary" : "bg-line"}`} />
+        <span className={`mx-[7.5px] h-[7px] w-[7px] shrink-0 rounded-full ${active ? "bg-or" : "bg-white/25"}`} />
       )}
       {item.label}
     </Link>
@@ -77,7 +78,7 @@ export default function Sidebar({
   }, [courante?.groupe.cle, courante?.groupe.titre]);
 
   return (
-    <nav className="h-full w-[268px] shrink-0 overflow-y-auto border-r border-line bg-white p-3">
+    <nav className="sid-scroll-sombre h-full w-[268px] shrink-0 overflow-y-auto border-r border-black/20 bg-nuit p-3">
       {groupes.map((groupe) => {
         const Icone = ICONES[groupe.cle];
 
@@ -92,10 +93,10 @@ export default function Sidebar({
               onClick={onNavigate}
               aria-current={actif ? "page" : undefined}
               className={`mb-1 flex min-h-[48px] items-center gap-3 rounded-lg px-3 text-[15px] font-bold ${
-                actif ? "bg-primary-light text-primary-dark" : "text-primary-dark hover:bg-appbg"
+                actif ? "bg-white/10 text-white" : "text-white/90 hover:bg-white/5"
               }`}
             >
-              <Icone size={19} className="shrink-0 text-primary" />
+              <Icone size={19} strokeWidth={1.7} className="shrink-0 text-or" />
               {item.label}
             </Link>
           );
@@ -109,16 +110,16 @@ export default function Sidebar({
               type="button"
               onClick={() => setOuvert(estOuvert ? null : groupe.cle)}
               aria-expanded={estOuvert}
-              className={`flex min-h-[48px] w-full items-center gap-3 rounded-lg px-3 text-left text-[15px] font-bold hover:bg-appbg ${
-                contientLaPage ? "text-primary-dark" : "text-[#28323d]"
+              className={`flex min-h-[48px] w-full items-center gap-3 rounded-lg px-3 text-left text-[15px] font-bold hover:bg-white/5 ${
+                contientLaPage ? "text-white" : "text-white/85"
               }`}
             >
-              <Icone size={19} className="shrink-0 text-primary" />
+              <Icone size={19} strokeWidth={1.7} className="shrink-0 text-or" />
               <span className="flex-1">{groupe.titre}</span>
-              <ChevronDown size={18} className={`shrink-0 text-ink-faint transition-transform ${estOuvert ? "rotate-180" : ""}`} />
+              <ChevronDown size={18} className={`shrink-0 text-white/45 transition-transform ${estOuvert ? "rotate-180" : ""}`} />
             </button>
             {estOuvert && (
-              <div className="mb-2 ml-[21px] border-l border-line pl-2">
+              <div className="mb-2 ml-[21px] border-l border-white/15 pl-2">
                 {groupe.items.map((item) => (
                   <Entree key={item.href} item={item} active={courante?.item.href === item.href} onNavigate={onNavigate} />
                 ))}
@@ -129,7 +130,7 @@ export default function Sidebar({
       })}
 
       {/* Reprises du bandeau, masquées au-delà de `sm` où elles y figurent déjà. */}
-      <div className="mt-3 border-t border-appbg pt-3 sm:hidden">
+      <div className="mt-3 border-t border-white/10 pt-3 sm:hidden">
         <button
           type="button"
           onClick={() => {
@@ -137,35 +138,35 @@ export default function Sidebar({
             // Le tiroir se referme d'abord : la visite montre l'écran, pas le menu.
             setTimeout(revoirLaVisite, 300);
           }}
-          className="flex min-h-[44px] w-full items-center gap-2.5 rounded-md pl-4 pr-3 text-left text-[14px] font-medium text-primary-dark hover:bg-appbg"
+          className="flex min-h-[44px] w-full items-center gap-2.5 rounded-md pl-4 pr-3 text-left text-[14px] font-medium text-white/85 hover:bg-white/5"
         >
-          <span className="h-[7px] w-[7px] shrink-0 rounded-full bg-primary" />
+          <span className="h-[7px] w-[7px] shrink-0 rounded-full bg-or" />
           Revoir la visite de cet écran
         </button>
         <Link
           href="/mon-compte/securite"
           onClick={onNavigate}
-          className="flex min-h-[44px] items-center gap-2.5 rounded-md pl-4 pr-3 text-[14px] font-medium text-ink-muted hover:bg-appbg"
+          className="flex min-h-[44px] items-center gap-2.5 rounded-md pl-4 pr-3 text-[14px] font-medium text-white/75 hover:bg-white/5"
         >
-          <span className="h-[7px] w-[7px] shrink-0 rounded-full bg-line" />
+          <span className="h-[7px] w-[7px] shrink-0 rounded-full bg-white/25" />
           Sécurité de l'appareil
         </Link>
         <Link
           href="/technique/aide"
           onClick={onNavigate}
-          className="flex min-h-[44px] items-center gap-2.5 rounded-md pl-4 pr-3 text-[14px] font-medium text-ink-muted hover:bg-appbg"
+          className="flex min-h-[44px] items-center gap-2.5 rounded-md pl-4 pr-3 text-[14px] font-medium text-white/75 hover:bg-white/5"
         >
-          <span className="h-[7px] w-[7px] shrink-0 rounded-full bg-line" />
+          <span className="h-[7px] w-[7px] shrink-0 rounded-full bg-white/25" />
           Aide
         </Link>
       </div>
 
       {periodeLabel && (
-        <div className="mt-4 border-t border-appbg px-3 pb-1 pt-4">
-          <div className="text-[11px] leading-relaxed text-ink-faint">
+        <div className="mt-4 border-t border-white/10 px-3 pb-1 pt-4">
+          <div className="text-[11px] uppercase leading-relaxed tracking-[1.2px] text-white/50">
             Période active
             <br />
-            <strong className="text-[13px] text-ink-muted">{periodeLabel}</strong>
+            <strong className="text-[13px] normal-case tracking-normal text-white/90">{periodeLabel}</strong>
           </div>
         </div>
       )}

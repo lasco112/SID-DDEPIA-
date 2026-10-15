@@ -1,6 +1,6 @@
 import './globals.css';
 import { ReactNode } from 'react';
-import { Manrope } from 'next/font/google';
+import { Cormorant_Garamond, Manrope } from 'next/font/google';
 import Providers from '@/components/Providers';
 import ServiceWorkerRegister from '@/components/ServiceWorkerRegister';
 import NavigationHorsLigne from '@/components/NavigationHorsLigne';
@@ -8,6 +8,10 @@ import SplashScreen from '@/components/SplashScreen';
 import DemoBanner from '@/components/DemoBanner';
 
 const manrope = Manrope({ subsets: ['latin'], variable: '--font-manrope' });
+// Grands titres d'accueil seulement. Comme Manrope, la police est copiée dans
+// l'application à la construction : aucun appel à Google une fois en ligne,
+// et le service worker la garde pour le hors-ligne.
+const cormorant = Cormorant_Garamond({ subsets: ['latin'], weight: ['600'], variable: '--font-cormorant', display: 'swap' });
 
 export const metadata = {
   title: "SID EPIA-O",
@@ -15,12 +19,12 @@ export const metadata = {
 };
 
 export const viewport = {
-  themeColor: "#397781",
+  themeColor: "#17365D",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="fr" className={manrope.variable}>
+    <html lang="fr" className={`${manrope.variable} ${cormorant.variable}`}>
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
         <link rel="manifest" href="/manifest.json?v=2" />

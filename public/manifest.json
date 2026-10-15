@@ -4,8 +4,8 @@
   "description": "Système d'Information Décisionnel de l'Élevage, des Pêches et des Industries Animales de la région de l'Ouest",
   "start_url": "/dashboard",
   "display": "standalone",
-  "background_color": "#f8fafb",
-  "theme_color": "#397781",
+  "background_color": "#f7f5f0",
+  "theme_color": "#17365d",
   "orientation": "any",
   "icons": [
     { "src": "/icon-192.png?v=2", "sizes": "192x192", "type": "image/png", "purpose": "any" },
