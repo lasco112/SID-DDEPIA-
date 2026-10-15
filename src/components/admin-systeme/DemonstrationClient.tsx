@@ -60,10 +60,10 @@ export default function DemonstrationClient() {
   if (!etat.configuree) {
     return (
       <div className="rounded-card border border-amber-200 bg-amber-50 p-5 text-[14px] text-amber-900">
-        <p className="font-bold">La base de démonstration n&apos;est pas branchée sur ce serveur.</p>
+        <p className="font-bold">La démonstration n&apos;est pas encore installée sur le serveur.</p>
         <p className="mt-1">
-          Il faut lui donner une base distincte de la production (réglage DEMO_DATABASE_URL du serveur), puis l&apos;installer une
-          fois. Demandez-le lors d&apos;une prochaine mise à jour.
+          Elle s&apos;installe toute seule à la prochaine mise à jour, sur le même serveur, à côté des vraies données et sans
+          jamais les toucher. Rien à faire de votre côté.
         </p>
       </div>
     );

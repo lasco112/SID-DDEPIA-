@@ -43,6 +43,12 @@ fi
 echo "  → Migrations de la base"
 sudo -u sid env HOME="$CIBLE" node --env-file="$CIBLE/.env" scripts/migrer.mjs deploy 2>&1 | tail -4
 
+# La base de démonstration (11-base-demonstration.sh) : installée la première
+# fois, simplement vérifiée ensuite. Son échec n'arrête JAMAIS la mise à jour :
+# la démonstration est un confort, la production est le service.
+echo "  → Base de démonstration"
+bash "$CIBLE/deploiement/11-base-demonstration.sh" || echo "  ✖ Démonstration non installée cette fois (la production n'est pas touchée)."
+
 echo "  → Construction de l'application (quelques minutes)"
 sudo -u sid env HOME="$CIBLE" npm run build 2>&1 | tail -5
 
