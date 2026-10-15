@@ -116,6 +116,9 @@ export default function AdminUtilisateursClient() {
       body: JSON.stringify({ actif }),
     });
     if (res.ok) await charger();
+    // Un refus se dit : sans ce message, le bouton paraissait mort (constaté
+    // en démonstration, où ces actions sont refusées, le 15 octobre 2026).
+    else window.alert((await res.json().catch(() => ({})))?.message ?? "Le changement n'a pas abouti.");
   }
 
   async function confirmerSuppressionCompte() {
@@ -140,6 +143,7 @@ export default function AdminUtilisateursClient() {
     if (!confirme) return;
     const res = await fetch(`/api/admin/utilisateurs/${id}/revoquer`, { method: "POST" });
     if (res.ok) window.alert("Session révoquée : prendra effet à la prochaine connexion réseau de l'appareil.");
+    else window.alert((await res.json().catch(() => ({})))?.message ?? "La révocation n'a pas abouti.");
   }
 
   async function confirmerReinitialisation(id: string, motDePasse: string) {

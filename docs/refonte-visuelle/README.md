@@ -55,7 +55,7 @@ Légendes et crédits : inchangés (`src/lib/fondsDepartement.ts`). Le test
 | 5 | Saisie mensuelle, nominative, événements : en-têtes ivoire, lignes alternées, valeurs à droite en chiffres tabulaires, motif « N/D » signalé en cuivre tant qu'il est vide ; densité et comportement inchangés | ✔ fait |
 | 6 | Validation, observations, supervision : harmonisées par le thème (vérifié sur la supervision DD) ; badges à pictogramme du prototype non ajoutés (voir conflits) | ✔ thème |
 | 7 | Rapports, statistiques : en-têtes et lignes alternées communs à tous les tableaux (`globals.css`, priorité nulle) | ✔ thème |
-| 8 | Administration, démonstration, harmonisation responsive, contrôle final | à faire |
+| 8 | Administration et démonstration : thème vérifié ; **boutons du menu réparés** (voir §6) ; contrôle de chaque lien du menu, pour chaque rôle, en réel et en démonstration | ✔ fait |
 
 ## 4. Conflits signalés (aucun résolu par invention)
 
@@ -96,3 +96,19 @@ Légendes et crédits : inchangés (`src/lib/fondsDepartement.ts`). Le test
 | `npm run build` | non lancé en local (fichier Prisma verrouillé par le serveur de développement) ; le serveur le lance à la mise à jour |
 
 Captures : `avant/` et `apres/`.
+
+## 6. Boutons du menu qui ne fonctionnaient pas (signalés par le DD, 15 octobre 2026)
+
+Contrôle : chaque lien du menu de chaque rôle ouvert avec un compte d'essai
+local — 54 liens pour 5 comptes réels, 80 liens pour 8 comptes de démonstration.
+
+| Défaut | Cause | Réparation |
+|---|---|---|
+| DD, réel : « Tableaux administratifs du BAC » renvoyait à l'accueil | la règle d'accès générale `/section` ne laissait passer que les chefs, alors que la page accepte le DD | règle `/section/bac` (CHEF_BAC + DD) avant la règle générale |
+| Démonstration : « Comptes utilisateurs », « Journal d'activité », « Questions des utilisateurs » renvoyaient sans un mot à l'accueil | écrans jamais ajoutés à la liste des écrans ouverts en démonstration | ouverts (leurs routes ne lisent que la base de la session, vérifié) |
+| Démonstration : réinitialiser un mot de passe, désactiver un compte | aurait cassé la démonstration pour toute la salle de formation | restent refusés, mais avec un message clair au lieu d'un bouton muet |
+| « Désactiver / Réactiver » et « Révoquer la session » ne disaient rien en cas d'échec | pas de branche d'erreur | le message du serveur s'affiche |
+
+Résultat après réparation : **0 lien qui ne s'ouvre pas**, en réel comme en
+démonstration. Garde-fou permanent : `tests/menu-acces.test.ts` compare le menu
+aux règles d'accès pour chaque rôle (275 tests réussis).

@@ -14,9 +14,14 @@ import { getToken } from "next-auth/jwt";
 
 const CHEF_ROLES = ["CHEF_BAC", "CHEF_SSV", "CHEF_PSA", "CHEF_SPAIH"];
 
-const PROTECTED_PREFIXES: Array<{ prefix: string; roles: string[] }> = [
+export const PROTECTED_PREFIXES: Array<{ prefix: string; roles: string[] }> = [
   { prefix: "/da", roles: ["DA", "AGENT_SAISIE"] }, // l'agent de saisie partage l'écran de saisie de son DA, mais jamais la soumission
   { prefix: "/dd", roles: ["DD"] },
+  // Les tableaux du BAC : le DD y a son entrée de menu « Tableaux
+  // administratifs du BAC », et la page l'accepte (allowedRoles CHEF_BAC + DD),
+  // mais la règle générale ci-dessous le renvoyait à l'accueil (constaté le
+  // 15 octobre 2026 en ouvrant chaque lien du menu). AVANT la règle générale.
+  { prefix: "/section/bac", roles: ["CHEF_BAC", "DD"] },
   { prefix: "/section", roles: CHEF_ROLES },
   { prefix: "/admin", roles: ["DD"] }, // ADMIN_TECH n'a aucun droit métier (CDC §A.2) : pas de gestion des comptes
   // Administration du système : un DD, et la marque d'administrateur vérifiée
@@ -86,7 +91,7 @@ const PROTECTED_PREFIXES: Array<{ prefix: string; roles: string[] }> = [
 // ce que le cahier des charges interdit explicitement. Étendre cette liste à mesure que
 // d'autres routes sont migrées (Phase 2 : vue croisée, supervision DD, génération de
 // rapports...), jamais avant de l'avoir fait.
-const CHEMINS_SURS_DEMO = [
+export const CHEMINS_SURS_DEMO = [
   "/dashboard",
   "/da/saisie",
   "/dd/supervision",
@@ -133,17 +138,47 @@ const CHEMINS_SURS_DEMO = [
   "/api/periodes",
   "/api/observations",
   "/api/aide",
+  // 15 octobre 2026 (« certains boutons du menu ne fonctionnent pas », constat
+  // du Délégué en démonstration) : ces écrans du menu « Administration de ma
+  // délégation » renvoyaient sans un mot à l'accueil. Vérifié : leurs routes
+  // ne lisent que `user.db` — la base de démonstration pour une session démo.
+  "/technique/audit",
+  "/api/technique/audit", // lecture seule
+  "/technique/aide", // ses données passent par /api/aide, déjà ouverte
+  "/admin/utilisateurs", // la page ; ses actions, voir CHEMINS_EXACTS_SURS_DEMO
 ];
+
+/**
+ * Ouvertes en démonstration pour CETTE adresse seulement, pas pour ses
+ * sous-adresses : la liste des comptes et la création d'un compte d'essai,
+ * oui ; mais réinitialiser un mot de passe, désactiver un compte ou
+ * réinitialiser tous les mots de passe casserait la démonstration pour toute
+ * la salle de formation — ces actions restent refusées, avec un message.
+ */
+export const CHEMINS_EXACTS_SURS_DEMO = ["/api/admin/utilisateurs"];
+
+const MESSAGE_COMPTES_DEMO =
+  "En démonstration, les mots de passe et l'état des comptes ne se modifient pas : les comptes de formation servent à tout le monde. Dans le vrai système, ce bouton fonctionne.";
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
   const isApi = pathname.startsWith("/api/");
 
-  if (token?.isDemo && pathname !== "/" && pathname !== "/demo" && !CHEMINS_SURS_DEMO.some((p) => pathname === p || pathname.startsWith(`${p}/`))) {
+  if (
+    token?.isDemo &&
+    pathname !== "/" &&
+    pathname !== "/demo" &&
+    !CHEMINS_EXACTS_SURS_DEMO.includes(pathname) &&
+    !CHEMINS_SURS_DEMO.some((p) => pathname === p || pathname.startsWith(`${p}/`))
+  ) {
     if (isApi) {
       return NextResponse.json(
-        { message: "Cette fonctionnalité n'est pas encore disponible dans l'environnement de démonstration." },
+        {
+          message: pathname.startsWith("/api/admin/utilisateurs/")
+            ? MESSAGE_COMPTES_DEMO
+            : "Cette fonctionnalité n'est pas encore disponible dans l'environnement de démonstration.",
+        },
         { status: 403 }
       );
     }
