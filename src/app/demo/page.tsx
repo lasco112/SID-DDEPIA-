@@ -129,7 +129,7 @@ export default function DemoLoginPage() {
   const titreFonction = fonction ? FONCTIONS.find((f) => f.cle === fonction)!.titre(departement!) : "";
 
   return (
-    <FondPhoto src={fondDepartement(departement?.code).src}>
+    <FondPhoto fond={fondDepartement(departement?.code)}>
       <div className="sticky top-0 z-50 bg-alerte py-2 text-center text-sm font-bold uppercase tracking-wide text-white">
         Mode démonstration — Données fictives
       </div>

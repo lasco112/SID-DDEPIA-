@@ -75,6 +75,7 @@ export default function EcranPassage({
           Bienvenue, {nom || username} · {fonction}
         </p>
         <p className="mt-5 text-[11.5px] text-white/65">{fond.legende}</p>
+        {fond.credit && <p className="mt-0.5 text-[10px] text-white/45">{fond.credit}</p>}
       </div>
       <FriseNdop variante="large" className="absolute inset-x-0 bottom-0" />
     </div>
