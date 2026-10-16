@@ -18,7 +18,8 @@
  */
 import { NextResponse } from "next/server";
 import { requireUser, assertRole, permissionErrorResponse } from "@/lib/permissions";
-import { trimestrielle, libelleOfficiel } from "@/server/periodes/calendrier";
+import { trimestrielle, libelleOfficiel, libelleCourt, memePeriodeAnneePrecedente } from "@/server/periodes/calendrier";
+import { anPasseManquant, messageAnPasseManquant, nomArrondissement } from "@/server/trimestre/saisieTrimestrielle";
 import { periodeTrimestrielle } from "@/server/trimestre/rubriques";
 import {
   etatCircuit, transmettre, renvoyer, validerSection, annulerValidationSection, codeSection, RefusCircuit, SECTIONS_CIRCUIT,
@@ -47,6 +48,12 @@ export async function GET(req: Request) {
     const etat = await etatCircuit(user.db, periode);
     const sienne = etat.arrondissements.find((a) => a.id === user.arrondissementId) ?? null;
     const maSection = etat.sections.find((s) => s.chef === user.role) ?? null;
+    // Ce que le DA doit encore inscrire pour l'an passé : affiché AVANT qu'il
+    // ne touche « Transmettre », pour qu'il ne découvre pas le refus au dernier moment.
+    const aCompleterAnPasse =
+      user.role === "DA" && sienne && sienne.statut !== "TRANSMIS"
+        ? await anPasseManquant(user.db, periode, { role: "DA", arrondissement: await nomArrondissement(user.db, user.arrondissementId) })
+        : [];
     return NextResponse.json({
       periode: libelleOfficiel(periode),
       role: user.role,
@@ -55,6 +62,8 @@ export async function GET(req: Request) {
       sections: etat.sections,
       tousTransmis: etat.tousTransmis,
       complet: etat.complet,
+      aCompleterAnPasse,
+      periodeN1: libelleCourt(memePeriodeAnneePrecedente(periode)),
       peut: {
         transmettre: user.role === "DA" && sienne != null && sienne.statut !== "TRANSMIS",
         renvoyer: user.role === "DD" || user.role.startsWith("CHEF_"),
@@ -93,6 +102,15 @@ export async function POST(req: Request) {
         // L'agent prépare, il ne transmet jamais — comme au mensuel.
         if (user.role !== "DA") return erreur("Seul le Délégué d'arrondissement transmet le rapport de son arrondissement.", 403);
         if (!user.arrondissementId) return erreur("Votre compte n'est rattaché à aucun arrondissement.", 400);
+        // IMPÉRATIF (décision du Délégué, 15 octobre 2026) : le chiffre de l'an
+        // passé que le SID n'a pas encore doit être inscrit avant de transmettre.
+        const manquants = await anPasseManquant(user.db, periode, {
+          role: "DA",
+          arrondissement: await nomArrondissement(user.db, user.arrondissementId),
+        });
+        if (manquants.length) {
+          return erreur(messageAnPasseManquant(manquants, libelleCourt(memePeriodeAnneePrecedente(periode))), 409);
+        }
         await transmettre(user.db, user.transaction, periodeId, periode, user.arrondissementId, user.id);
         details = { arrondissementId: user.arrondissementId };
         break;

@@ -45,6 +45,10 @@ interface Etat {
   tousTransmis: boolean;
   complet: boolean;
   peut: { transmettre: boolean; renvoyer: boolean; valider: boolean; annulerSection: string | null; relaisDD: boolean };
+  /** Les tableaux où le DA doit encore inscrire le chiffre de l'an passé (obligatoire avant de transmettre). */
+  aCompleterAnPasse?: { numero: number; titre: string }[];
+  /** « T3 2025 ». */
+  periodeN1?: string;
 }
 
 /**
@@ -263,6 +267,25 @@ export default function CircuitTrimestreClient({ username }: { username: string 
             <p className="mt-2 text-sm text-gray-700">
               Vos agents ont préparé le rapport. Relisez la saisie, les analyses et les textes, produisez un aperçu à l&apos;étape 4, « Vérifier et télécharger mon rapport », puis transmettez.
             </p>
+          )}
+          {etat.peut.transmettre && (etat.aCompleterAnPasse?.length ?? 0) > 0 && (
+            <div role="alert" className="mt-3 rounded-input border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+              <p className="font-semibold">
+                Avant de transmettre : inscrivez le chiffre de l&apos;an passé ({etat.periodeN1}) de votre arrondissement dans{" "}
+                {etat.aCompleterAnPasse!.length === 1 ? "ce tableau" : `ces ${etat.aCompleterAnPasse!.length} tableaux`}. Le SID ne
+                l&apos;a pas encore ; si l&apos;activité était nulle, inscrivez 0.
+              </p>
+              <ul className="mt-2 list-disc space-y-0.5 pl-5">
+                {etat.aCompleterAnPasse!.map((m) => (
+                  <li key={m.numero}>
+                    Tableau n° {m.numero} — {m.titre}
+                  </li>
+                ))}
+              </ul>
+              <a href="/trimestre/saisie" className="mt-2 inline-block font-semibold text-primary underline">
+                Compléter les tableaux du trimestre →
+              </a>
+            </div>
           )}
           {etat.peut.transmettre && (
             <button

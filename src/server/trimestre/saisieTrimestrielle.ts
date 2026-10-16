@@ -401,6 +401,12 @@ export interface CaseGrille {
   propose: string | null;
   /** Chef de section : case remplie par l'arrondissement — à signaler, pas à modifier. */
   reservee?: boolean;
+  /**
+   * Case « TOTAL {P-1} » que ce profil doit remplir lui-même — le SID n'a pas
+   * encore la même période de l'an passé (reprise d'historique). OBLIGATOIRE
+   * avant que le DA transmette (décision du Délégué, 15 octobre 2026).
+   */
+  anPasse?: boolean;
 }
 
 /** Un avertissement de la grille, et l'endroit qu'il vise (clé de ligne, colonne). */
@@ -493,6 +499,140 @@ export async function grilles(db: PrismaClient, periode: Periode, profil: Profil
   return sortie;
 }
 
+/**
+ * CORRIGER UN CHIFFRE DE L'AN PASSÉ déjà inscrit — même quand le rapport est
+ * transmis ou le domaine validé (décision du Délégué, 15 octobre 2026).
+ *
+ * Se corrigent ainsi : la case « TOTAL {P-1} » de la reprise d'historique, et
+ * toute case saisissable d'un trimestre d'une année passée (le T3 2025 rempli
+ * à partir des rapports de l'époque). Les chiffres de l'année en cours restent
+ * figés par le circuit. Le rapport n'est
+ * PAS rouvert ; la correction porte un motif, laisse une trace au journal
+ * (ancien et nouveau chiffre) et prévient le DD. Le DA corrige son
+ * arrondissement, le chef de section les tableaux de sa section (même une
+ * case remplie par l'arrondissement), le DD tout. L'agent de saisie, non.
+ */
+export const ROLES_CORRECTION_AN_PASSE = ["DD", "DA", "CHEF_BAC", "CHEF_PSA", "CHEF_SPAIH", "CHEF_SSV"] as const;
+
+/** L'année en cours au Cameroun. */
+export function anneeCourante(maintenant: Date = new Date()): number {
+  return Number(new Intl.DateTimeFormat("fr-FR", { year: "numeric", timeZone: "Africa/Douala" }).format(maintenant));
+}
+
+export async function refusCorrectionAnPasse(
+  db: PrismaClient,
+  periode: Periode,
+  profil: Profil,
+  numero: number,
+  ligne: string,
+  colonne: string
+): Promise<string | null> {
+  if (!(ROLES_CORRECTION_AN_PASSE as readonly string[]).includes(profil.role)) {
+    return "Un chiffre de l'an passé se corrige par le DA, le chef de section ou le Délégué départemental.";
+  }
+  const t = tableauDe(numero);
+  if (!t) return `Le tableau n° ${numero} n'existe pas au canevas.`;
+  const ctx = await contextePour(db, periode, profil);
+  const { colonnes, cles } = coordonnees(t.bloc, ctx);
+  if (!cles.includes(ligne) || !colonnes.includes(colonne)) return "Cette case n'existe pas dans ce tableau, ou n'est pas de votre ressort.";
+  const historique = estCaseHistorique(t.bloc, ctx, ligne, colonne);
+  // Un trimestre d'une année passée (2025 en 2026) : ses chiffres, repris des
+  // rapports de l'époque, se corrigent eux aussi après validation.
+  const anneePassee = periode.annee < anneeCourante();
+  if (!historique && !anneePassee) {
+    return `Seul le chiffre de l'an passé (${ctx.periodeCourtN1}) d'un arrondissement se corrige ainsi. Les chiffres de la période suivent le circuit du rapport.`;
+  }
+  if (!autorise(t.bloc, profil, ligne, colonne)) {
+    return estArrondissement(profil) ? "Vous ne corrigez que le chiffre de votre arrondissement." : "Ce tableau n'est pas de votre section.";
+  }
+  if (!historique) {
+    // Une case ordinaire d'un trimestre passé : celles qui se saisissent, pas
+    // les calculées ni les totaux.
+    switch (etatCase(t.bloc, ctx, profil, ligne, colonne)) {
+      case "calculee":
+        return "Cette case se remplit à partir des rapports mensuels : elle ne se corrige pas ici.";
+      case "total":
+        return "Les totaux et les écarts sont calculés : corrigez les cases dont ils viennent.";
+      case "lecture":
+        return "Cette case n'est pas de votre ressort.";
+      default:
+        return null;
+    }
+  }
+  const automatique = Boolean(liaisonDe(numero) || liaisonEvenementDe(numero));
+  const sid = fournisseur(
+    await preparer(db, periode, automatique ? champsMobilises() : [], {
+      autoriserIncomplet: true,
+      arrondissementId: await arrondissementIdDe(db, profil),
+      sansAgregation: !automatique,
+    }),
+    ctx
+  ).sid;
+  if (sid({ numeroTableau: numero, titreTableau: t.bloc.titre, bloc: t.bloc, ligne, colonne, indexColonne: 0 }) != null) {
+    return "Le SID calcule ce chiffre à partir de ses propres données de l'an passé : il ne se corrige pas ici, mais dans le rapport d'où il vient.";
+  }
+  return null;
+}
+
+/** Un tableau où le chiffre de l'an passé de l'arrondissement manque encore. */
+export interface AnPasseManquant {
+  numero: number;
+  titre: string;
+}
+
+/**
+ * Les tableaux où CET arrondissement doit encore donner son chiffre de l'an
+ * passé — la case « TOTAL {P-1} » que le SID ne sait pas calculer, faute
+ * d'avoir la même période de l'an passé dans sa base.
+ *
+ * Seulement là où l'arrondissement a des chiffres cette période : sans eux,
+ * l'an passé ne sert à aucune comparaison (même règle que les manques des
+ * analyses). Un chiffre nul s'écrit 0 : une case vide se lit « non renseigné ».
+ *
+ * Décision du Délégué (15 octobre 2026) : c'est IMPÉRATIF — le DA ne transmet
+ * pas tant qu'il en manque (voir /api/trimestre/circuit).
+ */
+export async function anPasseManquant(db: PrismaClient, periode: Periode, profil: Profil): Promise<AnPasseManquant[]> {
+  const sortie: AnPasseManquant[] = [];
+  for (const g of await grilles(db, periode, profil)) {
+    const t = tableauDe(g.numero);
+    const axe = t ? axeTerritorial(t.bloc) : null;
+    if (!axe) continue;
+    const aRemplir = g.lignes.flatMap((l) => l.cases.filter((c) => c.anPasse).map((c) => ({ ligne: l.cle, c })));
+    const vides = aRemplir.filter(({ c }) => (c.saisi == null || c.saisi === "") && c.affiche == null);
+    if (vides.length === 0) continue;
+    // Le territoire de chaque case vide : sa ligne, ou sa colonne.
+    const aDesChiffres = vides.some(({ ligne, c }) => {
+      const cases =
+        axe === "lignes"
+          ? g.lignes.find((l) => l.cle === ligne)?.cases ?? []
+          : g.lignes.filter((l) => !estTotal(l.cle) && !/^ÉCART/i.test(l.cle)).map((l) => l.cases.find((x) => x.colonne === c.colonne)!);
+      return cases.some(
+        (x) =>
+          x &&
+          !x.anPasse &&
+          x.etat !== "total" &&
+          !estTotal(x.colonne) &&
+          !/^ÉCART/i.test(x.colonne) &&
+          (x.affiche != null || (x.saisi != null && x.saisi !== ""))
+      );
+    });
+    if (aDesChiffres) sortie.push({ numero: g.numero, titre: g.titre });
+  }
+  return sortie;
+}
+
+/** Le refus de transmettre, en clair : les tableaux à compléter, par numéro. */
+export function messageAnPasseManquant(manquants: AnPasseManquant[], periodeN1: string): string {
+  const liste = manquants.map((m) => `n° ${m.numero} (${m.titre})`);
+  const affichee = liste.length > 6 ? `${liste.slice(0, 6).join(" ; ")} ; et ${liste.length - 6} autre(s)` : liste.join(" ; ");
+  return (
+    `Avant de transmettre, inscrivez le chiffre de l'an passé (${periodeN1}) de votre arrondissement — ` +
+    `le SID ne l'a pas encore — dans ${manquants.length === 1 ? "ce tableau" : `ces ${manquants.length} tableaux`} : ${affichee}. ` +
+    `Si l'activité était nulle, inscrivez 0.`
+  );
+}
+
 function construireGrille(
   bloc: BlocTableau,
   section: string,
@@ -520,6 +660,7 @@ function construireGrille(
         propose: reprise == null ? null : String(reprise),
         etat: reservee ? ("lecture" as const) : etat,
         ...(reservee ? { reservee: true } : {}),
+        ...(etat === "saisie" && estCaseHistorique(bloc, ctx, cle, colonne) ? { anPasse: true } : {}),
         affiche:
           texteFixe(bloc, ctx, cle, colonne) ??
           valeur({ numeroTableau: numero, titreTableau: bloc.titre, bloc, ligne: cle, colonne, indexColonne: i + 1 }),

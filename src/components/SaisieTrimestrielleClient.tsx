@@ -40,6 +40,8 @@ interface CaseGrille {
   propose: string | null;
   /** Chef de section : case remplie par l'arrondissement — elle se signale, elle ne se modifie pas. */
   reservee?: boolean;
+  /** Le chiffre de l'an passé que le SID n'a pas encore : OBLIGATOIRE avant de transmettre. */
+  anPasse?: boolean;
 }
 
 interface Grille {
@@ -132,6 +134,13 @@ export default function SaisieTrimestrielleClient({
   /** On saisit l'an passé d'un tableau : la période d'où l'on vient, pour y revenir. */
   const [retourVers, setRetourVers] = useState<{ annee: number; trimestre: number } | null>(null);
   const [modeSignaler, setModeSignaler] = useState(false);
+  /**
+   * Corriger un chiffre déjà validé (décision du Délégué, 15 octobre 2026) :
+   * le chiffre de l'an passé, ou une case d'un trimestre d'une année passée —
+   * même rapport transmis. DA, chefs de section et DD ; jamais l'agent.
+   */
+  const peutCorriger = ["DD", "DA", "CHEF_BAC", "CHEF_PSA", "CHEF_SPAIH", "CHEF_SSV"].includes(moi?.role ?? "");
+  const [corriger, setCorriger] = useState(false);
   const [aSignaler, setASignaler] = useState<{ ligne: string; colonne: string; libelle: string; valeur: string | null } | null>(null);
 
   const urlGrille = useCallback(
@@ -511,6 +520,42 @@ export default function SaisieTrimestrielleClient({
                 {modeSignaler ? "Terminer le signalement" : "Signaler une case à l'arrondissement"}
               </button>
               {modeSignaler && <span className="text-sm text-amber-900">Touchez la case qui ne va pas.</span>}
+            </div>
+          )}
+          {peutCorriger && grille && grille.numero === courant.numero && casesCorrigeables(grille, annee).length > 0 && (
+            <div className="mb-3">
+              {!corriger ? (
+                <button
+                  type="button"
+                  data-visite="corriger-chiffre"
+                  onClick={() => setCorriger(true)}
+                  className="min-h-[44px] rounded-md border border-primary bg-white px-3 py-2 text-sm font-semibold text-primary hover:bg-primary-light"
+                >
+                  {annee < new Date().getFullYear() ? `Corriger un chiffre du T${trimestre} ${annee}` : `Corriger un chiffre de ${annee - 1}`}
+                </button>
+              ) : (
+                <CorrigerChiffrePanneau
+                  cases={casesCorrigeables(grille, annee)}
+                  onFermer={() => setCorriger(false)}
+                  onEnvoyer={async (ligne, colonne, valeur, motif) => {
+                    if (typeof navigator !== "undefined" && !navigator.onLine) {
+                      return "Une correction demande du réseau : elle est tracée et notifiée. Réessayez une fois connecté.";
+                    }
+                    const r = await fetch("/api/trimestre/an-passe", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ annee, trimestre, numeroTableau: grille.numero, ligne, colonne, valeur, motif }),
+                    }).catch(() => null);
+                    if (!r) return "Pas de connexion : rien n'a été enregistré.";
+                    const j = await r.json().catch(() => ({}));
+                    if (!r.ok) return j.message ?? "La correction n'a pas abouti.";
+                    setCorriger(false);
+                    setInfo("Correction enregistrée : le Délégué départemental en est informé, et elle figure au journal d'activité.");
+                    ouvrir(grille.numero, true);
+                    return null;
+                  }}
+                />
+              )}
             </div>
           )}
           {aSignaler && grille && (
@@ -919,13 +964,20 @@ function TableauSaisie({
           value={valeurs[k] ?? ""}
           // Un nombre : le clavier numérique du téléphone s'ouvre directement.
           inputMode={c.texte ? "text" : "decimal"}
-          placeholder={c.propose ?? (c.texte ? "texte" : "")}
-          title={c.propose ? "Valeur reprise du tableau du BAC : saisissez-en une autre si elle est fausse." : undefined}
+          placeholder={c.propose ?? (c.anPasse ? "obligatoire" : c.texte ? "texte" : "")}
+          title={
+            c.propose
+              ? "Valeur reprise du tableau du BAC : saisissez-en une autre si elle est fausse."
+              : c.anPasse
+                ? `Obligatoire : le chiffre de votre arrondissement à la même période de l'an passé (${c.colonne.replace(/^TOTAL\s*/, "")}). Le SID ne l'a pas encore. Si l'activité était nulle, inscrivez 0.`
+                : undefined
+          }
+          aria-required={c.anPasse || undefined}
           onChange={(e) => onChange(k, e.target.value)}
           onBlur={() => onQuitter(l.cle, c.colonne, c.saisi)}
-          className={`${large ? "w-full" : c.texte ? "w-48" : "w-28"} ${c.propose ? "placeholder:text-gray-500" : "placeholder:text-gray-300"} rounded-sm border border-gray-300 bg-white px-2 py-1 outline-none focus:border-primary focus:bg-amber-50 ${
-            enCours === k ? "bg-amber-100" : ""
-          }`}
+          className={`${large ? "w-full" : c.texte ? "w-48" : "w-28"} ${c.propose ? "placeholder:text-gray-500" : c.anPasse ? "" : "placeholder:text-gray-300"} rounded-sm border px-2 py-1 outline-none focus:border-primary focus:bg-amber-50 ${
+            c.anPasse && !(valeurs[k] ?? "").trim() ? "border-amber-500 bg-amber-50 placeholder:text-amber-700" : "border-gray-300 bg-white"
+          } ${enCours === k ? "bg-amber-100" : ""}`}
           aria-label={`${l.libelle}, ${c.colonne}`}
         />
       );
@@ -1061,6 +1113,112 @@ function TableauSaisie({
         {grille.lignes.some((l) => l.cases.some((c) => c.reservee)) &&
           " Cases bleutées : remplies par l'arrondissement — vous ne les modifiez pas ; touchez « Signaler une case à l'arrondissement » pour les lui faire corriger."}
       </p>
+    </div>
+  );
+}
+
+/** Les cases qu'un DA, un chef ou le DD peut corriger après validation. */
+function casesCorrigeables(grille: Grille, annee: number) {
+  const anneePassee = annee < new Date().getFullYear();
+  return grille.lignes.flatMap((l) =>
+    l.cases
+      .filter((c) => c.anPasse || (anneePassee && !c.texte && (c.etat === "saisie" || c.reservee)))
+      .map((c) => ({
+        ligne: l.cle,
+        colonne: c.colonne,
+        libelle: `${l.libelle || l.cle} · ${c.colonne}`,
+        actuel: c.saisi ?? c.affiche ?? null,
+      }))
+  );
+}
+
+function CorrigerChiffrePanneau({
+  cases,
+  onFermer,
+  onEnvoyer,
+}: {
+  cases: ReturnType<typeof casesCorrigeables>;
+  onFermer: () => void;
+  onEnvoyer: (ligne: string, colonne: string, valeur: string, motif: string) => Promise<string | null>;
+}) {
+  const [choix, setChoix] = useState(0);
+  const [valeur, setValeur] = useState("");
+  const [motif, setMotif] = useState("");
+  const [erreur, setErreur] = useState<string | null>(null);
+  const [occupe, setOccupe] = useState(false);
+  const c = cases[Math.min(choix, cases.length - 1)];
+
+  return (
+    <div className="rounded-card border border-primary/40 bg-primary-light p-4">
+      <p className="text-sm font-bold text-primary-dark">Corriger un chiffre déjà inscrit</p>
+      <p className="mt-1 text-[13px] text-ink-muted">
+        Le rapport n&apos;est pas rouvert : seul ce chiffre change. Le motif est obligatoire ; la correction est inscrite au
+        journal d&apos;activité et le Délégué départemental en est informé.
+      </p>
+      <label className="mt-3 block text-[13px] font-bold text-ink" htmlFor="corriger-case">
+        Case à corriger
+      </label>
+      <select
+        id="corriger-case"
+        value={choix}
+        onChange={(e) => setChoix(Number(e.target.value))}
+        className="mt-1 min-h-[42px] w-full rounded-input border border-gray-300 bg-white px-2 text-sm"
+      >
+        {cases.map((x, i) => (
+          <option key={`${x.ligne}|${x.colonne}`} value={i}>
+            {x.libelle} — actuellement : {x.actuel ?? "vide"}
+          </option>
+        ))}
+      </select>
+      <div className="mt-3 grid gap-3 sm:grid-cols-[180px_1fr]">
+        <div>
+          <label className="block text-[13px] font-bold text-ink" htmlFor="corriger-valeur">
+            Nouveau chiffre
+          </label>
+          <input
+            id="corriger-valeur"
+            inputMode="decimal"
+            value={valeur}
+            onChange={(e) => setValeur(e.target.value)}
+            placeholder="0 si nul"
+            className="mt-1 min-h-[42px] w-full rounded-input border border-gray-300 bg-white px-2 text-right text-sm font-semibold tabular-nums"
+          />
+        </div>
+        <div>
+          <label className="block text-[13px] font-bold text-ink" htmlFor="corriger-motif">
+            Motif de la correction
+          </label>
+          <input
+            id="corriger-motif"
+            value={motif}
+            onChange={(e) => setMotif(e.target.value)}
+            placeholder="Ex. : erreur de report du registre 2025"
+            className="mt-1 min-h-[42px] w-full rounded-input border border-gray-300 bg-white px-2 text-sm"
+          />
+        </div>
+      </div>
+      {erreur && <p className="mt-3 rounded-input bg-red-50 p-2 text-sm text-red-800">{erreur}</p>}
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button
+          type="button"
+          disabled={occupe || !c}
+          onClick={async () => {
+            setErreur(null);
+            if (!valeur.trim()) return setErreur("Inscrivez le nouveau chiffre (0 si l'activité était nulle).");
+            if (motif.trim().length < 5) return setErreur("Indiquez le motif : pourquoi ce chiffre change.");
+            setOccupe(true);
+            const e = await onEnvoyer(c.ligne, c.colonne, valeur, motif);
+            setOccupe(false);
+            if (e) setErreur(e);
+          }}
+          className="min-h-[44px] rounded-btn bg-primary px-4 text-sm font-bold text-white hover:bg-primary-hover disabled:opacity-50"
+        >
+          {occupe ? "Enregistrement…" : "Enregistrer la correction"}
+        </button>
+        <button type="button" onClick={onFermer} className="min-h-[44px] rounded-btn border border-gray-300 bg-white px-4 text-sm font-semibold text-ink-muted hover:bg-gray-100">
+          Annuler
+        </button>
+      </div>
     </div>
   );
 }
