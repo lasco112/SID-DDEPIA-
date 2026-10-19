@@ -23,6 +23,7 @@ import {
   nombreOperationsEnAttente,
 } from "@/lib/etablissementsLocal";
 import VisiteGuidee from "@/components/VisiteGuidee";
+import ListeFermes from "@/components/ListeFermes";
 
 interface Arrondissement {
   id: string;
@@ -167,6 +168,7 @@ export default function EtablissementsClient({
       )}
 
       <VisiteGuidee ecran="etablissements" />
+      <ListeFermes estDD={estDD} arrondissements={arrondissements} />
       <div data-visite="types-etablissement" className="mb-4 flex flex-wrap gap-2">
         {TYPES.map((t) => (
           <button

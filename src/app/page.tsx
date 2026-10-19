@@ -24,6 +24,11 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  // Tant que la page n'a pas fini de se charger, le bouton attend : sans cela,
+  // un formulaire validé trop tôt partait par le navigateur lui-même, identifiant
+  // et mot de passe écrits EN CLAIR dans l'adresse (constaté le 19 octobre 2026).
+  const [pret, setPret] = useState(false);
+  useEffect(() => setPret(true), []);
   const router = useRouter();
 
   // Une erreur de connexion qui a fait quitter la page (réseau coupé au milieu
@@ -111,7 +116,8 @@ export default function LoginPage() {
               </div>
             )}
 
-            <form onSubmit={handleSubmit}>
+            {/* method="post" : même avant la fin du chargement, rien ne s'écrit dans l'adresse. */}
+            <form method="post" onSubmit={handleSubmit}>
               <label htmlFor="connexion-identifiant" className="mb-1.5 block text-[14px] font-bold text-ink">
                 Identifiant
               </label>
@@ -141,10 +147,10 @@ export default function LoginPage() {
 
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || !pret}
                 className="min-h-[48px] w-full rounded-btn bg-primary py-3 text-[15.5px] font-bold text-white hover:bg-primary-hover disabled:cursor-not-allowed disabled:bg-[#A9B6C6]"
               >
-                {loading ? 'Connexion…' : 'Se connecter'}
+                {loading ? 'Connexion…' : pret ? 'Se connecter' : 'Chargement…'}
               </button>
             </form>
 

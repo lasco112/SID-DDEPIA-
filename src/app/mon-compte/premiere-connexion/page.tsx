@@ -66,7 +66,7 @@ export default function PremiereConnexionPage() {
           <div className="text-[13px] font-semibold uppercase tracking-[2px] text-ink-faint">Bienvenue</div>
         </div>
 
-        <form onSubmit={valider} className="rounded-xl border border-line bg-white p-[30px_30px_26px] shadow-[0_10px_30px_rgba(24,52,80,.08)]">
+        <form method="post" onSubmit={valider} className="rounded-xl border border-line bg-white p-[30px_30px_26px] shadow-[0_10px_30px_rgba(24,52,80,.08)]">
           <h1 className="mb-1 text-2xl font-bold text-primary-dark">Complétez votre compte</h1>
           <p className="mb-6 text-[13.5px] text-ink-muted">
             Votre compte a été autorisé par le Délégué Départemental. Confirmez vos informations et choisissez votre
