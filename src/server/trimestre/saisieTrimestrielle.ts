@@ -31,7 +31,7 @@ import { cleCellule, saisiesVues, type ValeurCellule } from "./saisieCanevas";
 import { numerosSansMaille, TABLEAUX_BAC, chefDeSection } from "./canevas/sections";
 import { preparer, fournisseur, estCaseCalculee, estCaseHistorique, valeurReprise, versNombre } from "./remplissage";
 import { REPRISES, repriseDe } from "./canevas/reprises";
-import { champsMobilises, liaisonDe, estLiee } from "./liaison";
+import { champsMobilises, liaisonDe, estLiee, type Formule } from "./liaison";
 import { liaisonEvenementDe } from "./evenements";
 import { listerArrondissements, graphieCanevas } from "@/lib/arrondissements";
 import { identiteDepartement } from "@/lib/departement";
@@ -1219,6 +1219,76 @@ async function detailDuTotal(
       };
     }),
     mensuel: champ?.template ?? null,
+  };
+}
+
+/**
+ * « D'OÙ VIENT CE CHIFFRE ? » — une case grise du trimestre, calculée à partir
+ * des rapports mensuels, détaillée mois par mois (demande du Délégué, 20
+ * octobre 2026 : un chef qui voit une erreur au trimestre doit pouvoir
+ * vérifier le mensuel, d'où elle vient forcément).
+ *
+ * Lecture seule. La correction, s'il y a lieu, se fait DANS LE MOIS, par le
+ * circuit du mensuel — jamais dans le trimestre : il n'y a qu'une source.
+ */
+export async function origineCase(
+  db: PrismaClient,
+  periode: Periode,
+  profil: Profil,
+  numero: number,
+  ligne: string,
+  colonne: string
+): Promise<{ origine: ControleCategories & { explication: string; periodeLue: string } } | { message: string }> {
+  const t = tableauDe(numero);
+  if (!t) return { message: "Tableau inconnu." };
+  const ctx = await contextePour(db, periode, profil);
+  if (!estCaseCalculee(numero, ligne, colonne, ctx)) return { message: "Cette case ne vient pas des rapports mensuels." };
+  const liaison = liaisonDe(numero);
+  if (!liaison) {
+    return { message: "Ce chiffre vient des listes du mensuel (vaccinations, consultations, circulation…) : vérifiez-les dans les rapports mensuels des trois mois." };
+  }
+  const [categorie, territoire] = liaison.orientation === "lignes" ? [colonne, ligne] : [ligne, colonne];
+  if (estTotal(territoire) || /^ÉCART/i.test(territoire)) {
+    return { message: "Touchez la case d'un arrondissement : le total du département additionne leurs chiffres." };
+  }
+  // Le ressort : le DD lit tout ; un DA ou un agent, son arrondissement ; un
+  // chef, les tableaux de sa section (le chef BAC, ceux du BAC).
+  const ressort =
+    profil.role === "DD" ||
+    (estArrondissement(profil) && territoire === profil.arrondissement) ||
+    (profil.role === "CHEF_BAC" && TABLEAUX_BAC.has(numero)) ||
+    (estChefTechnique(profil.role) && chefDuTableau(numero) === profil.role);
+  if (!ressort || !ctx.arrondissements.includes(territoire)) return { message: "Cette case n'est pas de votre ressort." };
+
+  // La formule : celle de la catégorie, ou celle du total de la ligne.
+  const n1 = `TOTAL ${ctx.periodeCourtN1}`;
+  const anPasse = categorie === n1;
+  let formule: Formule | undefined;
+  if (estTotal(categorie)) {
+    formule = liaison.total;
+    if (!formule) return { message: "Ce total additionne les catégories de la ligne : touchez l'une d'elles pour voir d'où elle vient." };
+  } else {
+    const corr = liaison.correspondances.find((c) => c.libelle === categorie);
+    if (corr?.depuisSaisie) {
+      return { message: `Ce chiffre se calcule à partir du tableau n° ${corr.depuisSaisie.tableau} du trimestre (« ${corr.depuisSaisie.colonne} ») : ${corr.depuisSaisie.explication}` };
+    }
+    formule = corr?.formule ?? (corr?.champ ? { champs: [corr.champ], explication: "Le chiffre du rapport mensuel, repris tel quel." } : undefined);
+  }
+  if (!formule) return { message: "Cette case n'est alimentée par aucun champ du mensuel." };
+
+  // Le total de l'an passé se lit dans les mois de l'an passé.
+  const periodeLue = anPasse ? memePeriodeAnneePrecedente(periode) : periode;
+  const detail = await detailDuTotal(db, periodeLue, formule, territoire);
+  if (!detail) return { message: "Le détail mois par mois n'a pas pu être établi pour cette case." };
+  return {
+    origine: {
+      ...detail,
+      tableau: numero,
+      titreTableau: t.bloc.titre,
+      nature: categorie,
+      explication: formule.explication,
+      periodeLue: libelleCourt(periodeLue),
+    },
   };
 }
 

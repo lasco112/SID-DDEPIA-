@@ -17,7 +17,7 @@ import { trimestrielle, libelleOfficiel } from "@/server/periodes/calendrier";
 import { periodeTrimestrielle } from "@/server/trimestre/rubriques";
 import { ecrireSaisieCanevas, cleCellule, dateAppareil } from "@/server/trimestre/saisieCanevas";
 import {
-  ROLES_SAISIE, resumer, grille, grilles, refusDeSaisie, nomArrondissement, attendUnNombre, incoherenceCategories, porteeDeSaisie,
+  ROLES_SAISIE, resumer, grille, grilles, refusDeSaisie, origineCase, nomArrondissement, attendUnNombre, incoherenceCategories, porteeDeSaisie,
   type Profil,
 } from "@/server/trimestre/saisieTrimestrielle";
 import { preparerEvenements } from "@/server/trimestre/evenements";
@@ -57,6 +57,12 @@ export async function GET(req: Request) {
     // Toutes les grilles d'un coup : le téléphone les garde pour saisir sans réseau.
     if (params.get("toutes")) {
       return NextResponse.json({ periode: libelleOfficiel(periode), grilles: await grilles(user.db, periode, profil) });
+    }
+
+    // « D'où vient ce chiffre ? » : une case grise, mois par mois (lecture seule).
+    if (params.get("origine") && params.get("tableau")) {
+      const r = await origineCase(user.db, periode, profil, Number(params.get("tableau")), params.get("ligne") ?? "", params.get("colonne") ?? "");
+      return NextResponse.json(r);
     }
 
     const numero = params.get("tableau");
