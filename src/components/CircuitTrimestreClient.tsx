@@ -24,6 +24,8 @@ interface Arrondissement {
   auteur: string | null;
   motif: string | null;
   parLeDD: boolean;
+  /** Le DD, pour un rapport renvoyé : ce que l'arrondissement a corrigé depuis le renvoi. */
+  corrections?: { cases: number; tableaux: number[] };
 }
 
 interface Section {
@@ -35,6 +37,8 @@ interface Section {
   auteur: string | null;
   parLeDD: boolean;
   motif: string | null;
+  /** L'ordre de correction du DD en cours pour ce chef (20 octobre 2026). */
+  ordre?: { motif: string; le: string; auteur: string | null } | null;
 }
 
 interface Etat {
@@ -91,6 +95,10 @@ export default function CircuitTrimestreClient({ username }: { username: string 
   const [message, setMessage] = useState<string | null>(null);
   const [occupe, setOccupe] = useState(false);
   const [renvoi, setRenvoi] = useState<{ id: string; motif: string } | null>(null);
+  /** Le DD valide les corrections d'un rapport renvoyé (20 octobre 2026). */
+  const [validation, setValidation] = useState<{ id: string; commentaire: string } | null>(null);
+  /** Le DD rédige un ordre de correction pour un chef. */
+  const [ordre, setOrdre] = useState<{ code: string; motif: string } | null>(null);
   /** Le DD prend le relais : quelle étape, et pourquoi. */
   const [relais, setRelais] = useState<{ cle: string; corps: Record<string, unknown>; motif: string } | null>(null);
 
@@ -324,7 +332,52 @@ export default function CircuitTrimestreClient({ username }: { username: string 
                   </p>
                 )}
                 {a.motif && <p className={`mt-1 text-xs ${a.parLeDD ? "text-blue-800" : "text-red-800"}`}>Motif : {a.motif}</p>}
-                {a.statut !== "TRANSMIS" && formulaireRelais(`arr-${a.id}`, "Transmettre en tant que DD", { action: "transmettre", arrondissementId: a.id })}
+                {a.statut === "RENVOYE" && etat.peut.relaisDD && (
+                  <div className="mt-2 rounded-input border border-green-200 bg-green-50 p-3">
+                    <p className="text-sm text-green-900">
+                      {a.corrections && a.corrections.cases > 0
+                        ? `Depuis le renvoi, l'arrondissement a modifié ${a.corrections.cases} case${a.corrections.cases > 1 ? "s" : ""} — tableau${a.corrections.tableaux.length > 1 ? "x" : ""} n° ${a.corrections.tableaux.join(", ")}.`
+                        : "Aucune case modifiée dans la saisie trimestrielle depuis le renvoi (les textes et les analyses ont pu l'être)."}
+                    </p>
+                    {validation?.id === a.id ? (
+                      <div className="mt-2">
+                        <textarea
+                          value={validation.commentaire}
+                          onChange={(e) => setValidation({ id: a.id, commentaire: e.target.value })}
+                          rows={2}
+                          placeholder="Note pour le DA (facultatif)"
+                          className="w-full rounded border border-gray-300 p-2 text-sm"
+                        />
+                        <div className="mt-1 flex gap-2">
+                          <button
+                            type="button"
+                            disabled={occupe}
+                            onClick={() => {
+                              void agir({ action: "validerCorrections", arrondissementId: a.id, motif: validation.commentaire });
+                              setValidation(null);
+                            }}
+                            className="flex-1 rounded-md bg-green-700 px-3 py-2 text-sm font-semibold text-white hover:bg-green-800 disabled:opacity-50"
+                          >
+                            Confirmer : les corrections sont bonnes
+                          </button>
+                          <button type="button" onClick={() => setValidation(null)} className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm">
+                            Annuler
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        data-visite="circuit-valider-corrections"
+                        onClick={() => setValidation({ id: a.id, commentaire: "" })}
+                        className="mt-2 min-h-[40px] rounded-md bg-green-700 px-3 py-2 text-sm font-semibold text-white hover:bg-green-800"
+                      >
+                        Valider les corrections et le rapport
+                      </button>
+                    )}
+                  </div>
+                )}
+                {a.statut === "EN_PREPARATION" && formulaireRelais(`arr-${a.id}`, "Transmettre en tant que DD", { action: "transmettre", arrondissementId: a.id })}
                 {etat.peut.renvoyer && a.statut === "TRANSMIS" && (
                   renvoi?.id === a.id ? (
                     <div className="mt-2">
@@ -385,6 +438,68 @@ export default function CircuitTrimestreClient({ username }: { username: string 
                 </p>
               )}
               {s.parLeDD && s.motif && <p className="mt-1 text-xs text-blue-800">Motif : {s.motif}</p>}
+              {s.ordre && (
+                <p className="mt-2 rounded-input border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900">
+                  <strong>Ordre de correction du DD en cours</strong> depuis le {le(s.ordre.le)} — {s.ordre.motif}.{" "}
+                  {s.chef === etat.role
+                    ? "Vous pouvez corriger les cases remplies par les arrondissements dans les tableaux de votre section, puis valider à nouveau."
+                    : "Le chef peut corriger les cases remplies par les arrondissements."}
+                </p>
+              )}
+              {etat.role === "DD" &&
+                (s.ordre ? (
+                  <button
+                    type="button"
+                    disabled={occupe}
+                    onClick={() =>
+                      void agir(
+                        { action: "revoquerOrdre", section: s.code },
+                        `Révoquer l'ordre de correction du chef ${s.code} ? Il ne pourra plus corriger les cases remplies par les arrondissements.`
+                      )
+                    }
+                    className="mt-2 rounded border border-amber-600 px-2 py-1 text-xs font-semibold text-amber-900 hover:bg-amber-50"
+                  >
+                    Révoquer l'ordre de correction
+                  </button>
+                ) : ordre?.code === s.code ? (
+                  <div className="mt-2">
+                    <textarea
+                      value={ordre.motif}
+                      onChange={(e) => setOrdre({ code: s.code, motif: e.target.value })}
+                      rows={2}
+                      placeholder="Ce que le chef doit corriger, et pourquoi (obligatoire)."
+                      className="w-full rounded border border-gray-300 p-2 text-sm"
+                    />
+                    {s.statut === "VALIDE" && (
+                      <p className="mt-1 text-xs text-amber-900">Ce domaine est validé : l'ordre lèvera la validation, et le chef devra valider à nouveau.</p>
+                    )}
+                    <div className="mt-1 flex gap-2">
+                      <button
+                        type="button"
+                        disabled={occupe || !ordre.motif.trim()}
+                        onClick={() => {
+                          void agir({ action: "ordonnerCorrection", section: s.code, motif: ordre.motif });
+                          setOrdre(null);
+                        }}
+                        className="flex-1 rounded-md bg-amber-700 px-3 py-2 text-sm font-semibold text-white hover:bg-amber-800 disabled:opacity-50"
+                      >
+                        Donner l'ordre de correction
+                      </button>
+                      <button type="button" onClick={() => setOrdre(null)} className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm">
+                        Annuler
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    data-visite="circuit-ordre-correction"
+                    onClick={() => setOrdre({ code: s.code, motif: "" })}
+                    className="mt-2 ml-0 mr-2 rounded border border-amber-600 px-2 py-1 text-xs text-amber-900 hover:bg-amber-50"
+                  >
+                    Ordonner une correction au chef
+                  </button>
+                ))}
               {s.statut !== "VALIDE" && formulaireRelais(`sec-${s.code}`, "Valider en tant que DD", { action: "valider", section: s.code })}
               {s.chef === etat.role && etat.peut.valider && (
                 <button

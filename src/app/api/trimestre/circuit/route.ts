@@ -20,10 +20,11 @@ import { NextResponse } from "next/server";
 import { requireUser, assertRole, permissionErrorResponse } from "@/lib/permissions";
 import { trimestrielle, libelleOfficiel, libelleCourt, memePeriodeAnneePrecedente } from "@/server/periodes/calendrier";
 import { anPasseManquant, messageAnPasseManquant, nomArrondissement } from "@/server/trimestre/saisieTrimestrielle";
+import { ordresEnCours, donnerOrdreCorrection, revoquerOrdreCorrection } from "@/server/trimestre/ordresCorrection";
 import { periodeTrimestrielle } from "@/server/trimestre/rubriques";
 import {
   etatCircuit, transmettre, renvoyer, validerSection, annulerValidationSection, codeSection, RefusCircuit, SECTIONS_CIRCUIT,
-  transmettreParLeDD, validerSectionParLeDD, finaliserParLeDD,
+  transmettreParLeDD, validerSectionParLeDD, finaliserParLeDD, validerCorrectionsParLeDD, correctionsDepuisRenvoi,
 } from "@/server/trimestre/circuit";
 
 const ROLES = ["DD", "DA", "AGENT_SAISIE", "CHEF_BAC", "CHEF_PSA", "CHEF_SPAIH", "CHEF_SSV"] as const;
@@ -57,9 +58,25 @@ export async function GET(req: Request) {
     return NextResponse.json({
       periode: libelleOfficiel(periode),
       role: user.role,
-      // Un DA et un agent ne voient que leur arrondissement.
-      arrondissements: user.role === "DA" || user.role === "AGENT_SAISIE" ? (sienne ? [sienne] : []) : etat.arrondissements,
-      sections: etat.sections,
+      // Un DA et un agent ne voient que leur arrondissement. Le DD voit, pour
+      // chaque rapport renvoyé, ce que l'arrondissement a corrigé depuis.
+      arrondissements:
+        user.role === "DA" || user.role === "AGENT_SAISIE"
+          ? sienne ? [sienne] : []
+          : user.role === "DD"
+            ? await Promise.all(
+                etat.arrondissements.map(async (a) =>
+                  a.statut === "RENVOYE" && a.date
+                    ? { ...a, corrections: await correctionsDepuisRenvoi(user.db, periode, a.id, new Date(a.date)) }
+                    : a
+                )
+              )
+            : etat.arrondissements,
+      // Chaque domaine, avec l'ordre de correction du DD en cours, s'il y en a un.
+      sections: await (async () => {
+        const ordres = await ordresEnCours(user.db, periode);
+        return etat.sections.map((s) => ({ ...s, ordre: ordres.get(s.chef) ?? null }));
+      })(),
       tousTransmis: etat.tousTransmis,
       complet: etat.complet,
       aCompleterAnPasse,
@@ -113,6 +130,30 @@ export async function POST(req: Request) {
         }
         await transmettre(user.db, user.transaction, periodeId, periode, user.arrondissementId, user.id);
         details = { arrondissementId: user.arrondissementId };
+        break;
+      }
+      // Après un renvoi : le DD juge les corrections du DA bonnes et valide le
+      // rapport lui-même (20 octobre 2026).
+      case "validerCorrections": {
+        if (user.role !== "DD") return erreur("Seul le Délégué départemental valide les corrections d'un arrondissement.", 403);
+        if (!body.arrondissementId) return erreur("Arrondissement non précisé.", 400);
+        await validerCorrectionsParLeDD(user.db, user.transaction, periodeId, periode, body.arrondissementId, body.motif ?? "", user.id);
+        details = { arrondissementId: body.arrondissementId, parLeDD: true, correctionsValidees: true, commentaire: body.motif };
+        break;
+      }
+      // Ordre de correction du DD à un chef de section (20 octobre 2026).
+      case "ordonnerCorrection": {
+        if (user.role !== "DD") return erreur("Seul le Délégué départemental donne un ordre de correction.", 403);
+        if (!body.section) return erreur("Section non précisée.", 400);
+        const r = await donnerOrdreCorrection(user.db, user.transaction, periodeId, periode, body.section, body.motif ?? "", user.id);
+        details = { section: body.section, motif: body.motif, validationAnnulee: r.validationAnnulee };
+        break;
+      }
+      case "revoquerOrdre": {
+        if (user.role !== "DD") return erreur("Seul le Délégué départemental révoque un ordre de correction.", 403);
+        if (!body.section) return erreur("Section non précisée.", 400);
+        await revoquerOrdreCorrection(user.db, periode, body.section, user.id);
+        details = { section: body.section };
         break;
       }
       case "renvoyer": {

@@ -280,6 +280,74 @@ export async function transmettreParLeDD(
   });
 }
 
+/**
+ * Après un renvoi : le DA a corrigé, le DD juge les corrections bonnes et
+ * valide lui-même le rapport, sans attendre que le DA le retransmette
+ * (décision du Délégué, 20 octobre 2026). Le rapport passe « transmis », par
+ * le DD, avec un motif (un texte par défaut si le DD n'en écrit pas) ; le DA
+ * en est prévenu.
+ */
+export const MOTIF_CORRECTIONS_VALIDEES = "Corrections du DA vérifiées et jugées bonnes par le Délégué départemental.";
+
+export async function validerCorrectionsParLeDD(
+  db: PrismaClient,
+  transaction: Transactionnelle,
+  periodeId: string,
+  periode: Periode,
+  arrondissementId: string,
+  commentaire: string,
+  auteurId: string
+) {
+  const etat = await etatCircuit(db, periode);
+  const a = etat.arrondissements.find((x) => x.id === arrondissementId);
+  if (!a) throw new RefusCircuit("Arrondissement inconnu.");
+  if (a.statut !== "RENVOYE") {
+    throw new RefusCircuit(
+      a.statut === "TRANSMIS"
+        ? "Ce rapport est déjà transmis."
+        : "Ce rapport n'a pas été renvoyé pour correction : utilisez « Transmettre en tant que DD »."
+    );
+  }
+  const motif = commentaire.trim() ? `${MOTIF_CORRECTIONS_VALIDEES} ${commentaire.trim()}` : MOTIF_CORRECTIONS_VALIDEES;
+  await ecrire(transaction, periodeId, "ARRONDISSEMENT", arrondissementId, "TRANSMIS", auteurId, motif, true);
+  await notifierEvenement(db, { arrondissementId, saufUserId: auteurId }, {
+    declencheur: "CORRECTIONS_VALIDEES_PAR_DD",
+    message: `Le Délégué départemental a validé vos corrections : le rapport trimestriel de votre arrondissement est transmis.${commentaire.trim() ? ` Note : ${commentaire.trim()}` : ""}`,
+    lien: "/trimestre/circuit",
+  });
+}
+
+/**
+ * Ce que l'arrondissement a modifié dans le trimestre DEPUIS le renvoi : de
+ * quoi juger les corrections avant de les valider. Lu dans le journal (saisies,
+ * effacements, corrections de l'an passé faites par les comptes de
+ * l'arrondissement).
+ */
+export async function correctionsDepuisRenvoi(
+  db: PrismaClient,
+  periode: Periode,
+  arrondissementId: string,
+  depuis: Date
+): Promise<{ cases: number; tableaux: number[] }> {
+  const lignes = await db.auditLog.findMany({
+    where: {
+      action: { in: ["SAISIE_TRIMESTRIELLE", "EFFACEMENT_SAISIE_TRIMESTRIELLE", "CORRECTION_AN_PASSE"] },
+      createdAt: { gt: depuis },
+      user: { arrondissementId },
+    },
+    select: { details: true },
+  });
+  const cles = new Set<string>();
+  const tableaux = new Set<number>();
+  for (const l of lignes) {
+    const d = l.details as { annee?: number; trimestre?: number; numeroTableau?: number; ligne?: string; colonne?: string } | null;
+    if (!d || d.annee !== periode.annee || d.trimestre !== periode.rang || d.numeroTableau == null) continue;
+    cles.add(`${d.numeroTableau}|${d.ligne}|${d.colonne}`);
+    tableaux.add(d.numeroTableau);
+  }
+  return { cases: cles.size, tableaux: Array.from(tableaux).sort((x, y) => x - y) };
+}
+
 /** Le DD valide un domaine à la place de son chef de section. */
 export async function validerSectionParLeDD(
   db: PrismaClient,

@@ -37,6 +37,7 @@ import { listerArrondissements, graphieCanevas } from "@/lib/arrondissements";
 import { identiteDepartement } from "@/lib/departement";
 import { observationsTrimestre } from "@/server/observationsTrimestre";
 import { etatCircuit } from "./circuit";
+import { aOrdreDeCorrection, MESSAGE_SANS_ORDRE } from "./ordresCorrection";
 import {
   type Periode, libelleCourt, memePeriodeAnneePrecedente, moisDeLaPeriode,
 } from "../periodes/calendrier";
@@ -449,6 +450,8 @@ export interface GrilleSaisie {
   alertes: AlerteGrille[];
   /** Ce qu'il faut saisir. */
   aide: string;
+  /** Un chef : a-t-il l'ordre du DD de corriger les cases des arrondissements ? */
+  ordreCorrection?: boolean;
 }
 
 /** La grille d'un tableau, telle que ce profil la voit et la remplit. */
@@ -475,7 +478,8 @@ async function grilleEtContexte(db: PrismaClient, periode: Periode, profil: Prof
   });
   const valeur = fournisseur(donnees, ctx);
   const confirmees = await reprisesConfirmees(db, periode);
-  return { g: construireGrille(bloc, section, ctx, profil, donnees, valeur, confirmees), bloc, ctx, donnees, valeur, confirmees };
+  const ordre = await aOrdreDeCorrection(db, periode, profil.role);
+  return { g: construireGrille(bloc, section, ctx, profil, donnees, valeur, confirmees, ordre), bloc, ctx, donnees, valeur, confirmees };
 }
 
 /**
@@ -490,11 +494,12 @@ export async function grilles(db: PrismaClient, periode: Periode, profil: Profil
   const donnees = await preparer(db, periode, champsMobilises(), { autoriserIncomplet: true, arrondissementId });
   const valeur = fournisseur(donnees, ctx);
   const confirmees = await reprisesConfirmees(db, periode);
+  const ordre = await aOrdreDeCorrection(db, periode, profil.role);
   const sortie: GrilleSaisie[] = [];
   for (const { bloc, section } of tableaux()) {
     const { colonnes, cles } = coordonnees(bloc, ctx);
     const saisissable = cles.some((l) => colonnes.some((c) => etatCase(bloc, ctx, profil, l, c, valeur.sid) === "saisie"));
-    if (saisissable) sortie.push(construireGrille(bloc, section, ctx, profil, donnees, valeur, confirmees));
+    if (saisissable) sortie.push(construireGrille(bloc, section, ctx, profil, donnees, valeur, confirmees, ordre));
   }
   return sortie;
 }
@@ -529,6 +534,10 @@ export async function refusCorrectionAnPasse(
 ): Promise<string | null> {
   if (!(ROLES_CORRECTION_AN_PASSE as readonly string[]).includes(profil.role)) {
     return "Un chiffre de l'an passé se corrige par le DA, le chef de section ou le Délégué départemental.";
+  }
+  // Un chef de section ne corrige un chiffre déjà inscrit que sur ordre du DD (20 octobre 2026).
+  if (profil.role.startsWith("CHEF_") && !(await aOrdreDeCorrection(db, periode, profil.role))) {
+    return "Un chef de section corrige un chiffre déjà inscrit seulement sur ordre du Délégué départemental. Demandez-lui un ordre de correction, ou signalez la case à l'arrondissement.";
   }
   const t = tableauDe(numero);
   if (!t) return `Le tableau n° ${numero} n'existe pas au canevas.`;
@@ -640,7 +649,9 @@ function construireGrille(
   profil: Profil,
   donnees: Awaited<ReturnType<typeof preparer>>,
   valeur: ReturnType<typeof fournisseur>,
-  confirmees: Set<string> = new Set()
+  confirmees: Set<string> = new Set(),
+  /** Le chef de section a l'ordre du DD de corriger, pour ce trimestre (ordresCorrection.ts). */
+  ordreCorrection = false
 ): GrilleSaisie {
   const numero = bloc.numero!;
   const { enteteLigne, colonnes, cles, libelles } = coordonnees(bloc, ctx);
@@ -652,8 +663,10 @@ function construireGrille(
       const s = donnees.saisies.get(cleCellule({ numeroTableau: numero, ligne: cle, colonne }));
       const reprise = s ? null : valeurReprise(donnees.saisies, numero, cle, colonne);
       const etat = etatCase(bloc, ctx, profil, cle, colonne, valeur.sid);
-      // Un chef de section complète ce qui manque ; ce que l'arrondissement a écrit se signale.
-      const reservee = etat === "saisie" && estChefTechnique(profil.role) && remplieParLArrondissement(s);
+      // Un chef de section complète ce qui manque ; ce que l'arrondissement a
+      // écrit se signale — sauf sur ordre de correction du DD (20 octobre 2026),
+      // qui vaut pour tous les chefs, BAC compris.
+      const reservee = etat === "saisie" && profil.role.startsWith("CHEF_") && !ordreCorrection && remplieParLArrondissement(s);
       return {
         colonne,
         texte: !attendUnNombre(colonne),
@@ -682,6 +695,7 @@ function construireGrille(
     lignes,
     avertissements: alertes.map((a) => a.texte),
     alertes,
+    ...(profil.role.startsWith("CHEF_") ? { ordreCorrection } : {}),
     aide: [
       AIDES[numero] ?? AIDE_PAR_DEFAUT,
       ...(bloc.kind === "arrondissements" && bloc.totalSansSomme ? [bloc.totalSansSomme] : []),
@@ -1247,8 +1261,9 @@ export async function refusDeSaisie(
     default:
       break;
   }
-  // Un chef de section ne réécrit pas ce que l'arrondissement a saisi.
-  if (estChefTechnique(profil.role)) {
+  // Un chef de section ne réécrit pas ce que l'arrondissement a saisi — sauf
+  // sur ordre de correction du DD pour ce trimestre (20 octobre 2026).
+  if (profil.role.startsWith("CHEF_") && !(await aOrdreDeCorrection(db, periode, profil.role))) {
     const p = await db.periodeReporting.findFirst({
       where: { type: "TRIMESTRIEL", annee: periode.annee, trimestre: periode.rang },
       select: { id: true },
@@ -1260,7 +1275,7 @@ export async function refusDeSaisie(
         })
       : null;
     if (existante && remplieParLArrondissement({ valeur: null, texte: null, parRole: existante.auteur?.role ?? null })) {
-      return MESSAGE_CASE_DE_L_ARRONDISSEMENT;
+      return MESSAGE_SANS_ORDRE;
     }
   }
   return null;

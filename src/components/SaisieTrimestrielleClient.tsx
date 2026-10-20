@@ -45,6 +45,8 @@ interface CaseGrille {
 }
 
 interface Grille {
+  /** Un chef : l'ordre du DD de corriger les cases des arrondissements, pour ce trimestre. */
+  ordreCorrection?: boolean;
   numero: number;
   titre: string;
   section: string;
@@ -522,7 +524,9 @@ export default function SaisieTrimestrielleClient({
               {modeSignaler && <span className="text-sm text-amber-900">Touchez la case qui ne va pas.</span>}
             </div>
           )}
-          {peutCorriger && grille && grille.numero === courant.numero && casesCorrigeables(grille, annee).length > 0 && (
+          {peutCorriger && grille && grille.numero === courant.numero && casesCorrigeables(grille, annee).length > 0 &&
+            // Un chef de section corrige seulement sur ordre du DD (20 octobre 2026).
+            (!moi?.role.startsWith("CHEF_") || grille.ordreCorrection) && (
             <div className="mb-3">
               {!corriger ? (
                 <button
