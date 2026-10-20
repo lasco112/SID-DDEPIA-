@@ -267,10 +267,11 @@ export default function EtablissementsClient({
           <table className="w-full border-collapse text-sm">
             <thead>
               <tr className="bg-gray-50 text-left">
-                <th className="border-b border-gray-200 px-3 py-2">Nom</th>
-                <th className="border-b border-gray-200 px-3 py-2">Localité</th>
-                <th className="border-b border-gray-200 px-3 py-2">Propriétaire</th>
-                <th className="border-b border-gray-200 px-3 py-2">Téléphone</th>
+                {/* Largeurs minimales : sans elles, le nom se réduisait à trois lettres sur un écran moyen. */}
+                <th className="min-w-[200px] border-b border-gray-200 px-3 py-2">Nom</th>
+                <th className="min-w-[140px] border-b border-gray-200 px-3 py-2">Localité</th>
+                <th className="min-w-[140px] border-b border-gray-200 px-3 py-2">Propriétaire</th>
+                <th className="min-w-[120px] border-b border-gray-200 px-3 py-2">Téléphone</th>
                 <th className="border-b border-gray-200 px-3 py-2">Fiche</th>
                 <th className="border-b border-gray-200 px-3 py-2">Statut</th>
                 <th className="border-b border-gray-200 px-3 py-2 text-right">Suppression</th>
@@ -376,8 +377,8 @@ function LigneEtablissement({
             onClick={() => {
               const r = nettoyerInfos(infos as Record<string, unknown>);
               if ("erreur" in r) return onMessage(r.erreur);
-              onMessage(null);
               onModifier(r.donnees);
+              onMessage(`Fiche de « ${etab.nom} » enregistrée.`);
               setFicheOuverte(false);
             }}
             className="mt-3 min-h-[40px] rounded-btn bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-hover disabled:opacity-50"

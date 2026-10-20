@@ -97,7 +97,7 @@ export default function AppShellClient({
 
         <div className="flex shrink-0 items-center gap-[11px]">
           <img src="/icon-512.png?v=2" alt="SID EPIA-O" className="h-[34px] w-[34px] shrink-0 rounded-[7px]" />
-          <div className="hidden leading-tight sm:block">
+          <div className="hidden leading-tight lg:block">
             <div className="text-[15px] font-bold">{application}</div>
             <div className="text-[11px] text-white/70">{"Délégation Départementale · " + departement}</div>
           </div>
@@ -108,7 +108,10 @@ export default function AppShellClient({
             visible — défaut constaté sur téléphones étroits (Android 14 entre
             autres) où la rangée complète dépassait la largeur de l'écran et
             faisait disparaître les derniers boutons à droite. */}
-        <div className="ml-auto flex min-w-0 shrink items-center gap-1 sm:gap-4">
+        {/* Entre le téléphone et l'ordinateur (tablette, 640–1024 px), la
+            rangée complète dépassait encore à droite : écarts resserrés et
+            textes masqués jusqu'aux grands écrans. */}
+        <div className="ml-auto flex min-w-0 shrink items-center gap-1 sm:gap-2 lg:gap-4">
           <BadgeACorriger />
           <span data-visite="periode" className="flex min-w-0 shrink">
             <SelecteurPeriode periodes={periodes} couranteId={couranteId} />
@@ -124,7 +127,7 @@ export default function AppShellClient({
               depuis, la rangée comptait huit éléments et les derniers
               sortaient du cadre. Les trois sont repris dans le tiroir de
               navigation, où ils restent atteignables. */}
-          <div className="hidden items-center gap-1 sm:flex sm:gap-4">
+          <div className="hidden items-center gap-1 sm:flex sm:gap-2 lg:gap-4">
             <RechercheGlobale role={role} adminSysteme={adminSysteme} />
             <AideButton role={role} />
           </div>
@@ -146,7 +149,7 @@ export default function AppShellClient({
             className="flex h-9 shrink-0 items-center gap-1.5 rounded-md border border-white/25 bg-white/10 px-2 text-[13px] font-semibold text-white hover:bg-white/20 sm:px-3"
           >
             <LogOut size={16} />
-            <span className="hidden sm:inline">Déconnexion</span>
+            <span className="hidden lg:inline">Déconnexion</span>
           </a>
         </div>
       </header>

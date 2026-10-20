@@ -66,14 +66,26 @@ export async function creerEtablissement(data: NouvelEtablissement): Promise<Eta
   };
   await offlineDB.etablissements.put(etablissement);
   await empiler({ entite: "etablissement", operation: "CREATION", cibleId: etablissement.id, payload: { ...etablissement } });
-  void synchroniserEtablissements();
+  await envoyerSansBloquer();
   return etablissement;
 }
 
 export async function modifierEtablissement(id: string, patch: Partial<EtablissementOffline>): Promise<void> {
   await offlineDB.etablissements.update(id, { ...patch, enAttenteSynchro: true });
   await empiler({ entite: "etablissement", operation: "MODIFICATION", cibleId: id, payload: { ...patch } });
-  void synchroniserEtablissements();
+  await envoyerSansBloquer();
+}
+
+/**
+ * Tente l'envoi tout de suite et l'ATTEND, quelques secondes au plus : l'écran
+ * dit ensuite la vérité — « ajouté » quand le serveur l'a reçu, « enregistré
+ * sur cet appareil » seulement quand il ne l'a pas reçu. Avant, l'envoi partait
+ * sans être attendu, et l'écran annonçait « sera transmis » même en ligne.
+ * Sans réseau (ou Wi-Fi sans Internet), on n'attend pas plus de 8 secondes :
+ * l'opération reste dans la file et repartira seule.
+ */
+async function envoyerSansBloquer(): Promise<void> {
+  await Promise.race([synchroniserEtablissements().catch(() => undefined), new Promise((ok) => setTimeout(ok, 8000))]);
 }
 
 /**
@@ -84,55 +96,63 @@ export async function modifierEtablissement(id: string, patch: Partial<Etablisse
 export async function supprimerEtablissement(id: string): Promise<void> {
   await offlineDB.etablissements.update(id, { deletedAt: new Date().toISOString(), enAttenteSynchro: true });
   await empiler({ entite: "etablissement", operation: "SUPPRESSION", cibleId: id, payload: {} });
-  void synchroniserEtablissements();
+  await envoyerSansBloquer();
 }
 
 export async function nombreOperationsEnAttente(): Promise<number> {
   return offlineDB.fileAttente.count();
 }
 
-let synchroEnCours = false;
+let synchroEnCours: Promise<{ envoyees: number; echecs: number }> | null = null;
 
 /**
  * Rejoue la file dans l'ordre. Une opération n'est retirée de la file que si
  * le serveur l'a réellement acceptée — sinon elle est conservée avec le
  * message d'erreur, et repartira à la tentative suivante.
+ *
+ * Un envoi déjà en cours est ATTENDU, puis la file relue : une opération
+ * empilée pendant qu'il tournait n'est pas oubliée jusqu'au prochain passage.
  */
 export async function synchroniserEtablissements(): Promise<{ envoyees: number; echecs: number }> {
-  if (synchroEnCours || typeof navigator === "undefined" || !navigator.onLine) return { envoyees: 0, echecs: 0 };
-  synchroEnCours = true;
+  if (typeof navigator === "undefined" || !navigator.onLine) return { envoyees: 0, echecs: 0 };
+  while (synchroEnCours) await synchroEnCours.catch(() => undefined);
+  synchroEnCours = rejouerLaFile();
+  try {
+    return await synchroEnCours;
+  } finally {
+    synchroEnCours = null;
+  }
+}
+
+async function rejouerLaFile(): Promise<{ envoyees: number; echecs: number }> {
   let envoyees = 0;
   let echecs = 0;
 
-  try {
-    const operations = await offlineDB.fileAttente.orderBy("id").toArray();
-    for (const op of operations) {
-      try {
-        const ok = await envoyerOperation(op);
-        if (!ok) {
-          echecs++;
-          continue;
-        }
-        if (op.id !== undefined) await offlineDB.fileAttente.delete(op.id);
-
-        if (op.operation === "SUPPRESSION") {
-          await offlineDB.etablissements.delete(op.cibleId); // confirmé côté serveur : on peut retirer la marque et la ligne
-        } else {
-          await offlineDB.etablissements.update(op.cibleId, { enAttenteSynchro: false });
-        }
-        envoyees++;
-      } catch (e) {
+  const operations = await offlineDB.fileAttente.orderBy("id").toArray();
+  for (const op of operations) {
+    try {
+      const ok = await envoyerOperation(op);
+      if (!ok) {
         echecs++;
-        if (op.id !== undefined) {
-          await offlineDB.fileAttente.update(op.id, {
-            tentatives: op.tentatives + 1,
-            derniereErreur: e instanceof Error ? e.message : "Erreur inconnue",
-          });
-        }
+        continue;
+      }
+      if (op.id !== undefined) await offlineDB.fileAttente.delete(op.id);
+
+      if (op.operation === "SUPPRESSION") {
+        await offlineDB.etablissements.delete(op.cibleId); // confirmé côté serveur : on peut retirer la marque et la ligne
+      } else {
+        await offlineDB.etablissements.update(op.cibleId, { enAttenteSynchro: false });
+      }
+      envoyees++;
+    } catch (e) {
+      echecs++;
+      if (op.id !== undefined) {
+        await offlineDB.fileAttente.update(op.id, {
+          tentatives: op.tentatives + 1,
+          derniereErreur: e instanceof Error ? e.message : "Erreur inconnue",
+        });
       }
     }
-  } finally {
-    synchroEnCours = false;
   }
 
   return { envoyees, echecs };
