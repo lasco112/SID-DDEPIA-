@@ -22,7 +22,7 @@ export default async function EtablissementsPage() {
       <div className="max-w-5xl">
         <h1 className="text-2xl font-bold text-primary-dark">Registre des établissements</h1>
         <p className="mt-1 text-gray-600">
-          Couvoirs, fermes de ponte, fermes de poulets de chair et provenderies utilisés dans les tableaux 1.3, 1.4, 1.5 et 2.3.
+          Tous les acteurs de l'élevage : couvoirs, fermes de ponte, fermes de poulets de chair et provenderies (utilisés dans les tableaux 1.3, 1.4, 1.5 et 2.3), marchés, abattoirs, aires d'abattage, étangs piscicoles et cliniques vétérinaires privées — avec leurs coordonnées GPS et, pour un marché, les espèces vendues, les jours et les équipements.
           Ajoutez un nouvel établissement ou corrigez un nom déjà existant — un établissement fermé peut être désactivé sans perdre son historique.
           {role === "DD"
             ? " La suppression définitive emporte aussi les saisies rattachées."

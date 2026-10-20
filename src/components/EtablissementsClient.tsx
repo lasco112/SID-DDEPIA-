@@ -24,6 +24,8 @@ import {
 } from "@/lib/etablissementsLocal";
 import VisiteGuidee from "@/components/VisiteGuidee";
 import ListeFermes from "@/components/ListeFermes";
+import InfosActeurForm from "@/components/InfosActeurForm";
+import { TYPES_ACTEURS, nettoyerInfos, libellesEspeces, type InfosStructurelles } from "@/lib/acteurs";
 
 interface Arrondissement {
   id: string;
@@ -34,12 +36,10 @@ interface Arrondissement {
 /** Même forme que la table locale : cet écran lit et écrit désormais Dexie. */
 type Etablissement = EtablissementOffline;
 
-const TYPES = [
-  { code: "ETAB_COUVOIR", label: "Couvoirs — Tableau 1.3" },
-  { code: "ETAB_FERME_PONTE", label: "Fermes de ponte — Tableau 1.4" },
-  { code: "ETAB_FERME_CHAIR", label: "Fermes de poulets de chair — Tableau 1.5" },
-  { code: "ETAB_PROVENDERIE", label: "Provenderies — Tableau 2.3" },
-];
+// Les neuf types d'acteurs (20 octobre 2026) : les quatre des tableaux
+// nominatifs, dans le même ordre qu'avant, puis marchés, abattoirs, aires
+// d'abattage, étangs et cliniques. Voir src/lib/acteurs.ts.
+const TYPES = TYPES_ACTEURS.map((t) => ({ code: t.code, label: t.tableau ? `${t.pluriel} — Tableau ${t.tableau}` : t.pluriel }));
 
 export default function EtablissementsClient({
   role,
@@ -61,6 +61,7 @@ export default function EtablissementsClient({
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
   const [nouveau, setNouveau] = useState({ nom: "", localite: "", proprietaire: "", telephone: "" });
+  const [infosNouveau, setInfosNouveau] = useState<InfosStructurelles>({});
   const [ajout, setAjout] = useState(false);
   const [aSupprimer, setASupprimer] = useState<{ id: string; nom: string } | null>(null);
 
@@ -98,10 +99,16 @@ export default function EtablissementsClient({
       setMessage("Nom et localité requis.");
       return;
     }
+    const infos = nettoyerInfos(infosNouveau as Record<string, unknown>);
+    if ("erreur" in infos) {
+      setMessage(infos.erreur);
+      return;
+    }
     setAjout(true);
     try {
-      const cree = await creerEtablissement({ typeCode, arrondissementId, ...nouveau });
+      const cree = await creerEtablissement({ typeCode, arrondissementId, ...nouveau, ...infos.donnees });
       setNouveau({ nom: "", localite: "", proprietaire: "", telephone: "" });
+      setInfosNouveau({});
       // On se fie au RÉSULTAT réel, pas à navigator.onLine : celui-ci reste
       // « en ligne » quand l'appareil est connecté au Wi-Fi sans Internet.
       setMessage(
@@ -173,7 +180,10 @@ export default function EtablissementsClient({
         {TYPES.map((t) => (
           <button
             key={t.code}
-            onClick={() => setTypeCode(t.code)}
+            onClick={() => {
+              setTypeCode(t.code);
+              setInfosNouveau({});
+            }}
             className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
               typeCode === t.code ? "bg-primary text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
             }`}
@@ -228,6 +238,15 @@ export default function EtablissementsClient({
             className="rounded-md border border-gray-300 px-3 py-2 text-sm"
           />
         </div>
+        {/* Les informations structurelles : ouvertes d'emblée pour un marché. */}
+        <details key={typeCode} open={typeCode === "ETAB_MARCHE"} className="mt-3 rounded-input border border-gray-200 bg-white p-3">
+          <summary className="cursor-pointer text-sm font-semibold text-primary">
+            Informations structurelles : coordonnées GPS{typeCode === "ETAB_MARCHE" ? ", espèces vendues, jours de marché, équipements" : ""}…
+          </summary>
+          <div className="mt-3">
+            <InfosActeurForm typeCode={typeCode} valeur={infosNouveau} onChange={setInfosNouveau} />
+          </div>
+        </details>
         <button
           type="submit"
           disabled={ajout}
@@ -252,6 +271,7 @@ export default function EtablissementsClient({
                 <th className="border-b border-gray-200 px-3 py-2">Localité</th>
                 <th className="border-b border-gray-200 px-3 py-2">Propriétaire</th>
                 <th className="border-b border-gray-200 px-3 py-2">Téléphone</th>
+                <th className="border-b border-gray-200 px-3 py-2">Fiche</th>
                 <th className="border-b border-gray-200 px-3 py-2">Statut</th>
                 <th className="border-b border-gray-200 px-3 py-2 text-right">Suppression</th>
               </tr>
@@ -261,6 +281,7 @@ export default function EtablissementsClient({
                 <LigneEtablissement
                   key={etab.id}
                   etab={etab}
+                  onMessage={setMessage}
                   onModifier={(patch) => modifier(etab.id, patch)}
                   onSupprimer={() => setASupprimer({ id: etab.id, nom: etab.nom })}
                 />
@@ -277,11 +298,27 @@ function LigneEtablissement({
   etab,
   onModifier,
   onSupprimer,
+  onMessage,
 }: {
   etab: Etablissement;
   onModifier: (patch: Partial<Etablissement>) => void;
   onSupprimer: () => void;
+  onMessage: (m: string | null) => void;
 }) {
+  const [ficheOuverte, setFicheOuverte] = useState(false);
+  const [infos, setInfos] = useState<InfosStructurelles>({
+    latitude: etab.latitude ?? null,
+    longitude: etab.longitude ?? null,
+    especes: etab.especes ?? [],
+    joursMarche: etab.joursMarche ?? [],
+    infrastructures: etab.infrastructures ?? [],
+    observations: etab.observations ?? null,
+  });
+  const resume = [
+    etab.latitude != null && etab.longitude != null ? "GPS" : null,
+    etab.especes?.length ? libellesEspeces(etab.especes) : null,
+    etab.joursMarche?.length ? etab.joursMarche.map((j) => j.slice(0, 3).toLowerCase()).join(", ") : null,
+  ].filter(Boolean).join(" · ");
   const [nom, setNom] = useState(etab.nom);
   const [localite, setLocalite] = useState(etab.localite);
   const [proprietaire, setProprietaire] = useState(etab.proprietaire ?? "");
@@ -290,6 +327,7 @@ function LigneEtablissement({
   const champCommun = "w-full rounded border border-transparent bg-transparent px-1 py-0.5 hover:border-gray-300 focus:border-blue-400 focus:bg-white focus:outline-none disabled:text-gray-400";
 
   return (
+    <>
     <tr className={!etab.actif ? "bg-gray-50 text-gray-400" : ""}>
       <td className="border-b border-gray-100 px-3 py-2">
         <input data-visite="modifier-etablissement" value={nom} disabled={!etab.actif} onChange={(e) => setNom(e.target.value)} onBlur={() => nom !== etab.nom && onModifier({ nom })} className={champCommun} />
@@ -302,6 +340,16 @@ function LigneEtablissement({
       </td>
       <td className="border-b border-gray-100 px-3 py-2">
         <input value={telephone} disabled={!etab.actif} onChange={(e) => setTelephone(e.target.value)} onBlur={() => telephone !== (etab.telephone ?? "") && onModifier({ telephone })} className={champCommun} />
+      </td>
+      <td className="border-b border-gray-100 px-3 py-2">
+        <button
+          type="button"
+          onClick={() => setFicheOuverte((v) => !v)}
+          className="rounded-btn border border-gray-300 bg-white px-2 py-1 text-xs font-semibold text-primary hover:bg-primary-light"
+        >
+          {ficheOuverte ? "Fermer la fiche" : "Fiche"}
+        </button>
+        {resume && <span className="mt-0.5 block max-w-[220px] truncate text-[11px] text-ink-muted" title={resume}>{resume}</span>}
       </td>
       <td className="border-b border-gray-100 px-3 py-2">
         <button
@@ -318,5 +366,27 @@ function LigneEtablissement({
         </button>
       </td>
     </tr>
+    {ficheOuverte && (
+      <tr>
+        <td colSpan={7} className="border-b border-gray-200 bg-gray-50 px-3 py-3">
+          <InfosActeurForm typeCode={etab.typeCode} valeur={infos} onChange={setInfos} desactive={!etab.actif} />
+          <button
+            type="button"
+            disabled={!etab.actif}
+            onClick={() => {
+              const r = nettoyerInfos(infos as Record<string, unknown>);
+              if ("erreur" in r) return onMessage(r.erreur);
+              onMessage(null);
+              onModifier(r.donnees);
+              setFicheOuverte(false);
+            }}
+            className="mt-3 min-h-[40px] rounded-btn bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-hover disabled:opacity-50"
+          >
+            Enregistrer la fiche
+          </button>
+        </td>
+      </tr>
+    )}
+    </>
   );
 }

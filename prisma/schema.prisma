@@ -312,6 +312,16 @@ model Etablissement {
   dateCollecteGPS  DateTime?
   precisionGPS     Float?
   createdAt        DateTime                              @default(now())
+  /// Informations structurelles (20 octobre 2026) : coordonnées lisibles par
+  /// tous les écrans et l'export (la géométrie PostGIS ci-dessus reste pour le
+  /// module SIG), espèces vendues ou élevées, jours d'un marché, ses
+  /// équipements. Codes : voir src/lib/acteurs.ts.
+  latitude         Float?
+  longitude        Float?
+  especes          String[]                              @default([])
+  joursMarche      String[]                              @default([])
+  infrastructures  String[]                              @default([])
+  observations     String?
 
   arrondissement Arrondissement     @relation(fields: [arrondissementId], references: [id])
   saisies        SaisieNominative[]

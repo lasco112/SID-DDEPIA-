@@ -17,8 +17,9 @@
  */
 
 import { offlineDB, type EtablissementOffline, type OperationEnAttente } from "@/lib/dexie";
+import type { InfosStructurelles } from "@/lib/acteurs";
 
-export interface NouvelEtablissement {
+export interface NouvelEtablissement extends InfosStructurelles {
   typeCode: string;
   nom: string;
   localite: string;
@@ -54,6 +55,12 @@ export async function creerEtablissement(data: NouvelEtablissement): Promise<Eta
     arrondissementId: data.arrondissementId,
     proprietaire: data.proprietaire?.trim() || null,
     telephone: data.telephone?.trim() || null,
+    latitude: data.latitude ?? null,
+    longitude: data.longitude ?? null,
+    especes: data.especes ?? [],
+    joursMarche: data.joursMarche ?? [],
+    infrastructures: data.infrastructures ?? [],
+    observations: data.observations ?? null,
     actif: true,
     enAttenteSynchro: true,
   };
@@ -145,6 +152,12 @@ async function envoyerOperation(op: OperationEnAttente): Promise<boolean> {
         arrondissementId: e.arrondissementId,
         proprietaire: e.proprietaire ?? undefined,
         telephone: e.telephone ?? undefined,
+        latitude: e.latitude ?? null,
+        longitude: e.longitude ?? null,
+        especes: e.especes ?? [],
+        joursMarche: e.joursMarche ?? [],
+        infrastructures: e.infrastructures ?? [],
+        observations: e.observations ?? null,
       }),
     });
     if (res.ok) return true;

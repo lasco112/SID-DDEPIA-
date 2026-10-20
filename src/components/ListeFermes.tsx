@@ -10,13 +10,16 @@
  * n'a que le sien (le serveur l'impose de toute façon).
  */
 import { useState } from "react";
+import { TYPES_ACTEURS } from "@/lib/acteurs";
 
-const SPECULATIONS = [
-  { code: "TOUS", label: "Toutes les spéculations" },
-  { code: "ETAB_COUVOIR", label: "Couvoirs" },
-  { code: "ETAB_FERME_PONTE", label: "Fermes de ponte" },
-  { code: "ETAB_FERME_CHAIR", label: "Fermes de poulets de chair" },
-  { code: "ETAB_PROVENDERIE", label: "Provenderies" },
+// Tous les acteurs du registre, ou un seul type (20 octobre 2026 : « sortir
+// toute la liste, tous les acteurs, ou faire des tris »).
+const SPECULATIONS = [{ code: "TOUS", label: "Tous les acteurs" }, ...TYPES_ACTEURS.map((t) => ({ code: t.code, label: t.pluriel }))];
+const TRIS = [
+  { code: "arrondissement", label: "Arrondissement, puis type" },
+  { code: "type", label: "Type d'acteur, puis arrondissement" },
+  { code: "nom", label: "Nom (alphabétique)" },
+  { code: "localite", label: "Localité" },
 ];
 
 interface Ligne {
@@ -28,6 +31,12 @@ interface Ligne {
   proprietaire: string | null;
   telephone: string | null;
   actif: boolean;
+  latitude: number | null;
+  longitude: number | null;
+  especes: string;
+  joursMarche: string;
+  infrastructures: string;
+  observations: string | null;
 }
 
 export default function ListeFermes({
@@ -41,12 +50,13 @@ export default function ListeFermes({
   const [arrondissementId, setArrondissementId] = useState("TOUS");
   const [typeCode, setTypeCode] = useState("TOUS");
   const [actifs, setActifs] = useState(true);
+  const [tri, setTri] = useState("arrondissement");
   const [resultat, setResultat] = useState<{ portee: string; speculation: string; lignes: Ligne[] } | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
   const [occupe, setOccupe] = useState(false);
 
   const parametres = (format?: string) =>
-    new URLSearchParams({ typeCode, arrondissementId, ...(actifs ? { actifs: "1" } : {}), ...(format ? { format } : {}) }).toString();
+    new URLSearchParams({ typeCode, arrondissementId, tri, ...(actifs ? { actifs: "1" } : {}), ...(format ? { format } : {}) }).toString();
 
   async function afficher() {
     setErreur(null);
@@ -75,34 +85,26 @@ export default function ListeFermes({
         onClick={() => setOuvert(true)}
         className="mb-5 min-h-[44px] rounded-btn border border-primary bg-white px-4 py-2 text-sm font-bold text-primary hover:bg-primary-light"
       >
-        Liste des fermes par arrondissement et par spéculation
+        Liste des fermes et des acteurs, par arrondissement et par type
       </button>
     );
   }
 
-  // Le nom d'une spéculation tel que le serveur l'écrit, et son pluriel.
-  const PLURIELS: Record<string, string> = {
-    Couvoir: "couvoirs",
-    "Ferme de ponte": "fermes de ponte",
-    "Ferme de poulets de chair": "fermes de poulets de chair",
-    Provenderie: "provenderies",
-  };
+  // Le décompte par type : le serveur écrit le libellé au singulier.
   const decompte = resultat
-    ? Object.keys(PLURIELS)
-        .map((s) => ({ label: PLURIELS[s], n: resultat.lignes.filter((l) => l.speculation === s).length }))
-        .filter((x) => x.n > 0)
+    ? TYPES_ACTEURS.map((t) => ({ label: t.pluriel.toLowerCase(), n: resultat.lignes.filter((l) => l.speculation === t.libelle).length })).filter((x) => x.n > 0)
     : [];
 
   return (
     <section className="mb-6 rounded-card border border-line bg-white p-4 shadow-card print:border-0 print:shadow-none">
       <div className="flex flex-wrap items-start justify-between gap-2 print:hidden">
-        <h2 className="text-[16px] font-bold text-primary-dark">Liste des fermes</h2>
+        <h2 className="text-[16px] font-bold text-primary-dark">Liste des fermes et des acteurs</h2>
         <button type="button" onClick={() => setOuvert(false)} className="text-sm font-semibold text-ink-muted hover:underline">
           Fermer
         </button>
       </div>
 
-      <div className="mt-3 grid gap-3 sm:grid-cols-3 print:hidden">
+      <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 print:hidden">
         <label className="text-[13px] font-bold text-ink">
           Arrondissement
           {estDD ? (
@@ -125,7 +127,7 @@ export default function ListeFermes({
           )}
         </label>
         <label className="text-[13px] font-bold text-ink">
-          Spéculation
+          Type d'acteur
           <select
             value={typeCode}
             onChange={(e) => setTypeCode(e.target.value)}
@@ -134,6 +136,20 @@ export default function ListeFermes({
             {SPECULATIONS.map((s) => (
               <option key={s.code} value={s.code}>
                 {s.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="text-[13px] font-bold text-ink">
+          Trier par
+          <select
+            value={tri}
+            onChange={(e) => setTri(e.target.value)}
+            className="mt-1 block min-h-[42px] w-full rounded-input border border-gray-300 bg-white px-2 text-sm font-normal"
+          >
+            {TRIS.map((x) => (
+              <option key={x.code} value={x.code}>
+                {x.label}
               </option>
             ))}
           </select>
@@ -190,11 +206,13 @@ export default function ListeFermes({
                   <tr className="text-left">
                     <th className="border-b border-gray-200 px-3 py-2 text-right">N°</th>
                     <th className="border-b border-gray-200 px-3 py-2">Arrondissement</th>
-                    <th className="border-b border-gray-200 px-3 py-2">Spéculation</th>
+                    <th className="border-b border-gray-200 px-3 py-2">Type</th>
                     <th className="border-b border-gray-200 px-3 py-2">Nom</th>
                     <th className="border-b border-gray-200 px-3 py-2">Localité</th>
                     <th className="border-b border-gray-200 px-3 py-2">Propriétaire</th>
                     <th className="border-b border-gray-200 px-3 py-2">Téléphone</th>
+                    <th className="border-b border-gray-200 px-3 py-2">Espèces · jours</th>
+                    <th className="border-b border-gray-200 px-3 py-2">GPS</th>
                     <th className="border-b border-gray-200 px-3 py-2">Statut</th>
                   </tr>
                 </thead>
@@ -208,6 +226,10 @@ export default function ListeFermes({
                       <td className="border-b border-gray-100 px-3 py-2">{l.localite}</td>
                       <td className="border-b border-gray-100 px-3 py-2">{l.proprietaire ?? "—"}</td>
                       <td className="border-b border-gray-100 px-3 py-2">{l.telephone ?? "—"}</td>
+                      <td className="border-b border-gray-100 px-3 py-2 text-[13px]">{[l.especes, l.joursMarche].filter(Boolean).join(" · ") || "—"}</td>
+                      <td className="border-b border-gray-100 px-3 py-2 text-[12px] tabular-nums">
+                        {l.latitude != null && l.longitude != null ? `${l.latitude}, ${l.longitude}` : "—"}
+                      </td>
                       <td className="border-b border-gray-100 px-3 py-2">{l.actif ? "En activité" : "Désactivé"}</td>
                     </tr>
                   ))}
@@ -231,15 +253,15 @@ function imprimer(r: { portee: string; speculation: string; lignes: Ligne[] }) {
   const lignes = r.lignes
     .map(
       (l, i) =>
-        `<tr><td style="text-align:right">${i + 1}</td><td>${echapper(l.arrondissement)}</td><td>${echapper(l.speculation)}</td><td><b>${echapper(l.nom)}</b></td><td>${echapper(l.localite)}</td><td>${echapper(l.proprietaire)}</td><td>${echapper(l.telephone)}</td><td>${l.actif ? "En activité" : "Désactivé"}</td></tr>`
+        `<tr><td style="text-align:right">${i + 1}</td><td>${echapper(l.arrondissement)}</td><td>${echapper(l.speculation)}</td><td><b>${echapper(l.nom)}</b></td><td>${echapper(l.localite)}</td><td>${echapper(l.proprietaire)}</td><td>${echapper(l.telephone)}</td><td>${echapper([l.especes, l.joursMarche].filter(Boolean).join(" · ") || null)}</td><td>${l.latitude != null && l.longitude != null ? `${l.latitude}, ${l.longitude}` : "—"}</td><td>${l.actif ? "En activité" : "Désactivé"}</td></tr>`
     )
     .join("");
-  fenetre.document.write(`<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Liste des fermes</title>
+  fenetre.document.write(`<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Liste des fermes et des acteurs</title>
 <style>body{font-family:Arial,sans-serif;color:#10253f;margin:24px}h1{font-size:18px;margin:0}p{margin:4px 0 14px;color:#4e5a68;font-size:13px}
 table{border-collapse:collapse;width:100%;font-size:12px}th,td{border:1px solid #cfc9bc;padding:5px 7px;text-align:left}th{background:#f2efe8}</style></head>
-<body><h1>Liste des fermes — ${echapper(r.portee)} — ${echapper(r.speculation)}</h1>
+<body><h1>Liste des fermes et des acteurs — ${echapper(r.portee)} — ${echapper(r.speculation)}</h1>
 <p>${r.lignes.length} établissement(s) · état au ${new Date().toLocaleDateString("fr-FR")}</p>
-<table><thead><tr><th>N°</th><th>Arrondissement</th><th>Spéculation</th><th>Nom</th><th>Localité</th><th>Propriétaire</th><th>Téléphone</th><th>Statut</th></tr></thead><tbody>${lignes}</tbody></table>
+<table><thead><tr><th>N°</th><th>Arrondissement</th><th>Type</th><th>Nom</th><th>Localité</th><th>Propriétaire</th><th>Téléphone</th><th>Espèces · jours</th><th>GPS</th><th>Statut</th></tr></thead><tbody>${lignes}</tbody></table>
 <script>window.onload=function(){window.print()}</script></body></html>`);
   fenetre.document.close();
 }

@@ -16,6 +16,7 @@
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { requireUser, assertRole, permissionErrorResponse } from "@/lib/permissions";
+import { nettoyerInfos } from "@/lib/acteurs";
 
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
   try {
@@ -35,6 +36,12 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       proprietaire?: string | null;
       telephone?: string | null;
       actif?: boolean;
+      latitude?: number | string | null;
+      longitude?: number | string | null;
+      especes?: string[];
+      joursMarche?: string[];
+      infrastructures?: string[];
+      observations?: string | null;
     };
 
     const data: Record<string, unknown> = {};
@@ -49,6 +56,10 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     if (body.proprietaire !== undefined) data.proprietaire = body.proprietaire?.trim() || null;
     if (body.telephone !== undefined) data.telephone = body.telephone?.trim() || null;
     if (body.actif !== undefined) data.actif = body.actif;
+    // Les informations structurelles (GPS, espèces, jours de marché…).
+    const infos = nettoyerInfos(body as unknown as Record<string, unknown>);
+    if ("erreur" in infos) return NextResponse.json({ message: infos.erreur }, { status: 400 });
+    Object.assign(data, infos.donnees);
 
     const mis_a_jour = await user.db.etablissement.update({ where: { id: params.id }, data });
 

@@ -12,8 +12,12 @@
  */
 import { NextResponse } from "next/server";
 import { requireUser, assertRole, permissionErrorResponse } from "@/lib/permissions";
+import { CODES_ACTEURS, nettoyerInfos } from "@/lib/acteurs";
 
-const TYPES_VALIDES = ["ETAB_COUVOIR", "ETAB_FERME_PONTE", "ETAB_FERME_CHAIR", "ETAB_PROVENDERIE"];
+// Les neuf types d'acteurs de la liste de référence (20 octobre 2026) — les
+// quatre premiers servent aux tableaux nominatifs du mensuel, les autres
+// (marchés, abattoirs, étangs…) au registre et à ses listes.
+const TYPES_VALIDES = CODES_ACTEURS;
 
 export async function GET(req: Request) {
   try {
@@ -66,6 +70,12 @@ export async function POST(req: Request) {
       proprietaire?: string;
       telephone?: string;
       arrondissementId?: string;
+      latitude?: number | string | null;
+      longitude?: number | string | null;
+      especes?: string[];
+      joursMarche?: string[];
+      infrastructures?: string[];
+      observations?: string | null;
     };
 
     if (!body.typeCode || !TYPES_VALIDES.includes(body.typeCode)) {
@@ -84,7 +94,11 @@ export async function POST(req: Request) {
       arrondissementId = body.arrondissementId;
     }
 
+    const infos = nettoyerInfos(body as unknown as Record<string, unknown>);
+    if ("erreur" in infos) return NextResponse.json({ message: infos.erreur }, { status: 400 });
+
     const donnees = {
+      ...infos.donnees,
       typeCode: body.typeCode,
       nom: body.nom.trim(),
       localite: body.localite.trim(),

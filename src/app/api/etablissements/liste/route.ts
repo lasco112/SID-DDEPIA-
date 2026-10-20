@@ -7,6 +7,7 @@
  *   ?typeCode=TOUS|ETAB_COUVOIR|ETAB_FERME_PONTE|ETAB_FERME_CHAIR|ETAB_PROVENDERIE
  *   &arrondissementId=TOUS|<id>     (le DD seulement : un DA ou un agent a le sien)
  *   &actifs=1                       (seulement les établissements en activité)
+ *   &tri=arrondissement|type|nom|localite
  *   &format=xlsx                    (le fichier Excel ; sinon du JSON)
  *
  * Lecture seule, par `user.db` : le cloisonnement du département s'applique,
@@ -16,14 +17,12 @@ import { NextResponse } from "next/server";
 import ExcelJS from "exceljs";
 import { requireUser, assertRole, permissionErrorResponse } from "@/lib/permissions";
 import { identiteDepartement } from "@/lib/departement";
+import { TYPES_ACTEURS, libellesEspeces, libellesInfrastructures, libelleJour } from "@/lib/acteurs";
 
-// Pas exporté : un fichier de route Next n'exporte que ses méthodes.
-const SPECULATIONS: Record<string, string> = {
-  ETAB_COUVOIR: "Couvoir",
-  ETAB_FERME_PONTE: "Ferme de ponte",
-  ETAB_FERME_CHAIR: "Ferme de poulets de chair",
-  ETAB_PROVENDERIE: "Provenderie",
-};
+// Les neuf types d'acteurs (20 octobre 2026). Pas exporté : un fichier de
+// route Next n'exporte que ses méthodes.
+const SPECULATIONS: Record<string, string> = Object.fromEntries(TYPES_ACTEURS.map((t) => [t.code, t.libelle]));
+const TRIS = ["arrondissement", "type", "nom", "localite"] as const;
 
 export async function GET(req: Request) {
   try {
@@ -53,20 +52,33 @@ export async function GET(req: Request) {
       },
       select: {
         id: true, typeCode: true, nom: true, localite: true, proprietaire: true, telephone: true, actif: true,
+        latitude: true, longitude: true, especes: true, joursMarche: true, infrastructures: true, observations: true,
         arrondissement: { select: { nom: true, ordre: true } },
       },
     });
     const ordreType = Object.keys(SPECULATIONS);
-    lignes.sort(
-      (a, b) =>
-        (a.arrondissement.ordre ?? 0) - (b.arrondissement.ordre ?? 0) ||
-        ordreType.indexOf(a.typeCode) - ordreType.indexOf(b.typeCode) ||
-        a.nom.localeCompare(b.nom, "fr")
-    );
+    const tri = (TRIS as readonly string[]).includes(q.get("tri") ?? "") ? q.get("tri")! : "arrondissement";
+    const parArr = (a: (typeof lignes)[number], b: (typeof lignes)[number]) => (a.arrondissement.ordre ?? 0) - (b.arrondissement.ordre ?? 0);
+    const parType = (a: (typeof lignes)[number], b: (typeof lignes)[number]) => ordreType.indexOf(a.typeCode) - ordreType.indexOf(b.typeCode);
+    const parNom = (a: (typeof lignes)[number], b: (typeof lignes)[number]) => a.nom.localeCompare(b.nom, "fr");
+    const parLocalite = (a: (typeof lignes)[number], b: (typeof lignes)[number]) => a.localite.localeCompare(b.localite, "fr");
+    const ordres = {
+      arrondissement: [parArr, parType, parNom],
+      type: [parType, parArr, parNom],
+      nom: [parNom, parArr],
+      localite: [parLocalite, parNom],
+    }[tri as (typeof TRIS)[number]];
+    lignes.sort((a, b) => {
+      for (const f of ordres) {
+        const d = f(a, b);
+        if (d) return d;
+      }
+      return 0;
+    });
 
     const identite = await identiteDepartement(user.db);
     const portee = arrondissementId ? `Arrondissement de ${lignes[0]?.arrondissement.nom ?? (await user.db.arrondissement.findUnique({ where: { id: arrondissementId }, select: { nom: true } }))?.nom ?? ""}` : `Département ${identite.nomAvecArticle}`;
-    const speculation = typeCode === "TOUS" ? "Toutes les spéculations" : SPECULATIONS[typeCode];
+    const speculation = typeCode === "TOUS" ? "Tous les acteurs" : SPECULATIONS[typeCode];
 
     const rangees = lignes.map((l) => ({
       id: l.id,
@@ -77,6 +89,12 @@ export async function GET(req: Request) {
       proprietaire: l.proprietaire,
       telephone: l.telephone,
       actif: l.actif,
+      latitude: l.latitude,
+      longitude: l.longitude,
+      especes: libellesEspeces(l.especes),
+      joursMarche: l.joursMarche.map(libelleJour).join(", "),
+      infrastructures: libellesInfrastructures(l.infrastructures),
+      observations: l.observations,
     }));
 
     if (q.get("format") !== "xlsx") {
@@ -90,16 +108,22 @@ export async function GET(req: Request) {
     feuille.addRow([`Liste des fermes — ${portee} — ${speculation}`]).font = { bold: true, size: 13 };
     feuille.addRow([`${identite.intituleCourt} · état au ${new Date().toLocaleDateString("fr-FR", { timeZone: "Africa/Douala" })}${seulementActifs ? " · établissements en activité" : ""}`]);
     feuille.addRow([]);
-    const entete = feuille.addRow(["N°", "Arrondissement", "Spéculation", "Nom", "Localité", "Propriétaire", "Téléphone", "Statut"]);
+    const entete = feuille.addRow([
+      "N°", "Arrondissement", "Type d'acteur", "Nom", "Localité", "Propriétaire", "Téléphone", "Statut",
+      "Latitude", "Longitude", "Espèces", "Jours de marché", "Équipements", "Observations",
+    ]);
     entete.font = { bold: true };
     entete.eachCell((c) => {
       c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF2EFE8" } };
       c.border = { bottom: { style: "thin" } };
     });
     rangees.forEach((r, i) =>
-      feuille.addRow([i + 1, r.arrondissement, r.speculation, r.nom, r.localite, r.proprietaire ?? "", r.telephone ?? "", r.actif ? "En activité" : "Désactivé"])
+      feuille.addRow([
+        i + 1, r.arrondissement, r.speculation, r.nom, r.localite, r.proprietaire ?? "", r.telephone ?? "", r.actif ? "En activité" : "Désactivé",
+        r.latitude ?? "", r.longitude ?? "", r.especes, r.joursMarche, r.infrastructures, r.observations ?? "",
+      ])
     );
-    [6, 18, 26, 32, 22, 24, 16, 13].forEach((w, i) => (feuille.getColumn(i + 1).width = w));
+    [6, 18, 26, 32, 22, 24, 16, 13, 12, 12, 30, 24, 34, 40].forEach((w, i) => (feuille.getColumn(i + 1).width = w));
 
     const decompte = classeur.addWorksheet("Décompte");
     const types = typeCode === "TOUS" ? ordreType : [typeCode];

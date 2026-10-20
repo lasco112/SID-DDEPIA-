@@ -131,6 +131,15 @@ export async function GET() {
         localite: e.localite,
         arrondissementId: e.arrondissementId,
         actif: e.actif,
+        proprietaire: e.proprietaire,
+        telephone: e.telephone,
+        // Informations structurelles (20 octobre 2026) : consultables sans réseau.
+        latitude: e.latitude,
+        longitude: e.longitude,
+        especes: e.especes,
+        joursMarche: e.joursMarche,
+        infrastructures: e.infrastructures,
+        observations: e.observations,
       })),
       referentiels: referentiels.map((r) => ({
         id: `${r.categorie}:${r.code}`,

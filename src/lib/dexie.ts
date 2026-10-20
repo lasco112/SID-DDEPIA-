@@ -119,6 +119,13 @@ export interface EtablissementOffline {
   actif: boolean;
   proprietaire?: string | null;
   telephone?: string | null;
+  /** Informations structurelles (20 octobre 2026) — codes : src/lib/acteurs.ts. */
+  latitude?: number | null;
+  longitude?: number | null;
+  especes?: string[];
+  joursMarche?: string[];
+  infrastructures?: string[];
+  observations?: string | null;
   /**
    * Suppression demandée hors ligne (« tombstone ») : l'établissement
    * disparaît immédiatement des écrans mais reste stocké tant que le serveur
