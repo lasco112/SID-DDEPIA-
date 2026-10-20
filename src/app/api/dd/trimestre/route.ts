@@ -26,6 +26,7 @@ import { archiverRapportTrimestriel } from "@/server/trimestre/archivage";
 import { etatCircuit, messageIncomplet, finaliserParLeDD, RefusCircuit } from "@/server/trimestre/circuit";
 import { analysesARevoir, messageAnalysesARevoir } from "@/server/trimestre/analyse/ecranAnalyses";
 import { periodeTrimestrielle } from "@/server/trimestre/rubriques";
+import { erreursDeCoherence, messageErreursCoherence } from "@/server/trimestre/saisieTrimestrielle";
 import { periodeDuRapport, periodeDuCircuit, cleDeRapport } from "@/server/trimestre/periodeRapport";
 import { trimestresSansSaisie } from "@/server/trimestre/consolidation";
 import { rassembler } from "@/server/trimestre/rapport-docx";
@@ -151,6 +152,19 @@ export async function POST(req: Request) {
     if (!apercu && p.type === "TRIMESTRIEL") {
       const aRevoir = await analysesARevoir(db, pc, { role: "DD" });
       if (aRevoir.length) return NextResponse.json({ message: messageAnalysesARevoir(aRevoir) }, { status: 409 });
+      // Aucun chiffre contradictoire dans la version définitive (20 octobre 2026).
+      const incoherences = await erreursDeCoherence(db, pc);
+      if (incoherences.length) {
+        return NextResponse.json(
+          {
+            message: messageErreursCoherence(
+              incoherences,
+              "Renvoyez le rapport de l'arrondissement concerné ou donnez un ordre de correction au chef de la section ; un total mensuel faux se corrige dans le mois. L'aperçu, lui, reste possible."
+            ),
+          },
+          { status: 409 }
+        );
+      }
     }
     let circuit = await etatCircuit(db, pc);
     // Exceptionnellement, le DD prend le relais : il franchit lui-même les

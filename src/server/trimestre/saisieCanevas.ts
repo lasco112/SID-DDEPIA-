@@ -26,6 +26,7 @@
 import type { PrismaClient } from "@prisma/client";
 import { listerArrondissements } from "@/lib/arrondissements";
 import type { Transactionnelle } from "@/lib/dbCloisonne";
+import { tableauxDependants } from "./dependances";
 
 /**
  * La date de modification d'une écriture faite HORS LIGNE, telle que
@@ -226,8 +227,27 @@ async function analysesARevoirApresChangement(db: PrismaClient, periodeId: strin
   for (const a of arrondissements) {
     if (a.nom === cellule.ligne || a.nom === cellule.colonne) portees.add(a.id);
   }
+  // Tous les liens (20 octobre 2026) : le tableau lui-même, ceux qui en
+  // découlent (la viande des abattages, le tableau 15 du BAC)…
+  const numeros = [cellule.numeroTableau, ...tableauxDependants(cellule.numeroTableau)];
+  // … et le même trimestre de l'année suivante, dont la colonne « an passé »
+  // se calcule à partir de celui-ci (un T3 2025 corrigé change le T3 2026).
+  const periodes = [periodeId];
+  const ici = await db.periodeReporting.findUnique({ where: { id: periodeId }, select: { annee: true, trimestre: true, type: true } });
+  if (ici?.type === "TRIMESTRIEL" && ici.trimestre != null) {
+    const suivante = await db.periodeReporting.findFirst({
+      where: { type: "TRIMESTRIEL", annee: ici.annee + 1, trimestre: ici.trimestre },
+      select: { id: true },
+    });
+    if (suivante) periodes.push(suivante.id);
+  }
   await db.analyseCanevas.updateMany({
-    where: { periodeId, numeroTableau: cellule.numeroTableau, portee: { in: Array.from(portees) }, NOT: { texteCalcule: "" } },
+    where: {
+      periodeId: { in: periodes },
+      numeroTableau: { in: numeros },
+      portee: { in: Array.from(portees) },
+      NOT: { texteCalcule: "" },
+    },
     data: { texteCalcule: "" },
   });
 }

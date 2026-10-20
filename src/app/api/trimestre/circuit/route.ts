@@ -19,7 +19,10 @@
 import { NextResponse } from "next/server";
 import { requireUser, assertRole, permissionErrorResponse } from "@/lib/permissions";
 import { trimestrielle, libelleOfficiel, libelleCourt, memePeriodeAnneePrecedente } from "@/server/periodes/calendrier";
-import { anPasseManquant, messageAnPasseManquant, nomArrondissement } from "@/server/trimestre/saisieTrimestrielle";
+import {
+  anPasseManquant, messageAnPasseManquant, nomArrondissement, erreursDeCoherence, messageErreursCoherence, type ErreurCoherence,
+} from "@/server/trimestre/saisieTrimestrielle";
+import type { Periode } from "@/server/periodes/calendrier";
 import { ordresEnCours, donnerOrdreCorrection, revoquerOrdreCorrection } from "@/server/trimestre/ordresCorrection";
 import { analysesARevoir, messageAnalysesARevoir } from "@/server/trimestre/analyse/ecranAnalyses";
 import { periodeTrimestrielle } from "@/server/trimestre/rubriques";
@@ -39,6 +42,31 @@ function periodeDe(annee: unknown, trimestre: unknown) {
 }
 
 const erreur = (message: string, status: number) => NextResponse.json({ message }, { status });
+
+/**
+ * Aucune étape du circuit ne laisse passer des chiffres qui se contredisent
+ * (décision du Délégué, 20 octobre 2026) — notamment après un mois corrigé,
+ * qui peut défaire l'égalité entre les catégories du trimestre et le total
+ * mensuel. Chacun ne bute que sur ce qui le concerne.
+ */
+const SUITE_ARRONDISSEMENT =
+  "Corrigez-les dans « Saisir les tableaux du trimestre » (touchez la case grise pour voir, mois par mois, d'où vient le total), puis recommencez.";
+const SUITE_CHEF =
+  "Faites-les corriger avant de valider : signalez la case à l'arrondissement ou renvoyez-lui son rapport ; un total mensuel faux se corrige dans le mois. Pour un écart avec le BAC, le chef BAC confirme son chiffre ou le corrige.";
+const SUITE_DD =
+  "Renvoyez le rapport de l'arrondissement concerné ou donnez un ordre de correction au chef de la section ; un total mensuel faux se corrige dans le mois (rouvrez-le s'il est clôturé). Un écart BAC / arrondissement se règle au BAC.";
+
+type Filtre = { arrondissement: string | undefined } | { chef: string } | "tout";
+function retenir(liste: ErreurCoherence[], filtre: Filtre): ErreurCoherence[] {
+  if (filtre === "tout") return liste;
+  // Un arrondissement répond de ses erreurs ; l'écart avec le BAC se tranche au BAC.
+  if ("arrondissement" in filtre) return liste.filter((e) => e.genre === "erreur" && e.arrondissement === filtre.arrondissement);
+  return liste.filter((e) => e.chef === filtre.chef);
+}
+async function refusIncoherent(db: Parameters<typeof erreursDeCoherence>[0], periode: Periode, filtre: Filtre, suite: string) {
+  const restantes = retenir(await erreursDeCoherence(db, periode), filtre);
+  return restantes.length ? erreur(messageErreursCoherence(restantes, suite), 409) : null;
+}
 
 export async function GET(req: Request) {
   try {
@@ -81,6 +109,15 @@ export async function GET(req: Request) {
       tousTransmis: etat.tousTransmis,
       complet: etat.complet,
       aCompleterAnPasse,
+      // Les chiffres qui se contredisent, vus AVANT le bouton — chacun les siens.
+      incoherences: retenir(
+        await erreursDeCoherence(user.db, periode),
+        user.role === "DD"
+          ? "tout"
+          : user.role === "DA" || user.role === "AGENT_SAISIE"
+            ? { arrondissement: await nomArrondissement(user.db, user.arrondissementId) }
+            : { chef: user.role }
+      ).map((e) => ({ numero: e.numero, titre: e.titre, texte: e.texte, arrondissement: e.arrondissement })),
       periodeN1: libelleCourt(memePeriodeAnneePrecedente(periode)),
       peut: {
         transmettre: user.role === "DA" && sienne != null && sienne.statut !== "TRANSMIS",
@@ -113,6 +150,8 @@ export async function POST(req: Request) {
       case "transmettre": {
         if (user.role === "DD") {
           if (!body.arrondissementId) return erreur("Arrondissement non précisé.", 400);
+          const refusDD = await refusIncoherent(user.db, periode, { arrondissement: await nomArrondissement(user.db, body.arrondissementId) }, SUITE_DD);
+          if (refusDD) return refusDD;
           await transmettreParLeDD(user.db, user.transaction, periodeId, periode, body.arrondissementId, body.motif ?? "", user.id);
           details = { arrondissementId: body.arrondissementId, parLeDD: true, motif: body.motif };
           break;
@@ -132,6 +171,8 @@ export async function POST(req: Request) {
         // Une analyse « à revoir » (chiffres changés après validation) se reprend avant de transmettre.
         const aRevoirDA = await analysesARevoir(user.db, periode, { role: "DA", arrondissement: await nomArrondissement(user.db, user.arrondissementId) });
         if (aRevoirDA.length) return erreur(messageAnalysesARevoir(aRevoirDA), 409);
+        const refusDA = await refusIncoherent(user.db, periode, { arrondissement: await nomArrondissement(user.db, user.arrondissementId) }, SUITE_ARRONDISSEMENT);
+        if (refusDA) return refusDA;
         await transmettre(user.db, user.transaction, periodeId, periode, user.arrondissementId, user.id);
         details = { arrondissementId: user.arrondissementId };
         break;
@@ -141,6 +182,8 @@ export async function POST(req: Request) {
       case "validerCorrections": {
         if (user.role !== "DD") return erreur("Seul le Délégué départemental valide les corrections d'un arrondissement.", 403);
         if (!body.arrondissementId) return erreur("Arrondissement non précisé.", 400);
+        const refusCorr = await refusIncoherent(user.db, periode, { arrondissement: await nomArrondissement(user.db, body.arrondissementId) }, SUITE_DD);
+        if (refusCorr) return refusCorr;
         await validerCorrectionsParLeDD(user.db, user.transaction, periodeId, periode, body.arrondissementId, body.motif ?? "", user.id);
         details = { arrondissementId: body.arrondissementId, parLeDD: true, correctionsValidees: true, commentaire: body.motif };
         break;
@@ -175,6 +218,10 @@ export async function POST(req: Request) {
           const chefDuDomaine = SECTIONS_CIRCUIT.find((s) => s.code === body.section)?.chef;
           const aRevoirDomaine = chefDuDomaine ? await analysesARevoir(user.db, periode, { role: chefDuDomaine }) : [];
           if (aRevoirDomaine.length) return erreur(messageAnalysesARevoir(aRevoirDomaine), 409);
+          if (chefDuDomaine) {
+            const refusDomaine = await refusIncoherent(user.db, periode, { chef: chefDuDomaine }, SUITE_DD);
+            if (refusDomaine) return refusDomaine;
+          }
           await validerSectionParLeDD(user.db, user.transaction, periodeId, body.section, body.motif ?? "", user.id);
           details = { section: body.section, parLeDD: true, motif: body.motif };
           break;
@@ -182,6 +229,8 @@ export async function POST(req: Request) {
         if (!user.role.startsWith("CHEF_")) return erreur("Seul un chef de section valide un domaine du rapport.", 403);
         const aRevoirChef = await analysesARevoir(user.db, periode, { role: user.role });
         if (aRevoirChef.length) return erreur(messageAnalysesARevoir(aRevoirChef), 409);
+        const refusChef = await refusIncoherent(user.db, periode, { chef: user.role }, SUITE_CHEF);
+        if (refusChef) return refusChef;
         await validerSection(user.db, user.transaction, periodeId, periode, user.role, user.id);
         details = { section: codeSection(user.role) };
         break;
@@ -199,7 +248,9 @@ export async function POST(req: Request) {
         if (user.role !== "DD") return erreur("Seul le Délégué départemental finalise le rapport à la place des autres.", 403);
         const aRevoirDep = await analysesARevoir(user.db, periode, { role: "DD" });
         if (aRevoirDep.length) return erreur(messageAnalysesARevoir(aRevoirDep), 409);
-        details = { ...(await finaliserParLeDD(user.db, user.transaction, periodeId, periode, body.motif ?? "", user.id)), motif: body.motif, parLeDD: true };
+        const refusFinal = await refusIncoherent(user.db, periode, "tout", SUITE_DD);
+        if (refusFinal) return refusFinal;
+        details ={ ...(await finaliserParLeDD(user.db, user.transaction, periodeId, periode, body.motif ?? "", user.id)), motif: body.motif, parLeDD: true };
         break;
       }
       default:

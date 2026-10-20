@@ -53,6 +53,8 @@ interface Etat {
   aCompleterAnPasse?: { numero: number; titre: string }[];
   /** « T3 2025 ». */
   periodeN1?: string;
+  /** Les chiffres qui se contredisent, dans le ressort de ce profil (20 octobre 2026). */
+  incoherences?: { numero: number; titre: string; texte: string; arrondissement: string | null }[];
 }
 
 /**
@@ -243,6 +245,34 @@ export default function CircuitTrimestreClient({ username }: { username: string 
 
       {erreur && <p className="mt-3 rounded-md bg-red-50 p-3 text-sm text-red-800">{erreur}</p>}
       {message && <p className="mt-3 rounded-md bg-green-50 p-3 text-sm text-green-800">{message}</p>}
+
+      {/* Des chiffres qui se contredisent : rien ne se transmet, ne se valide ni ne se finalise avant leur correction. */}
+      {(etat.incoherences?.length ?? 0) > 0 && (
+        <div role="alert" className="mt-4 rounded-input border border-red-300 bg-red-50 p-3 text-sm text-red-900">
+          <p className="font-semibold">
+            {etat.incoherences!.length === 1 ? "Un chiffre se contredit" : `${etat.incoherences!.length} chiffres se contredisent`} : à corriger
+            avant de {etat.role === "DD" ? "finaliser" : etat.role.startsWith("CHEF_") ? "valider votre section" : "transmettre"}.
+          </p>
+          <ul className="mt-2 list-disc space-y-0.5 pl-5">
+            {etat.incoherences!.slice(0, 12).map((e, i) => (
+              <li key={`${e.numero}-${i}`}>
+                Tableau n° {e.numero} — {e.texte}
+              </li>
+            ))}
+          </ul>
+          {etat.incoherences!.length > 12 && <p className="mt-1">… et {etat.incoherences!.length - 12} autre(s).</p>}
+          <p className="mt-2">
+            {etat.role === "DD"
+              ? "Souvent un mois corrigé après la saisie des catégories du trimestre. Renvoyez le rapport de l'arrondissement concerné, ou donnez un ordre de correction au chef de la section."
+              : etat.role.startsWith("CHEF_")
+                ? "Signalez la case à l'arrondissement ou renvoyez-lui son rapport. Pour un écart avec le BAC, le chef BAC confirme son chiffre ou le corrige."
+                : "Touchez la case grise du tableau pour voir, mois par mois, d'où vient le total."}
+          </p>
+          <a href="/trimestre/saisie" className="mt-2 inline-block font-semibold text-primary underline">
+            Ouvrir les tableaux du trimestre →
+          </a>
+        </div>
+      )}
 
       {/* ---- L'arrondissement de l'agent ou du DA ---- */}
       {sien && (

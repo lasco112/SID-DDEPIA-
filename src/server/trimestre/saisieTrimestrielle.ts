@@ -888,6 +888,60 @@ export async function pointsParTableau(
   return sortie;
 }
 
+/**
+ * LES CHIFFRES QUI SE CONTREDISENT dans le trimestre (demande du Délégué, 20
+ * octobre 2026 : des tableaux dépendent d'autres ; une correction ne doit
+ * laisser aucune erreur, et tous les liens doivent être pris en compte).
+ *
+ *  - la somme des catégories ≠ le total des rapports mensuels — le cas typique
+ *    d'un mois corrigé APRÈS la saisie des catégories du trimestre ;
+ *  - des lettres dans une case qui attend un nombre ;
+ *  - une infrastructure du BAC (tableau 7) que l'arrondissement contredit au
+ *    tableau 15, et que le BAC n'a ni confirmée ni corrigée.
+ *
+ * Tant qu'il en reste, le rapport ne se transmet pas, le domaine ne se valide
+ * pas, la version définitive ne se produit pas (route du circuit, /api/dd/trimestre).
+ */
+export interface ErreurCoherence {
+  numero: number;
+  titre: string;
+  texte: string;
+  /** L'arrondissement en cause, s'il y en a un. */
+  arrondissement: string | null;
+  /** Le chef du domaine dont relève le tableau. */
+  chef: string | null;
+  genre: "erreur" | "ecart";
+}
+
+export async function erreursDeCoherence(db: PrismaClient, periode: Periode): Promise<ErreurCoherence[]> {
+  const profil: Profil = { role: "DD" };
+  const ctx = await contextePour(db, periode, profil);
+  const donnees = await preparer(db, periode, champsMobilises(), { autoriserIncomplet: true });
+  const valeur = fournisseur(donnees, ctx);
+  const confirmees = await reprisesConfirmees(db, periode);
+  // L'écart BAC / arrondissement se tranche au BAC : il ne bloque que son tableau.
+  const sources = new Set(REPRISES.map((r) => r.source));
+  const sortie: ErreurCoherence[] = [];
+  for (const { bloc, section } of tableaux()) {
+    const numero = bloc.numero!;
+    const g = construireGrille(bloc, section, ctx, profil, donnees, valeur, confirmees);
+    for (const p of verifierGrille(bloc, ctx, valeur, donnees.saisies, g.lignes, confirmees)) {
+      if (p.genre !== "erreur" && !(p.genre === "ecart" && sources.has(numero))) continue;
+      const c = p.cases[0];
+      const arrondissement = c ? ctx.arrondissements.find((a) => a === c.ligne || a === c.colonne) ?? null : null;
+      sortie.push({ numero, titre: bloc.titre, texte: p.texte, arrondissement, chef: chefDuTableau(numero), genre: p.genre });
+    }
+  }
+  return sortie;
+}
+
+/** Le refus, en clair : ce qui se contredit, et comment s'en sortir. */
+export function messageErreursCoherence(liste: ErreurCoherence[], suite: string): string {
+  const premiers = liste.slice(0, 4).map((e) => `tableau n° ${e.numero} — ${e.texte.replace(/\.\s*$/, "")}`);
+  const reste = liste.length > 4 ? ` (et ${liste.length - 4} autre${liste.length - 4 > 1 ? "s" : ""})` : "";
+  return `Des chiffres se contredisent encore : ${premiers.join(" ; ")}${reste}. ${suite}`;
+}
+
 const AUTEUR: Record<string, string> = { DD: "Le DD", CHEF_BAC: "Le chef BAC" };
 
 /**
@@ -1127,10 +1181,14 @@ export async function incoherenceCategories(
   const l = g?.lignes.find((x) => x.cle === ligne);
   if (!g || !l) return null;
   let somme = 0;
+  // La somme AVANT cette saisie — null si une catégorie manquait.
+  let sommeAvant: number | null = 0;
   const saisies: { libelle: string; valeur: number }[] = [];
   for (const c of l.cases) {
     if (!categories.includes(c.colonne)) continue;
-    const v = c.colonne === colonne ? nouvelle : versNombre(c.saisi);
+    const actuelle = versNombre(c.saisi);
+    sommeAvant = actuelle == null || sommeAvant == null ? null : sommeAvant + actuelle;
+    const v = c.colonne === colonne ? nouvelle : actuelle;
     if (v == null) return null; // une catégorie manque encore : on attend
     somme += v;
     saisies.push({ libelle: c.colonne, valeur: v });
@@ -1138,6 +1196,13 @@ export async function incoherenceCategories(
   const ctx = await contextePour(db, periode, profil);
   const total = versNombre(l.cases.find((c) => c.colonne === `TOTAL ${ctx.periodeCourt}`)?.affiche);
   if (total == null || Math.abs(somme - total) < 0.5) return null;
+  // Le total mensuel a changé APRÈS la saisie des catégories (un mois corrigé) :
+  // l'écart existe déjà. Une saisie qui le RÉDUIT est acceptée, sans quoi une
+  // correction portant sur plusieurs catégories serait impossible — chacune
+  // serait refusée tour à tour. L'écart restant s'affiche, et le rapport ne se
+  // transmet, ne se valide ni ne se finalise tant qu'il n'est pas à zéro
+  // (erreursDeCoherence). Une saisie qui crée un écart, ou l'aggrave, reste refusée.
+  if (sommeAvant != null && Math.abs(somme - total) < Math.abs(sommeAvant - total) - 0.5) return null;
   const f = (n: number) => n.toLocaleString("fr-FR");
   const message =
     `${l.libelle} : la somme des catégories (${f(somme)}) doit être égale au ${nature} des rapports mensuels (${f(total)}), ` +

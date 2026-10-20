@@ -17,6 +17,7 @@ import { periodeTrimestrielle } from "@/server/trimestre/rubriques";
 import { ecrireSaisieCanevas, cleCellule } from "@/server/trimestre/saisieCanevas";
 import {
   ROLES_CORRECTION_AN_PASSE, refusCorrectionAnPasse, anneeCourante, nomArrondissement, porteeDeSaisie, tableauDe, type Profil,
+  attendUnNombre, incoherenceCategories,
 } from "@/server/trimestre/saisieTrimestrielle";
 import { axeTerritorial } from "@/server/trimestre/canevas/structure";
 import { listerArrondissements } from "@/lib/arrondissements";
@@ -49,6 +50,13 @@ export async function POST(req: Request) {
 
     const refus = await refusCorrectionAnPasse(user.db, periode, profil, body.numeroTableau, body.ligne, body.colonne);
     if (refus) return erreur(refus, 403);
+    if (!attendUnNombre(body.colonne)) return erreur("Cette case porte du texte : elle ne se corrige pas par un chiffre.", 400);
+
+    // Les mêmes contrôles qu'à la saisie (20 octobre 2026) : une correction ne
+    // doit laisser aucune erreur — la somme des catégories doit retomber sur le
+    // total des rapports mensuels.
+    const incoherence = await incoherenceCategories(user.db, periode, profil, body.numeroTableau, body.ligne, body.colonne, valeur);
+    if (incoherence) return NextResponse.json({ message: incoherence.message, controle: incoherence.controle }, { status: 409 });
 
     const periodeId = await periodeTrimestrielle(user.db, periode);
     const cellule = { numeroTableau: body.numeroTableau, ligne: body.ligne, colonne: body.colonne };
