@@ -525,8 +525,8 @@ export default function SaisieTrimestrielleClient({
             </div>
           )}
           {peutCorriger && grille && grille.numero === courant.numero && casesCorrigeables(grille, annee).length > 0 &&
-            // Un chef de section corrige seulement sur ordre du DD (20 octobre 2026).
-            (!moi?.role.startsWith("CHEF_") || grille.ordreCorrection) && (
+            // Un chef de section technique corrige seulement sur ordre du DD (20 octobre 2026) ; le chef BAC, librement.
+            (!["CHEF_PSA", "CHEF_SSV", "CHEF_SPAIH"].includes(moi?.role ?? "") || grille.ordreCorrection) && (
             <div className="mb-3">
               {!corriger ? (
                 <button

@@ -2,7 +2,10 @@
  * LES ORDRES DE CORRECTION DU DD aux chefs de section (décision du Délégué,
  * 20 octobre 2026).
  *
- * Sans ordre, un chef de section RELIT les tableaux de sa section, SIGNALE à
+ * Le chef BAC n'est PAS concerné : il complète et corrige librement les
+ * tableaux du BAC, comme avant (décision du Délégué, 20 octobre 2026).
+ *
+ * Sans ordre, un chef de section technique (PSA, SSV, SPAIH) RELIT les tableaux de sa section, SIGNALE à
  * l'arrondissement ce qui ne va pas, et COMPLÈTE les cases encore vides. Il ne
  * modifie pas une case qu'un arrondissement a remplie — en 2026 comme pour le
  * chiffre de 2025.
@@ -27,6 +30,8 @@ import { SECTIONS_CIRCUIT, RefusCircuit, annulerValidationSection, etatCircuit }
 import { notifierEvenement } from "@/server/notifications/evenements";
 
 export const ACTION_ORDRE = "ORDRE_CORRECTION_CHEF";
+/** Les chefs dont la correction des cases des arrondissements demande l'ordre du DD. */
+export const CHEFS_SOUS_ORDRE = ["CHEF_PSA", "CHEF_SSV", "CHEF_SPAIH"];
 export const ACTION_REVOCATION = "REVOCATION_ORDRE_CORRECTION_CHEF";
 
 export interface OrdreCorrection {
@@ -60,7 +65,7 @@ export async function ordresEnCours(db: PrismaClient, periode: Periode): Promise
 
 /** Ce chef a-t-il, pour ce trimestre, l'ordre du DD de corriger ? */
 export async function aOrdreDeCorrection(db: PrismaClient, periode: Periode, chef: string): Promise<boolean> {
-  if (!chef.startsWith("CHEF_")) return false;
+  if (!CHEFS_SOUS_ORDRE.includes(chef)) return false;
   return (await ordresEnCours(db, periode)).has(chef);
 }
 
@@ -76,6 +81,7 @@ export async function donnerOrdreCorrection(
 ): Promise<{ validationAnnulee: boolean }> {
   const s = SECTIONS_CIRCUIT.find((x) => x.code === section);
   if (!s) throw new RefusCircuit("Section inconnue.");
+  if (!CHEFS_SOUS_ORDRE.includes(s.chef)) throw new RefusCircuit("Le chef BAC complète et corrige déjà librement les tableaux du BAC : aucun ordre n'est nécessaire.");
   const m = motif.trim();
   if (!m) throw new RefusCircuit("Indiquez le motif : ce que le chef doit corriger, et pourquoi.");
   if ((await ordresEnCours(db, periode)).has(s.chef)) throw new RefusCircuit("Un ordre de correction est déjà en cours pour ce chef.");

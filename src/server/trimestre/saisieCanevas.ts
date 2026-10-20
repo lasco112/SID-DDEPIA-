@@ -24,6 +24,7 @@
  * « DDEPIA », la régie départementale, que le canevas gère déjà.
  */
 import type { PrismaClient } from "@prisma/client";
+import { listerArrondissements } from "@/lib/arrondissements";
 import type { Transactionnelle } from "@/lib/dbCloisonne";
 
 /**
@@ -126,9 +127,16 @@ export async function ecrireSaisieCanevas(
         colonne: cellule.colonne,
         portee,
       },
-      select: { id: true, updatedAt: true },
+      select: { id: true, updatedAt: true, valeur: true, valeurTexte: true },
     });
     if (existante && modifieLe && existante.updatedAt > modifieLe) return { enregistre: false, ignoree: true };
+
+    // Le chiffre change-t-il vraiment ? Si oui, les analyses déjà validées de
+    // ce tableau ne décrivent plus le tableau : elles repassent « à revoir »
+    // (décision du Délégué, 20 octobre 2026 — texte à reprendre et à revalider).
+    const avant = existante ? (existante.valeur == null ? null : Number(existante.valeur)) : null;
+    const change = existante ? avant !== valeur || (existante.valeurTexte ?? null) !== texte : !vide;
+    if (change) await analysesARevoirApresChangement(tx as unknown as PrismaClient, periodeId, cellule, portee);
 
     if (vide) {
       if (existante) await tx.saisieCanevas.delete({ where: { id: existante.id } });
@@ -196,4 +204,30 @@ export async function saisiesVues(
     if (sansMaille.has(Number(cle.split(" | ")[0]))) vues.set(cle, v);
   });
   return vues;
+}
+
+/**
+ * Un chiffre d'un tableau a changé : ses analyses DÉJÀ VALIDÉES repassent
+ * « à revoir » — celle du rapport départemental, et celle du rapport de
+ * l'arrondissement concerné (sa ligne, sa colonne, ou sa version d'un tableau
+ * sans maille). Le texte validé et l'explication sont gardés, pour être repris ;
+ * seule l'empreinte « texte calculé » est effacée, ce qui suffit à ce que
+ * l'analyse ne compte plus comme validée nulle part (statutDe, analyses.ts) et
+ * qu'une vieille validation faite hors ligne ne l'écrase pas.
+ *
+ * Les chiffres venus du mensuel n'ont pas besoin de ce signal : s'ils
+ * changent, le texte recalculé change, et l'analyse est déjà « à revoir ».
+ */
+async function analysesARevoirApresChangement(db: PrismaClient, periodeId: string, cellule: CelluleCanevas, portee: string) {
+  const portees = new Set<string>([""]);
+  if (portee) portees.add(portee);
+  // Les noms tels que les tableaux les écrivent (graphie du canevas).
+  const arrondissements = await listerArrondissements(db);
+  for (const a of arrondissements) {
+    if (a.nom === cellule.ligne || a.nom === cellule.colonne) portees.add(a.id);
+  }
+  await db.analyseCanevas.updateMany({
+    where: { periodeId, numeroTableau: cellule.numeroTableau, portee: { in: Array.from(portees) }, NOT: { texteCalcule: "" } },
+    data: { texteCalcule: "" },
+  });
 }

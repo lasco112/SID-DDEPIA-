@@ -535,8 +535,9 @@ export async function refusCorrectionAnPasse(
   if (!(ROLES_CORRECTION_AN_PASSE as readonly string[]).includes(profil.role)) {
     return "Un chiffre de l'an passé se corrige par le DA, le chef de section ou le Délégué départemental.";
   }
-  // Un chef de section ne corrige un chiffre déjà inscrit que sur ordre du DD (20 octobre 2026).
-  if (profil.role.startsWith("CHEF_") && !(await aOrdreDeCorrection(db, periode, profil.role))) {
+  // Un chef de section technique ne corrige un chiffre déjà inscrit que sur
+  // ordre du DD (20 octobre 2026) ; le chef BAC, librement.
+  if (estChefTechnique(profil.role) && !(await aOrdreDeCorrection(db, periode, profil.role))) {
     return "Un chef de section corrige un chiffre déjà inscrit seulement sur ordre du Délégué départemental. Demandez-lui un ordre de correction, ou signalez la case à l'arrondissement.";
   }
   const t = tableauDe(numero);
@@ -663,10 +664,11 @@ function construireGrille(
       const s = donnees.saisies.get(cleCellule({ numeroTableau: numero, ligne: cle, colonne }));
       const reprise = s ? null : valeurReprise(donnees.saisies, numero, cle, colonne);
       const etat = etatCase(bloc, ctx, profil, cle, colonne, valeur.sid);
-      // Un chef de section complète ce qui manque ; ce que l'arrondissement a
-      // écrit se signale — sauf sur ordre de correction du DD (20 octobre 2026),
-      // qui vaut pour tous les chefs, BAC compris.
-      const reservee = etat === "saisie" && profil.role.startsWith("CHEF_") && !ordreCorrection && remplieParLArrondissement(s);
+      // Un chef de section technique complète ce qui manque ; ce que
+      // l'arrondissement a écrit se signale — sauf sur ordre de correction du
+      // DD (20 octobre 2026). Le chef BAC garde sa liberté : il complète et
+      // corrige les tableaux du BAC.
+      const reservee = etat === "saisie" && estChefTechnique(profil.role) && !ordreCorrection && remplieParLArrondissement(s);
       return {
         colonne,
         texte: !attendUnNombre(colonne),
@@ -695,7 +697,7 @@ function construireGrille(
     lignes,
     avertissements: alertes.map((a) => a.texte),
     alertes,
-    ...(profil.role.startsWith("CHEF_") ? { ordreCorrection } : {}),
+    ...(estChefTechnique(profil.role) ? { ordreCorrection } : {}),
     aide: [
       AIDES[numero] ?? AIDE_PAR_DEFAUT,
       ...(bloc.kind === "arrondissements" && bloc.totalSansSomme ? [bloc.totalSansSomme] : []),
@@ -1261,9 +1263,10 @@ export async function refusDeSaisie(
     default:
       break;
   }
-  // Un chef de section ne réécrit pas ce que l'arrondissement a saisi — sauf
-  // sur ordre de correction du DD pour ce trimestre (20 octobre 2026).
-  if (profil.role.startsWith("CHEF_") && !(await aOrdreDeCorrection(db, periode, profil.role))) {
+  // Un chef de section technique ne réécrit pas ce que l'arrondissement a
+  // saisi — sauf sur ordre de correction du DD pour ce trimestre (20 octobre
+  // 2026). Le chef BAC, lui, garde sa liberté sur les tableaux du BAC.
+  if (estChefTechnique(profil.role) && !(await aOrdreDeCorrection(db, periode, profil.role))) {
     const p = await db.periodeReporting.findFirst({
       where: { type: "TRIMESTRIEL", annee: periode.annee, trimestre: periode.rang },
       select: { id: true },

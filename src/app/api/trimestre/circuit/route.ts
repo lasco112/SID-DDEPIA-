@@ -21,6 +21,7 @@ import { requireUser, assertRole, permissionErrorResponse } from "@/lib/permissi
 import { trimestrielle, libelleOfficiel, libelleCourt, memePeriodeAnneePrecedente } from "@/server/periodes/calendrier";
 import { anPasseManquant, messageAnPasseManquant, nomArrondissement } from "@/server/trimestre/saisieTrimestrielle";
 import { ordresEnCours, donnerOrdreCorrection, revoquerOrdreCorrection } from "@/server/trimestre/ordresCorrection";
+import { analysesARevoir, messageAnalysesARevoir } from "@/server/trimestre/analyse/ecranAnalyses";
 import { periodeTrimestrielle } from "@/server/trimestre/rubriques";
 import {
   etatCircuit, transmettre, renvoyer, validerSection, annulerValidationSection, codeSection, RefusCircuit, SECTIONS_CIRCUIT,
@@ -128,6 +129,9 @@ export async function POST(req: Request) {
         if (manquants.length) {
           return erreur(messageAnPasseManquant(manquants, libelleCourt(memePeriodeAnneePrecedente(periode))), 409);
         }
+        // Une analyse « à revoir » (chiffres changés après validation) se reprend avant de transmettre.
+        const aRevoirDA = await analysesARevoir(user.db, periode, { role: "DA", arrondissement: await nomArrondissement(user.db, user.arrondissementId) });
+        if (aRevoirDA.length) return erreur(messageAnalysesARevoir(aRevoirDA), 409);
         await transmettre(user.db, user.transaction, periodeId, periode, user.arrondissementId, user.id);
         details = { arrondissementId: user.arrondissementId };
         break;
@@ -168,11 +172,16 @@ export async function POST(req: Request) {
       case "valider": {
         if (user.role === "DD") {
           if (!body.section) return erreur("Domaine non précisé.", 400);
+          const chefDuDomaine = SECTIONS_CIRCUIT.find((s) => s.code === body.section)?.chef;
+          const aRevoirDomaine = chefDuDomaine ? await analysesARevoir(user.db, periode, { role: chefDuDomaine }) : [];
+          if (aRevoirDomaine.length) return erreur(messageAnalysesARevoir(aRevoirDomaine), 409);
           await validerSectionParLeDD(user.db, user.transaction, periodeId, body.section, body.motif ?? "", user.id);
           details = { section: body.section, parLeDD: true, motif: body.motif };
           break;
         }
         if (!user.role.startsWith("CHEF_")) return erreur("Seul un chef de section valide un domaine du rapport.", 403);
+        const aRevoirChef = await analysesARevoir(user.db, periode, { role: user.role });
+        if (aRevoirChef.length) return erreur(messageAnalysesARevoir(aRevoirChef), 409);
         await validerSection(user.db, user.transaction, periodeId, periode, user.role, user.id);
         details = { section: codeSection(user.role) };
         break;
@@ -188,6 +197,8 @@ export async function POST(req: Request) {
       }
       case "finaliser": {
         if (user.role !== "DD") return erreur("Seul le Délégué départemental finalise le rapport à la place des autres.", 403);
+        const aRevoirDep = await analysesARevoir(user.db, periode, { role: "DD" });
+        if (aRevoirDep.length) return erreur(messageAnalysesARevoir(aRevoirDep), 409);
         details = { ...(await finaliserParLeDD(user.db, user.transaction, periodeId, periode, body.motif ?? "", user.id)), motif: body.motif, parLeDD: true };
         break;
       }

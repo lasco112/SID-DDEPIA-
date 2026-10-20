@@ -446,7 +446,7 @@ export default function CircuitTrimestreClient({ username }: { username: string 
                     : "Le chef peut corriger les cases remplies par les arrondissements."}
                 </p>
               )}
-              {etat.role === "DD" &&
+              {etat.role === "DD" && s.code !== "BAC" &&
                 (s.ordre ? (
                   <button
                     type="button"

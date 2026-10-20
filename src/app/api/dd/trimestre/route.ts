@@ -24,6 +24,7 @@ import { inspecterPeriode, PeriodeNonCalculableError } from "@/server/trimestre/
 import { genererRapportCanevas, ControlesCroisesError } from "@/server/trimestre/rapportCanevas";
 import { archiverRapportTrimestriel } from "@/server/trimestre/archivage";
 import { etatCircuit, messageIncomplet, finaliserParLeDD, RefusCircuit } from "@/server/trimestre/circuit";
+import { analysesARevoir, messageAnalysesARevoir } from "@/server/trimestre/analyse/ecranAnalyses";
 import { periodeTrimestrielle } from "@/server/trimestre/rubriques";
 import { periodeDuRapport, periodeDuCircuit, cleDeRapport } from "@/server/trimestre/periodeRapport";
 import { trimestresSansSaisie } from "@/server/trimestre/consolidation";
@@ -144,6 +145,13 @@ export async function POST(req: Request) {
     const pc = periodeDuCircuit(p);
     // Le circuit de validation : la version DÉFINITIVE exige les six rapports
     // d'arrondissement transmis et les quatre domaines validés par leur chef.
+    // Une analyse validée dont les chiffres ont changé depuis doit être reprise
+    // et revalidée avant toute version définitive (20 octobre 2026). L'aperçu,
+    // lui, reste toujours possible.
+    if (!apercu && p.type === "TRIMESTRIEL") {
+      const aRevoir = await analysesARevoir(db, pc, { role: "DD" });
+      if (aRevoir.length) return NextResponse.json({ message: messageAnalysesARevoir(aRevoir) }, { status: 409 });
+    }
     let circuit = await etatCircuit(db, pc);
     // Exceptionnellement, le DD prend le relais : il franchit lui-même les
     // étapes restantes — marquées « par le DD », motif à l'appui — puis produit

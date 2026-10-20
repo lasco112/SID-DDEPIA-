@@ -133,3 +133,34 @@ export async function ecranAnalyses(db: PrismaClient, periode: Periode, profil: 
     analyses,
   };
 }
+
+/**
+ * Les analyses « à revoir » de ce profil : validées, puis un chiffre du
+ * tableau a changé (une correction, un mois rectifié). Tant qu'il en reste,
+ * le rapport ne se transmet pas, le domaine ne se valide pas et la version
+ * définitive ne se produit pas : le texte doit être repris et revalidé
+ * (décision du Délégué, 20 octobre 2026).
+ */
+export async function analysesARevoir(db: PrismaClient, periode: Periode, profil: Profil): Promise<{ numero: number; titre: string }[]> {
+  const portee = (await porteeDe(db, profil)) ?? "";
+  const trimestre = await db.periodeReporting.findFirst({
+    where: { type: "TRIMESTRIEL", annee: periode.annee, trimestre: periode.rang },
+    select: { id: true },
+  });
+  if (!trimestre) return [];
+  const enregistrees = await lireAnalyses(db, trimestre.id, portee);
+  if (enregistrees.size === 0) return [];
+  return (await propositionsPour(db, periode, profil))
+    .filter((p) => statutDe(p, enregistrees.get(p.numero)) === "a_revoir")
+    .map((p) => ({ numero: p.numero, titre: p.titre }));
+}
+
+/** Le refus, en clair : quels tableaux, et où les revalider. */
+export function messageAnalysesARevoir(liste: { numero: number; titre: string }[]): string {
+  const noms = liste.map((a) => `n° ${a.numero}`);
+  const affiches = noms.length > 8 ? `${noms.slice(0, 8).join(", ")} et ${noms.length - 8} autre(s)` : noms.join(", ");
+  return (
+    `Des chiffres ont changé après la validation de l'analyse de ${liste.length === 1 ? "ce tableau" : `ces ${liste.length} tableaux`} : ${affiches}. ` +
+    `Reprenez le texte et validez-le à nouveau à l'étape « Valider l'analyse des chiffres sous chaque tableau », puis recommencez.`
+  );
+}

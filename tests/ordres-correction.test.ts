@@ -91,16 +91,14 @@ test("l'ordre lève la validation du domaine", async () => {
   await revoquerOrdreCorrection(base, P, section, dd.id);
 });
 
-test("le BAC : la colonne d'un arrondissement se corrige sur ordre ; la sienne, librement", async () => {
+test("le chef BAC garde sa liberté : il corrige la colonne d'un arrondissement sans ordre", async () => {
   const dschang = await base.arrondissement.findFirstOrThrow({ where: { nom: "Dschang" }, select: { id: true } });
   const da = await base.user.findFirstOrThrow({ where: { role: "DA", arrondissementId: dschang.id }, select: { id: true } });
   const dd = await base.user.findFirstOrThrow({ where: { role: "DD", actif: true }, select: { id: true } });
   // Recettes (n° 13) : Dschang a rempli sa colonne de janvier.
   await ecrireSaisieCanevas(base, transaction, periodeId!, { numeroTableau: 13, ligne: "JANVIER", colonne: "Dschang" }, { valeur: 5000 }, da.id);
-  assert.match((await refusDeSaisie(base, P, { role: "CHEF_BAC" }, 13, "JANVIER", "Dschang")) ?? "", /ordre du Délégué/);
-  // Sa propre colonne, celle de la DDEPIA, reste libre.
-  assert.equal(await refusDeSaisie(base, P, { role: "CHEF_BAC" }, 13, "JANVIER", "DDEPIA"), null);
-  await donnerOrdreCorrection(base, transaction, periodeId!, P, "BAC", "Revoir les recettes de Dschang", dd.id);
   assert.equal(await refusDeSaisie(base, P, { role: "CHEF_BAC" }, 13, "JANVIER", "Dschang"), null);
-  await revoquerOrdreCorrection(base, P, "BAC", dd.id);
+  assert.equal(await refusDeSaisie(base, P, { role: "CHEF_BAC" }, 13, "JANVIER", "DDEPIA"), null);
+  // Aucun ordre n'est donné au BAC : il n'en a pas besoin.
+  await assert.rejects(donnerOrdreCorrection(base, transaction, periodeId!, P, "BAC", "inutile", dd.id), /librement/);
 });
