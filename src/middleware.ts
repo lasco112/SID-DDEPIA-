@@ -29,6 +29,10 @@ export const PROTECTED_PREFIXES: Array<{ prefix: string; roles: string[] }> = [
   { prefix: "/admin-systeme", roles: ["DD"] },
   { prefix: "/api/admin-systeme", roles: ["DD"] },
   { prefix: "/etablissements", roles: ["DA", "DD", "AGENT_SAISIE"] }, // registre des établissements NOMINATIF (§B.5.3) : DA et agent de saisie sur leur arrondissement, DD sur tous
+  // Collectes ponctuelles (21 octobre 2026) : le DD les lance et les suit ; un
+  // DA ou un agent lit celles qui le visent (accueil). Droits fins dans les routes.
+  { prefix: "/collectes", roles: ["DD"] },
+  { prefix: "/api/collectes", roles: ["DD", "DA", "AGENT_SAISIE"] },
   // Règle spécifique AVANT la règle générale "/technique" (Array.find prend la
   // première correspondance) : la boîte de réception de l'aide est partagée
   // DD + ADMIN_TECH, alors que le reste de l'espace technique reste réservé
@@ -128,6 +132,9 @@ export const CHEMINS_SURS_DEMO = [
   "/section",
   "/trimestre",
   "/etablissements",
+  // Collectes ponctuelles (21 octobre 2026) : leurs routes ne lisent que `user.db`.
+  "/collectes",
+  "/api/collectes",
   "/mon-compte/synchronisation",
   "/mon-compte/securite",
   "/api/bootstrap",
@@ -221,6 +228,7 @@ export const config = {
     "/admin/:path*",
     "/admin-systeme/:path*",
     "/etablissements/:path*",
+    "/collectes/:path*",
     "/technique/:path*",
     "/api/:path*",
     "/dashboard",

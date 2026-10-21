@@ -23,6 +23,9 @@ import NotificationsPanel from "@/components/NotificationsPanel";
 import VisiteGuidee from "@/components/VisiteGuidee";
 import { identiteDepartement } from "@/lib/departement";
 import { fondDepartement } from "@/lib/fondsDepartement";
+import { dateAuCameroun } from "@/lib/marches";
+import { libelleActeur } from "@/lib/acteurs";
+import { avancement, collectesPour, lienDe, periodeEnClair, type Collecte } from "@/server/collectes/collectes";
 
 interface Lien {
   href: string;
@@ -307,7 +310,8 @@ async function salutation(db: PrismaClient, moi: { id: string; role: string; use
     where: { id: moi.id },
     select: { nom: true, fonction: true, arrondissement: { select: { nom: true } }, section: { select: { code: true, nom: true } } },
   });
-  const heure = Number(new Intl.DateTimeFormat("fr-FR", { hour: "numeric", hour12: false, timeZone: "Africa/Douala" }).format(new Date()));
+  // « en-GB » et non « fr-FR », qui écrit « 19 h » : Number("19 h") ne vaut rien, et l'accueil disait toujours « Bonjour ».
+  const heure = parseInt(new Intl.DateTimeFormat("en-GB", { hour: "2-digit", hour12: false, timeZone: "Africa/Douala" }).format(new Date()), 10);
   const salut = heure >= 18 || heure < 4 ? "Bonsoir" : "Bonjour";
   const arr = u?.arrondissement?.nom;
   const section = u?.section ? `${u.section.code} (${u.section.nom})` : null;
@@ -390,6 +394,91 @@ function CarteRapport({ c }: { c: Carte }) {
   );
 }
 
+/**
+ * Les COLLECTES PONCTUELLES en cours (21 octobre 2026) : en tête de l'accueil,
+ * au-dessus des rapports — le DD les a voulues « activité prioritaire ».
+ */
+interface CarteCollecte {
+  id: string;
+  titre: string;
+  periode: string;
+  consigne: string | null;
+  prioritaire: boolean;
+  avancement: string;
+  dernierJour: boolean;
+  bouton: Lien;
+  lien?: Lien;
+}
+
+async function cartesCollectes(db: PrismaClient, moi: { role: string; arrondissementId?: string | null }): Promise<CarteCollecte[]> {
+  try {
+    const aujourdhui = dateAuCameroun();
+    if (moi.role === "DD") {
+      const enCours = (await db.collecteCampagne.findMany({
+        where: { clotureeLe: null, debut: { lte: aujourdhui }, fin: { gte: aujourdhui } },
+        orderBy: { fin: "asc" },
+      })) as Collecte[];
+      return Promise.all(
+        enCours.map(async (c) => {
+          const a = await avancement(db, c);
+          return {
+            id: c.id, titre: c.titre, periode: periodeEnClair(c), consigne: null, prioritaire: c.prioritaire, dernierJour: c.fin === aujourdhui,
+            avancement: `${a.total.fiches} fiche(s) reçue(s), dont ${a.total.completes} complète(s) · ${a.total.arrondissementsActifs} arrondissement(s) sur ${a.lignes.length} ont commencé.`,
+            bouton: { href: "/collectes", label: "Suivre la collecte" },
+          };
+        })
+      );
+    }
+    const miennes = await collectesPour(db, { role: moi.role, arrondissementId: moi.arrondissementId ?? null }, aujourdhui);
+    return Promise.all(
+      miennes.map(async (c) => {
+        const a = await avancement(db, c, moi.arrondissementId ?? undefined);
+        const l = a.lignes[0];
+        const objet = libelleActeur(c.typeCode).toLowerCase();
+        return {
+          id: c.id, titre: c.titre, periode: periodeEnClair(c), consigne: c.consigne, prioritaire: c.prioritaire, dernierJour: c.fin === aujourdhui,
+          avancement: l && l.fiches > 0
+            ? `Votre arrondissement a envoyé ${l.fiches} fiche(s), dont ${l.completes} complète(s).`
+            : "Votre arrondissement n'a encore envoyé aucune fiche.",
+          bouton: { href: `${lienDe(c)}&nouveau=1`, label: c.typeCode === "ETAB_MARCHE" ? "Commencer : ajouter un marché" : `Commencer : ajouter un(e) ${objet}` },
+          lien: { href: lienDe(c), label: "Voir ce qui est déjà recensé" },
+        };
+      })
+    );
+  } catch (e) {
+    // Une carte de collecte manquée ne doit jamais empêcher l'accueil de s'ouvrir.
+    console.error("[accueil] collectes :", e);
+    return [];
+  }
+}
+
+function CarteDeCollecte({ c }: { c: CarteCollecte }) {
+  return (
+    <section data-visite="carte-collecte" className="rounded-card border-2 border-cuivre/70 bg-white p-4 shadow-card sm:p-5">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <h2 className="text-[17px] font-bold text-primary-dark">
+          {c.titre} <span className="font-semibold text-ink-muted">· {c.periode}</span>
+        </h2>
+        {c.prioritaire && (
+          <span className="rounded-full bg-cuivre px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-white">
+            {c.dernierJour ? "Prioritaire — dernier jour" : "Activité prioritaire"}
+          </span>
+        )}
+      </div>
+      {c.consigne && <p className="mt-3 text-[15px] text-ink">{c.consigne}</p>}
+      <p className="mt-3 rounded-input bg-appbg px-3 py-2 text-sm text-ink-muted">{c.avancement}</p>
+      <a href={c.bouton.href} className="mt-4 flex min-h-[48px] w-full items-center justify-center rounded-btn bg-primary px-4 py-3 text-center text-[15px] font-bold text-white hover:bg-primary-dark">
+        {c.bouton.label} →
+      </a>
+      {c.lien && (
+        <a href={c.lien.href} className="mt-2 block text-center text-sm font-medium text-primary hover:underline">
+          {c.lien.label}
+        </a>
+      )}
+    </section>
+  );
+}
+
 export default async function DashboardPage() {
   const session = await getServerSession(authOptions);
   const moi = await contexteSession(session);
@@ -397,7 +486,13 @@ export default async function DashboardPage() {
   const db = moi.db as PrismaClient;
   const role = moi.role as string;
 
-  const [accueil, identite, ...lesCartes] = await Promise.all([salutation(db, moi), identiteDepartement(db), carteMensuelle(db, moi), carteTrimestrielle(db, moi)]);
+  const [accueil, identite, collectes, ...lesCartes] = await Promise.all([
+    salutation(db, moi),
+    identiteDepartement(db),
+    cartesCollectes(db, moi),
+    carteMensuelle(db, moi),
+    carteTrimestrielle(db, moi),
+  ]);
   const fond = fondDepartement(identite.code);
   const cartes = lesCartes.filter((c): c is Carte => c != null);
   const trimestre = cartes.find((c) => c.titre === TITRE_TRIMESTRIEL);
@@ -433,6 +528,14 @@ export default async function DashboardPage() {
             </p>
           </div>
         </section>
+
+        {collectes.length > 0 && (
+          <div className="mb-4 grid grid-cols-1 gap-4">
+            {collectes.map((c) => (
+              <CarteDeCollecte key={c.id} c={c} />
+            ))}
+          </div>
+        )}
 
         {cartes.length > 0 && (
           <div className="mb-[26px] grid grid-cols-1 items-start gap-4 lg:grid-cols-2">

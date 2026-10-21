@@ -149,6 +149,7 @@ model Departement {
   demandeAides           DemandeAide[]
   textesDepartement      TexteDepartement[]
   photosEtablissements   PhotoEtablissement[]
+  collectes              CollecteCampagne[]
 
   @@index([regionId])
 }
@@ -334,6 +335,36 @@ model Etablissement {
   photo          PhotoEtablissement?
 
   @@index([arrondissementId, typeCode, actif])
+}
+
+/// Une COLLECTE PONCTUELLE (21 octobre 2026) : le DD lance une petite collecte
+/// — le recensement des marchés, par exemple — comme activité prioritaire,
+/// pour des arrondissements et des rôles, entre deux dates. Les agents la
+/// voient en tête de leur accueil ; le DD suit l'avancement. Les fiches
+/// collectées vont au registre ; la collecte ne fait que les compter.
+model CollecteCampagne {
+  departementId String?
+  departement   Departement? @relation(fields: [departementId], references: [id])
+
+  id                String   @id @default(cuid())
+  titre             String
+  consigne          String?  @db.Text
+  /// Le questionnaire : un type d'acteur du registre (src/lib/acteurs.ts).
+  typeCode          String
+  /// Les arrondissements visés ; vide : tous ceux du département.
+  arrondissementIds String[] @default([])
+  /// Les rôles qui collectent : DA, AGENT_SAISIE.
+  roles             String[] @default([])
+  /// Premier et dernier jour, « AAAA-MM-JJ », heure du Cameroun (bornes comprises).
+  debut             String
+  fin               String
+  prioritaire       Boolean  @default(true)
+  creeParId         String?
+  createdAt         DateTime @default(now())
+  /// Clôturée par le DD avant la date de fin.
+  clotureeLe        DateTime?
+
+  @@index([fin])
 }
 
 /// La photo d'un établissement (21 octobre 2026), prise par le téléphone.

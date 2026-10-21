@@ -221,6 +221,8 @@ export const MENU_PAR_ROLE: Record<string, NavGroupe[]> = {
         { href: "/etablissements", label: "Établissements" },
         { href: "/technique/audit", label: "Journal d'activité" },
         { href: "/technique/aide", label: "Questions des utilisateurs" },
+        // Ajoutée en fin de liste (21 octobre 2026) : rien de ce qui existait ne bouge.
+        { href: "/collectes", label: "Collectes ponctuelles" },
       ],
     },
   ],

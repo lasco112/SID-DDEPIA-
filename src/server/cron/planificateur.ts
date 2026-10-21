@@ -39,6 +39,7 @@ import type { PrismaClient } from "@prisma/client";
 import { db } from "@/lib/db";
 import { clientCloisonne } from "@/lib/dbCloisonne";
 import { purgerSortiesBrutes } from "@/server/redaction/journal";
+import { rappelsDuMatin } from "@/server/collectes/collectes";
 import { rappelJ1DA, verrouillageEtAlerteRetardDA, alerteRetardSections, rappelClotureDD } from "@/server/cron/triggers";
 
 let demarre = false;
@@ -148,6 +149,21 @@ export async function verifierRelances(maintenant: Date = new Date()): Promise<v
         // Pas de marqueur : la relance sera retentée à l'heure suivante, et les
         // départements suivants sont traités malgré cet échec.
       }
+    }
+  }
+
+  /*
+   * Les collectes ponctuelles (21 octobre 2026) : un rappel chaque matin de la
+   * collecte, à partir de 7 h, à ceux qui collectent. Une fois par jour et par
+   * collecte (marqueur en base). Un échec n'empêche ni les autres départements
+   * ni le reste du passage horaire.
+   */
+  for (const departement of departements) {
+    try {
+      const n = await rappelsDuMatin(clientCloisonne(db, departement.id), maintenant);
+      if (n) console.log(`[collectes] rappel du matin ${departement.code} : ${n} notification(s).`);
+    } catch (e) {
+      console.error(`[collectes] rappel du matin (${departement.code}) :`, e);
     }
   }
 

@@ -64,6 +64,27 @@ export default function EtablissementsClient({
   const moi = useUtilisateur();
   /** Le questionnaire d'un marché ouvert : null pour un nouveau marché. */
   const [questionnaire, setQuestionnaire] = useState<{ etab: Etablissement | null } | null>(null);
+  /** Arrivé par « Commencer » d'une collecte ponctuelle : son titre et sa fin. */
+  const [collecte, setCollecte] = useState<{ titre: string; fin: string; consigne: string | null } | null>(null);
+
+  // ?type=ETAB_MARCHE&collecte=…&nouveau=1 : l'onglet, la collecte, et le
+  // questionnaire ouvert d'emblée (bouton « Commencer » de l'accueil).
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    const type = q.get("type");
+    if (type && TYPES.some((t) => t.code === type)) setTypeCode(type);
+    if (q.get("nouveau") === "1" && type === MARCHE) setQuestionnaire({ etab: null });
+    const id = q.get("collecte");
+    if (id) {
+      fetch("/api/collectes", { cache: "no-store" })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((j) => {
+          const c = j?.collectes?.find((x: { id: string }) => x.id === id);
+          if (c) setCollecte({ titre: c.titre, fin: c.fin, consigne: c.consigne });
+        })
+        .catch(() => undefined); // sans réseau : le registre marche sans le bandeau
+    }
+  }, []);
   // Seul le DD choisit l'arrondissement : le DA et l'agent de saisie sont
   // cloisonnés sur le leur (§A.2), le serveur le revérifie de son côté.
   const estDD = role === "DD";
@@ -210,6 +231,15 @@ export default function EtablissementsClient({
       )}
 
       <VisiteGuidee ecran="etablissements" />
+      {collecte && (
+        <div className="mb-4 rounded-card border-2 border-cuivre/70 bg-white p-3 text-sm text-ink">
+          <p className="font-bold text-primary-dark">
+            Collecte en cours : {collecte.titre} — jusqu&apos;au{" "}
+            {new Date(`${collecte.fin}T12:00:00Z`).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" })}
+          </p>
+          {collecte.consigne && <p className="mt-1">{collecte.consigne}</p>}
+        </div>
+      )}
       <ListeFermes estDD={estDD} arrondissements={arrondissements} />
       <div data-visite="types-etablissement" className="mb-4 flex flex-wrap gap-2">
         {TYPES.map((t) => (
