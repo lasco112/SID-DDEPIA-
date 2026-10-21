@@ -38,6 +38,7 @@ import { identiteDepartement } from "@/lib/departement";
 import { observationsTrimestre } from "@/server/observationsTrimestre";
 import { etatCircuit } from "./circuit";
 import { aOrdreDeCorrection, MESSAGE_SANS_ORDRE } from "./ordresCorrection";
+import { TABLEAUX_CORRIGEABLES } from "./correctionsTrimestre";
 import {
   type Periode, libelleCourt, memePeriodeAnneePrecedente, moisDeLaPeriode,
 } from "../periodes/calendrier";
@@ -79,6 +80,10 @@ export function chefDuTableau(numero: number): string | null {
   const s = SECTIONS_CANEVAS.find((x) => x.blocs.some((b) => b.type === "tableau" && b.numero === numero));
   return s ? chefDeSection(s.cle) : null;
 }
+
+/** Un tableau dont ce chef de section peut corriger des cases calculées, sur ordre du DD (21 octobre 2026). */
+const corrigeableParLeChef = (profil: Profil, numero: number) =>
+  estChefTechnique(profil.role) && TABLEAUX_CORRIGEABLES.has(numero) && chefDuTableau(numero) === profil.role;
 
 /** La case a-t-elle été remplie par l'arrondissement (DA ou agent) — ou par on ne sait qui ? */
 const remplieParLArrondissement = (s: ValeurCellule | undefined) =>
@@ -349,7 +354,9 @@ export async function resumer(db: PrismaClient, periode: Periode, profil: Profil
         if (saisies.has(cleCellule({ numeroTableau: bloc.numero!, ligne: l, colonne: c }))) renseignees++;
       }
     }
-    if (saisissables === 0) continue;
+    // Un tableau entièrement calculé (les alevins, par exemple) reste dans la
+    // liste de son chef de section : il peut y corriger une case sur ordre du DD.
+    if (saisissables === 0 && !corrigeableParLeChef(profil, bloc.numero!)) continue;
     resultat.push({
       numero: bloc.numero!,
       titre: bloc.titre,
@@ -501,7 +508,7 @@ export async function grilles(db: PrismaClient, periode: Periode, profil: Profil
   for (const { bloc, section } of tableaux()) {
     const { colonnes, cles } = coordonnees(bloc, ctx);
     const saisissable = cles.some((l) => colonnes.some((c) => etatCase(bloc, ctx, profil, l, c, valeur.sid) === "saisie"));
-    if (saisissable) sortie.push(construireGrille(bloc, section, ctx, profil, donnees, valeur, confirmees, ordre));
+    if (saisissable || corrigeableParLeChef(profil, bloc.numero!)) sortie.push(construireGrille(bloc, section, ctx, profil, donnees, valeur, confirmees, ordre));
   }
   return sortie;
 }
