@@ -474,8 +474,8 @@ export default function CircuitTrimestreClient({ username }: { username: string 
                 <p className="mt-2 rounded-input border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900">
                   <strong>Ordre de correction du DD en cours</strong> depuis le {le(s.ordre.le)} — {s.ordre.motif}.{" "}
                   {s.chef === etat.role
-                    ? "Vous pouvez corriger les cases remplies par les arrondissements dans les tableaux de votre section, puis valider à nouveau."
-                    : "Le chef peut corriger les cases remplies par les arrondissements."}
+                    ? "Vous pouvez corriger, dans les tableaux de votre section, les cases remplies par les arrondissements et — quand le vrai chiffre manque au mensuel — les cases grises des listes du mensuel et de la pisciculture (touchez la case). Validez ensuite à nouveau."
+                    : "Le chef peut corriger les cases remplies par les arrondissements, et les cases grises des listes du mensuel et de la pisciculture quand le vrai chiffre y manque."}
                 </p>
               )}
               {!s.ordre && s.demande && (
@@ -529,7 +529,7 @@ export default function CircuitTrimestreClient({ username }: { username: string 
                     onClick={() =>
                       void agir(
                         { action: "revoquerOrdre", section: s.code },
-                        `Révoquer l'ordre de correction du chef ${s.code} ? Il ne pourra plus corriger les cases remplies par les arrondissements.`
+                        `Révoquer l'ordre de correction du chef ${s.code} ? Il ne pourra plus corriger les cases remplies par les arrondissements, ni les cases grises. Ses corrections déjà faites restent.`
                       )
                     }
                     className="mt-2 rounded border border-amber-600 px-2 py-1 text-xs font-semibold text-amber-900 hover:bg-amber-50"
