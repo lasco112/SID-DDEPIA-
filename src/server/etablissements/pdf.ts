@@ -6,8 +6,8 @@
 import PDFDocument from "pdfkit";
 import { libellesEspeces, INFRASTRUCTURES_MARCHE } from "@/lib/acteurs";
 import {
-  ACCES, CONTROLES, EFFECTIFS, ETATS, FONCTIONNEMENTS, PORTEES, RYTHMES, TYPES_MARCHE,
-  joursEnClair, libelleDe, lieuxEnClair, type FicheMarche,
+  ACCES, CONTROLES, EFFECTIFS, ETATS, FONCTIONNEMENTS, ORGANISATIONS, PORTEES, RYTHMES, TYPES_MARCHE,
+  especePrincipaleEnClair, joursEnClair, libelleDe, lieuxEnClair, type FicheMarche,
 } from "@/lib/marches";
 
 type Doc = InstanceType<typeof PDFDocument>;
@@ -172,7 +172,8 @@ function pageFiche(doc: Doc, m: MarchePourFiche, intitule: string, codeDeparteme
   }
 
   rubrique(doc, "Le marché");
-  ligne(doc, "Type", libelleDe(TYPES_MARCHE, f.typeMarche), largeurTexte);
+  ligne(doc, "Organisation", f.organisation ? libelleDe(ORGANISATIONS, f.organisation) : libelleDe(TYPES_MARCHE, f.typeMarche), largeurTexte);
+  ligne(doc, "Se vend le plus", especePrincipaleEnClair(f, (c) => libellesEspeces([c])) ?? (m.especes.length === 1 ? libellesEspeces(m.especes) : null), largeurTexte);
   ligne(doc, "État", libelleDe(FONCTIONNEMENTS, f.fonctionnement), largeurTexte);
   ligne(doc, "Portée", libelleDe(PORTEES, f.portee), largeurTexte);
   ligne(doc, "Se tient", libelleDe(RYTHMES, f.rythme), largeurTexte);

@@ -97,12 +97,36 @@ export function dateCourte(date: string, aujourdhui: string = dateAuCameroun()):
 
 export type Choix = { code: string; libelle: string };
 
+/**
+ * COMMENT LE MARCHÉ EST ORGANISÉ (décision du Délégué, 21 octobre 2026 :
+ * « Bétail / Porcs / Volailles / Mixte » n'était pas clair). Ce qu'on y vend se
+ * dit par les espèces ; ici, seulement où se vendent les animaux. Beaucoup de
+ * marchés ont une zone pour les animaux et une autre pour les autres produits.
+ */
+export const ORGANISATIONS: (Choix & { aide: string })[] = [
+  { code: "RESERVE_ANIMAUX", libelle: "Un marché réservé aux animaux", aide: "On n'y vend que des animaux." },
+  { code: "ZONE_ANIMAUX", libelle: "Un marché général, avec une zone pour les animaux", aide: "Vivres et autres produits d'un côté ; les animaux dans un espace à part." },
+  { code: "MELANGE", libelle: "Un marché général, sans zone pour les animaux", aide: "Les animaux se vendent au milieu des autres produits." },
+];
+
+/** L'ancienne question, gardée pour relire une fiche remplie avant le 21 octobre 2026. */
 export const TYPES_MARCHE: Choix[] = [
   { code: "BETAIL", libelle: "Bétail" },
   { code: "PORCS", libelle: "Porcs" },
   { code: "VOLAILLES", libelle: "Volailles" },
   { code: "MIXTE", libelle: "Mixte (vivres et animaux)" },
 ];
+
+/** L'espèce la plus vendue : une espèce vendue, ou ces deux regroupements. */
+export const PETITS_RUMINANTS = "PETITS_RUMINANTS";
+export const PLUSIEURS_ESPECES = "PLUSIEURS";
+export function choixEspecePrincipale(especesVendues: string[], libelleEspece: (code: string) => string): Choix[] {
+  return [
+    ...especesVendues.map((e) => ({ code: e, libelle: libelleEspece(e) })),
+    ...(especesVendues.includes("OVINS") && especesVendues.includes("CAPRINS") ? [{ code: PETITS_RUMINANTS, libelle: "Petits ruminants (moutons et chèvres)" }] : []),
+    { code: PLUSIEURS_ESPECES, libelle: "Plusieurs espèces, à part égale" },
+  ];
+}
 
 export const FONCTIONNEMENTS: Choix[] = [
   { code: "FONCTIONNEL", libelle: "Fonctionne" },
@@ -193,6 +217,11 @@ export function libelleLieu(code: string, autre?: string | null, arrondissementD
 // ---------------------------------------------------------------------------
 
 export interface FicheMarche {
+  /** Où se vendent les animaux : ORGANISATIONS. */
+  organisation?: string | null;
+  /** L'espèce la plus vendue (code d'espèce, PETITS_RUMINANTS ou PLUSIEURS). */
+  especePrincipale?: string | null;
+  /** Ancienne question (avant le 21 octobre 2026) : relue, plus posée. */
   typeMarche?: string | null;
   fonctionnement?: string | null;
   portee?: string | null;
@@ -239,7 +268,12 @@ export function nettoyerFicheMarche(
   const b = brut as Record<string, unknown>;
   const f: FicheMarche = {};
 
+  f.organisation = dans(ORGANISATIONS, b.organisation);
   f.typeMarche = dans(TYPES_MARCHE, b.typeMarche);
+  // L'espèce la plus vendue doit faire partie des espèces vendues : contrôlé à
+  // l'écriture (preparerEcriture), qui connaît la liste.
+  f.especePrincipale =
+    typeof b.especePrincipale === "string" && [...codesEspeces, PETITS_RUMINANTS, PLUSIEURS_ESPECES].includes(b.especePrincipale) ? b.especePrincipale : null;
   f.fonctionnement = dans(FONCTIONNEMENTS, b.fonctionnement);
   f.portee = dans(PORTEES, b.portee);
   f.rythme = dans(RYTHMES, b.rythme);
@@ -305,6 +339,25 @@ export const equipementsPresents = (f: FicheMarche) =>
   Object.entries(f.equipements ?? {}).filter(([, e]) => e !== "ABSENT").map(([code]) => code);
 
 export const libelleDe = (liste: Choix[], code: string | null | undefined) => (code ? liste.find((c) => c.code === code)?.libelle ?? code : null);
+
+/** L'espèce la plus vendue, en clair. */
+export function especePrincipaleEnClair(f: FicheMarche, libelleEspece: (code: string) => string): string | null {
+  if (!f.especePrincipale) return null;
+  if (f.especePrincipale === PETITS_RUMINANTS) return "petits ruminants (moutons et chèvres)";
+  if (f.especePrincipale === PLUSIEURS_ESPECES) return "plusieurs espèces à part égale";
+  return libelleEspece(f.especePrincipale).toLowerCase();
+}
+
+/** Le marché en une ligne : « Marché réservé aux animaux — surtout bovins ». Une seule espèce vendue : c'est elle. */
+export function typeEnClair(f: FicheMarche, libelleEspece: (code: string) => string, especesVendues: string[] = []): string | null {
+  const orga = f.organisation ? libelleDe(ORGANISATIONS, f.organisation)!.replace(/^Un m/, "M") : libelleDe(TYPES_MARCHE, f.typeMarche);
+  const esp = especePrincipaleEnClair(
+    !f.especePrincipale && especesVendues.length === 1 ? { ...f, especePrincipale: especesVendues[0] } : f,
+    libelleEspece
+  );
+  if (!orga) return esp ? `Surtout ${esp}` : null;
+  return esp ? `${orga} — ${f.especePrincipale === PLUSIEURS_ESPECES ? esp : `surtout ${esp}`}` : orga;
+}
 
 /** Les jours du marché, en clair : « Grand marché : Ngang (mardi 27 oct.) · Petit marché : Meta ». */
 export function joursEnClair(f: FicheMarche, codeDepartement: string | null | undefined, avecDates = true): string | null {

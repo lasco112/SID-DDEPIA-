@@ -19,10 +19,12 @@ import { X, ChevronLeft, ChevronRight, Camera, Pencil, Store, Check } from "luci
 import CaptureGps, { useGpsEnAvance, type PositionGps } from "@/components/CaptureGps";
 import { ESPECES, INFRASTRUCTURES_MARCHE } from "@/lib/acteurs";
 import {
-  ACCES, CONTROLES, EFFECTIFS, ETATS, FONCTIONNEMENTS, JOURS_SEMAINE, PORTEES, RYTHMES, TYPES_MARCHE,
-  calendrierDe, dateAuCameroun, dateCourte, jourTraditionnel, joursEnClair, libelleDe, lieuxDeDestination,
-  lieuxDeProvenance, lieuxEnClair, prochaineDate, type Choix, type FicheMarche,
+  ACCES, CONTROLES, EFFECTIFS, ETATS, FONCTIONNEMENTS, JOURS_SEMAINE, ORGANISATIONS, PORTEES, RYTHMES, TYPES_MARCHE,
+  calendrierDe, choixEspecePrincipale, dateAuCameroun, dateCourte, especePrincipaleEnClair, jourTraditionnel, joursEnClair, libelleDe,
+  lieuxDeDestination, lieuxDeProvenance, lieuxEnClair, prochaineDate, type Choix, type FicheMarche,
 } from "@/lib/marches";
+
+const libelleEspece = (code: string) => ESPECES.find((x) => x.code === code)?.libelle ?? code;
 import { compresserPhoto } from "@/lib/photo";
 import type { EtablissementOffline } from "@/lib/dexie";
 
@@ -44,7 +46,7 @@ interface Brouillon {
 
 const ETAPES = [
   "Le marché",
-  "Type et état",
+  "Organisation et état",
   "Quand se tient-il ?",
   "Les espèces vendues",
   "D'où viennent les animaux ?",
@@ -187,7 +189,7 @@ export default function QuestionnaireMarche({
         if (!r.localite.trim()) return "Écrivez le quartier ou le village.";
         return null;
       case 1:
-        return f.typeMarche ? null : "Touchez le type de marché.";
+        return f.organisation ? null : "Touchez comment le marché est organisé.";
       case 2:
         if (!f.rythme) return "Touchez comment se tient le marché.";
         if (f.rythme === "HUIT_JOURS" && cal && !f.grandMarche) return "Touchez le jour du grand marché.";
@@ -330,8 +332,18 @@ export default function QuestionnaireMarche({
       case 1:
         return (
           <>
-            <Question>Quel type de marché ?</Question>
-            <UnChoix liste={TYPES_MARCHE} valeur={f.typeMarche} onChange={(v) => majFiche({ typeMarche: v })} colonnes={2} />
+            <Question aide="Ce qu'on y vend se demande plus loin, espèce par espèce.">Comment le marché est-il organisé ?</Question>
+            <div className="grid gap-2">
+              {ORGANISATIONS.map((o) => (
+                <Tuile key={o.code} choisi={f.organisation === o.code} onClick={() => majFiche({ organisation: f.organisation === o.code ? null : o.code })}>
+                  <span className="block">{o.libelle}</span>
+                  <span className="mt-0.5 block text-[13px] font-normal text-ink-muted">{o.aide}</span>
+                </Tuile>
+              ))}
+            </div>
+            {f.typeMarche && !f.organisation && (
+              <p className="mt-2 text-[13px] text-ink-muted">Réponse donnée avant : « {libelleDe(TYPES_MARCHE, f.typeMarche)} ». Touchez la bonne organisation.</p>
+            )}
             <Question>Le marché fonctionne-t-il ?</Question>
             <UnChoix liste={FONCTIONNEMENTS} valeur={f.fonctionnement} onChange={(v) => majFiche({ fonctionnement: v })} />
             <Question>D'où viennent les acheteurs et les vendeurs ?</Question>
@@ -413,7 +425,12 @@ export default function QuestionnaireMarche({
                   key={e.code}
                   petit
                   choisi={r.especes.includes(e.code)}
-                  onClick={() => setR({ ...r, especes: r.especes.includes(e.code) ? r.especes.filter((x) => x !== e.code) : [...r.especes, e.code] })}
+                  onClick={() => {
+                    const especes = r.especes.includes(e.code) ? r.especes.filter((x) => x !== e.code) : [...r.especes, e.code];
+                    // L'espèce la plus vendue doit rester parmi les espèces vendues.
+                    const encore = choixEspecePrincipale(especes, libelleEspece).some((c) => c.code === f.especePrincipale) && especes.length > 1;
+                    setR({ ...r, especes, fiche: { ...f, especePrincipale: encore ? f.especePrincipale : null } });
+                  }}
                 >
                   {e.libelle}
                 </Tuile>
@@ -438,6 +455,12 @@ export default function QuestionnaireMarche({
                 </div>
               </>
             )}
+            {r.especes.length > 1 && (
+              <>
+                <Question aide="Facultatif.">Quelle espèce se vend le plus ?</Question>
+                <UnChoix liste={choixEspecePrincipale(r.especes, libelleEspece)} valeur={f.especePrincipale} onChange={(v) => majFiche({ especePrincipale: v })} colonnes={2} />
+              </>
+            )}
           </>
         );
       case 4:
@@ -447,7 +470,9 @@ export default function QuestionnaireMarche({
       case 6:
         return (
           <>
-            <Question aide="Pour chacun, touchez son état — « Absent » s'il n'existe pas.">Les équipements du marché</Question>
+            <Question aide="Pour chacun, touchez son état — « Absent » s'il n'existe pas.">
+              {f.organisation === "ZONE_ANIMAUX" ? "Les équipements de la zone des animaux" : "Les équipements du marché"}
+            </Question>
             <div className="space-y-3">
               {INFRASTRUCTURES_MARCHE.map((eq) => (
                 <div key={eq.code}>
@@ -536,18 +561,25 @@ export default function QuestionnaireMarche({
   const recapitulatif = () => {
     const lignes: { etape: number; titre: string; valeurs: [string, string | null][] }[] = [
       { etape: 0, titre: ETAPES[0], valeurs: [["Nom", r.nom], ["Quartier ou village", r.localite], ["Géré par", `Commune de ${arrondissement.nom}`]] },
-      { etape: 1, titre: ETAPES[1], valeurs: [["Type", libelleDe(TYPES_MARCHE, f.typeMarche)], ["État", libelleDe(FONCTIONNEMENTS, f.fonctionnement)], ["Portée", libelleDe(PORTEES, f.portee)]] },
+      {
+        etape: 1,
+        titre: ETAPES[1],
+        valeurs: [["Organisation", libelleDe(ORGANISATIONS, f.organisation)], ["État", libelleDe(FONCTIONNEMENTS, f.fonctionnement)], ["Portée", libelleDe(PORTEES, f.portee)]],
+      },
       { etape: 2, titre: ETAPES[2], valeurs: [["Jours", joursEnClair(f, codeDepartement)]] },
       {
         etape: 3,
         titre: ETAPES[3],
-        valeurs: r.especes.map((e) => [ESPECES.find((x) => x.code === e)?.libelle ?? e, libelleDe(EFFECTIFS, f.effectifs?.[e]) ?? "taille non indiquée"] as [string, string]),
+        valeurs: [
+          ...r.especes.map((e) => [libelleEspece(e), libelleDe(EFFECTIFS, f.effectifs?.[e]) ?? "taille non indiquée"] as [string, string]),
+          ...(r.especes.length > 1 ? [["Se vend le plus", especePrincipaleEnClair(f, libelleEspece)] as [string, string | null]] : []),
+        ],
       },
       { etape: 4, titre: ETAPES[4], valeurs: [["Provenance", lieuxEnClair(f.provenances, f.provenancePrincipale, f.provenanceAutre, arrondissement.nom)]] },
       { etape: 5, titre: ETAPES[5], valeurs: [["Destinations", lieuxEnClair(f.destinations, f.destinationPrincipale, f.destinationAutre)]] },
       {
         etape: 6,
-        titre: ETAPES[6],
+        titre: f.organisation === "ZONE_ANIMAUX" ? "Les équipements (zone des animaux)" : ETAPES[6],
         valeurs: [
           ...INFRASTRUCTURES_MARCHE.filter((eq) => f.equipements?.[eq.code]).map((eq) => [eq.libelle, libelleDe(ETATS, f.equipements![eq.code])] as [string, string | null]),
           ...(f.equipementAutre?.trim() ? [[f.equipementAutre, libelleDe(ETATS, f.etatEquipementAutre)] as [string, string | null]] : []),

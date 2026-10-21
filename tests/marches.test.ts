@@ -8,7 +8,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { ESPECES, INFRASTRUCTURES_MARCHE } from "../src/lib/acteurs";
 import {
-  CALENDRIERS, dateAuCameroun, equipementsPresents, jourTraditionnel, joursEnClair, lieuxEnClair, nettoyerFicheMarche, prochaineDate,
+  CALENDRIERS, choixEspecePrincipale, dateAuCameroun, equipementsPresents, jourTraditionnel, joursEnClair, lieuxEnClair, nettoyerFicheMarche,
+  prochaineDate, typeEnClair,
 } from "../src/lib/marches";
 import { preparerEcriture } from "../src/server/etablissements/donnees";
 
@@ -61,6 +62,25 @@ test("provenances et destinations : plusieurs lieux, toujours un principal parmi
     assert.deepEqual(r.fiche.provenances, ["ARR:Fokoué", "REG:Adamaoua", "AUTRE"]);
     assert.equal(lieuxEnClair(r.fiche.provenances, r.fiche.provenancePrincipale, r.fiche.provenanceAutre), "Région Adamaoua (principal), Fokoué, Bamenda");
   }
+});
+
+test("organisation et espèce la plus vendue : en clair, et contrôlée contre les espèces vendues", () => {
+  const lib = (c: string) => ESPECES.find((e) => e.code === c)!.libelle;
+  const r = nettoyer({ organisation: "ZONE_ANIMAUX", especePrincipale: "PETITS_RUMINANTS" });
+  assert.ok("fiche" in r);
+  if ("fiche" in r) assert.equal(typeEnClair(r.fiche, lib), "Marché général, avec une zone pour les animaux — surtout petits ruminants (moutons et chèvres)");
+  assert.ok("fiche" in nettoyer({ organisation: "N'IMPORTE" }) && (nettoyer({ organisation: "N'IMPORTE" }) as { fiche: { organisation: unknown } }).fiche.organisation === null);
+  assert.equal(typeEnClair({ organisation: "RESERVE_ANIMAUX" }, lib, ["BOVINS"]), "Marché réservé aux animaux — surtout bovins", "une seule espèce : c'est elle");
+  assert.equal(typeEnClair({ organisation: "MELANGE", especePrincipale: "PLUSIEURS" }, lib), "Marché général, sans zone pour les animaux — plusieurs espèces à part égale");
+  assert.equal(typeEnClair({ typeMarche: "BETAIL" }, lib), "Bétail", "une fiche remplie avant se relit encore");
+  assert.deepEqual(choixEspecePrincipale(["OVINS", "CAPRINS"], lib).map((c) => c.code), ["OVINS", "CAPRINS", "PETITS_RUMINANTS", "PLUSIEURS"]);
+  assert.deepEqual(choixEspecePrincipale(["OVINS", "BOVINS"], lib).map((c) => c.code), ["OVINS", "BOVINS", "PLUSIEURS"]);
+  // À l'écriture : une espèce dominante qui n'est pas vendue est écartée.
+  const ctx = { typeCode: "ETAB_MARCHE", codeDepartement: "MEN", username: "x" };
+  const w = preparerEcriture({ especes: ["BOVINS", "OVINS"], fiche: { especePrincipale: "PETITS_RUMINANTS" } }, ctx);
+  assert.ok("data" in w && (w.data.fiche as { especePrincipale: unknown }).especePrincipale === null);
+  const w2 = preparerEcriture({ especes: ["BOVINS", "OVINS"], fiche: { especePrincipale: "BOVINS" } }, ctx);
+  assert.ok("data" in w2 && (w2.data.fiche as { especePrincipale: unknown }).especePrincipale === "BOVINS");
 });
 
 test("équipements et état : les présents alimentent l'ancienne colonne", () => {

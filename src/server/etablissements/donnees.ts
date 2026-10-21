@@ -10,7 +10,7 @@
  */
 import type { Prisma } from "@prisma/client";
 import { ESPECES, INFRASTRUCTURES_MARCHE, nettoyerInfos } from "@/lib/acteurs";
-import { nettoyerFicheMarche, equipementsPresents, type FicheMarche } from "@/lib/marches";
+import { nettoyerFicheMarche, equipementsPresents, PETITS_RUMINANTS, PLUSIEURS_ESPECES, type FicheMarche } from "@/lib/marches";
 
 export const TYPE_MARCHE = "ETAB_MARCHE";
 
@@ -79,6 +79,12 @@ export function preparerEcriture(
     const especes = (data.especes as string[] | undefined) ?? null;
     if (especes && r.fiche.effectifs) {
       for (const esp of Object.keys(r.fiche.effectifs)) if (!especes.includes(esp)) delete r.fiche.effectifs[esp];
+    }
+    // L'espèce la plus vendue fait partie des espèces vendues.
+    const ep = r.fiche.especePrincipale;
+    if (especes && ep && ep !== PLUSIEURS_ESPECES) {
+      const ok = ep === PETITS_RUMINANTS ? especes.includes("OVINS") && especes.includes("CAPRINS") : especes.includes(ep);
+      if (!ok) r.fiche.especePrincipale = null;
     }
   }
   // Un marché n'a ni propriétaire ni téléphone : c'est la commune qui le gère.

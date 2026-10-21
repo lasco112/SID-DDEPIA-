@@ -22,8 +22,8 @@ import { requireUser, assertRole, permissionErrorResponse } from "@/lib/permissi
 import { identiteDepartement } from "@/lib/departement";
 import { TYPES_ACTEURS, INFRASTRUCTURES_MARCHE, libellesEspeces, libellesInfrastructures, libelleJour } from "@/lib/acteurs";
 import {
-  ACCES, CONTROLES, EFFECTIFS, ETATS, FONCTIONNEMENTS, PORTEES, TYPES_MARCHE,
-  joursEnClair, libelleDe, lieuxEnClair, type FicheMarche,
+  ACCES, CONTROLES, EFFECTIFS, ETATS, FONCTIONNEMENTS, PORTEES,
+  joursEnClair, libelleDe, lieuxEnClair, typeEnClair, type FicheMarche,
 } from "@/lib/marches";
 import { TYPE_MARCHE, communeDe } from "@/server/etablissements/donnees";
 import { listePdf, fichesPdf } from "@/server/etablissements/pdf";
@@ -124,7 +124,7 @@ export async function GET(req: Request) {
         aPhoto: Boolean(l.photo),
         marche: marche
           ? {
-              type: libelleDe(TYPES_MARCHE, f.typeMarche),
+              type: typeEnClair(f, (c) => libellesEspeces([c]), l.especes),
               fonctionnement: libelleDe(FONCTIONNEMENTS, f.fonctionnement),
               portee: libelleDe(PORTEES, f.portee),
               effectifs: l.especes.map((e) => `${libellesEspeces([e])} : ${libelleDe(EFFECTIFS, f.effectifs?.[e]) ?? "?"}`).join(" ; "),
@@ -228,7 +228,7 @@ export async function GET(req: Request) {
       fm.addRow([`${identite.intituleCourt} · état au ${etatAu}`]);
       fm.addRow([]);
       styleEntete(fm.addRow([
-        "N°", "Arrondissement", "Nom", "Localité", "Géré par", "Type", "État", "Portée", "Jours", "Espèces (taille habituelle)",
+        "N°", "Arrondissement", "Nom", "Localité", "Géré par", "Organisation et espèce dominante", "État", "Portée", "Jours", "Espèces (taille habituelle)",
         "Provenance (principale d'abord)", "Destinations (principale d'abord)", "Équipements et état", "Agent MINEPIA", "Laissez-passer",
         "Accès", "Latitude", "Longitude", "Précision (m)", "Photo", "Observations", "Statut",
       ]));
