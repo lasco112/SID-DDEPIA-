@@ -22,7 +22,142 @@ import { trimestreARapporter } from "@/lib/trimestreEchu";
 import { lireAvecCopie, garderCopie, envoyer, enAttente } from "@/lib/trimestreHorsLigne";
 import HorsLigneTrimestre from "@/components/HorsLigneTrimestre";
 import ComparaisonMensuel, { type ControleCategories } from "@/components/ComparaisonMensuel";
-import OrigineMensuelle, { CorrectionAuTrimestre, type Origine, type InfoCorrection } from "@/components/OrigineMensuelle";
+import OrigineMensuelle, { type Origine, type InfoCorrection } from "@/components/OrigineMensuelle";
+
+/**
+ * LE BANDEAU DE L'ORDRE, en tête d'un tableau d'une section technique (21
+ * octobre 2026) : le DD y donne ou révoque l'ordre de correction — sans
+ * attendre de demande —, le chef y voit s'il l'a et peut le demander.
+ */
+function BandeauOrdre({
+  ordre,
+  role,
+  periode,
+  titre,
+  onFait,
+}: {
+  ordre: NonNullable<Grille["ordreSection"]>;
+  role: string;
+  periode: { annee: number; trimestre: number };
+  titre: string;
+  onFait: () => void;
+}) {
+  const [motif, setMotif] = useState<string | null>(null);
+  const [occupe, setOccupe] = useState(false);
+  const [erreur, setErreur] = useState<string | null>(null);
+  const [fait, setFait] = useState<string | null>(null);
+  const dd = role === "DD";
+  const depuis = (iso: string) => new Date(iso).toLocaleDateString("fr-FR", { day: "numeric", month: "long" });
+
+  async function agir(action: string, texte?: string, apres?: string) {
+    setErreur(null);
+    setOccupe(true);
+    try {
+      const r = await fetch("/api/trimestre/circuit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ annee: periode.annee, trimestre: periode.trimestre, action, section: ordre.section, motif: texte }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.message ?? "Impossible pour le moment.");
+      setMotif(null);
+      setFait(apres ?? null);
+      onFait();
+    } catch (e) {
+      setErreur(typeof navigator !== "undefined" && !navigator.onLine ? "Il faut du réseau pour cela." : e instanceof Error ? e.message : "Impossible pour le moment.");
+    } finally {
+      setOccupe(false);
+    }
+  }
+
+  const formulaire = (envoyer: string, action: string, apres: string) => (
+    <div className="mt-2 space-y-2">
+      <textarea rows={2} value={motif ?? ""} onChange={(e) => setMotif(e.target.value)} className="block w-full rounded-input border border-gray-300 bg-white px-3 py-2 text-sm" />
+      <div className="flex gap-2">
+        <button
+          type="button"
+          disabled={occupe || (motif ?? "").trim().length < 5}
+          onClick={() => void agir(action, motif ?? "", apres)}
+          className="min-h-[44px] flex-1 rounded-btn bg-amber-700 px-3 text-sm font-semibold text-white disabled:opacity-50"
+        >
+          {occupe ? "Envoi…" : envoyer}
+        </button>
+        <button type="button" onClick={() => setMotif(null)} className="min-h-[44px] flex-1 rounded-btn border border-gray-300 bg-white px-3 text-sm">
+          Annuler
+        </button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div data-visite="bandeau-ordre" className={`mb-3 rounded-md border p-3 text-sm ${ordre.enCours ? "border-green-300 bg-green-50 text-green-950" : "border-amber-300 bg-amber-50 text-amber-950"}`}>
+      {ordre.enCours ? (
+        <>
+          <p>
+            <b>{dd ? `Le chef ${ordre.section} a votre ordre de correction` : "Vous avez l'ordre du DD de corriger"}</b> depuis le {depuis(ordre.enCours.le)} — {ordre.enCours.motif}
+          </p>
+          {!dd && <p className="mt-1">Touchez une case grise pour corriger son chiffre, ou corrigez directement une case remplie par l&apos;arrondissement.</p>}
+          {dd && (
+            <button
+              type="button"
+              disabled={occupe}
+              onClick={() => {
+                if (window.confirm(`Révoquer l'ordre du chef ${ordre.section} ? Ses corrections déjà faites restent.`)) void agir("revoquerOrdre", undefined, "Ordre révoqué.");
+              }}
+              className="mt-2 min-h-[40px] rounded-btn border border-amber-700 bg-white px-3 font-semibold text-amber-900"
+            >
+              Révoquer l&apos;ordre
+            </button>
+          )}
+        </>
+      ) : dd ? (
+        <>
+          <p>
+            {ordre.demande ? (
+              <>
+                <b>Le chef {ordre.section} vous demande l&apos;ordre de corriger</b> depuis le {depuis(ordre.demande.le)} — {ordre.demande.motif}
+              </>
+            ) : (
+              <>
+                <b>Correction par le chef {ordre.section} :</b> il lui faut votre ordre pour corriger les chiffres de ce tableau.
+              </>
+            )}
+          </p>
+          {motif == null ? (
+            <button
+              type="button"
+              onClick={() => setMotif(ordre.demande?.motif ?? `Corriger le tableau « ${titre} ».`)}
+              className="mt-2 min-h-[44px] rounded-btn bg-amber-700 px-4 font-semibold text-white hover:bg-amber-800"
+            >
+              Donner l&apos;ordre au chef {ordre.section}
+            </button>
+          ) : (
+            formulaire("Donner l'ordre", "ordonnerCorrection", `Ordre donné : le chef ${ordre.section} est prévenu.`)
+          )}
+        </>
+      ) : ordre.demande ? (
+        <p>
+          <b>Votre demande d&apos;ordre est chez le DD</b> depuis le {depuis(ordre.demande.le)} — vous serez prévenu dès qu&apos;il l&apos;aura donné.
+        </p>
+      ) : (
+        <>
+          <p>
+            <b>Pour corriger un chiffre de ce tableau, il vous faut l&apos;ordre du DD.</b>
+          </p>
+          {motif == null ? (
+            <button type="button" onClick={() => setMotif("")} className="mt-2 min-h-[44px] rounded-btn border border-amber-700 bg-white px-4 font-semibold text-amber-900">
+              Demander l&apos;ordre au DD
+            </button>
+          ) : (
+            formulaire("Envoyer la demande", "demanderOrdre", "Demande envoyée au DD.")
+          )}
+        </>
+      )}
+      {fait && <p className="mt-2 font-semibold text-green-800">{fait}</p>}
+      {erreur && <p className="mt-2 font-semibold text-red-800">{erreur}</p>}
+    </div>
+  );
+}
 
 /** « D'où vient ce chiffre ? » : la case touchée, son détail, et ce qu'on peut en faire au trimestre. */
 type EtatOrigine = {
@@ -59,6 +194,8 @@ interface CaseGrille {
 interface Grille {
   /** Un chef : l'ordre du DD de corriger les cases des arrondissements, pour ce trimestre. */
   ordreCorrection?: boolean;
+  /** L'ordre de la section de ce tableau, vu par le DD et par le chef concerné (21 octobre 2026). */
+  ordreSection?: { chef: string; section: string; enCours: { motif: string; le: string } | null; demande: { motif: string; le: string } | null };
   numero: number;
   titre: string;
   section: string;
@@ -520,6 +657,15 @@ export default function SaisieTrimestrielleClient({
 
         <div className="mt-4 rounded-md border border-gray-200 bg-white p-3">
           {chargementGrille && !grille && <p className="text-sm text-gray-600">Chargement…</p>}
+          {grille && grille.numero === courant.numero && grille.ordreSection && (
+            <BandeauOrdre
+              ordre={grille.ordreSection}
+              role={moi?.role ?? ""}
+              periode={{ annee, trimestre }}
+              titre={grille.titre}
+              onFait={() => void chargerGrille(grille.numero)}
+            />
+          )}
           {peutSignaler && grille && grille.numero === courant.numero && (
             <div className="mb-3 flex flex-wrap items-center gap-2">
               <button
@@ -1084,29 +1230,19 @@ function TableauSaisie({
           </p>
         )
       )}
-      {origine &&
-        (origine.chargement ? (
-          <p className="mb-3 text-sm text-ink-muted">Recherche dans les rapports mensuels…</p>
-        ) : origine.donnees ? (
-          <OrigineMensuelle
-            origine={origine.donnees}
-            correction={origine.correction ?? null}
-            periode={periode}
-            cellule={origine.cellule}
-            onCorrige={onCorrige}
-            onFermer={() => onFermerOrigine?.()}
-          />
-        ) : (
-          <div className="mb-3 rounded-md bg-appbg p-3 text-sm text-gray-800">
-            {origine.message}{" "}
-            <button type="button" onClick={() => onFermerOrigine?.()} className="text-xs text-ink-muted underline">
-              Fermer
-            </button>
-            {origine.correction && periode && origine.cellule && (
-              <CorrectionAuTrimestre correction={origine.correction} periode={periode} cellule={origine.cellule} onCorrige={onCorrige} />
-            )}
-          </div>
-        ))}
+      {origine && (
+        // Une fenêtre par-dessus l'écran : sur un téléphone, elle ne peut pas passer hors de vue.
+        <OrigineMensuelle
+          chargement={origine.chargement}
+          origine={origine.donnees}
+          message={origine.message}
+          correction={origine.correction ?? null}
+          periode={periode}
+          cellule={origine.cellule}
+          onCorrige={onCorrige}
+          onFermer={() => onFermerOrigine?.()}
+        />
+      )}
       {(grille.alertes ?? grille.avertissements.map((texte) => ({ texte }))).length > 0 && (
         <ul className="mb-3 space-y-2 rounded-md bg-amber-50 p-3 text-sm text-amber-900">
           {(grille.alertes ?? grille.avertissements.map((texte) => ({ texte } as { texte: string; confirmable?: ConfirmationReprise }))).map((a, i) => (

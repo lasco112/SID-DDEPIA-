@@ -36,8 +36,8 @@ import { liaisonEvenementDe, detailEvenementCase } from "./evenements";
 import { listerArrondissements, graphieCanevas } from "@/lib/arrondissements";
 import { identiteDepartement } from "@/lib/departement";
 import { observationsTrimestre } from "@/server/observationsTrimestre";
-import { etatCircuit } from "./circuit";
-import { aOrdreDeCorrection, MESSAGE_SANS_ORDRE } from "./ordresCorrection";
+import { etatCircuit, codeSection } from "./circuit";
+import { aOrdreDeCorrection, MESSAGE_SANS_ORDRE, CHEFS_SOUS_ORDRE, ordresEnCours, demandesEnCours } from "./ordresCorrection";
 import { TABLEAUX_CORRIGEABLES } from "./correctionsTrimestre";
 import {
   type Periode, libelleCourt, memePeriodeAnneePrecedente, moisDeLaPeriode,
@@ -461,6 +461,17 @@ export interface GrilleSaisie {
   aide: string;
   /** Un chef : a-t-il l'ordre du DD de corriger les cases des arrondissements ? */
   ordreCorrection?: boolean;
+  /**
+   * L'ORDRE DE CORRECTION pour la section de ce tableau (21 octobre 2026), vu
+   * par le DD et par le chef concerné : le DD le donne ou le révoque d'ici, le
+   * chef le demande d'ici — sans aller chercher l'écran du circuit.
+   */
+  ordreSection?: {
+    chef: string;
+    section: string;
+    enCours: { motif: string; le: string } | null;
+    demande: { motif: string; le: string } | null;
+  };
 }
 
 /** La grille d'un tableau, telle que ce profil la voit et la remplit. */
@@ -488,7 +499,17 @@ async function grilleEtContexte(db: PrismaClient, periode: Periode, profil: Prof
   const valeur = fournisseur(donnees, ctx);
   const confirmees = await reprisesConfirmees(db, periode);
   const ordre = await aOrdreDeCorrection(db, periode, profil.role);
-  return { g: construireGrille(bloc, section, ctx, profil, donnees, valeur, confirmees, ordre), bloc, ctx, donnees, valeur, confirmees };
+  const g = construireGrille(bloc, section, ctx, profil, donnees, valeur, confirmees, ordre);
+  // L'ordre de la section, pour le bandeau du tableau : le DD et le chef concerné.
+  const chef = chefDuTableau(numero);
+  const code = chef ? codeSection(chef) : null;
+  if (chef && code && CHEFS_SOUS_ORDRE.includes(chef) && (profil.role === "DD" || profil.role === chef)) {
+    const [ordres, demandes] = await Promise.all([ordresEnCours(db, periode), demandesEnCours(db, periode)]);
+    const o = ordres.get(chef);
+    const d = demandes.get(chef);
+    g.ordreSection = { chef, section: code, enCours: o ? { motif: o.motif, le: o.le } : null, demande: d ? { motif: d.motif, le: d.le } : null };
+  }
+  return { g, bloc, ctx, donnees, valeur, confirmees };
 }
 
 /**

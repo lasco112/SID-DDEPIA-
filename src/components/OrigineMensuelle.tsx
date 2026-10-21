@@ -35,6 +35,12 @@ export interface InfoCorrection {
   peutCorriger: boolean;
   affiche: number | null;
   mensuel: number | null;
+  /** Le chef qui corrige ce tableau, sa section et l'état de l'ordre — pour le DD, qui le donne d'ici. */
+  chef: string | null;
+  section: string | null;
+  ordreEnCours: boolean;
+  demande: { motif: string; le: string } | null;
+  motifPropose: string;
   existante: {
     valeur: number;
     valeurMensuelle: number | null;
@@ -55,21 +61,65 @@ const STATUT_RAPPORT: Record<string, string> = {
   CLOTURE: "clôturé",
 };
 
+/**
+ * LA FENÊTRE D'UNE CASE GRISE (21 octobre 2026) : par-dessus l'écran — sur un
+ * téléphone, un cadre inséré au-dessus du tableau passait hors de vue, et le
+ * bouton de correction, tout en bas, n'était jamais trouvé. L'action vient
+ * EN PREMIER (corriger, demander l'ordre, donner l'ordre), le détail ensuite.
+ */
 export default function OrigineMensuelle({
-  origine: o,
+  origine,
+  message,
+  chargement = false,
   onFermer,
   correction = null,
   periode,
   cellule,
   onCorrige,
 }: {
-  origine: Origine;
+  origine?: Origine;
+  /** Pas de détail pour cette case : la raison. */
+  message?: string;
+  chargement?: boolean;
   onFermer: () => void;
   correction?: InfoCorrection | null;
   periode?: { annee: number; trimestre: number };
   cellule?: { numero: number; ligne: string; colonne: string };
   onCorrige?: () => void;
 }) {
+  const titre = origine ? `${origine.arrondissement}, « ${origine.nature} » (${origine.periodeLue})` : cellule ? `${cellule.ligne}, « ${cellule.colonne} »` : "Cette case";
+  return (
+    <div className="fixed inset-0 z-[195] flex items-end justify-center bg-black/40 sm:items-center sm:p-4" onClick={onFermer}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="D'où vient ce chiffre ?"
+        onClick={(e) => e.stopPropagation()}
+        className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-t-2xl bg-white shadow-xl sm:rounded-2xl"
+      >
+        <div className="flex items-start justify-between gap-2 bg-primary-light px-4 py-3">
+          <div className="min-w-0">
+            <p className="text-[15px] font-bold text-primary-dark">D&apos;où vient ce chiffre ?</p>
+            <p className="text-sm text-ink">{titre}</p>
+          </div>
+          <button type="button" onClick={onFermer} className="min-h-[40px] shrink-0 rounded-btn border border-primary/40 bg-white px-3 text-sm font-semibold text-primary">
+            Fermer
+          </button>
+        </div>
+        <div className="overflow-y-auto px-4 py-3">
+          {chargement && <p className="text-sm text-ink-muted">Recherche dans les rapports mensuels…</p>}
+          {/* L'action d'abord : corriger, demander l'ordre, ou le donner. */}
+          {!chargement && correction && periode && cellule && <CorrectionAuTrimestre correction={correction} periode={periode} cellule={cellule} onCorrige={onCorrige} />}
+          {!chargement && origine && <DetailOrigine o={origine} correction={correction} />}
+          {!chargement && !origine && message && <p className="mt-3 rounded-md bg-appbg p-3 text-sm text-gray-800">{message}</p>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Le détail mois par mois. */
+function DetailOrigine({ o, correction }: { o: Origine; correction: InfoCorrection | null }) {
   const moi = useUtilisateur();
   const role = moi?.role ?? "";
   const [erreur, setErreur] = useState<string | null>(null);
@@ -90,7 +140,7 @@ export default function OrigineMensuelle({
       : role === "DD"
         ? "Si un mois est faux, corrigez-le dans les données de l'arrondissement ou renvoyez son rapport ; s'il est clôturé, rouvrez d'abord le mois dans « Ouvrir et clôturer les mois »."
         : correction?.corrigeable
-          ? "Si le vrai chiffre manque au mensuel (rien d'inscrit, ou inscrit faux), corrigez-le ci-dessous, au trimestre, sur ordre du DD."
+          ? "Si le vrai chiffre manque au mensuel (rien d'inscrit, ou inscrit faux), corrigez-le au trimestre, sur ordre du DD (cadre bleu, en haut)."
           : "Si un mois est faux, ouvrez-le : dans « Contrôler les chiffres des arrondissements », vous corrigez la case de votre section (correction tracée, motif obligatoire). Si le mois est clôturé, demandez au DD de le rouvrir.";
 
   async function ouvrir(periodeId: string) {
@@ -105,14 +155,9 @@ export default function OrigineMensuelle({
   }
 
   return (
-    <section className="mb-4 overflow-hidden rounded-card border border-primary/40 bg-white shadow-card">
-      <div className="bg-primary-light px-4 py-3">
-        <p className="text-sm font-bold text-primary-dark">
-          D&apos;où vient ce chiffre ? — {o.arrondissement}, « {o.nature} » ({o.periodeLue})
-        </p>
-        <p className="mt-0.5 text-xs text-ink-muted">{o.explication}</p>
-      </div>
-      <div className="px-4 py-3">
+    <section className="mt-3">
+      <p className="text-xs text-ink-muted">Calcul : {o.explication}.</p>
+      <div className="mt-1">
         <p className="text-sm text-gray-800">
           Il se calcule à partir des rapports mensuels :{" "}
           <strong>{stock ? "le chiffre du mois le plus récent (un effectif à date ne s'additionne pas)" : "la somme des mois"}</strong>.
@@ -166,10 +211,6 @@ export default function OrigineMensuelle({
           {!correction?.corrigeable && " Le trimestre se recalcule ensuite tout seul : ce chiffre ne se tape jamais au trimestre."}
         </p>
         {erreur && <p className="mt-2 text-sm text-red-800">{erreur}</p>}
-        {correction && periode && cellule && <CorrectionAuTrimestre correction={correction} periode={periode} cellule={cellule} onCorrige={onCorrige} />}
-        <button type="button" onClick={onFermer} className="mt-3 text-xs text-ink-muted underline">
-          Fermer
-        </button>
       </div>
     </section>
   );
@@ -224,8 +265,10 @@ export function CorrectionAuTrimestre({
   const e = c.existante;
 
   return (
-    <div className="mt-3 rounded-md border border-sky-300 bg-sky-50 p-3 text-sm text-sky-950">
+    <div className="rounded-md border border-sky-300 bg-sky-50 p-3 text-sm text-sky-950">
       <p className="font-bold">Corriger au trimestre</p>
+      {c.estChef && c.aOrdre && !c.raison && <p className="mt-1 font-semibold text-green-800">✓ Vous avez l&apos;ordre du DD : vous pouvez corriger ce chiffre.</p>}
+      {!c.estChef && <OrdreDuDD correction={c} periode={periode} onFait={onCorrige} />}
 
       {e && (
         <div className={`mt-2 rounded-md p-2 ${e.conflit ? "bg-red-50 text-red-900" : "bg-white"}`}>
@@ -239,7 +282,7 @@ export function CorrectionAuTrimestre({
         </div>
       )}
 
-      {c.estChef && c.aOrdre && c.raison && <p className="mt-2 rounded-md bg-amber-50 p-2 text-amber-900">{c.raison}</p>}
+      {c.estChef && c.raison && <p className="mt-2 rounded-md bg-amber-50 p-2 font-semibold text-amber-900">{c.raison}</p>}
 
       {c.peutCorriger && !form && annulation == null && (
         <div className="mt-2 flex flex-wrap gap-2">
@@ -384,8 +427,96 @@ export function CorrectionAuTrimestre({
         )
       )}
 
-      {!c.estChef && !e && <p className="mt-1 text-xs">Seul le chef de la section corrige ce chiffre au trimestre, sur ordre du DD.</p>}
       {message && <p className="mt-2 font-semibold text-green-800">{message}</p>}
+      {erreur && <p className="mt-2 font-semibold text-red-800">{erreur}</p>}
+    </div>
+  );
+}
+
+/**
+ * LE DD DONNE L'ORDRE D'ICI (21 octobre 2026) : sans attendre de demande, et
+ * sans aller chercher l'écran du circuit. Un motif est proposé, modifiable.
+ */
+function OrdreDuDD({ correction: c, periode, onFait }: { correction: InfoCorrection; periode: { annee: number; trimestre: number }; onFait?: () => void }) {
+  const moi = useUtilisateur();
+  const [motif, setMotif] = useState<string | null>(null);
+  const [occupe, setOccupe] = useState(false);
+  const [erreur, setErreur] = useState<string | null>(null);
+  if (moi?.role !== "DD" || !c.chef || !c.section) {
+    return <p className="mt-1 text-xs">Seul le chef de la section corrige ce chiffre au trimestre, sur ordre du DD.</p>;
+  }
+  async function agir(action: "ordonnerCorrection" | "revoquerOrdre", texte?: string) {
+    setErreur(null);
+    setOccupe(true);
+    try {
+      const r = await fetch("/api/trimestre/circuit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ annee: periode.annee, trimestre: periode.trimestre, action, section: c.section, motif: texte }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.message ?? "Impossible pour le moment.");
+      setMotif(null);
+      onFait?.();
+    } catch (e) {
+      setErreur(e instanceof Error ? e.message : "Impossible pour le moment.");
+    } finally {
+      setOccupe(false);
+    }
+  }
+  return (
+    <div className="mt-2">
+      {c.ordreEnCours ? (
+        <>
+          <p>
+            <b>Le chef {c.section} a votre ordre</b> de corriger les tableaux de sa section pour ce trimestre.
+          </p>
+          <button
+            type="button"
+            disabled={occupe}
+            onClick={() => {
+              if (window.confirm(`Révoquer l'ordre du chef ${c.section} ? Ses corrections déjà faites restent.`)) void agir("revoquerOrdre");
+            }}
+            className="mt-2 min-h-[40px] rounded-btn border border-amber-700 bg-white px-3 font-semibold text-amber-900"
+          >
+            Révoquer l&apos;ordre
+          </button>
+        </>
+      ) : motif == null ? (
+        <>
+          {c.demande ? (
+            <p>
+              <b>Le chef {c.section} vous demande l&apos;ordre</b> : « {c.demande.motif} »
+            </p>
+          ) : (
+            <p>C&apos;est le chef {c.section} qui corrige ce chiffre, sur votre ordre. Vous pouvez le lui donner tout de suite.</p>
+          )}
+          <button
+            type="button"
+            onClick={() => setMotif(c.demande?.motif ?? c.motifPropose)}
+            className="mt-2 min-h-[44px] rounded-btn bg-amber-700 px-4 font-semibold text-white hover:bg-amber-800"
+          >
+            Donner l&apos;ordre au chef {c.section}
+          </button>
+        </>
+      ) : (
+        <div className="space-y-2">
+          <textarea rows={2} value={motif} onChange={(ev) => setMotif(ev.target.value)} className="block w-full rounded-input border border-gray-300 bg-white px-3 py-2 text-sm" />
+          <div className="flex gap-2">
+            <button
+              type="button"
+              disabled={occupe || motif.trim().length < 3}
+              onClick={() => void agir("ordonnerCorrection", motif)}
+              className="min-h-[44px] flex-1 rounded-btn bg-amber-700 px-3 font-semibold text-white disabled:opacity-50"
+            >
+              {occupe ? "Envoi…" : "Donner l'ordre"}
+            </button>
+            <button type="button" onClick={() => setMotif(null)} className="min-h-[44px] flex-1 rounded-btn border border-gray-300 bg-white px-3">
+              Annuler
+            </button>
+          </div>
+        </div>
+      )}
       {erreur && <p className="mt-2 font-semibold text-red-800">{erreur}</p>}
     </div>
   );

@@ -26,6 +26,7 @@ import { fondDepartement } from "@/lib/fondsDepartement";
 import { dateAuCameroun } from "@/lib/marches";
 import { libelleActeur } from "@/lib/acteurs";
 import { avancement, collectesPour, lienDe, periodeEnClair, type Collecte } from "@/server/collectes/collectes";
+import { demandesEnCours } from "@/server/trimestre/ordresCorrection";
 
 interface Lien {
   href: string;
@@ -452,6 +453,46 @@ async function cartesCollectes(db: PrismaClient, moi: { role: string; arrondisse
   }
 }
 
+/**
+ * Les DEMANDES D'ORDRE DE CORRECTION des chefs de section, en attente (21
+ * octobre 2026) : en tête de l'accueil du DD, pour qu'il ne les manque pas.
+ */
+async function demandesDOrdre(db: PrismaClient, role: string) {
+  if (role !== "DD") return [];
+  try {
+    const { annee, trimestre } = trimestreARapporter();
+    const d = await demandesEnCours(db, trimestrielle(annee, trimestre));
+    return Array.from(d.values()).map((x) => ({ ...x, periode: `${ordinal(trimestre)} trimestre ${annee}` }));
+  } catch (e) {
+    console.error("[accueil] demandes d'ordre :", e);
+    return [];
+  }
+}
+
+function CarteDemandesOrdre({ demandes }: { demandes: Awaited<ReturnType<typeof demandesDOrdre>> }) {
+  return (
+    <section className="rounded-card border-2 border-amber-500/70 bg-white p-4 shadow-card sm:p-5">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <h2 className="text-[17px] font-bold text-primary-dark">Des chefs de section vous demandent l&apos;ordre de corriger</h2>
+        <span className="rounded-full bg-amber-600 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-white">À décider</span>
+      </div>
+      <ul className="mt-3 space-y-2">
+        {demandes.map((d) => (
+          <li key={d.chef} className="rounded-input bg-appbg px-3 py-2 text-sm text-ink">
+            <b>Chef {d.section}</b> ({d.periode}) — {d.motif}
+          </li>
+        ))}
+      </ul>
+      <a href="/trimestre/circuit" className="mt-4 flex min-h-[48px] w-full items-center justify-center rounded-btn bg-amber-700 px-4 py-3 text-center text-[15px] font-bold text-white hover:bg-amber-800">
+        Donner l&apos;ordre (ou non) →
+      </a>
+      <p className="mt-2 text-center text-xs text-ink-muted">
+        Vous pouvez aussi donner l&apos;ordre sans demande : en tête de chaque tableau du chef, ou en touchant une case grise.
+      </p>
+    </section>
+  );
+}
+
 function CarteDeCollecte({ c }: { c: CarteCollecte }) {
   return (
     <section data-visite="carte-collecte" className="rounded-card border-2 border-cuivre/70 bg-white p-4 shadow-card sm:p-5">
@@ -486,9 +527,10 @@ export default async function DashboardPage() {
   const db = moi.db as PrismaClient;
   const role = moi.role as string;
 
-  const [accueil, identite, collectes, ...lesCartes] = await Promise.all([
+  const [accueil, identite, demandes, collectes, ...lesCartes] = await Promise.all([
     salutation(db, moi),
     identiteDepartement(db),
+    demandesDOrdre(db, role),
     cartesCollectes(db, moi),
     carteMensuelle(db, moi),
     carteTrimestrielle(db, moi),
@@ -528,6 +570,12 @@ export default async function DashboardPage() {
             </p>
           </div>
         </section>
+
+        {demandes.length > 0 && (
+          <div className="mb-4">
+            <CarteDemandesOrdre demandes={demandes} />
+          </div>
+        )}
 
         {collectes.length > 0 && (
           <div className="mb-4 grid grid-cols-1 gap-4">

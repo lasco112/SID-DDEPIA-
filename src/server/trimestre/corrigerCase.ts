@@ -45,6 +45,13 @@ export interface InfoCorrection {
   /** Le chiffre affiché aujourd'hui, et ce que donne le mensuel seul. */
   affiche: number | null;
   mensuel: number | null;
+  /** Le chef qui corrige ce tableau, sa section, et l'état de l'ordre — pour le DD, qui le donne d'ici. */
+  chef: string | null;
+  section: string | null;
+  ordreEnCours: boolean;
+  demande: { motif: string; le: string } | null;
+  /** Ce que l'ordre proposé au DD dira, prêt à envoyer. */
+  motifPropose: string;
   existante: (CorrectionDeCase & { auteur: string | null }) | null;
 }
 
@@ -71,9 +78,13 @@ export async function infoCorrection(db: PrismaClient, periode: Periode, profil:
       !/^ÉCART/i.test(tc.categorie) &&
       estCaseCalculee(numero, ligne, colonne, ctx)
   );
-  const estChef = CHEFS_SOUS_ORDRE.includes(profil.role) && chefDuTableau(numero) === profil.role;
-  const aOrdre = estChef && (await aOrdreDeCorrection(db, periode, profil.role));
-  const demandeEnCours = estChef && !aOrdre && (await demandesEnCours(db, periode)).has(profil.role);
+  const chef = chefDuTableau(numero);
+  const estChef = CHEFS_SOUS_ORDRE.includes(profil.role) && chef === profil.role;
+  const ordreEnCours = chef ? await aOrdreDeCorrection(db, periode, chef) : false;
+  const aOrdre = estChef && ordreEnCours;
+  const demandes = await demandesEnCours(db, periode);
+  const d = chef ? demandes.get(chef) : undefined;
+  const demandeEnCours = estChef && !aOrdre && Boolean(d);
 
   const g = corrigeable ? await grille(db, periode, profil, numero) : null;
   const c = g?.lignes.find((l) => l.cle === ligne)?.cases.find((x) => x.colonne === colonne);
@@ -105,6 +116,11 @@ export async function infoCorrection(db: PrismaClient, periode: Periode, profil:
     affiche,
     mensuel: existante ? existante.mensuelActuel : affiche,
     existante: existante ? { ...existante, auteur } : null,
+    chef,
+    section: chef ? codeSection(chef) : null,
+    ordreEnCours,
+    demande: d ? { motif: d.motif, le: d.le } : null,
+    motifPropose: tc ? `Corriger le tableau n° ${numero} — ${tc.territoire}, « ${tc.categorie} » (chiffre absent ou faux au mensuel).` : `Corriger le tableau n° ${numero}.`,
   };
 }
 
