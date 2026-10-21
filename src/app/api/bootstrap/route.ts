@@ -15,6 +15,7 @@ import { NextResponse } from "next/server";
 import { resoudrePeriode } from "@/server/periodes/courante";
 import { requireUser, permissionErrorResponse } from "@/lib/permissions";
 import { dernierePurge } from "@/lib/marqueurPurge";
+import { SELECTION_ETABLISSEMENT, versClient } from "@/server/etablissements/donnees";
 
 export async function GET() {
   try {
@@ -35,6 +36,7 @@ export async function GET() {
           ...(user.arrondissementId ? { arrondissementId: user.arrondissementId } : {}),
         },
         orderBy: { nom: "asc" },
+        select: SELECTION_ETABLISSEMENT,
       }),
       db.referentielItem.findMany({ where: { actif: true }, orderBy: { ordre: "asc" } }),
       resoudrePeriode(db),
@@ -124,23 +126,9 @@ export async function GET() {
           ordre: f.ordre,
         })),
       })),
-      etablissements: etablissements.map((e) => ({
-        id: e.id,
-        typeCode: e.typeCode,
-        nom: e.nom,
-        localite: e.localite,
-        arrondissementId: e.arrondissementId,
-        actif: e.actif,
-        proprietaire: e.proprietaire,
-        telephone: e.telephone,
-        // Informations structurelles (20 octobre 2026) : consultables sans réseau.
-        latitude: e.latitude,
-        longitude: e.longitude,
-        especes: e.especes,
-        joursMarche: e.joursMarche,
-        infrastructures: e.infrastructures,
-        observations: e.observations,
-      })),
+      // Informations structurelles et fiche d'un marché (20–21 octobre 2026) :
+      // consultables sans réseau. La photo, elle, n'est jamais envoyée ici.
+      etablissements: etablissements.map(versClient),
       referentiels: referentiels.map((r) => ({
         id: `${r.categorie}:${r.code}`,
         categorie: r.categorie,

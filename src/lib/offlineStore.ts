@@ -11,7 +11,7 @@
  *    que le réseau est disponible (pour rester à jour sans jamais bloquer
  *    l'utilisateur qui, lui, peut être hors ligne).
  */
-import { offlineDB } from "@/lib/dexie";
+import { offlineDB, type EtablissementOffline } from "@/lib/dexie";
 import { NAV_PAR_ROLE } from "@/lib/navItems";
 
 export interface BootstrapPayload {
@@ -131,8 +131,17 @@ export async function telechargerBootstrap(): Promise<void> {
       await offlineDB.meta.put({ cle: "bootstrap", ...data.meta, pinHash: metaExistant?.pinHash });
       await offlineDB.tableaux.clear();
       await offlineDB.tableaux.bulkPut(data.tableaux);
+      // Le travail local pas encore envoyé (ajout, modification, suppression,
+      // photo prise hors ligne) n'est jamais écrasé par la copie du serveur :
+      // sans cela, un établissement ajouté sans réseau disparaissait de l'écran
+      // jusqu'à son envoi, et un établissement supprimé réapparaissait.
+      const enAttente = (await offlineDB.etablissements.toArray()).filter((e) => e.enAttenteSynchro || e.deletedAt || e.photoLocale);
       await offlineDB.etablissements.clear();
       await offlineDB.etablissements.bulkPut(data.etablissements);
+      if (enAttente.length) {
+        const serveur = new Map(data.etablissements.map((e: EtablissementOffline) => [e.id, e] as const));
+        await offlineDB.etablissements.bulkPut(enAttente.map((e) => ({ ...(serveur.get(e.id) ?? {}), ...e })));
+      }
       await offlineDB.referentiels.clear();
       await offlineDB.referentiels.bulkPut(data.referentiels);
       await offlineDB.periodes.clear();

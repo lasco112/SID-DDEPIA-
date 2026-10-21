@@ -30,9 +30,12 @@ interface Ligne {
   localite: string;
   proprietaire: string | null;
   telephone: string | null;
+  /** Un marché : la commune qui le gère. */
+  gestionnaire: string | null;
   actif: boolean;
   latitude: number | null;
   longitude: number | null;
+  precisionGPS: number | null;
   especes: string;
   joursMarche: string;
   infrastructures: string;
@@ -175,6 +178,21 @@ export default function ListeFermes({
         >
           Télécharger (Excel)
         </a>
+        <a
+          href={`/api/etablissements/liste?${parametres("pdf")}`}
+          className="flex min-h-[44px] items-center rounded-btn border border-gray-300 bg-white px-4 text-sm font-bold text-primary hover:bg-gray-100"
+        >
+          Télécharger (PDF)
+        </a>
+        {(typeCode === "TOUS" || typeCode === "ETAB_MARCHE") && (
+          <a
+            href={`/api/etablissements/liste?${parametres("pdf")}&fiches=1`}
+            title="Une page par marché, avec sa photo"
+            className="flex min-h-[44px] items-center rounded-btn border border-gray-300 bg-white px-4 text-sm font-bold text-primary hover:bg-gray-100"
+          >
+            Fiches des marchés (PDF)
+          </a>
+        )}
         {resultat && resultat.lignes.length > 0 && (
           <button
             type="button"
@@ -209,7 +227,7 @@ export default function ListeFermes({
                     <th className="border-b border-gray-200 px-3 py-2">Type</th>
                     <th className="border-b border-gray-200 px-3 py-2">Nom</th>
                     <th className="border-b border-gray-200 px-3 py-2">Localité</th>
-                    <th className="border-b border-gray-200 px-3 py-2">Propriétaire</th>
+                    <th className="border-b border-gray-200 px-3 py-2">Gestionnaire / propriétaire</th>
                     <th className="border-b border-gray-200 px-3 py-2">Téléphone</th>
                     <th className="border-b border-gray-200 px-3 py-2">Espèces · jours</th>
                     <th className="border-b border-gray-200 px-3 py-2">GPS</th>
@@ -224,11 +242,11 @@ export default function ListeFermes({
                       <td className="border-b border-gray-100 px-3 py-2">{l.speculation}</td>
                       <td className="border-b border-gray-100 px-3 py-2 font-medium">{l.nom}</td>
                       <td className="border-b border-gray-100 px-3 py-2">{l.localite}</td>
-                      <td className="border-b border-gray-100 px-3 py-2">{l.proprietaire ?? "—"}</td>
+                      <td className="border-b border-gray-100 px-3 py-2">{l.gestionnaire ?? l.proprietaire ?? "—"}</td>
                       <td className="border-b border-gray-100 px-3 py-2">{l.telephone ?? "—"}</td>
                       <td className="border-b border-gray-100 px-3 py-2 text-[13px]">{[l.especes, l.joursMarche].filter(Boolean).join(" · ") || "—"}</td>
                       <td className="border-b border-gray-100 px-3 py-2 text-[12px] tabular-nums">
-                        {l.latitude != null && l.longitude != null ? `${l.latitude}, ${l.longitude}` : "—"}
+                        {l.latitude != null && l.longitude != null ? `${l.latitude}, ${l.longitude}${l.precisionGPS != null ? ` (± ${String(l.precisionGPS).replace(".", ",")} m)` : ""}` : "—"}
                       </td>
                       <td className="border-b border-gray-100 px-3 py-2">{l.actif ? "En activité" : "Désactivé"}</td>
                     </tr>
@@ -253,7 +271,7 @@ function imprimer(r: { portee: string; speculation: string; lignes: Ligne[] }) {
   const lignes = r.lignes
     .map(
       (l, i) =>
-        `<tr><td style="text-align:right">${i + 1}</td><td>${echapper(l.arrondissement)}</td><td>${echapper(l.speculation)}</td><td><b>${echapper(l.nom)}</b></td><td>${echapper(l.localite)}</td><td>${echapper(l.proprietaire)}</td><td>${echapper(l.telephone)}</td><td>${echapper([l.especes, l.joursMarche].filter(Boolean).join(" · ") || null)}</td><td>${l.latitude != null && l.longitude != null ? `${l.latitude}, ${l.longitude}` : "—"}</td><td>${l.actif ? "En activité" : "Désactivé"}</td></tr>`
+        `<tr><td style="text-align:right">${i + 1}</td><td>${echapper(l.arrondissement)}</td><td>${echapper(l.speculation)}</td><td><b>${echapper(l.nom)}</b></td><td>${echapper(l.localite)}</td><td>${echapper(l.gestionnaire ?? l.proprietaire)}</td><td>${echapper(l.telephone)}</td><td>${echapper([l.especes, l.joursMarche].filter(Boolean).join(" · ") || null)}</td><td>${l.latitude != null && l.longitude != null ? `${l.latitude}, ${l.longitude}` : "—"}</td><td>${l.actif ? "En activité" : "Désactivé"}</td></tr>`
     )
     .join("");
   fenetre.document.write(`<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Liste des fermes et des acteurs</title>
@@ -261,7 +279,7 @@ function imprimer(r: { portee: string; speculation: string; lignes: Ligne[] }) {
 table{border-collapse:collapse;width:100%;font-size:12px}th,td{border:1px solid #cfc9bc;padding:5px 7px;text-align:left}th{background:#f2efe8}</style></head>
 <body><h1>Liste des fermes et des acteurs — ${echapper(r.portee)} — ${echapper(r.speculation)}</h1>
 <p>${r.lignes.length} établissement(s) · état au ${new Date().toLocaleDateString("fr-FR")}</p>
-<table><thead><tr><th>N°</th><th>Arrondissement</th><th>Type</th><th>Nom</th><th>Localité</th><th>Propriétaire</th><th>Téléphone</th><th>Espèces · jours</th><th>GPS</th><th>Statut</th></tr></thead><tbody>${lignes}</tbody></table>
+<table><thead><tr><th>N°</th><th>Arrondissement</th><th>Type</th><th>Nom</th><th>Localité</th><th>Gestionnaire / propriétaire</th><th>Téléphone</th><th>Espèces · jours</th><th>GPS</th><th>Statut</th></tr></thead><tbody>${lignes}</tbody></table>
 <script>window.onload=function(){window.print()}</script></body></html>`);
   fenetre.document.close();
 }

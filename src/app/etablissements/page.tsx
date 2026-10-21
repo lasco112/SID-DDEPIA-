@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { contexteSession } from "@/lib/permissions";
 import AppShell from "@/components/AppShell";
 import EtablissementsClient from "@/components/EtablissementsClient";
+import { identiteDepartement } from "@/lib/departement";
 
 export default async function EtablissementsPage() {
   const session = await getServerSession(authOptions);
@@ -16,6 +17,8 @@ export default async function EtablissementsPage() {
   // celle du département de la session, pas celle de tout le pays.
   const arrondissements = await user.db.arrondissement.findMany({ orderBy: { ordre: "asc" } });
   const ownArrondissementId = user.arrondissementId;
+  // Le calendrier traditionnel des jours de marché dépend du département.
+  const identite = await identiteDepartement(user.db);
 
   return (
     <AppShell allowedRoles={["DA", "DD", "AGENT_SAISIE"]}>
@@ -33,6 +36,8 @@ export default async function EtablissementsPage() {
             role={role as "DA" | "DD" | "AGENT_SAISIE"}
             arrondissements={arrondissements}
             ownArrondissementId={ownArrondissementId}
+            codeDepartement={identite.code}
+            nomDepartement={identite.nom}
           />
         </div>
         {/* Retirer d'un coup les établissements de démonstration : rangé dans

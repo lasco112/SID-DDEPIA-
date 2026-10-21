@@ -126,6 +126,17 @@ export interface EtablissementOffline {
   joursMarche?: string[];
   infrastructures?: string[];
   observations?: string | null;
+  /** La position : sa précision en mètres, sa date, son auteur (21 octobre 2026). */
+  precisionGPS?: number | null;
+  dateCollecteGPS?: string | null;
+  sourceGPS?: string | null;
+  /** La fiche d'un marché — src/lib/marches.ts (FicheMarche). */
+  fiche?: import("@/lib/marches").FicheMarche | null;
+  /** Le serveur a une photo de cet établissement. */
+  aPhoto?: boolean;
+  photoLe?: string | null;
+  /** Une photo prise sur CET appareil, pas encore envoyée (data URL JPEG). */
+  photoLocale?: string | null;
   /**
    * Suppression demandée hors ligne (« tombstone ») : l'établissement
    * disparaît immédiatement des écrans mais reste stocké tant que le serveur
@@ -144,7 +155,8 @@ export interface EtablissementOffline {
 export interface OperationEnAttente {
   id?: number;
   entite: "etablissement";
-  operation: "CREATION" | "MODIFICATION" | "SUPPRESSION";
+  /** PHOTO : `payload.image` (data URL) envoie la photo ; `payload.image` null la retire. */
+  operation: "CREATION" | "MODIFICATION" | "SUPPRESSION" | "PHOTO";
   /** Identifiant de la cible — généré sur l'appareil pour une création. */
   cibleId: string;
   payload: Record<string, unknown>;

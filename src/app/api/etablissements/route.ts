@@ -12,7 +12,10 @@
  */
 import { NextResponse } from "next/server";
 import { requireUser, assertRole, permissionErrorResponse } from "@/lib/permissions";
-import { CODES_ACTEURS, nettoyerInfos } from "@/lib/acteurs";
+import type { Prisma } from "@prisma/client";
+import { CODES_ACTEURS } from "@/lib/acteurs";
+import { identiteDepartement } from "@/lib/departement";
+import { SELECTION_ETABLISSEMENT, TYPE_MARCHE, preparerEcriture, versClient } from "@/server/etablissements/donnees";
 
 // Les neuf types d'acteurs de la liste de référence (20 octobre 2026) — les
 // quatre premiers servent aux tableaux nominatifs du mensuel, les autres
@@ -43,8 +46,9 @@ export async function GET(req: Request) {
     const etablissements = await user.db.etablissement.findMany({
       where: { typeCode, arrondissementId },
       orderBy: [{ actif: "desc" }, { nom: "asc" }],
+      select: SELECTION_ETABLISSEMENT,
     });
-    return NextResponse.json({ etablissements });
+    return NextResponse.json({ etablissements: etablissements.map(versClient) });
   } catch (e) {
     const { status, message } = permissionErrorResponse(e);
     return NextResponse.json({ message }, { status });
@@ -76,6 +80,9 @@ export async function POST(req: Request) {
       joursMarche?: string[];
       infrastructures?: string[];
       observations?: string | null;
+      precisionGPS?: number | null;
+      dateCollecteGPS?: string | null;
+      fiche?: unknown;
     };
 
     if (!body.typeCode || !TYPES_VALIDES.includes(body.typeCode)) {
@@ -94,18 +101,33 @@ export async function POST(req: Request) {
       arrondissementId = body.arrondissementId;
     }
 
-    const infos = nettoyerInfos(body as unknown as Record<string, unknown>);
-    if ("erreur" in infos) return NextResponse.json({ message: infos.erreur }, { status: 400 });
+    // Un renvoi d'appareil réécrit SA création — jamais l'établissement d'un
+    // autre arrondissement dont on aurait repris l'identifiant.
+    if (body.id) {
+      const deja = await user.db.etablissement.findUnique({ where: { id: body.id }, select: { arrondissementId: true } });
+      if (deja && deja.arrondissementId !== arrondissementId) {
+        return NextResponse.json({ message: "Cet identifiant appartient à un établissement d'un autre arrondissement." }, { status: 403 });
+      }
+    }
 
+    const prepare = preparerEcriture(body as unknown as Record<string, unknown>, {
+      typeCode: body.typeCode,
+      codeDepartement: (await identiteDepartement(user.db)).code,
+      username: user.username,
+    });
+    if ("erreur" in prepare) return NextResponse.json({ message: prepare.erreur }, { status: 400 });
+
+    const estMarche = body.typeCode === TYPE_MARCHE;
     const donnees = {
-      ...infos.donnees,
+      ...prepare.data,
       typeCode: body.typeCode,
       nom: body.nom.trim(),
       localite: body.localite.trim(),
-      proprietaire: body.proprietaire?.trim() || null,
-      telephone: body.telephone?.trim() || null,
+      // Un marché n'a ni propriétaire ni téléphone : c'est la commune qui le gère.
+      proprietaire: estMarche ? null : body.proprietaire?.trim() || null,
+      telephone: estMarche ? null : body.telephone?.trim() || null,
       arrondissementId,
-    };
+    } as Prisma.EtablissementUncheckedCreateInput;
 
     // upsert plutôt que create quand l'appareil fournit son identifiant :
     // un même envoi rejoué après une coupure réseau met simplement à jour la
@@ -115,14 +137,15 @@ export async function POST(req: Request) {
           where: { id: body.id },
           create: { id: body.id, ...donnees },
           update: donnees,
+          select: SELECTION_ETABLISSEMENT,
         })
-      : await user.db.etablissement.create({ data: donnees });
+      : await user.db.etablissement.create({ data: donnees, select: SELECTION_ETABLISSEMENT });
 
     await user.db.auditLog.create({
       data: { userId: user.id, action: "CREATION_ETABLISSEMENT", entite: "Etablissement", entiteId: etablissement.id, details: { nom: etablissement.nom, typeCode: etablissement.typeCode } },
     });
 
-    return NextResponse.json({ etablissement }, { status: 201 });
+    return NextResponse.json({ etablissement: versClient(etablissement) }, { status: 201 });
   } catch (e) {
     const { status, message } = permissionErrorResponse(e);
     return NextResponse.json({ message }, { status });

@@ -6,11 +6,12 @@
  * de marché et les équipements ; pour un abattoir, un étang ou une clinique,
  * les espèces concernées ; et des observations.
  *
- * Utilisé à l'ajout d'un acteur et dans sa fiche. « Utiliser ma position »
- * prend la position du téléphone, sur place, avec l'accord de l'agent.
+ * Utilisé à l'ajout d'un acteur (autre qu'un marché, qui a son questionnaire)
+ * et dans sa fiche. La position se prend par le téléphone, sur place, à 5 m
+ * près au plus (CaptureGps) — jamais tapée (21 octobre 2026).
  */
-import { useState } from "react";
-import { ESPECES, INFRASTRUCTURES_MARCHE, JOURS, QUESTION_ESPECES, libelleJour, type InfosStructurelles } from "@/lib/acteurs";
+import { ESPECES, QUESTION_ESPECES, type InfosStructurelles } from "@/lib/acteurs";
+import CaptureGps from "@/components/CaptureGps";
 
 export default function InfosActeurForm({
   typeCode,
@@ -23,28 +24,18 @@ export default function InfosActeurForm({
   onChange: (v: InfosStructurelles) => void;
   desactive?: boolean;
 }) {
-  const [gps, setGps] = useState<string | null>(null);
-  const marche = typeCode === "ETAB_MARCHE";
+  // Les marchés ont leur questionnaire (QuestionnaireMarche) : ce formulaire sert aux autres acteurs.
   const questionEspeces = QUESTION_ESPECES[typeCode];
-  const basculer = (cle: "especes" | "joursMarche" | "infrastructures", code: string) => {
+  const basculer = (cle: "especes", code: string) => {
     const actuel = valeur[cle] ?? [];
     onChange({ ...valeur, [cle]: actuel.includes(code) ? actuel.filter((x) => x !== code) : [...actuel, code] });
   };
+  const position =
+    valeur.latitude != null && valeur.longitude != null && valeur.precisionGPS != null
+      ? { latitude: valeur.latitude, longitude: valeur.longitude, precisionGPS: valeur.precisionGPS, dateCollecteGPS: valeur.dateCollecteGPS ?? new Date().toISOString() }
+      : null;
 
-  function maPosition() {
-    if (!("geolocation" in navigator)) return setGps("Cet appareil ne donne pas sa position.");
-    setGps("Recherche de la position…");
-    navigator.geolocation.getCurrentPosition(
-      (p) => {
-        onChange({ ...valeur, latitude: Number(p.coords.latitude.toFixed(6)), longitude: Number(p.coords.longitude.toFixed(6)) });
-        setGps(`Position prise (précision ± ${Math.round(p.coords.accuracy)} m).`);
-      },
-      () => setGps("Position refusée ou introuvable : autorisez la localisation, ou saisissez les coordonnées."),
-      { enableHighAccuracy: true, timeout: 20000 }
-    );
-  }
-
-  const cases = (liste: { code: string; libelle: string }[], cle: "especes" | "joursMarche" | "infrastructures") => (
+  const cases = (liste: { code: string; libelle: string }[], cle: "especes") => (
     <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1.5">
       {liste.map((x) => (
         <label key={x.code} className="flex min-h-[32px] items-center gap-1.5 text-sm text-ink">
@@ -58,34 +49,14 @@ export default function InfosActeurForm({
   return (
     <div className="space-y-3">
       <div>
-        <p className="text-[13px] font-bold text-ink">Coordonnées GPS</p>
-        <div className="mt-1 flex flex-wrap items-center gap-2">
-          <input
-            inputMode="decimal"
-            placeholder="Latitude (ex. 5,4467)"
-            disabled={desactive}
-            value={valeur.latitude ?? ""}
-            onChange={(e) => onChange({ ...valeur, latitude: e.target.value === "" ? null : (e.target.value as unknown as number) })}
-            className="min-h-[40px] w-44 rounded-input border border-gray-300 bg-white px-2 text-sm tabular-nums"
-          />
-          <input
-            inputMode="decimal"
-            placeholder="Longitude (ex. 10,0533)"
-            disabled={desactive}
-            value={valeur.longitude ?? ""}
-            onChange={(e) => onChange({ ...valeur, longitude: e.target.value === "" ? null : (e.target.value as unknown as number) })}
-            className="min-h-[40px] w-44 rounded-input border border-gray-300 bg-white px-2 text-sm tabular-nums"
-          />
-          <button
-            type="button"
-            disabled={desactive}
-            onClick={maPosition}
-            className="min-h-[40px] rounded-btn border border-primary bg-white px-3 text-sm font-semibold text-primary hover:bg-primary-light"
-          >
-            Utiliser ma position
-          </button>
-        </div>
-        {gps && <p className="mt-1 text-xs text-ink-muted">{gps}</p>}
+        <p className="mb-1 text-[13px] font-bold text-ink">Position GPS — prise sur place, avec le téléphone</p>
+        <CaptureGps
+          valeur={position}
+          desactive={desactive}
+          onChange={(p) =>
+            onChange({ ...valeur, latitude: p?.latitude ?? null, longitude: p?.longitude ?? null, precisionGPS: p?.precisionGPS ?? null, dateCollecteGPS: p?.dateCollecteGPS ?? null })
+          }
+        />
       </div>
 
       {questionEspeces && (
@@ -93,19 +64,6 @@ export default function InfosActeurForm({
           <p className="text-[13px] font-bold text-ink">{questionEspeces}</p>
           {cases(ESPECES, "especes")}
         </div>
-      )}
-
-      {marche && (
-        <>
-          <div>
-            <p className="text-[13px] font-bold text-ink">Jours de marché</p>
-            {cases(JOURS.map((j) => ({ code: j, libelle: libelleJour(j) })), "joursMarche")}
-          </div>
-          <div>
-            <p className="text-[13px] font-bold text-ink">Équipements du marché</p>
-            {cases(INFRASTRUCTURES_MARCHE, "infrastructures")}
-          </div>
-        </>
       )}
 
       <div>
@@ -118,7 +76,7 @@ export default function InfosActeurForm({
           disabled={desactive}
           value={valeur.observations ?? ""}
           onChange={(e) => onChange({ ...valeur, observations: e.target.value })}
-          placeholder={marche ? "Ex. : gestionnaire, fréquentation, provenance des animaux…" : "Ex. : capacité, état, remarques…"}
+          placeholder="Ex. : capacité, état, remarques…"
           className="mt-1 w-full rounded-input border border-gray-300 bg-white px-2 py-1.5 text-sm"
         />
       </div>

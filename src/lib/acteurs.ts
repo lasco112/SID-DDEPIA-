@@ -9,6 +9,7 @@
  * aux tableaux nominatifs du mensuel (1.3, 1.4, 1.5, 2.3). Chaque acteur est
  * rattaché à un arrondissement, donc à un département.
  */
+import { PRECISION_GPS_MAX_M } from "./marches";
 
 export interface TypeActeur {
   code: string;
@@ -86,6 +87,10 @@ export const libellesInfrastructures = (codes: string[]) => codes.map((c) => lib
 export interface InfosStructurelles {
   latitude?: number | null;
   longitude?: number | null;
+  /** Précision de la position, en mètres, telle que le téléphone l'a mesurée. */
+  precisionGPS?: number | null;
+  /** Quand la position a été prise (ISO). */
+  dateCollecteGPS?: string | null;
   especes?: string[];
   joursMarche?: string[];
   infrastructures?: string[];
@@ -95,6 +100,12 @@ export interface InfosStructurelles {
 /**
  * Vérifie et nettoie ce qu'un formulaire envoie. Rend un message d'erreur, ou
  * les données à écrire (seulement les champs présents).
+ *
+ * LA POSITION (décision du Délégué, 21 octobre 2026) : prise par le téléphone,
+ * à 5 m près au plus — jamais tapée à la main. Une position qui arrive sans sa
+ * précision, ou moins précise, n'est PAS enregistrée : le reste de la fiche
+ * l'est. On ne refuse pas l'envoi entier — un vieux téléphone qui renvoie une
+ * saisie faite hors ligne avant la mise à jour ne doit pas rester bloqué.
  */
 export function nettoyerInfos(body: Record<string, unknown>): { erreur: string } | { donnees: InfosStructurelles } {
   const donnees: InfosStructurelles = {};
@@ -105,8 +116,21 @@ export function nettoyerInfos(body: Record<string, unknown>): { erreur: string }
     if ((lat == null) !== (lng == null)) return { erreur: "Donnez la latitude ET la longitude, ou aucune des deux." };
     if (lat != null && (!Number.isFinite(lat) || lat < -90 || lat > 90)) return { erreur: "Latitude invalide : un nombre entre -90 et 90 (ex. 5,4467)." };
     if (lng != null && (!Number.isFinite(lng) || lng < -180 || lng > 180)) return { erreur: "Longitude invalide : un nombre entre -180 et 180 (ex. 10,0533)." };
-    donnees.latitude = lat;
-    donnees.longitude = lng;
+    const precision = nombre(body.precisionGPS);
+    if (lat == null) {
+      donnees.latitude = null;
+      donnees.longitude = null;
+      donnees.precisionGPS = null;
+      donnees.dateCollecteGPS = null;
+    } else if (precision != null && Number.isFinite(precision) && precision >= 0 && precision <= PRECISION_GPS_MAX_M) {
+      donnees.latitude = lat;
+      donnees.longitude = lng;
+      donnees.precisionGPS = Math.round(precision * 10) / 10;
+      const le = typeof body.dateCollecteGPS === "string" ? new Date(body.dateCollecteGPS) : null;
+      const maintenant = new Date();
+      donnees.dateCollecteGPS = (le && !Number.isNaN(le.getTime()) && le <= maintenant ? le : maintenant).toISOString();
+    }
+    // Sinon : position sans précision, ou trop imprécise — ignorée.
   }
   const liste = (v: unknown, permis: string[]) =>
     Array.isArray(v) ? Array.from(new Set(v.map(String).filter((x) => permis.includes(x)))) : undefined;

@@ -15,15 +15,25 @@ test("les neuf types de la liste de référence, les quatre du mensuel en tête"
   assert.ok(CODES_ACTEURS.includes("ETAB_MARCHE"));
 });
 
-test("coordonnées GPS : virgule acceptée, les deux ou aucune, bornes vérifiées", () => {
-  const ok = nettoyerInfos({ latitude: "5,4467", longitude: "10.0533" });
-  assert.deepEqual("donnees" in ok && ok.donnees, { latitude: 5.4467, longitude: 10.0533 });
+test("coordonnées GPS : prises par le téléphone à 5 m près au plus, bornes vérifiées", () => {
+  const le = "2026-10-20T08:00:00.000Z";
+  const ok = nettoyerInfos({ latitude: "5,4467", longitude: "10.0533", precisionGPS: 3.46, dateCollecteGPS: le });
+  assert.deepEqual("donnees" in ok && ok.donnees, { latitude: 5.4467, longitude: 10.0533, precisionGPS: 3.5, dateCollecteGPS: le });
   assert.ok("erreur" in nettoyerInfos({ latitude: "5.4", longitude: "" }));
-  assert.ok("erreur" in nettoyerInfos({ latitude: "95", longitude: "10" }));
+  assert.ok("erreur" in nettoyerInfos({ latitude: "95", longitude: "10", precisionGPS: 2 }));
   assert.ok("erreur" in nettoyerInfos({ latitude: "abc", longitude: "10" }));
+  // Sans sa précision (tapée à la main, vieil appareil) ou à plus de 5 m : la position n'est PAS gardée —
+  // le reste passe, rien n'est bloqué.
+  for (const precisionGPS of [undefined, 12, 5.01]) {
+    const r = nettoyerInfos({ latitude: "5.4", longitude: "10.1", precisionGPS, observations: "x" });
+    assert.deepEqual("donnees" in r && r.donnees, { observations: "x" }, `précision ${precisionGPS}`);
+  }
+  // Une date d'appareil dans le futur est ramenée à maintenant.
+  const futur = nettoyerInfos({ latitude: "5.4", longitude: "10.1", precisionGPS: 4, dateCollecteGPS: "2099-01-01T00:00:00Z" });
+  assert.ok("donnees" in futur && new Date(futur.donnees.dateCollecteGPS!) <= new Date());
   // Effacer les deux : permis.
   const vide = nettoyerInfos({ latitude: "", longitude: "" });
-  assert.deepEqual("donnees" in vide && vide.donnees, { latitude: null, longitude: null });
+  assert.deepEqual("donnees" in vide && vide.donnees, { latitude: null, longitude: null, precisionGPS: null, dateCollecteGPS: null });
 });
 
 test("listes : seuls les codes connus passent, sans doublon", () => {

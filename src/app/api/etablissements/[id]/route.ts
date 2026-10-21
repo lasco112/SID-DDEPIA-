@@ -16,14 +16,15 @@
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { requireUser, assertRole, permissionErrorResponse } from "@/lib/permissions";
-import { nettoyerInfos } from "@/lib/acteurs";
+import { identiteDepartement } from "@/lib/departement";
+import { SELECTION_ETABLISSEMENT, preparerEcriture, versClient } from "@/server/etablissements/donnees";
 
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
   try {
     const user = await requireUser();
     assertRole(user, ["DA", "DD", "AGENT_SAISIE"]);
 
-    const etablissement = await user.db.etablissement.findUnique({ where: { id: params.id } });
+    const etablissement = await user.db.etablissement.findUnique({ where: { id: params.id }, select: SELECTION_ETABLISSEMENT });
     if (!etablissement) return NextResponse.json({ message: "Établissement introuvable" }, { status: 404 });
 
     if (user.role !== "DD" && etablissement.arrondissementId !== user.arrondissementId) {
@@ -31,6 +32,9 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     }
 
     const body = (await req.json()) as {
+      precisionGPS?: number | null;
+      dateCollecteGPS?: string | null;
+      fiche?: unknown;
       nom?: string;
       localite?: string;
       proprietaire?: string | null;
@@ -56,12 +60,16 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     if (body.proprietaire !== undefined) data.proprietaire = body.proprietaire?.trim() || null;
     if (body.telephone !== undefined) data.telephone = body.telephone?.trim() || null;
     if (body.actif !== undefined) data.actif = body.actif;
-    // Les informations structurelles (GPS, espèces, jours de marché…).
-    const infos = nettoyerInfos(body as unknown as Record<string, unknown>);
-    if ("erreur" in infos) return NextResponse.json({ message: infos.erreur }, { status: 400 });
-    Object.assign(data, infos.donnees);
+    // Les informations structurelles (GPS, espèces, jours de marché…) et la fiche d'un marché.
+    const prepare = preparerEcriture(body as unknown as Record<string, unknown>, {
+      typeCode: etablissement.typeCode,
+      codeDepartement: (await identiteDepartement(user.db)).code,
+      username: user.username,
+    });
+    if ("erreur" in prepare) return NextResponse.json({ message: prepare.erreur }, { status: 400 });
+    Object.assign(data, prepare.data);
 
-    const mis_a_jour = await user.db.etablissement.update({ where: { id: params.id }, data });
+    const mis_a_jour = await user.db.etablissement.update({ where: { id: params.id }, data, select: SELECTION_ETABLISSEMENT });
 
     await user.db.auditLog.create({
       data: {
@@ -73,7 +81,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       },
     });
 
-    return NextResponse.json({ etablissement: mis_a_jour });
+    return NextResponse.json({ etablissement: versClient(mis_a_jour) });
   } catch (e) {
     const { status, message } = permissionErrorResponse(e);
     return NextResponse.json({ message }, { status });

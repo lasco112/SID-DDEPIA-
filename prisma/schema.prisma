@@ -148,6 +148,7 @@ model Departement {
   auditLogs              AuditLog[]
   demandeAides           DemandeAide[]
   textesDepartement      TexteDepartement[]
+  photosEtablissements   PhotoEtablissement[]
 
   @@index([regionId])
 }
@@ -322,11 +323,35 @@ model Etablissement {
   joursMarche      String[]                              @default([])
   infrastructures  String[]                              @default([])
   observations     String?
+  /// La fiche d'un MARCHÉ (21 octobre 2026) : type, jours du calendrier
+  /// traditionnel, effectifs par espèce, provenances et destinations (avec le
+  /// lieu principal), équipements et leur état, contrôle vétérinaire, accès.
+  /// Forme et codes : src/lib/marches.ts (FicheMarche).
+  fiche            Json?
 
   arrondissement Arrondissement     @relation(fields: [arrondissementId], references: [id])
   saisies        SaisieNominative[]
+  photo          PhotoEtablissement?
 
   @@index([arrondissementId, typeCode, actif])
+}
+
+/// La photo d'un établissement (21 octobre 2026), prise par le téléphone.
+/// Table À PART, à dessein : aucune liste, aucun téléphone ne la charge sans le
+/// demander — le registre envoyé aux appareils resterait sinon très lourd.
+model PhotoEtablissement {
+  departementId   String?
+  departement     Departement?  @relation(fields: [departementId], references: [id])
+
+  etablissementId String        @id
+  /// L'image, compressée sur le téléphone (JPEG).
+  contenu         Bytes
+  typeMime        String        @default("image/jpeg")
+  prisLe          DateTime      @default(now())
+  /// L'utilisateur qui l'a prise (identifiant ; pas de clé : un compte supprimé ne doit pas emporter la photo).
+  auteurId        String?
+
+  etablissement Etablissement @relation(fields: [etablissementId], references: [id], onDelete: Cascade)
 }
 
 // ============================================================================

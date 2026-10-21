@@ -21,11 +21,18 @@ import {
   supprimerEtablissement,
   synchroniserEtablissements,
   nombreOperationsEnAttente,
+  envoyerPhoto,
 } from "@/lib/etablissementsLocal";
 import VisiteGuidee from "@/components/VisiteGuidee";
 import ListeFermes from "@/components/ListeFermes";
 import InfosActeurForm from "@/components/InfosActeurForm";
+import QuestionnaireMarche, { type ReponsesMarche } from "@/components/QuestionnaireMarche";
+import { useUtilisateur } from "@/components/UtilisateurContexte";
+import { Store, MapPin, FileDown } from "lucide-react";
 import { TYPES_ACTEURS, nettoyerInfos, libellesEspeces, type InfosStructurelles } from "@/lib/acteurs";
+import { joursEnClair } from "@/lib/marches";
+
+const MARCHE = "ETAB_MARCHE";
 
 interface Arrondissement {
   id: string;
@@ -45,11 +52,18 @@ export default function EtablissementsClient({
   role,
   arrondissements,
   ownArrondissementId,
+  codeDepartement = null,
+  nomDepartement = "",
 }: {
   role: "DA" | "DD" | "AGENT_SAISIE";
   arrondissements: Arrondissement[];
   ownArrondissementId: string | null;
+  codeDepartement?: string | null;
+  nomDepartement?: string;
 }) {
+  const moi = useUtilisateur();
+  /** Le questionnaire d'un marché ouvert : null pour un nouveau marché. */
+  const [questionnaire, setQuestionnaire] = useState<{ etab: Etablissement | null } | null>(null);
   // Seul le DD choisit l'arrondissement : le DA et l'agent de saisie sont
   // cloisonnés sur le leur (§A.2), le serveur le revérifie de son côté.
   const estDD = role === "DD";
@@ -134,6 +148,27 @@ export default function EtablissementsClient({
     }
   }
 
+  /** Le questionnaire d'un marché, enregistré : un nouveau marché, ou la fiche d'un marché existant. */
+  async function enregistrerMarche(r: ReponsesMarche, etab: Etablissement | null) {
+    setMessage(null);
+    const gps = r.gps
+      ? { latitude: r.gps.latitude, longitude: r.gps.longitude, precisionGPS: r.gps.precisionGPS, dateCollecteGPS: r.gps.dateCollecteGPS }
+      : { latitude: null, longitude: null, precisionGPS: null, dateCollecteGPS: null };
+    const commun = { nom: r.nom.trim(), localite: r.localite.trim(), especes: r.especes, observations: r.observations?.trim() || null, fiche: r.fiche, ...gps };
+    if (etab) {
+      await modifierEtablissement(etab.id, commun);
+      if (r.photo !== undefined) await envoyerPhoto(etab.id, r.photo);
+    } else {
+      await creerEtablissement({ typeCode: MARCHE, arrondissementId, ...commun, photo: r.photo ?? null });
+    }
+    setMessage(
+      (await nombreOperationsEnAttente()) > 0
+        ? `« ${commun.nom} » enregistré sur cet appareil — il sera transmis dès que le serveur sera joignable.`
+        : `« ${commun.nom} » enregistré.`
+    );
+    await charger();
+  }
+
   async function confirmerSuppression() {
     if (!aSupprimer) return;
     const { id, nom } = aSupprimer;
@@ -210,6 +245,33 @@ export default function EtablissementsClient({
         </div>
       )}
 
+      {questionnaire && (
+        <QuestionnaireMarche
+          etablissement={questionnaire.etab}
+          arrondissement={{ id: arrondissementId, nom: arrondissements.find((a) => a.id === arrondissementId)?.nom ?? "" }}
+          arrondissements={arrondissements.map((a) => a.nom)}
+          codeDepartement={codeDepartement}
+          nomDepartement={nomDepartement}
+          username={moi?.username ?? "inconnu"}
+          onEnregistrer={(r) => enregistrerMarche(r, questionnaire.etab)}
+          onFermer={() => setQuestionnaire(null)}
+        />
+      )}
+
+      {typeCode === MARCHE ? (
+        <div data-visite="ajouter-etablissement" className="mb-5 rounded-lg border border-gray-200 bg-gray-50 p-4">
+          <button
+            type="button"
+            onClick={() => setQuestionnaire({ etab: null })}
+            className="flex min-h-[52px] w-full items-center justify-center gap-2 rounded-btn bg-primary px-4 text-[15px] font-bold text-white hover:bg-primary-hover sm:w-auto"
+          >
+            <Store size={20} /> Ajouter un marché
+          </button>
+          <p className="mt-2 text-sm text-ink-muted">
+            Un questionnaire en 10 étapes, à remplir <b>sur place</b> : la position GPS se prend au milieu du marché. Sans réseau, tout est gardé sur le téléphone.
+          </p>
+        </div>
+      ) : (
       <form onSubmit={ajouter} data-visite="ajouter-etablissement" className="mb-5 rounded-lg border border-gray-200 bg-gray-50 p-4">
         <h3 className="mb-3 text-sm font-semibold text-gray-700">Ajouter un établissement</h3>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
@@ -255,6 +317,7 @@ export default function EtablissementsClient({
           {ajout ? "Ajout…" : "Ajouter"}
         </button>
       </form>
+      )}
 
       {message && <p className="mb-3 text-sm text-gray-700">{message}</p>}
 
@@ -270,8 +333,15 @@ export default function EtablissementsClient({
                 {/* Largeurs minimales : sans elles, le nom se réduisait à trois lettres sur un écran moyen. */}
                 <th className="min-w-[200px] border-b border-gray-200 px-3 py-2">Nom</th>
                 <th className="min-w-[140px] border-b border-gray-200 px-3 py-2">Localité</th>
-                <th className="min-w-[140px] border-b border-gray-200 px-3 py-2">Propriétaire</th>
-                <th className="min-w-[120px] border-b border-gray-200 px-3 py-2">Téléphone</th>
+                {typeCode === MARCHE ? (
+                  // Un marché n'a ni propriétaire ni téléphone : c'est la commune qui le gère.
+                  <th className="min-w-[200px] border-b border-gray-200 px-3 py-2">Jours de marché</th>
+                ) : (
+                  <>
+                    <th className="min-w-[140px] border-b border-gray-200 px-3 py-2">Propriétaire</th>
+                    <th className="min-w-[120px] border-b border-gray-200 px-3 py-2">Téléphone</th>
+                  </>
+                )}
                 <th className="border-b border-gray-200 px-3 py-2">Fiche</th>
                 <th className="border-b border-gray-200 px-3 py-2">Statut</th>
                 <th className="border-b border-gray-200 px-3 py-2 text-right">Suppression</th>
@@ -285,6 +355,8 @@ export default function EtablissementsClient({
                   onMessage={setMessage}
                   onModifier={(patch) => modifier(etab.id, patch)}
                   onSupprimer={() => setASupprimer({ id: etab.id, nom: etab.nom })}
+                  codeDepartement={codeDepartement}
+                  onOuvrirQuestionnaire={etab.typeCode === MARCHE ? () => setQuestionnaire({ etab }) : undefined}
                 />
               ))}
             </tbody>
@@ -300,25 +372,33 @@ function LigneEtablissement({
   onModifier,
   onSupprimer,
   onMessage,
+  codeDepartement,
+  onOuvrirQuestionnaire,
 }: {
   etab: Etablissement;
   onModifier: (patch: Partial<Etablissement>) => void;
   onSupprimer: () => void;
   onMessage: (m: string | null) => void;
+  codeDepartement: string | null;
+  /** Un marché : sa fiche est le questionnaire. */
+  onOuvrirQuestionnaire?: () => void;
 }) {
   const [ficheOuverte, setFicheOuverte] = useState(false);
   const [infos, setInfos] = useState<InfosStructurelles>({
     latitude: etab.latitude ?? null,
     longitude: etab.longitude ?? null,
+    precisionGPS: etab.precisionGPS ?? null,
+    dateCollecteGPS: etab.dateCollecteGPS ?? null,
     especes: etab.especes ?? [],
     joursMarche: etab.joursMarche ?? [],
     infrastructures: etab.infrastructures ?? [],
     observations: etab.observations ?? null,
   });
   const resume = [
-    etab.latitude != null && etab.longitude != null ? "GPS" : null,
+    etab.latitude != null && etab.longitude != null ? `GPS${etab.precisionGPS != null ? ` ± ${String(etab.precisionGPS).replace(".", ",")} m` : ""}` : null,
     etab.especes?.length ? libellesEspeces(etab.especes) : null,
-    etab.joursMarche?.length ? etab.joursMarche.map((j) => j.slice(0, 3).toLowerCase()).join(", ") : null,
+    !onOuvrirQuestionnaire && etab.joursMarche?.length ? etab.joursMarche.map((j) => j.slice(0, 3).toLowerCase()).join(", ") : null,
+    etab.aPhoto || etab.photoLocale ? "photo" : null,
   ].filter(Boolean).join(" · ");
   const [nom, setNom] = useState(etab.nom);
   const [localite, setLocalite] = useState(etab.localite);
@@ -336,21 +416,44 @@ function LigneEtablissement({
       <td className="border-b border-gray-100 px-3 py-2">
         <input value={localite} disabled={!etab.actif} onChange={(e) => setLocalite(e.target.value)} onBlur={() => localite !== etab.localite && onModifier({ localite })} className={champCommun} />
       </td>
+      {onOuvrirQuestionnaire ? (
+        <td className="border-b border-gray-100 px-3 py-2 text-[13px]">
+          {joursEnClair(etab.fiche ?? {}, codeDepartement) ?? <span className="text-ink-muted">—</span>}
+        </td>
+      ) : (
+        <>
+          <td className="border-b border-gray-100 px-3 py-2">
+            <input value={proprietaire} disabled={!etab.actif} onChange={(e) => setProprietaire(e.target.value)} onBlur={() => proprietaire !== (etab.proprietaire ?? "") && onModifier({ proprietaire })} className={champCommun} />
+          </td>
+          <td className="border-b border-gray-100 px-3 py-2">
+            <input value={telephone} disabled={!etab.actif} onChange={(e) => setTelephone(e.target.value)} onBlur={() => telephone !== (etab.telephone ?? "") && onModifier({ telephone })} className={champCommun} />
+          </td>
+        </>
+      )}
       <td className="border-b border-gray-100 px-3 py-2">
-        <input value={proprietaire} disabled={!etab.actif} onChange={(e) => setProprietaire(e.target.value)} onBlur={() => proprietaire !== (etab.proprietaire ?? "") && onModifier({ proprietaire })} className={champCommun} />
-      </td>
-      <td className="border-b border-gray-100 px-3 py-2">
-        <input value={telephone} disabled={!etab.actif} onChange={(e) => setTelephone(e.target.value)} onBlur={() => telephone !== (etab.telephone ?? "") && onModifier({ telephone })} className={champCommun} />
-      </td>
-      <td className="border-b border-gray-100 px-3 py-2">
-        <button
-          type="button"
-          onClick={() => setFicheOuverte((v) => !v)}
-          className="rounded-btn border border-gray-300 bg-white px-2 py-1 text-xs font-semibold text-primary hover:bg-primary-light"
-        >
-          {ficheOuverte ? "Fermer la fiche" : "Fiche"}
-        </button>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <button
+            type="button"
+            disabled={Boolean(onOuvrirQuestionnaire) && !etab.actif}
+            onClick={() => (onOuvrirQuestionnaire ? onOuvrirQuestionnaire() : setFicheOuverte((v) => !v))}
+            className="rounded-btn border border-gray-300 bg-white px-2 py-1 text-xs font-semibold text-primary hover:bg-primary-light disabled:opacity-50"
+          >
+            {ficheOuverte ? "Fermer la fiche" : "Fiche"}
+          </button>
+          {onOuvrirQuestionnaire && !etab.enAttenteSynchro && (
+            <a
+              href={`/api/etablissements/liste?typeCode=ETAB_MARCHE&arrondissementId=${etab.arrondissementId}&id=${etab.id}&format=pdf&fiches=1`}
+              title="La fiche du marché en PDF"
+              className="flex items-center gap-1 rounded-btn border border-gray-300 bg-white px-2 py-1 text-xs font-semibold text-primary hover:bg-primary-light"
+            >
+              <FileDown size={13} /> PDF
+            </a>
+          )}
+        </div>
         {resume && <span className="mt-0.5 block max-w-[220px] truncate text-[11px] text-ink-muted" title={resume}>{resume}</span>}
+        {onOuvrirQuestionnaire && etab.latitude == null && (
+          <span className="mt-0.5 flex items-center gap-1 text-[11px] font-semibold text-amber-800"><MapPin size={11} /> position à prendre</span>
+        )}
       </td>
       <td className="border-b border-gray-100 px-3 py-2">
         <button

@@ -18,6 +18,7 @@
 
 import { offlineDB, type EtablissementOffline, type OperationEnAttente } from "@/lib/dexie";
 import type { InfosStructurelles } from "@/lib/acteurs";
+import type { FicheMarche } from "@/lib/marches";
 
 export interface NouvelEtablissement extends InfosStructurelles {
   typeCode: string;
@@ -26,6 +27,10 @@ export interface NouvelEtablissement extends InfosStructurelles {
   arrondissementId: string;
   proprietaire?: string | null;
   telephone?: string | null;
+  /** La fiche d'un marché. */
+  fiche?: FicheMarche | null;
+  /** Une photo prise à l'ajout (data URL JPEG). */
+  photo?: string | null;
 }
 
 function nouvelIdentifiant(): string {
@@ -57,17 +62,34 @@ export async function creerEtablissement(data: NouvelEtablissement): Promise<Eta
     telephone: data.telephone?.trim() || null,
     latitude: data.latitude ?? null,
     longitude: data.longitude ?? null,
+    precisionGPS: data.precisionGPS ?? null,
+    dateCollecteGPS: data.dateCollecteGPS ?? null,
     especes: data.especes ?? [],
     joursMarche: data.joursMarche ?? [],
     infrastructures: data.infrastructures ?? [],
     observations: data.observations ?? null,
+    ...(data.fiche !== undefined ? { fiche: data.fiche } : {}),
+    photoLocale: data.photo ?? null,
     actif: true,
     enAttenteSynchro: true,
   };
   await offlineDB.etablissements.put(etablissement);
-  await empiler({ entite: "etablissement", operation: "CREATION", cibleId: etablissement.id, payload: { ...etablissement } });
+  const { photoLocale: _photo, ...payload } = etablissement;
+  await empiler({ entite: "etablissement", operation: "CREATION", cibleId: etablissement.id, payload: { ...payload } });
+  // La photo part APRÈS la création : la file se rejoue dans l'ordre.
+  if (data.photo) await empiler({ entite: "etablissement", operation: "PHOTO", cibleId: etablissement.id, payload: { image: data.photo } });
   await envoyerSansBloquer();
   return etablissement;
+}
+
+/**
+ * La photo d'un établissement : gardée sur l'appareil tout de suite (elle
+ * s'affiche même sans réseau), envoyée dès que possible. `null` la retire.
+ */
+export async function envoyerPhoto(id: string, image: string | null): Promise<void> {
+  await offlineDB.etablissements.update(id, { photoLocale: image, ...(image ? {} : { aPhoto: false }) });
+  await empiler({ entite: "etablissement", operation: "PHOTO", cibleId: id, payload: { image } });
+  await envoyerSansBloquer();
 }
 
 export async function modifierEtablissement(id: string, patch: Partial<EtablissementOffline>): Promise<void> {
@@ -129,7 +151,15 @@ async function rejouerLaFile(): Promise<{ envoyees: number; echecs: number }> {
   let echecs = 0;
 
   const operations = await offlineDB.fileAttente.orderBy("id").toArray();
+  // Une opération qui échoue retient les suivantes sur la MÊME cible : une
+  // photo ou une modification envoyée avant la création recevrait « 404 » et
+  // serait tenue pour faite — donc perdue.
+  const retenues = new Set<string>();
   for (const op of operations) {
+    if (retenues.has(op.cibleId)) {
+      echecs++;
+      continue;
+    }
     try {
       const ok = await envoyerOperation(op);
       if (!ok) {
@@ -140,12 +170,16 @@ async function rejouerLaFile(): Promise<{ envoyees: number; echecs: number }> {
 
       if (op.operation === "SUPPRESSION") {
         await offlineDB.etablissements.delete(op.cibleId); // confirmé côté serveur : on peut retirer la marque et la ligne
+      } else if (op.operation === "PHOTO") {
+        const image = (op.payload as { image?: string | null }).image ?? null;
+        await offlineDB.etablissements.update(op.cibleId, { photoLocale: null, aPhoto: Boolean(image), photoLe: image ? new Date().toISOString() : null });
       } else {
         await offlineDB.etablissements.update(op.cibleId, { enAttenteSynchro: false });
       }
       envoyees++;
     } catch (e) {
       echecs++;
+      retenues.add(op.cibleId);
       if (op.id !== undefined) {
         await offlineDB.fileAttente.update(op.id, {
           tentatives: op.tentatives + 1,
@@ -174,13 +208,26 @@ async function envoyerOperation(op: OperationEnAttente): Promise<boolean> {
         telephone: e.telephone ?? undefined,
         latitude: e.latitude ?? null,
         longitude: e.longitude ?? null,
+        precisionGPS: e.precisionGPS ?? null,
+        dateCollecteGPS: e.dateCollecteGPS ?? null,
         especes: e.especes ?? [],
         joursMarche: e.joursMarche ?? [],
         infrastructures: e.infrastructures ?? [],
         observations: e.observations ?? null,
+        ...(e.fiche !== undefined ? { fiche: e.fiche } : {}),
       }),
     });
     if (res.ok) return true;
+    throw new Error((await res.json().catch(() => ({}))).message ?? `Erreur serveur (${res.status})`);
+  }
+
+  if (op.operation === "PHOTO") {
+    const image = (op.payload as { image?: string | null }).image ?? null;
+    const res = await fetch(`/api/etablissements/${op.cibleId}/photo`, image
+      ? { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ image }) }
+      : { method: "DELETE" });
+    // 404 : l'établissement n'existe plus côté serveur — la photo n'a plus d'objet.
+    if (res.ok || res.status === 404) return true;
     throw new Error((await res.json().catch(() => ({}))).message ?? `Erreur serveur (${res.status})`);
   }
 
