@@ -142,8 +142,20 @@ export const VISITES: Record<string, DefinitionVisite> = {
     ],
   },
   "trimestre-saisie-tableau": {
-    version: 4,
+    version: 5,
     etapes: [
+      {
+        cible: "bandeau-ordre",
+        titre: "La révision des tableaux",
+        texte: "Les cases des arrondissements sont le travail des DA. Le chef de section les corrige pendant la révision que le DD ouvre, après le dépôt de tous les rapports. Ce cadre dit si elle est ouverte, et permet de la demander (chef) ou de l'ouvrir (DD).",
+        depuis: 5,
+      },
+      {
+        cible: "choix-arrondissement",
+        titre: "Un arrondissement à la fois",
+        texte: "Sur un téléphone, choisissez un arrondissement : sa ligne (ou sa liste) s'affiche en formulaire, plus facile à lire et à corriger.",
+        depuis: 5,
+      },
       {
         cible: "case-saisie",
         titre: "Case blanche : à saisir",
@@ -152,9 +164,9 @@ export const VISITES: Record<string, DefinitionVisite> = {
       { cible: "case-grise", titre: "Case grise : calculée", texte: "Calculée par le SID, à partir de vos rapports mensuels ou comme total. Elle ne se saisit pas." },
       {
         cible: "case-arrondissement",
-        titre: "Case bleutée : remplie par l'arrondissement",
-        texte: "Vous ne la modifiez pas. Si le chiffre vous paraît faux, touchez « Signaler une case à l'arrondissement », puis cette case : il la corrige ou vous répond.",
-        depuis: 4,
+        titre: "Case bleutée : celle d'un arrondissement",
+        texte: "Révision fermée, vous ne la modifiez pas. Touchez-la : vous pouvez la signaler à l'arrondissement, ou demander au DD d'ouvrir la révision.",
+        depuis: 5,
       },
       {
         cible: "an-passe-colonne",
@@ -276,9 +288,13 @@ export const VISITES: Record<string, DefinitionVisite> = {
     ],
   },
   circuit: {
-    version: 1,
+    version: 2,
     etapes: [
-      { cible: "circuit-etapes", titre: "Le circuit du rapport", texte: "Qui fait quoi, dans l'ordre : les arrondissements transmettent, les chefs valident leur domaine, puis le DD produit le rapport." },
+      {
+        cible: "circuit-etapes",
+        titre: "Le circuit du rapport",
+        texte: "Qui fait quoi, dans l'ordre : les arrondissements déposent, les chefs révisent leurs tableaux quand le DD ouvre la révision, puis valident leur domaine ; le DD produit le rapport.",
+      },
       { cible: "circuit-sien", titre: "Votre rapport", texte: "L'état du rapport de votre arrondissement : en préparation, transmis, ou renvoyé — avec le motif." },
       {
         cible: "circuit-transmettre",
@@ -288,6 +304,12 @@ export const VISITES: Record<string, DefinitionVisite> = {
       { cible: "circuit-arrondissements", titre: "Les arrondissements", texte: "Où en est chaque arrondissement : transmis ou non, et quand." },
       { cible: "circuit-renvoyer", titre: "Renvoyer pour correction", texte: "Rouvre le rapport d'un arrondissement, avec un motif : le DA est prévenu." },
       { cible: "circuit-relais", titre: "En tant que DD", texte: "Si un DA ou un chef ne peut pas le faire, le DD transmet ou valide à sa place, avec un motif. C'est noté « par le DD »." },
+      {
+        cible: "circuit-revision",
+        titre: "La révision des tableaux",
+        texte: "Après le dépôt de tous les rapports, le DD ouvre la révision aux chefs de section — un par un, à leur demande, ou à tous d'un coup. Elle se ferme quand le chef valide sa section ; chaque DA reçoit alors le bilan de ce qui a changé chez lui.",
+        depuis: 2,
+      },
       { cible: "circuit-sections", titre: "Les quatre domaines", texte: "Chaque chef de section valide son domaine (analyses et textes) quand tous les arrondissements ont transmis." },
       { cible: "circuit-valider", titre: "Valider ma section", texte: "Valide votre domaine du rapport trimestriel. Ses analyses et textes ne seront plus modifiables." },
     ],

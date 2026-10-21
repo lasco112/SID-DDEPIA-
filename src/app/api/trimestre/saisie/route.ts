@@ -18,7 +18,7 @@ import { periodeTrimestrielle } from "@/server/trimestre/rubriques";
 import { ecrireSaisieCanevas, cleCellule, dateAppareil } from "@/server/trimestre/saisieCanevas";
 import {
   ROLES_SAISIE, resumer, grille, grilles, refusDeSaisie, origineCase, nomArrondissement, attendUnNombre, incoherenceCategories, porteeDeSaisie,
-  type Profil,
+  versionDuChef, tableauDe, territoireDeCase, contextePour, estChefTechnique, type Profil,
 } from "@/server/trimestre/saisieTrimestrielle";
 import { preparerEvenements } from "@/server/trimestre/evenements";
 import { TABLEAUX_CORRIGEABLES } from "@/server/trimestre/correctionsTrimestre";
@@ -73,7 +73,8 @@ export async function GET(req: Request) {
 
     const numero = params.get("tableau");
     if (numero) {
-      const g = await grille(user.db, periode, profil, Number(numero));
+      // Un chef de section : la liste d'un arrondissement qu'il complète (21 octobre 2026).
+      const g = await grille(user.db, periode, profil, Number(numero), params.get("version"));
       if (!g) return NextResponse.json({ message: "Tableau inconnu." }, { status: 404 });
       return NextResponse.json({ periode: libelleOfficiel(periode), grille: g });
     }
@@ -107,6 +108,8 @@ export async function PUT(req: Request) {
       valeur?: string | number | null;
       /** Saisie faite hors ligne : quand, sur l'appareil. */
       modifieLe?: string;
+      /** Un chef de section : la liste de cet arrondissement, qu'il complète (21 octobre 2026). */
+      version?: string | null;
     };
     const periode = periodeDe(body.annee, body.trimestre);
     if (!periode) return NextResponse.json({ message: "Période demandée invalide." }, { status: 400 });
@@ -116,7 +119,13 @@ export async function PUT(req: Request) {
     const profil = await profilDe(user);
     if (!profil) return sansArrondissement();
 
-    const refus = await refusDeSaisie(user.db, periode, profil, body.numeroTableau, body.ligne, body.colonne);
+    // La liste d'un arrondissement, révisée par le chef de la section : seulement
+    // dans un tableau en liste de sa section, et pendant la révision (refusDeSaisie).
+    const versionArr = body.version ? await versionDuChef(user.db, profil, body.numeroTableau, body.version) : null;
+    if (body.version && !versionArr) {
+      return NextResponse.json({ message: "Seul le chef de la section révise la liste d'un arrondissement, dans un tableau en liste de sa section." }, { status: 403 });
+    }
+    const refus = await refusDeSaisie(user.db, periode, profil, body.numeroTableau, body.ligne, body.colonne, versionArr?.id ?? "");
     if (refus) return NextResponse.json({ message: refus }, { status: 403 });
     // Le circuit : un rapport transmis, un domaine validé, ne se modifient plus.
     const verrou = await motifDeVerrou(user.db, periode, { role: user.role, arrondissementId: user.arrondissementId });
@@ -148,6 +157,14 @@ export async function PUT(req: Request) {
     if (incoherence) return NextResponse.json({ message: incoherence.message, controle: incoherence.controle }, { status: 409 });
 
     const periodeId = await periodeTrimestrielle(user.db, periode);
+    // Un DA qui remplit le budget-programme remplit le SIEN ; un chef qui
+    // révise la liste d'un arrondissement écrit dans CELLE-CI.
+    const portee = versionArr?.id ?? (await porteeDeSaisie(user.db, profil, body.numeroTableau));
+    // Le chiffre d'avant, pour le journal de la révision : ce que le chef a changé.
+    const precedente = estChefTechnique(profil.role)
+      ? await user.db.saisieCanevas.findFirst({ where: { periodeId, ...cellule, portee }, select: { valeur: true, valeurTexte: true } })
+      : null;
+    const anciens = precedente ? precedente.valeurTexte ?? (precedente.valeur == null ? null : String(precedente.valeur)) : null;
     const { enregistre, ignoree } = await ecrireSaisieCanevas(
       user.db,
       user.transaction,
@@ -155,21 +172,33 @@ export async function PUT(req: Request) {
       cellule,
       estNombre ? { valeur: nombre } : { texte: brut == null ? null : String(brut) },
       user.id,
-      // Un DA qui remplit le budget-programme remplit le SIEN.
-      await porteeDeSaisie(user.db, profil, body.numeroTableau),
+      portee,
       body.modifieLe ? dateAppareil(body.modifieLe) : undefined
     );
     // Une vieille saisie hors ligne, dépassée par une correction faite depuis :
     // conservée côté serveur, et dite à l'appareil — qui cesse de la renvoyer.
     if (ignoree) return NextResponse.json({ enregistre: false, ignoree: true });
 
+    // Le chef en révision : l'arrondissement touché est noté, pour le bilan que
+    // son DA recevra à la fermeture de la révision (ordresCorrection.ts).
+    const t = tableauDe(body.numeroTableau);
+    const arrondissement =
+      estChefTechnique(profil.role) && t
+        ? territoireDeCase(t.bloc, await contextePour(user.db, periode, profil), body.ligne, body.colonne, versionArr?.nom ?? null)
+        : null;
     await user.db.auditLog.create({
       data: {
         userId: user.id,
         action: enregistre ? "SAISIE_TRIMESTRIELLE" : "EFFACEMENT_SAISIE_TRIMESTRIELLE",
         entite: "SaisieCanevas",
         entiteId: cleCellule(cellule),
-        details: { ...cellule, annee: periode.annee, trimestre: periode.rang },
+        details: {
+          ...cellule,
+          annee: periode.annee,
+          trimestre: periode.rang,
+          ...(versionArr ? { liste: versionArr.nom } : {}),
+          ...(arrondissement ? { arrondissement, ancien: anciens ?? null, nouveau: brut == null || brut === "" ? null : String(brut) } : {}),
+        },
       },
     });
 

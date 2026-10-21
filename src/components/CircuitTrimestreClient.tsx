@@ -37,10 +37,14 @@ interface Section {
   auteur: string | null;
   parLeDD: boolean;
   motif: string | null;
-  /** L'ordre de correction du DD en cours pour ce chef (20 octobre 2026). */
+  /** Une section technique : sa révision des tableaux s'ouvre par le DD (pas le BAC). */
+  sousRevision?: boolean;
+  /** La révision ouverte par le DD pour ce chef (20-21 octobre 2026). */
   ordre?: { motif: string; le: string; auteur: string | null } | null;
-  /** La demande d'ordre du chef, en attente de la réponse du DD (21 octobre 2026). */
+  /** La demande d'ouverture du chef, en attente de la réponse du DD. */
   demande?: { motif: string; le: string; auteur: string | null } | null;
+  /** Révision ouverte : ce que le chef a déjà changé. */
+  bilan?: { cases: number; tableaux: number[]; parArrondissement: Record<string, { cases: number; tableaux: number[] }> };
 }
 
 interface Etat {
@@ -86,8 +90,8 @@ const BADGE_SECTION: Record<Section["statut"], { texte: string; classe: string }
 const ETAPES = [
   ["Agent de saisie", "prépare le rapport de son arrondissement : saisie trimestrielle, analyses, textes."],
   ["Délégué d'arrondissement", "relit l'ensemble, corrige s'il le juge utile, puis transmet au DD."],
-  ["Chef de section", "une fois tous les arrondissements transmis, relit et valide son domaine du rapport départemental."],
-  ["Délégué départemental", "relit le document final et produit la version définitive."],
+  ["Chef de section", "une fois tous les rapports déposés, révise les tableaux de sa section quand le DD ouvre la révision, puis valide son domaine du rapport départemental."],
+  ["Délégué départemental", "ouvre la révision aux chefs de section, relit le document final et produit la version définitive."],
 ];
 
 const le = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString("fr-FR") : "");
@@ -101,8 +105,8 @@ export default function CircuitTrimestreClient({ username }: { username: string 
   const [renvoi, setRenvoi] = useState<{ id: string; motif: string } | null>(null);
   /** Le DD valide les corrections d'un rapport renvoyé (20 octobre 2026). */
   const [validation, setValidation] = useState<{ id: string; commentaire: string } | null>(null);
-  /** Le DD rédige un ordre de correction pour un chef. */
-  const [ordre, setOrdre] = useState<{ code: string; motif: string } | null>(null);
+  /** La révision des tableaux : le DD l'ouvre (ou refuse la demande), le chef la demande — un mot facultatif. */
+  const [revision, setRevision] = useState<{ code: string; action: "ordonnerCorrection" | "refuserDemande" | "demanderOrdre" | "ouvrirRevisionTous"; motif: string } | null>(null);
   /** Le DD prend le relais : quelle étape, et pourquoi. */
   const [relais, setRelais] = useState<{ cle: string; corps: Record<string, unknown>; motif: string } | null>(null);
 
@@ -147,6 +151,7 @@ export default function CircuitTrimestreClient({ username }: { username: string 
       setMessage("Enregistré.");
       setRenvoi(null);
       setRelais(null);
+      setRevision(null);
       await charger();
     } catch {
       setErreur("Pas de connexion : rien n'a été enregistré. Réessayez quand le réseau revient.");
@@ -200,6 +205,197 @@ export default function CircuitTrimestreClient({ username }: { username: string 
   if (!etat) return <p className="text-gray-600">Chargement…</p>;
 
   const sien = etat.role === "DA" || etat.role === "AGENT_SAISIE" ? etat.arrondissements[0] : null;
+
+  /**
+   * LA RÉVISION DES TABLEAUX (décision du Délégué, 21 octobre 2026) : le DD
+   * l'ouvre aux chefs de section — un par un, à leur demande ou non, ou à tous
+   * d'un coup —, jamais avant le dépôt des rapports de tous les DA. Elle se
+   * ferme quand le chef valide sa section, ou quand le DD la ferme.
+   */
+  function blocRevision() {
+    if (!etat) return null;
+    const dd = etat.role === "DD";
+    const techniques = etat.sections.filter((s) => s.sousRevision);
+    const manquants = etat.arrondissements.filter((a) => a.statut !== "TRANSMIS").map((a) => a.nom);
+    const ouvertes = techniques.filter((s) => s.ordre);
+    const fermees = techniques.filter((s) => !s.ordre);
+    const enClair = (b: NonNullable<Section["bilan"]>) =>
+      b.cases === 0
+        ? "aucune case modifiée pour l'instant"
+        : `${b.cases} case${b.cases > 1 ? "s" : ""} modifiée${b.cases > 1 ? "s" : ""} (tableau${b.tableaux.length > 1 ? "x" : ""} n° ${b.tableaux.join(", ")})`;
+    const formulaire = (code: string, envoyer: string, placeholder: string, classe: string) =>
+      revision?.code === code && (
+        <div className="mt-2">
+          <textarea
+            value={revision.motif}
+            onChange={(e) => setRevision({ ...revision, motif: e.target.value })}
+            rows={2}
+            placeholder={placeholder}
+            className="w-full rounded border border-gray-300 p-2 text-sm"
+          />
+          <div className="mt-1 flex gap-2">
+            <button
+              type="button"
+              disabled={occupe}
+              onClick={() => void agir({ action: revision.action, section: code === "tous" ? undefined : code, motif: revision.motif })}
+              className={`min-h-[44px] flex-1 rounded-md px-3 py-2 text-sm font-semibold text-white disabled:opacity-50 ${classe}`}
+            >
+              {envoyer}
+            </button>
+            <button type="button" onClick={() => setRevision(null)} className="min-h-[44px] flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm">
+              Annuler
+            </button>
+          </div>
+        </div>
+      );
+
+    return (
+      <section className="mt-5">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">Révision des tableaux par les chefs de section</h2>
+        <div data-visite="circuit-revision" className="mt-2 rounded-md border border-gray-200 bg-white">
+          <p className={`m-3 rounded-md p-3 text-sm ${manquants.length ? "bg-gray-50 text-gray-700" : "bg-green-50 text-green-900"}`}>
+            {manquants.length
+              ? `La révision s'ouvre après le dépôt des rapports de tous les DA. Pas encore déposé : ${manquants.join(", ")}.`
+              : dd
+                ? "Tous les rapports des DA sont déposés. Ouvrez la révision : le chef corrige alors les tableaux de sa section, pour tous les arrondissements. Elle se ferme quand il valide sa section, ou quand vous la fermez."
+                : "Tous les rapports des DA sont déposés. Le DD ouvre la révision des tableaux : demandez-la s'il vous faut corriger."}
+          </p>
+          {dd && !manquants.length && (
+            <div className="px-3 pb-3">
+              <div className="flex flex-wrap gap-2">
+                {fermees.length > 0 && revision?.code !== "tous" && (
+                  <button
+                    type="button"
+                    data-visite="circuit-revision-tous"
+                    onClick={() => setRevision({ code: "tous", action: "ouvrirRevisionTous", motif: "" })}
+                    className="min-h-[44px] rounded-md bg-green-700 px-4 py-2 text-sm font-semibold text-white hover:bg-green-800"
+                  >
+                    Ouvrir la révision à toutes les sections
+                  </button>
+                )}
+                {ouvertes.length > 1 && (
+                  <button
+                    type="button"
+                    disabled={occupe}
+                    onClick={() =>
+                      void agir(
+                        { action: "fermerRevisionTous" },
+                        "Fermer toutes les révisions ouvertes ? Les chefs ne pourront plus corriger ; leurs corrections déjà faites restent, et chaque DA reçoit le bilan."
+                      )
+                    }
+                    className="min-h-[44px] rounded-md border border-gray-500 bg-white px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50"
+                  >
+                    Fermer toutes les révisions
+                  </button>
+                )}
+              </div>
+              {formulaire("tous", "Ouvrir à toutes les sections", "Un mot pour les chefs (facultatif) : ce qu'il faut revoir en priorité.", "bg-green-700 hover:bg-green-800")}
+            </div>
+          )}
+          <ul className="divide-y divide-gray-100 border-t border-gray-100">
+            {techniques.map((s) => {
+              const moi = s.chef === etat.role;
+              if (!dd && !moi) return null;
+              const statut = s.ordre
+                ? { texte: "Révision ouverte", classe: "bg-green-100 text-green-800" }
+                : s.demande
+                  ? { texte: "Demandée", classe: "bg-sky-100 text-sky-900" }
+                  : { texte: "Fermée", classe: "bg-gray-100 text-gray-700" };
+              return (
+                <li key={s.code} className="px-3 py-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-sm text-gray-900">
+                      <strong>{s.code}</strong> — {s.nom}
+                    </span>
+                    <span className={`rounded px-2 py-0.5 text-xs font-semibold ${statut.classe}`}>{statut.texte}</span>
+                  </div>
+                  {s.ordre && (
+                    <p className="mt-1 text-sm text-gray-700">
+                      Ouverte le {le(s.ordre.le)} — {s.ordre.motif}
+                      {s.bilan && <> · <strong>{enClair(s.bilan)}</strong></>}
+                    </p>
+                  )}
+                  {!s.ordre && s.demande && (
+                    <p className="mt-1 rounded-input border border-sky-300 bg-sky-50 p-2 text-sm text-sky-950">
+                      {moi ? "Votre demande attend la réponse du DD" : `Le chef ${s.code} demande la révision`} depuis le {le(s.demande.le)} — {s.demande.motif}
+                    </p>
+                  )}
+
+                  {/* Le DD : ouvrir, accepter ou refuser la demande, fermer. */}
+                  {dd && s.ordre && (
+                    <button
+                      type="button"
+                      disabled={occupe}
+                      onClick={() =>
+                        void agir(
+                          { action: "revoquerOrdre", section: s.code },
+                          `Fermer la révision du chef ${s.code} ? Il ne pourra plus corriger ; ses corrections déjà faites restent, et chaque DA reçoit le bilan.`
+                        )
+                      }
+                      className="mt-2 min-h-[40px] rounded-md border border-gray-500 bg-white px-3 py-1 text-sm font-semibold text-gray-800 hover:bg-gray-50"
+                    >
+                      Fermer la révision
+                    </button>
+                  )}
+                  {dd && !s.ordre && !manquants.length && revision?.code !== s.code && (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        data-visite="circuit-ordre-correction"
+                        onClick={() => setRevision({ code: s.code, action: "ordonnerCorrection", motif: s.demande?.motif ?? "" })}
+                        className="min-h-[40px] rounded-md bg-green-700 px-3 py-1 text-sm font-semibold text-white hover:bg-green-800"
+                      >
+                        {s.demande ? "Accepter et ouvrir la révision" : "Ouvrir la révision"}
+                      </button>
+                      {s.demande && (
+                        <button
+                          type="button"
+                          onClick={() => setRevision({ code: s.code, action: "refuserDemande", motif: "" })}
+                          className="min-h-[40px] rounded-md border border-red-700 bg-white px-3 py-1 text-sm font-semibold text-red-800 hover:bg-red-50"
+                        >
+                          Refuser
+                        </button>
+                      )}
+                    </div>
+                  )}
+                  {dd &&
+                    revision?.action === "ordonnerCorrection" &&
+                    formulaire(s.code, `Ouvrir la révision ${s.code}`, "Un mot pour le chef (facultatif) : ce qu'il doit revoir.", "bg-green-700 hover:bg-green-800")}
+                  {dd && revision?.action === "refuserDemande" && formulaire(s.code, "Refuser la demande", "Pourquoi (facultatif) : le chef le lira.", "bg-red-700 hover:bg-red-800")}
+                  {dd && !s.ordre && s.statut === "VALIDE" && revision?.code === s.code && revision.action === "ordonnerCorrection" && (
+                    <p className="mt-1 text-xs text-amber-900">Cette section est validée : l&apos;ouverture lève la validation, le chef validera à nouveau.</p>
+                  )}
+
+                  {/* Le chef : demander, attendre, réviser. */}
+                  {moi && s.ordre && (
+                    <a
+                      href="/trimestre/saisie"
+                      className="mt-2 inline-block min-h-[44px] rounded-md bg-primary px-4 py-3 text-sm font-semibold text-white hover:bg-primary-dark"
+                    >
+                      Réviser les tableaux de ma section →
+                    </a>
+                  )}
+                  {moi && !s.ordre && !s.demande && !manquants.length && revision?.code !== s.code && (
+                    <button
+                      type="button"
+                      data-visite="circuit-demander-revision"
+                      onClick={() => setRevision({ code: s.code, action: "demanderOrdre", motif: "" })}
+                      className="mt-2 min-h-[44px] rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-dark"
+                    >
+                      Demander au DD d&apos;ouvrir la révision
+                    </button>
+                  )}
+                  {moi && revision?.action === "demanderOrdre" &&
+                    formulaire(s.code, "Envoyer la demande au DD", "Ce que vous voulez corriger, et pourquoi (facultatif mais utile au DD).", "bg-primary hover:bg-primary-dark")}
+                </li>
+              );
+            })}
+          </ul>
+          {dd && <p className="border-t border-gray-100 px-3 py-2 text-xs text-gray-500">Le chef BAC corrige librement les tableaux du BAC : il n&apos;a pas de révision à ouvrir.</p>}
+        </div>
+      </section>
+    );
+  }
 
   return (
     <div className="max-w-3xl">
@@ -265,9 +461,9 @@ export default function CircuitTrimestreClient({ username }: { username: string 
           {etat.incoherences!.length > 12 && <p className="mt-1">… et {etat.incoherences!.length - 12} autre(s).</p>}
           <p className="mt-2">
             {etat.role === "DD"
-              ? "Souvent un mois corrigé après la saisie des catégories du trimestre. Renvoyez le rapport de l'arrondissement concerné, ou donnez un ordre de correction au chef de la section."
+              ? "Souvent un mois corrigé après la saisie des catégories du trimestre. Renvoyez le rapport de l'arrondissement concerné, ou ouvrez la révision au chef de la section (plus bas)."
               : etat.role.startsWith("CHEF_")
-                ? "Signalez la case à l'arrondissement ou renvoyez-lui son rapport. Pour un écart avec le BAC, le chef BAC confirme son chiffre ou le corrige."
+                ? "Corrigez-les pendant la révision ouverte par le DD, ou signalez la case à l'arrondissement. Pour un écart avec le BAC, le chef BAC confirme son chiffre ou le corrige."
                 : "Touchez la case grise du tableau pour voir, mois par mois, d'où vient le total."}
           </p>
           <a href="/trimestre/saisie" className="mt-2 inline-block font-semibold text-primary underline">
@@ -451,6 +647,9 @@ export default function CircuitTrimestreClient({ username }: { username: string 
         </section>
       )}
 
+      {/* ---- La révision des tableaux par les chefs de section (21 octobre 2026) ---- */}
+      {!sien && blocRevision()}
+
       {/* ---- Les quatre domaines ---- */}
       <section className="mt-5">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">Validation par les chefs de section</h2>
@@ -471,110 +670,8 @@ export default function CircuitTrimestreClient({ username }: { username: string 
               )}
               {s.parLeDD && s.motif && <p className="mt-1 text-xs text-blue-800">Motif : {s.motif}</p>}
               {s.ordre && (
-                <p className="mt-2 rounded-input border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900">
-                  <strong>Ordre de correction du DD en cours</strong> depuis le {le(s.ordre.le)} — {s.ordre.motif}.{" "}
-                  {s.chef === etat.role
-                    ? "Vous pouvez corriger, dans les tableaux de votre section, les cases remplies par les arrondissements et — quand le vrai chiffre manque au mensuel — les cases grises des listes du mensuel et de la pisciculture (touchez la case). Validez ensuite à nouveau."
-                    : "Le chef peut corriger les cases remplies par les arrondissements, et les cases grises des listes du mensuel et de la pisciculture quand le vrai chiffre y manque."}
-                </p>
+                <p className="mt-1 text-xs font-semibold text-green-800">Révision des tableaux en cours — la validation de la section la fermera.</p>
               )}
-              {!s.ordre && s.demande && (
-                <p className="mt-2 rounded-input border border-sky-300 bg-sky-50 p-2 text-xs text-sky-950">
-                  <strong>{s.chef === etat.role ? "Votre demande d'ordre de correction" : `Le chef ${s.code} demande un ordre de correction`}</strong> depuis le {le(s.demande.le)} — {s.demande.motif}
-                  {s.chef === etat.role ? " · en attente de la réponse du DD." : ""}
-                </p>
-              )}
-              {/* Le chef demande lui-même l'ordre au DD (21 octobre 2026). */}
-              {s.chef === etat.role && s.code !== "BAC" && !s.ordre && !s.demande &&
-                (ordre?.code === s.code ? (
-                  <div className="mt-2">
-                    <textarea
-                      value={ordre.motif}
-                      onChange={(e) => setOrdre({ code: s.code, motif: e.target.value })}
-                      rows={2}
-                      placeholder="Ce que vous voulez corriger, et pourquoi (obligatoire)."
-                      className="w-full rounded border border-gray-300 p-2 text-sm"
-                    />
-                    <div className="mt-1 flex gap-2">
-                      <button
-                        type="button"
-                        disabled={occupe || ordre.motif.trim().length < 5}
-                        onClick={() => {
-                          void agir({ action: "demanderOrdre", motif: ordre.motif });
-                          setOrdre(null);
-                        }}
-                        className="flex-1 rounded-md bg-primary px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
-                      >
-                        Envoyer la demande au DD
-                      </button>
-                      <button type="button" onClick={() => setOrdre(null)} className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm">
-                        Annuler
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setOrdre({ code: s.code, motif: "" })}
-                    className="mt-2 rounded border border-primary px-2 py-1 text-xs font-semibold text-primary hover:bg-primary-light"
-                  >
-                    Demander au DD un ordre de correction
-                  </button>
-                ))}
-              {etat.role === "DD" && s.code !== "BAC" &&
-                (s.ordre ? (
-                  <button
-                    type="button"
-                    disabled={occupe}
-                    onClick={() =>
-                      void agir(
-                        { action: "revoquerOrdre", section: s.code },
-                        `Révoquer l'ordre de correction du chef ${s.code} ? Il ne pourra plus corriger les cases remplies par les arrondissements, ni les cases grises. Ses corrections déjà faites restent.`
-                      )
-                    }
-                    className="mt-2 rounded border border-amber-600 px-2 py-1 text-xs font-semibold text-amber-900 hover:bg-amber-50"
-                  >
-                    Révoquer l'ordre de correction
-                  </button>
-                ) : ordre?.code === s.code ? (
-                  <div className="mt-2">
-                    <textarea
-                      value={ordre.motif}
-                      onChange={(e) => setOrdre({ code: s.code, motif: e.target.value })}
-                      rows={2}
-                      placeholder="Ce que le chef doit corriger, et pourquoi (obligatoire)."
-                      className="w-full rounded border border-gray-300 p-2 text-sm"
-                    />
-                    {s.statut === "VALIDE" && (
-                      <p className="mt-1 text-xs text-amber-900">Ce domaine est validé : l'ordre lèvera la validation, et le chef devra valider à nouveau.</p>
-                    )}
-                    <div className="mt-1 flex gap-2">
-                      <button
-                        type="button"
-                        disabled={occupe || !ordre.motif.trim()}
-                        onClick={() => {
-                          void agir({ action: "ordonnerCorrection", section: s.code, motif: ordre.motif });
-                          setOrdre(null);
-                        }}
-                        className="flex-1 rounded-md bg-amber-700 px-3 py-2 text-sm font-semibold text-white hover:bg-amber-800 disabled:opacity-50"
-                      >
-                        Donner l'ordre de correction
-                      </button>
-                      <button type="button" onClick={() => setOrdre(null)} className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm">
-                        Annuler
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    data-visite="circuit-ordre-correction"
-                    onClick={() => setOrdre({ code: s.code, motif: s.demande?.motif ?? "" })}
-                    className={`mt-2 ml-0 mr-2 rounded border px-2 py-1 text-xs hover:bg-amber-50 ${s.demande ? "border-amber-700 bg-amber-100 font-semibold text-amber-950" : "border-amber-600 text-amber-900"}`}
-                  >
-                    {s.demande ? "Donner l'ordre demandé" : "Ordonner une correction au chef"}
-                  </button>
-                ))}
               {s.statut !== "VALIDE" && formulaireRelais(`sec-${s.code}`, "Valider en tant que DD", { action: "valider", section: s.code })}
               {s.chef === etat.role && etat.peut.valider && (
                 <button
@@ -583,7 +680,9 @@ export default function CircuitTrimestreClient({ username }: { username: string 
                   onClick={() =>
                     void agir(
                       { action: "valider" },
-                      "Valider votre domaine du rapport trimestriel ? Ses analyses et ses textes ne seront plus modifiables."
+                      s.ordre
+                        ? "Valider votre domaine du rapport trimestriel ? Votre révision des tableaux se fermera, le DD et les DA en recevront le bilan ; analyses et textes ne seront plus modifiables."
+                        : "Valider votre domaine du rapport trimestriel ? Ses analyses et ses textes ne seront plus modifiables."
                     )
                   }
                   data-visite="circuit-valider"

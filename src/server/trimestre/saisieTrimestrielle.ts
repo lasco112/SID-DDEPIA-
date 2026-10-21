@@ -85,12 +85,19 @@ export function chefDuTableau(numero: number): string | null {
 const corrigeableParLeChef = (profil: Profil, numero: number) =>
   estChefTechnique(profil.role) && TABLEAUX_CORRIGEABLES.has(numero) && chefDuTableau(numero) === profil.role;
 
-/** La case a-t-elle été remplie par l'arrondissement (DA ou agent) — ou par on ne sait qui ? */
-const remplieParLArrondissement = (s: ValeurCellule | undefined) =>
-  Boolean(s) && (s!.parRole == null || s!.parRole === "DA" || s!.parRole === "AGENT_SAISIE");
+/**
+ * L'arrondissement auquel appartient une case : sa ligne ou sa colonne dans un
+ * tableau à maille, ou sa liste dans un tableau sans maille. Null : une case
+ * du département. C'est le travail du DA : un chef de section technique n'y
+ * écrit que pendant la RÉVISION ouverte par le DD (ordresCorrection.ts).
+ */
+export function territoireDeCase(bloc: BlocTableau, ctx: ContexteCanevas, ligne: string, colonne: string, liste?: string | null): string | null {
+  if (liste) return liste;
+  const axe = axeTerritorial(bloc);
+  const t = axe === "lignes" ? ligne : axe === "colonnes" ? colonne : null;
+  return t && ctx.arrondissements.includes(t) ? t : null;
+}
 
-export const MESSAGE_CASE_DE_L_ARRONDISSEMENT =
-  "Cette case a été remplie par l'arrondissement : vous ne la modifiez pas. Touchez « Signaler une case à l'arrondissement » pour la lui faire corriger.";
 
 const estArrondissement = (p: Profil) => p.role === "DA" || p.role === "AGENT_SAISIE";
 
@@ -407,7 +414,7 @@ export interface CaseGrille {
   texte: boolean;
   /** La valeur reprise d'un autre tableau, proposée tant que rien n'est saisi. */
   propose: string | null;
-  /** Chef de section : case remplie par l'arrondissement — à signaler, pas à modifier. */
+  /** Chef de section : case d'un arrondissement, hors révision — à signaler, pas à modifier. */
   reservee?: boolean;
   /** Case calculée, corrigée au trimestre par le chef de section, sur ordre du DD. */
   corrigee?: CorrectionDeCase;
@@ -459,33 +466,59 @@ export interface GrilleSaisie {
   alertes: AlerteGrille[];
   /** Ce qu'il faut saisir. */
   aide: string;
-  /** Un chef : a-t-il l'ordre du DD de corriger les cases des arrondissements ? */
+  /** Un chef : la révision de sa section est-elle ouverte (il corrige les cases des arrondissements) ? */
   ordreCorrection?: boolean;
+  /** Où sont les arrondissements : de quoi n'en montrer qu'un à la fois sur un téléphone. */
+  axe?: "lignes" | "colonnes" | null;
   /**
-   * L'ORDRE DE CORRECTION pour la section de ce tableau (21 octobre 2026), vu
-   * par le DD et par le chef concerné : le DD le donne ou le révoque d'ici, le
-   * chef le demande d'ici — sans aller chercher l'écran du circuit.
+   * LA RÉVISION de la section de ce tableau (21 octobre 2026), vue par le DD
+   * et par le chef concerné : le DD l'ouvre ou la ferme d'ici, le chef la
+   * demande d'ici — sans aller chercher l'écran du circuit.
    */
   ordreSection?: {
     chef: string;
     section: string;
     enCours: { motif: string; le: string } | null;
     demande: { motif: string; le: string } | null;
+    /** Les rapports des DA pas encore déposés : la révision ne s'ouvre qu'après. */
+    depotsManquants: string[];
   };
+  /**
+   * Un tableau en liste (sans maille) de la section d'un chef : les listes
+   * qu'il peut compléter (une par arrondissement), et celle qu'il a ouverte —
+   * null : la version du département.
+   */
+  versions?: string[];
+  version?: string | null;
 }
 
 /** La grille d'un tableau, telle que ce profil la voit et la remplit. */
-export async function grille(db: PrismaClient, periode: Periode, profil: Profil, numero: number): Promise<GrilleSaisie | null> {
-  return (await grilleEtContexte(db, periode, profil, numero))?.g ?? null;
+export async function grille(db: PrismaClient, periode: Periode, profil: Profil, numero: number, version?: string | null): Promise<GrilleSaisie | null> {
+  return (await grilleEtContexte(db, periode, profil, numero, version))?.g ?? null;
+}
+
+/**
+ * LA LISTE D'UN ARRONDISSEMENT, révisée par le chef de section (décision du
+ * Délégué, 21 octobre 2026) : dans un tableau sans maille de sa section
+ * (suspicions, ouvrages, vétérinaires…), chaque DA tient SA liste, pour son
+ * rapport. Le chef la lit toujours ; pendant la révision ouverte par le DD, il
+ * y ajoute ce que le DA a oublié et corrige ce qui est faux. Rend
+ * l'arrondissement visé, ou null.
+ */
+export async function versionDuChef(db: PrismaClient, profil: Profil, numero: number, version: string | null | undefined) {
+  if (!version || !estChefTechnique(profil.role) || chefDuTableau(numero) !== profil.role || !numerosSansMaille().has(numero)) return null;
+  return (await listerArrondissements(db)).find((a) => a.nom === version) ?? null;
 }
 
 /** La grille, avec ce qui a servi à la construire : de quoi la contrôler ensuite. */
-async function grilleEtContexte(db: PrismaClient, periode: Periode, profil: Profil, numero: number) {
+async function grilleEtContexte(db: PrismaClient, periode: Periode, profil: Profil, numero: number, version?: string | null) {
   const t = tableauDe(numero);
   if (!t) return null;
   const { bloc, section } = t;
   const ctx = await contextePour(db, periode, profil);
-  const arrondissementId = await arrondissementIdDe(db, profil);
+  // Le chef dans la liste d'un arrondissement : les saisies de CETTE liste.
+  const versionArr = await versionDuChef(db, profil, numero, version);
+  const arrondissementId = versionArr?.id ?? (await arrondissementIdDe(db, profil));
 
   // La consolidation du trimestre n'est utile qu'aux tableaux alimentés par le
   // mensuel : un tableau purement saisi se contente de ses saisies.
@@ -499,15 +532,26 @@ async function grilleEtContexte(db: PrismaClient, periode: Periode, profil: Prof
   const valeur = fournisseur(donnees, ctx);
   const confirmees = await reprisesConfirmees(db, periode);
   const ordre = await aOrdreDeCorrection(db, periode, profil.role);
-  const g = construireGrille(bloc, section, ctx, profil, donnees, valeur, confirmees, ordre);
-  // L'ordre de la section, pour le bandeau du tableau : le DD et le chef concerné.
+  const g = construireGrille(bloc, section, ctx, profil, donnees, valeur, confirmees, ordre, versionArr?.nom ?? null);
+  // Un tableau en liste de sa section : le chef choisit la liste qu'il complète.
+  if (estChefTechnique(profil.role) && chefDuTableau(numero) === profil.role && numerosSansMaille().has(numero)) {
+    g.versions = (await listerArrondissements(db)).map((a) => a.nom);
+    g.version = versionArr?.nom ?? null;
+  }
+  // La révision de la section, pour le bandeau du tableau : le DD et le chef concerné.
   const chef = chefDuTableau(numero);
   const code = chef ? codeSection(chef) : null;
   if (chef && code && CHEFS_SOUS_ORDRE.includes(chef) && (profil.role === "DD" || profil.role === chef)) {
-    const [ordres, demandes] = await Promise.all([ordresEnCours(db, periode), demandesEnCours(db, periode)]);
+    const [ordres, demandes, etat] = await Promise.all([ordresEnCours(db, periode), demandesEnCours(db, periode), etatCircuit(db, periode)]);
     const o = ordres.get(chef);
     const d = demandes.get(chef);
-    g.ordreSection = { chef, section: code, enCours: o ? { motif: o.motif, le: o.le } : null, demande: d ? { motif: d.motif, le: d.le } : null };
+    g.ordreSection = {
+      chef,
+      section: code,
+      enCours: o ? { motif: o.motif, le: o.le } : null,
+      demande: d ? { motif: d.motif, le: d.le } : null,
+      depotsManquants: etat.arrondissements.filter((a) => a.statut !== "TRANSMIS").map((a) => a.nom),
+    };
   }
   return { g, bloc, ctx, donnees, valeur, confirmees };
 }
@@ -565,10 +609,10 @@ export async function refusCorrectionAnPasse(
   if (!(ROLES_CORRECTION_AN_PASSE as readonly string[]).includes(profil.role)) {
     return "Un chiffre de l'an passé se corrige par le DA, le chef de section ou le Délégué départemental.";
   }
-  // Un chef de section technique ne corrige un chiffre déjà inscrit que sur
-  // ordre du DD (20 octobre 2026) ; le chef BAC, librement.
+  // Un chef de section technique ne corrige un chiffre déjà inscrit que pendant
+  // la révision ouverte par le DD (20-21 octobre 2026) ; le chef BAC, librement.
   if (estChefTechnique(profil.role) && !(await aOrdreDeCorrection(db, periode, profil.role))) {
-    return "Un chef de section corrige un chiffre déjà inscrit seulement sur ordre du Délégué départemental. Demandez-lui un ordre de correction, ou signalez la case à l'arrondissement.";
+    return "Un chef de section corrige un chiffre déjà inscrit seulement pendant la révision ouverte par le Délégué départemental. Demandez-lui de l'ouvrir, ou signalez la case à l'arrondissement.";
   }
   const t = tableauDe(numero);
   if (!t) return `Le tableau n° ${numero} n'existe pas au canevas.`;
@@ -718,8 +762,10 @@ function construireGrille(
   donnees: Awaited<ReturnType<typeof preparer>>,
   valeur: ReturnType<typeof fournisseur>,
   confirmees: Set<string> = new Set(),
-  /** Le chef de section a l'ordre du DD de corriger, pour ce trimestre (ordresCorrection.ts). */
-  ordreCorrection = false
+  /** La révision de la section du chef est ouverte par le DD, pour ce trimestre (ordresCorrection.ts). */
+  ordreCorrection = false,
+  /** Le chef dans la liste d'un arrondissement (tableau sans maille) : son nom. */
+  liste: string | null = null
 ): GrilleSaisie {
   const numero = bloc.numero!;
   const { enteteLigne, colonnes, cles, libelles } = coordonnees(bloc, ctx);
@@ -731,11 +777,12 @@ function construireGrille(
       const s = donnees.saisies.get(cleCellule({ numeroTableau: numero, ligne: cle, colonne }));
       const reprise = s ? null : valeurReprise(donnees.saisies, numero, cle, colonne);
       const etat = etatCase(bloc, ctx, profil, cle, colonne, valeur.sid);
-      // Un chef de section technique complète ce qui manque ; ce que
-      // l'arrondissement a écrit se signale — sauf sur ordre de correction du
-      // DD (20 octobre 2026). Le chef BAC garde sa liberté : il complète et
-      // corrige les tableaux du BAC.
-      const reservee = etat === "saisie" && estChefTechnique(profil.role) && !ordreCorrection && remplieParLArrondissement(s);
+      // DISCIPLINE (décision du Délégué, 21 octobre 2026) : les cases d'un
+      // arrondissement — remplies ou vides — sont le travail du DA. Le chef de
+      // section technique les lit et les signale ; il ne les modifie que pendant
+      // la révision ouverte par le DD. Le chef BAC garde sa liberté sur le BAC.
+      const reservee =
+        etat === "saisie" && estChefTechnique(profil.role) && !ordreCorrection && territoireDeCase(bloc, ctx, cle, colonne, liste) != null;
       // Une case calculée, corrigée au trimestre par le chef de section (21 octobre 2026).
       const corrigee = etat === "calculee" ? correctionDeCase(donnees, numero, cle, colonne) : null;
       return {
@@ -768,6 +815,7 @@ function construireGrille(
     avertissements: alertes.map((a) => a.texte),
     alertes,
     ...(estChefTechnique(profil.role) ? { ordreCorrection } : {}),
+    axe: axeTerritorial(bloc),
     aide: [
       AIDES[numero] ?? AIDE_PAR_DEFAUT,
       ...(bloc.kind === "arrondissements" && bloc.totalSansSomme ? [bloc.totalSansSomme] : []),
@@ -1514,7 +1562,9 @@ export async function refusDeSaisie(
   profil: Profil,
   numero: number,
   ligne: string,
-  colonne: string
+  colonne: string,
+  /** La liste d'un arrondissement que le chef complète (versionDuChef) : son identifiant. */
+  porteeVersion = ""
 ): Promise<string | null> {
   const t = tableauDe(numero);
   if (!t) return `Le tableau n° ${numero} n'existe pas au canevas.`;
@@ -1545,23 +1595,13 @@ export async function refusDeSaisie(
     default:
       break;
   }
-  // Un chef de section technique ne réécrit pas ce que l'arrondissement a
-  // saisi — sauf sur ordre de correction du DD pour ce trimestre (20 octobre
-  // 2026). Le chef BAC, lui, garde sa liberté sur les tableaux du BAC.
+  // DISCIPLINE (décision du Délégué, 21 octobre 2026) : un chef de section
+  // technique n'écrit dans la case d'un arrondissement — remplie ou vide, sa
+  // ligne, sa colonne ou sa liste — que pendant la révision ouverte par le DD.
+  // Le chef BAC, lui, garde sa liberté sur les tableaux du BAC.
   if (estChefTechnique(profil.role) && !(await aOrdreDeCorrection(db, periode, profil.role))) {
-    const p = await db.periodeReporting.findFirst({
-      where: { type: "TRIMESTRIEL", annee: periode.annee, trimestre: periode.rang },
-      select: { id: true },
-    });
-    const existante = p
-      ? await db.saisieCanevas.findFirst({
-          where: { periodeId: p.id, numeroTableau: numero, ligne, colonne, portee: "" },
-          select: { auteur: { select: { role: true } } },
-        })
-      : null;
-    if (existante && remplieParLArrondissement({ valeur: null, texte: null, parRole: existante.auteur?.role ?? null })) {
-      return MESSAGE_SANS_ORDRE;
-    }
+    const liste = porteeVersion ? (await listerArrondissements(db)).find((a) => a.id === porteeVersion)?.nom ?? porteeVersion : null;
+    if (territoireDeCase(t.bloc, ctx, ligne, colonne, liste) != null) return MESSAGE_SANS_ORDRE;
   }
   return null;
 }

@@ -2,16 +2,16 @@
  * CORRIGER AU TRIMESTRE une case calculée à partir du mensuel (décision du
  * Délégué, 21 octobre 2026) — les règles :
  *
- *  - seul le CHEF DE LA SECTION du tableau corrige, et seulement SUR ORDRE DU
- *    DD (ordresCorrection.ts) ; il peut demander cet ordre lui-même ;
+ *  - seul le CHEF DE LA SECTION du tableau corrige, et seulement pendant la
+ *    RÉVISION ouverte par le DD (ordresCorrection.ts) ; il peut la demander ;
  *  - seulement les tableaux des listes du mensuel et la pisciculture
  *    (TABLEAUX_CORRIGEABLES), la case d'un arrondissement — jamais un total ;
  *  - seulement quand les TROIS rapports mensuels de l'arrondissement sont
  *    transmis : un chiffre qui peut encore changer ne se corrige pas ;
  *  - pas quand la section est validée : le chef annule sa validation d'abord ;
  *  - un motif et une source (registre du poste, fiche de campagne…) ;
- *  - l'ancien et le nouveau chiffre au journal ; le DD et l'arrondissement
- *    prévenus ; les analyses du tableau repassent « à revoir ».
+ *  - l'ancien et le nouveau chiffre au journal ; le DD prévenu, l'arrondissement
+ *    au bilan de la révision ; les analyses du tableau repassent « à revoir ».
  *
  * Aucune note dans le rapport imprimé (décision du Délégué) : la case porte le
  * chiffre corrigé, comme les autres. La trace est au journal et à l'écran.
@@ -140,8 +140,8 @@ export async function corrigerCase(
 ) {
   const info = await infoCorrection(db, periode, profil, demande.numero, demande.ligne, demande.colonne);
   if (!info.corrigeable) throw new RefusCorrection("Cette case ne se corrige pas au trimestre.", 400);
-  if (!info.estChef) throw new RefusCorrection("Seul le chef de la section corrige ce tableau, sur ordre du Délégué départemental.", 403);
-  if (!info.aOrdre) throw new RefusCorrection("Il vous faut l'ordre du Délégué départemental : demandez-le-lui d'abord.", 403);
+  if (!info.estChef) throw new RefusCorrection("Seul le chef de la section corrige ce tableau, pendant la révision ouverte par le Délégué départemental.", 403);
+  if (!info.aOrdre) throw new RefusCorrection("La révision de votre section n'est pas ouverte : demandez au DD de l'ouvrir.", 403);
   if (info.raison) throw new RefusCorrection(info.raison, 409);
 
   const brut = String(demande.valeur ?? "").replace(/[\s  ]/g, "").replace(",", ".");
@@ -180,8 +180,8 @@ export async function annulerCorrectionCase(
 ) {
   const info = await infoCorrection(db, periode, profil, demande.numero, demande.ligne, demande.colonne);
   if (!info.existante) throw new RefusCorrection("Cette case n'est pas corrigée.", 404);
-  if (!info.estChef) throw new RefusCorrection("Seul le chef de la section annule une correction, sur ordre du Délégué départemental.", 403);
-  if (!info.aOrdre) throw new RefusCorrection("Il vous faut l'ordre du Délégué départemental : demandez-le-lui d'abord.", 403);
+  if (!info.estChef) throw new RefusCorrection("Seul le chef de la section annule une correction, pendant la révision ouverte par le Délégué départemental.", 403);
+  if (!info.aOrdre) throw new RefusCorrection("La révision de votre section n'est pas ouverte : demandez au DD de l'ouvrir.", 403);
   const motif = typeof demande.motif === "string" ? demande.motif.trim() : "";
   if (motif.length < 5) throw new RefusCorrection("Indiquez le motif de l'annulation.", 400);
   const periodeId = await periodeTrimestrielle(db, periode);
@@ -215,7 +215,10 @@ async function apresChangement(
       action: t.action,
       entite: "CorrectionTrimestre",
       entiteId: `${cellule.numeroTableau} | ${cellule.ligne} | ${cellule.colonne}`,
-      details: { ...cellule, annee: periode.annee, trimestre: periode.rang, ancien: t.ancien, nouveau: t.nouveau, mensuel: t.mensuel, motif: t.motif, source: t.source, chef: profil.role },
+      details: {
+        ...cellule, annee: periode.annee, trimestre: periode.rang, arrondissement: tc.territoire,
+        ancien: t.ancien, nouveau: t.nouveau, mensuel: t.mensuel, motif: t.motif, source: t.source, chef: profil.role,
+      },
     },
   });
   const nf = (n: number | null) => (n == null ? "vide" : n.toLocaleString("fr-FR"));
@@ -223,7 +226,7 @@ async function apresChangement(
   const message =
     `${quoi} (${libelleCourt(periode)}) — tableau n° ${cellule.numeroTableau}, ${tc.territoire}, « ${tc.categorie} » : ${nf(t.ancien)} → ${nf(t.nouveau)}. ` +
     `Motif : ${t.motif}${t.source ? ` (source : ${t.source})` : ""}`;
+  // Le DD suit la révision au fil de l'eau ; l'arrondissement reçoit le bilan à
+  // la fermeture de la révision (ordresCorrection.ts), pas une alerte par case.
   await notifierEvenement(db, { roles: ["DD"], saufUserId: auteurId }, { declencheur: t.action, message, lien: "/trimestre/saisie" });
-  const arr = (await listerArrondissements(db)).find((a) => a.nom === tc.territoire || a.nomCanevas === graphieCanevas(tc.territoire));
-  if (arr) await notifierEvenement(db, { arrondissementId: arr.id, saufUserId: auteurId }, { declencheur: t.action, message, lien: "/trimestre/saisie" });
 }

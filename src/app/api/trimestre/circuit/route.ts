@@ -23,7 +23,10 @@ import {
   anPasseManquant, messageAnPasseManquant, nomArrondissement, erreursDeCoherence, messageErreursCoherence, type ErreurCoherence,
 } from "@/server/trimestre/saisieTrimestrielle";
 import type { Periode } from "@/server/periodes/calendrier";
-import { ordresEnCours, donnerOrdreCorrection, revoquerOrdreCorrection, demandesEnCours, demanderOrdreCorrection } from "@/server/trimestre/ordresCorrection";
+import {
+  ordresEnCours, donnerOrdreCorrection, revoquerOrdreCorrection, demandesEnCours, demanderOrdreCorrection,
+  ouvrirRevisionPourTous, fermerRevisionPourTous, refuserDemande, bilanRevision, CHEFS_SOUS_ORDRE,
+} from "@/server/trimestre/ordresCorrection";
 import { analysesARevoir, messageAnalysesARevoir } from "@/server/trimestre/analyse/ecranAnalyses";
 import { periodeTrimestrielle } from "@/server/trimestre/rubriques";
 import {
@@ -52,9 +55,9 @@ const erreur = (message: string, status: number) => NextResponse.json({ message 
 const SUITE_ARRONDISSEMENT =
   "Corrigez-les dans « Saisir les tableaux du trimestre » (touchez la case grise pour voir, mois par mois, d'où vient le total), puis recommencez.";
 const SUITE_CHEF =
-  "Faites-les corriger avant de valider : signalez la case à l'arrondissement ou renvoyez-lui son rapport ; un total mensuel faux se corrige dans le mois. Pour un écart avec le BAC, le chef BAC confirme son chiffre ou le corrige.";
+  "Corrigez-les avant de valider — pendant la révision ouverte par le DD — ou signalez la case à l'arrondissement ; un total mensuel faux se corrige dans le mois. Pour un écart avec le BAC, le chef BAC confirme son chiffre ou le corrige.";
 const SUITE_DD =
-  "Renvoyez le rapport de l'arrondissement concerné ou donnez un ordre de correction au chef de la section ; un total mensuel faux se corrige dans le mois (rouvrez-le s'il est clôturé). Un écart BAC / arrondissement se règle au BAC.";
+  "Renvoyez le rapport de l'arrondissement concerné ou ouvrez la révision des tableaux au chef de la section ; un total mensuel faux se corrige dans le mois (rouvrez-le s'il est clôturé). Un écart BAC / arrondissement se règle au BAC.";
 
 type Filtre = { arrondissement: string | undefined } | { chef: string } | "tout";
 function retenir(liste: ErreurCoherence[], filtre: Filtre): ErreurCoherence[] {
@@ -101,10 +104,22 @@ export async function GET(req: Request) {
                 )
               )
             : etat.arrondissements,
-      // Chaque domaine, avec l'ordre de correction du DD en cours, s'il y en a un.
+      // Chaque domaine, avec sa révision : ouverte (et ce qui a déjà changé), ou demandée.
       sections: await (async () => {
         const [ordres, demandes] = await Promise.all([ordresEnCours(user.db, periode), demandesEnCours(user.db, periode)]);
-        return etat.sections.map((s) => ({ ...s, ordre: ordres.get(s.chef) ?? null, demande: demandes.get(s.chef) ?? null }));
+        return Promise.all(
+          etat.sections.map(async (s) => {
+            const o = ordres.get(s.chef) ?? null;
+            const voitBilan = o && (user.role === "DD" || user.role === s.chef);
+            return {
+              ...s,
+              sousRevision: CHEFS_SOUS_ORDRE.includes(s.chef),
+              ordre: o,
+              demande: demandes.get(s.chef) ?? null,
+              ...(voitBilan ? { bilan: await bilanRevision(user.db, periode, s.chef, new Date(o.le)) } : {}),
+            };
+          })
+        );
       })(),
       tousTransmis: etat.tousTransmis,
       complet: etat.complet,
@@ -188,25 +203,42 @@ export async function POST(req: Request) {
         details = { arrondissementId: body.arrondissementId, parLeDD: true, correctionsValidees: true, commentaire: body.motif };
         break;
       }
-      // Ordre de correction du DD à un chef de section (20 octobre 2026).
+      // LA RÉVISION DES TABLEAUX, ouverte et fermée par le DD (ordresCorrection.ts).
       case "ordonnerCorrection": {
-        if (user.role !== "DD") return erreur("Seul le Délégué départemental donne un ordre de correction.", 403);
+        if (user.role !== "DD") return erreur("Seul le Délégué départemental ouvre la révision des tableaux.", 403);
         if (!body.section) return erreur("Section non précisée.", 400);
         const r = await donnerOrdreCorrection(user.db, user.transaction, periodeId, periode, body.section, body.motif ?? "", user.id);
         details = { section: body.section, motif: body.motif, validationAnnulee: r.validationAnnulee };
         break;
       }
-      // Le chef demande lui-même l'ordre au DD (21 octobre 2026).
+      case "ouvrirRevisionTous": {
+        if (user.role !== "DD") return erreur("Seul le Délégué départemental ouvre la révision des tableaux.", 403);
+        details = { sections: await ouvrirRevisionPourTous(user.db, user.transaction, periodeId, periode, body.motif ?? "", user.id), motif: body.motif };
+        break;
+      }
+      // Le chef demande lui-même l'ouverture au DD (21 octobre 2026).
       case "demanderOrdre": {
         await demanderOrdreCorrection(user.db, periode, user.role, body.motif ?? "", user.id);
         details = { chef: user.role, motif: body.motif };
         break;
       }
-      case "revoquerOrdre": {
-        if (user.role !== "DD") return erreur("Seul le Délégué départemental révoque un ordre de correction.", 403);
+      case "refuserDemande": {
+        if (user.role !== "DD") return erreur("Seul le Délégué départemental répond à une demande de révision.", 403);
         if (!body.section) return erreur("Section non précisée.", 400);
-        await revoquerOrdreCorrection(user.db, periode, body.section, user.id);
-        details = { section: body.section };
+        await refuserDemande(user.db, periode, body.section, body.motif ?? "", user.id);
+        details = { section: body.section, motif: body.motif };
+        break;
+      }
+      case "revoquerOrdre": {
+        if (user.role !== "DD") return erreur("Seul le Délégué départemental ferme la révision des tableaux.", 403);
+        if (!body.section) return erreur("Section non précisée.", 400);
+        const bilan = await revoquerOrdreCorrection(user.db, periode, body.section, user.id);
+        details = { section: body.section, cases: bilan?.cases ?? 0 };
+        break;
+      }
+      case "fermerRevisionTous": {
+        if (user.role !== "DD") return erreur("Seul le Délégué départemental ferme la révision des tableaux.", 403);
+        details = { sections: await fermerRevisionPourTous(user.db, periode, user.id) };
         break;
       }
       case "renvoyer": {
@@ -229,6 +261,8 @@ export async function POST(req: Request) {
             if (refusDomaine) return refusDomaine;
           }
           await validerSectionParLeDD(user.db, user.transaction, periodeId, body.section, body.motif ?? "", user.id);
+          // La section validée : sa révision se ferme, les DA reçoivent le bilan.
+          await revoquerOrdreCorrection(user.db, periode, body.section, user.id, "validation");
           details = { section: body.section, parLeDD: true, motif: body.motif };
           break;
         }
@@ -238,7 +272,10 @@ export async function POST(req: Request) {
         const refusChef = await refusIncoherent(user.db, periode, { chef: user.role }, SUITE_CHEF);
         if (refusChef) return refusChef;
         await validerSection(user.db, user.transaction, periodeId, periode, user.role, user.id);
-        details = { section: codeSection(user.role) };
+        // Le chef a fini : sa révision se ferme d'elle-même, le DD et les DA en reçoivent le bilan.
+        const code = codeSection(user.role);
+        if (code) await revoquerOrdreCorrection(user.db, periode, code, user.id, "validation");
+        details = { section: code };
         break;
       }
       case "annuler": {
@@ -257,6 +294,10 @@ export async function POST(req: Request) {
         const refusFinal = await refusIncoherent(user.db, periode, "tout", SUITE_DD);
         if (refusFinal) return refusFinal;
         details ={ ...(await finaliserParLeDD(user.db, user.transaction, periodeId, periode, body.motif ?? "", user.id)), motif: body.motif, parLeDD: true };
+        // Tout est validé : les révisions encore ouvertes se ferment.
+        for (const o of Array.from((await ordresEnCours(user.db, periode)).values())) {
+          await revoquerOrdreCorrection(user.db, periode, o.section, user.id, "validation");
+        }
         break;
       }
       default:

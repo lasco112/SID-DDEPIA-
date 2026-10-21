@@ -19,7 +19,7 @@ import type { DetailsObservation } from "@/server/observations";
 import type { DetailsObservationT, CibleTrimestre } from "@/server/observationsTrimestre";
 import { trimestrielle } from "@/server/periodes/calendrier";
 import { periodeTrimestrielle } from "@/server/trimestre/rubriques";
-import { tableauDe, grille, estChefTechnique, chefDuTableau } from "@/server/trimestre/saisieTrimestrielle";
+import { tableauDe, grille, estChefTechnique, chefDuTableau, versionDuChef } from "@/server/trimestre/saisieTrimestrielle";
 import { axeTerritorial } from "@/server/trimestre/canevas/structure";
 import { SECTIONS_CANEVAS, TABLEAUX_BAC, chefDeSection } from "@/server/trimestre/canevas/sections";
 import { zonesTexte } from "@/server/trimestre/rapportCanevas";
@@ -35,6 +35,8 @@ interface CorpsTrimestre {
   ligne?: string;
   colonne?: string;
   zone?: string;
+  /** La liste d'un arrondissement (tableau sans maille), ouverte par le chef de section. */
+  version?: string | null;
 }
 
 /** Un chef de section, en toutes lettres. */
@@ -63,10 +65,12 @@ async function signalerTrimestre(user: SessionUser, c: CorpsTrimestre, texte: st
     // Un chef de section technique : les tableaux de SA section seulement.
     if (estChefTechnique(user.role) && chefDuTableau(c.numero!) !== user.role) return erreur("Ce tableau n'est pas de votre section.", 403);
     const axe = axeTerritorial(t.bloc);
-    const territoire = axe === "lignes" ? c.ligne : axe === "colonnes" ? c.colonne : null;
+    // La liste d'un arrondissement (tableau sans maille) : celle que le chef a ouverte.
+    const liste = c.version && estChefTechnique(user.role) ? await versionDuChef(db, { role: user.role }, c.numero!, c.version) : null;
+    const territoire = liste ? liste.nom : axe === "lignes" ? c.ligne : axe === "colonnes" ? c.colonne : null;
     const arr = territoire ? (await listerArrondissements(db)).find((a) => a.nom === territoire) : undefined;
     if (!arr) return erreur("Cette case relève du département, pas d'un arrondissement : corrigez-la vous-même.", 400);
-    const g = await grille(db, periode, { role: "DD" }, c.numero!);
+    const g = liste ? await grille(db, periode, { role: user.role }, c.numero!, liste.nom) : await grille(db, periode, { role: "DD" }, c.numero!);
     const l = g?.lignes.find((x) => x.cle === c.ligne);
     const k = l?.cases.find((x) => x.colonne === c.colonne);
     if (!l || !k) return erreur("Case inconnue.", 400);

@@ -473,7 +473,7 @@ function CarteDemandesOrdre({ demandes }: { demandes: Awaited<ReturnType<typeof 
   return (
     <section className="rounded-card border-2 border-amber-500/70 bg-white p-4 shadow-card sm:p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <h2 className="text-[17px] font-bold text-primary-dark">Des chefs de section vous demandent l&apos;ordre de corriger</h2>
+        <h2 className="text-[17px] font-bold text-primary-dark">Des chefs de section vous demandent d&apos;ouvrir la révision des tableaux</h2>
         <span className="rounded-full bg-amber-600 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-white">À décider</span>
       </div>
       <ul className="mt-3 space-y-2">
@@ -484,10 +484,10 @@ function CarteDemandesOrdre({ demandes }: { demandes: Awaited<ReturnType<typeof 
         ))}
       </ul>
       <a href="/trimestre/circuit" className="mt-4 flex min-h-[48px] w-full items-center justify-center rounded-btn bg-amber-700 px-4 py-3 text-center text-[15px] font-bold text-white hover:bg-amber-800">
-        Donner l&apos;ordre (ou non) →
+        Accepter ou refuser, dans « Suivre le trimestre » →
       </a>
       <p className="mt-2 text-center text-xs text-ink-muted">
-        Vous pouvez aussi donner l&apos;ordre sans demande : en tête de chaque tableau du chef, ou en touchant une case grise.
+        Vous pouvez aussi ouvrir la révision sans demande, à une section ou à toutes, au même endroit.
       </p>
     </section>
   );

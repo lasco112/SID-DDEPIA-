@@ -71,19 +71,19 @@ export async function POST(req: Request) {
     await ecrireSaisieCanevas(user.db, user.transaction, periodeId, cellule, { valeur }, user.id, portee);
 
     const n1 = libelleCourt(memePeriodeAnneePrecedente(periode));
+    // Le territoire de la case : sa ligne ou sa colonne.
+    const bloc = tableauDe(body.numeroTableau)!.bloc;
+    const territoire = axeTerritorial(bloc) === "colonnes" ? body.colonne : body.ligne;
     await user.db.auditLog.create({
       data: {
         userId: user.id,
         action: "CORRECTION_AN_PASSE",
         entite: "SaisieCanevas",
         entiteId: cleCellule(cellule),
-        details: { ...cellule, annee: periode.annee, trimestre: periode.rang, periodeN1: n1, ancien, nouveau: valeur, motif },
+        details: { ...cellule, annee: periode.annee, trimestre: periode.rang, periodeN1: n1, ancien, nouveau: valeur, motif, arrondissement: territoire },
       },
     });
 
-    // Le territoire de la case : sa ligne ou sa colonne.
-    const bloc = tableauDe(body.numeroTableau)!.bloc;
-    const territoire = axeTerritorial(bloc) === "colonnes" ? body.colonne : body.ligne;
     const nf = (n: number | null) => (n == null ? "vide" : n.toLocaleString("fr-FR"));
     const quoi = periode.annee < anneeCourante() ? `Chiffre du ${libelleCourt(periode)} corrigé` : `Chiffre de l'an passé corrigé (${n1})`;
     const message =

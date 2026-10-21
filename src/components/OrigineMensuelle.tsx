@@ -140,7 +140,7 @@ function DetailOrigine({ o, correction }: { o: Origine; correction: InfoCorrecti
       : role === "DD"
         ? "Si un mois est faux, corrigez-le dans les données de l'arrondissement ou renvoyez son rapport ; s'il est clôturé, rouvrez d'abord le mois dans « Ouvrir et clôturer les mois »."
         : correction?.corrigeable
-          ? "Si le vrai chiffre manque au mensuel (rien d'inscrit, ou inscrit faux), corrigez-le au trimestre, sur ordre du DD (cadre bleu, en haut)."
+          ? "Si le vrai chiffre manque au mensuel (rien d'inscrit, ou inscrit faux), corrigez-le au trimestre pendant la révision ouverte par le DD (cadre bleu, en haut)."
           : "Si un mois est faux, ouvrez-le : dans « Contrôler les chiffres des arrondissements », vous corrigez la case de votre section (correction tracée, motif obligatoire). Si le mois est clôturé, demandez au DD de le rouvrir.";
 
   async function ouvrir(periodeId: string) {
@@ -267,7 +267,7 @@ export function CorrectionAuTrimestre({
   return (
     <div className="rounded-md border border-sky-300 bg-sky-50 p-3 text-sm text-sky-950">
       <p className="font-bold">Corriger au trimestre</p>
-      {c.estChef && c.aOrdre && !c.raison && <p className="mt-1 font-semibold text-green-800">✓ Vous avez l&apos;ordre du DD : vous pouvez corriger ce chiffre.</p>}
+      {c.estChef && c.aOrdre && !c.raison && <p className="mt-1 font-semibold text-green-800">✓ Révision ouverte : vous pouvez corriger ce chiffre.</p>}
       {!c.estChef && <OrdreDuDD correction={c} periode={periode} onFait={onCorrige} />}
 
       {e && (
@@ -346,7 +346,7 @@ export function CorrectionAuTrimestre({
             <button
               type="button"
               disabled={occupe || !form.valeur.trim() || form.motif.trim().length < 5 || form.source.trim().length < 3}
-              onClick={() => void envoyer("/api/trimestre/correction-case", "POST", { ...corps, ...form }, "Correction enregistrée : le DD et l'arrondissement sont prévenus.")}
+              onClick={() => void envoyer("/api/trimestre/correction-case", "POST", { ...corps, ...form }, "Correction enregistrée : le DD est prévenu ; l'arrondissement la verra au bilan de la révision.")}
               className="min-h-[44px] flex-1 rounded-btn bg-primary px-3 font-semibold text-white disabled:opacity-50"
             >
               {occupe ? "Enregistrement…" : "Enregistrer la correction"}
@@ -383,15 +383,15 @@ export function CorrectionAuTrimestre({
         </div>
       )}
 
-      {/* Sans l'ordre du DD : le chef le demande. */}
+      {/* Révision fermée : le chef la demande. */}
       {c.estChef && !c.aOrdre && (
         c.demandeEnCours ? (
-          <p className="mt-2">Votre demande d&apos;ordre est chez le DD : vous serez prévenu dès qu&apos;il l&apos;aura donné.</p>
+          <p className="mt-2">Votre demande de révision est chez le DD : vous serez prévenu de sa réponse.</p>
         ) : demande == null ? (
           <div className="mt-2">
-            <p>Pour corriger ce chiffre, il vous faut l&apos;ordre du Délégué départemental.</p>
-            <button type="button" onClick={() => setDemande("")} className="mt-2 min-h-[40px] rounded-btn border border-primary bg-white px-3 font-semibold text-primary">
-              Demander l&apos;ordre au DD
+            <p>Pour corriger ce chiffre, il faut que le Délégué départemental ouvre la révision de votre section (après le dépôt de tous les rapports des DA).</p>
+            <button type="button" onClick={() => setDemande(c.motifPropose)} className="mt-2 min-h-[40px] rounded-btn border border-primary bg-white px-3 font-semibold text-primary">
+              Demander au DD d&apos;ouvrir la révision
             </button>
           </div>
         ) : (
@@ -406,13 +406,13 @@ export function CorrectionAuTrimestre({
             <div className="flex gap-2">
               <button
                 type="button"
-                disabled={occupe || demande.trim().length < 5}
+                disabled={occupe}
                 onClick={() =>
                   void envoyer(
                     "/api/trimestre/circuit",
                     "POST",
                     { annee: periode.annee, trimestre: periode.trimestre, action: "demanderOrdre", motif: demande },
-                    "Demande envoyée au DD : vous serez prévenu dès qu'il aura donné l'ordre."
+                    "Demande envoyée au DD : vous serez prévenu de sa réponse."
                   )
                 }
                 className="min-h-[44px] flex-1 rounded-btn bg-primary px-3 font-semibold text-white disabled:opacity-50"
@@ -434,8 +434,8 @@ export function CorrectionAuTrimestre({
 }
 
 /**
- * LE DD DONNE L'ORDRE D'ICI (21 octobre 2026) : sans attendre de demande, et
- * sans aller chercher l'écran du circuit. Un motif est proposé, modifiable.
+ * LE DD OUVRE LA RÉVISION D'ICI (21 octobre 2026) : sans attendre de demande,
+ * et sans aller chercher l'écran du circuit. Un mot est proposé, modifiable.
  */
 function OrdreDuDD({ correction: c, periode, onFait }: { correction: InfoCorrection; periode: { annee: number; trimestre: number }; onFait?: () => void }) {
   const moi = useUtilisateur();
@@ -443,7 +443,7 @@ function OrdreDuDD({ correction: c, periode, onFait }: { correction: InfoCorrect
   const [occupe, setOccupe] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
   if (moi?.role !== "DD" || !c.chef || !c.section) {
-    return <p className="mt-1 text-xs">Seul le chef de la section corrige ce chiffre au trimestre, sur ordre du DD.</p>;
+    return <p className="mt-1 text-xs">Seul le chef de la section corrige ce chiffre au trimestre, pendant la révision ouverte par le DD.</p>;
   }
   async function agir(action: "ordonnerCorrection" | "revoquerOrdre", texte?: string) {
     setErreur(null);
@@ -469,47 +469,47 @@ function OrdreDuDD({ correction: c, periode, onFait }: { correction: InfoCorrect
       {c.ordreEnCours ? (
         <>
           <p>
-            <b>Le chef {c.section} a votre ordre</b> de corriger les tableaux de sa section pour ce trimestre.
+            <b>Révision ouverte au chef {c.section}</b> : il corrige les tableaux de sa section pour ce trimestre.
           </p>
           <button
             type="button"
             disabled={occupe}
             onClick={() => {
-              if (window.confirm(`Révoquer l'ordre du chef ${c.section} ? Ses corrections déjà faites restent.`)) void agir("revoquerOrdre");
+              if (window.confirm(`Fermer la révision du chef ${c.section} ? Ses corrections déjà faites restent, et chaque DA reçoit le bilan.`)) void agir("revoquerOrdre");
             }}
-            className="mt-2 min-h-[40px] rounded-btn border border-amber-700 bg-white px-3 font-semibold text-amber-900"
+            className="mt-2 min-h-[40px] rounded-btn border border-gray-600 bg-white px-3 font-semibold text-gray-800"
           >
-            Révoquer l&apos;ordre
+            Fermer la révision
           </button>
         </>
       ) : motif == null ? (
         <>
           {c.demande ? (
             <p>
-              <b>Le chef {c.section} vous demande l&apos;ordre</b> : « {c.demande.motif} »
+              <b>Le chef {c.section} vous demande d&apos;ouvrir la révision</b> : « {c.demande.motif} »
             </p>
           ) : (
-            <p>C&apos;est le chef {c.section} qui corrige ce chiffre, sur votre ordre. Vous pouvez le lui donner tout de suite.</p>
+            <p>C&apos;est le chef {c.section} qui corrige ce chiffre, pendant la révision que vous lui ouvrez (après le dépôt de tous les rapports des DA).</p>
           )}
           <button
             type="button"
             onClick={() => setMotif(c.demande?.motif ?? c.motifPropose)}
-            className="mt-2 min-h-[44px] rounded-btn bg-amber-700 px-4 font-semibold text-white hover:bg-amber-800"
+            className="mt-2 min-h-[44px] rounded-btn bg-green-700 px-4 font-semibold text-white hover:bg-green-800"
           >
-            Donner l&apos;ordre au chef {c.section}
+            Ouvrir la révision au chef {c.section}
           </button>
         </>
       ) : (
         <div className="space-y-2">
-          <textarea rows={2} value={motif} onChange={(ev) => setMotif(ev.target.value)} className="block w-full rounded-input border border-gray-300 bg-white px-3 py-2 text-sm" />
+          <textarea rows={2} value={motif} placeholder="Un mot (facultatif)" onChange={(ev) => setMotif(ev.target.value)} className="block w-full rounded-input border border-gray-300 bg-white px-3 py-2 text-sm" />
           <div className="flex gap-2">
             <button
               type="button"
-              disabled={occupe || motif.trim().length < 3}
+              disabled={occupe}
               onClick={() => void agir("ordonnerCorrection", motif)}
-              className="min-h-[44px] flex-1 rounded-btn bg-amber-700 px-3 font-semibold text-white disabled:opacity-50"
+              className="min-h-[44px] flex-1 rounded-btn bg-green-700 px-3 font-semibold text-white disabled:opacity-50"
             >
-              {occupe ? "Envoi…" : "Donner l'ordre"}
+              {occupe ? "Envoi…" : "Ouvrir la révision"}
             </button>
             <button type="button" onClick={() => setMotif(null)} className="min-h-[44px] flex-1 rounded-btn border border-gray-300 bg-white px-3">
               Annuler

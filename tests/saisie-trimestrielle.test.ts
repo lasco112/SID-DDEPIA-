@@ -327,38 +327,39 @@ test("catégories de même unité : le total additionne ce que donne le mensuel 
   assert.ok(g19!.lignes.filter((l) => !/^TOTAL|^ÉCART/.test(l.cle)).every((l) => l.cases.find((c) => c.colonne === "TOTAL T3 2026")!.affiche == null));
 });
 
-test("un chef de section complète ce qui manque dans SA section, et ne réécrit pas l'arrondissement", async () => {
+test("un chef de section lit SA section ; les cases des arrondissements attendent la révision du DD", async () => {
   const PSA = { role: "CHEF_PSA" };
   const SSV = { role: "CHEF_SSV" };
   periodeId = periodeId ?? (await periodeTrimestrielle(base, P));
   const da = await base.user.findFirstOrThrow({ where: { role: "DA", actif: true }, select: { id: true } });
   const chef = await base.user.findFirstOrThrow({ where: { role: "CHEF_PSA", actif: true }, select: { id: true } });
+  const REVISION = /révision ouverte/;
 
-  // Sa section, et elle seule.
-  assert.equal(await refusDeSaisie(base, P, PSA, 23, "Nkong-Ni", "Brebis"), null, "cheptel ovin : section PSA, case vide");
+  // Sa section, et elle seule ; et même une case VIDE d'un arrondissement
+  // attend la révision (discipline, décision du Délégué du 21 octobre 2026).
+  assert.match((await refusDeSaisie(base, P, PSA, 23, "Nkong-Ni", "Brebis")) ?? "", REVISION, "cheptel ovin : section PSA, case vide");
   assert.match((await refusDeSaisie(base, P, SSV, 23, "Nkong-Ni", "Brebis")) ?? "", /ressort/, "pas un chef d'une autre section");
   assert.match((await refusDeSaisie(base, P, PSA, 13, "JANVIER", "Dschang")) ?? "", /ressort/, "pas un tableau du BAC");
-  // L'an passé manquant se saisit aussi ; le total du trimestre, jamais.
-  assert.equal(await refusDeSaisie(base, P, SSV, 64, "Fokoué", "TOTAL T1 2030"), null, "le total de l'an passé, que le SID ignore");
+  // L'an passé d'un arrondissement aussi ; le total du trimestre, jamais.
+  assert.match((await refusDeSaisie(base, P, SSV, 64, "Fokoué", "TOTAL T1 2030")) ?? "", REVISION, "le total de l'an passé d'un arrondissement");
   assert.match((await refusDeSaisie(base, P, SSV, 64, "TOTAL T1 2031", "TOTAL T1 2030")) ?? "", /calculés|rapports mensuels/);
   assert.match((await refusDeSaisie(base, P, PSA, 14, "Nkong-Ni", "TOTAL T1 2031")) ?? "", /rapports mensuels/);
 
   // Une case remplie par l'arrondissement : réservée — elle se signale.
   const cellule = { numeroTableau: 23, ligne: "Nkong-Ni", colonne: "Brebis" };
   await ecrireSaisieCanevas(base, transaction, periodeId, cellule, { valeur: 40 }, da.id);
-  assert.match((await refusDeSaisie(base, P, PSA, 23, "Nkong-Ni", "Brebis")) ?? "", /remplie par l'arrondissement/);
+  assert.match((await refusDeSaisie(base, P, PSA, 23, "Nkong-Ni", "Brebis")) ?? "", REVISION);
   const lire = async () => (await grille(base, P, PSA, 23))!.lignes.find((l) => l.cle === "Nkong-Ni")!.cases.find((c) => c.colonne === "Brebis")!;
   let c = await lire();
   assert.equal(c.etat, "lecture");
   assert.equal(c.reservee, true);
   assert.equal(await refusDeSaisie(base, P, DD, 23, "Nkong-Ni", "Brebis"), null, "le DD, lui, garde la main");
 
-  // Une case que le chef a lui-même remplie reste la sienne : il peut la reprendre.
+  // Même une case que le chef a écrite autrefois : la case est à l'arrondissement.
   await ecrireSaisieCanevas(base, transaction, periodeId, cellule, { valeur: 41 }, chef.id);
-  assert.equal(await refusDeSaisie(base, P, PSA, 23, "Nkong-Ni", "Brebis"), null);
+  assert.match((await refusDeSaisie(base, P, PSA, 23, "Nkong-Ni", "Brebis")) ?? "", REVISION);
   c = await lire();
-  assert.equal(c.etat, "saisie");
-  assert.ok(!c.reservee);
+  assert.equal(c.reservee, true);
 
   // La liste de ses tableaux : ceux de sa section, aucun du BAC ni de la santé.
   const numeros = (await resumer(base, P, PSA)).map((t) => t.numero);

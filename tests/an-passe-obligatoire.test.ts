@@ -81,11 +81,11 @@ test("correction de l'an passé : chacun dans son ressort, jamais l'agent", asyn
   assert.ok(await refusCorrectionAnPasse(base, P, { role: "AGENT_SAISIE", arrondissement: "Dschang" }, 41, "Dschang", N1));
   // Le DD corrige tout arrondissement.
   assert.equal(await refusCorrectionAnPasse(base, P, { role: "DD" }, 41, "Fokoué", N1), null);
-  // Un chef de section : seulement sur ordre du DD (20 octobre 2026 — voir
-  // tests/ordres-correction.test.ts pour le chef qui a l'ordre).
+  // Un chef de section : seulement pendant la révision ouverte par le DD (21
+  // octobre 2026 — voir tests/ordres-correction.test.ts pour la révision ouverte).
   const chef = chefDuTableau(41)!;
   const autreChef = ["CHEF_PSA", "CHEF_SSV", "CHEF_SPAIH"].find((r) => r !== chef)!;
-  assert.match((await refusCorrectionAnPasse(base, P, { role: chef }, 41, "Fokoué", N1)) ?? "", /ordre du Délégué/);
+  assert.match((await refusCorrectionAnPasse(base, P, { role: chef }, 41, "Fokoué", N1)) ?? "", /révision ouverte/);
   assert.ok(await refusCorrectionAnPasse(base, P, { role: autreChef }, 41, "Fokoué", N1));
 });
 

@@ -1,38 +1,47 @@
 /**
- * LES ORDRES DE CORRECTION DU DD aux chefs de section (décision du Délégué,
- * 20 octobre 2026).
+ * LA RÉVISION DES TABLEAUX par les chefs de section — un processus encadré,
+ * ouvert par le DD (décisions du Délégué, 20 et 21 octobre 2026) :
  *
- * Le chef BAC n'est PAS concerné : il complète et corrige librement les
- * tableaux du BAC, comme avant (décision du Délégué, 20 octobre 2026).
+ *  1. Les DA DÉPOSENT leur rapport (circuit.ts). Avant, aucun chef ne touche
+ *     aux cases des arrondissements : il relit et signale.
+ *  2. Le DD OUVRE LA RÉVISION — section par section, ou pour toutes d'un coup —
+ *     de lui-même, ou à la DEMANDE d'un chef, qu'il accepte ou refuse. Jamais
+ *     avant le dépôt des rapports de TOUS les DA.
+ *  3. Révision ouverte, le chef corrige dans les tableaux de SA section, pour
+ *     tous les arrondissements : cases remplies ou vides, listes des DA, et
+ *     cases grises des listes du mensuel et de la pisciculture (corrigerCase.ts).
+ *     Chaque changement est au journal.
+ *  4. La révision se FERME quand le chef valide sa section, ou quand le DD la
+ *     ferme. Chaque DA reçoit alors le bilan de ce qui a changé chez lui.
  *
- * Sans ordre, un chef de section technique (PSA, SSV, SPAIH) RELIT les tableaux de sa section, SIGNALE à
- * l'arrondissement ce qui ne va pas, et COMPLÈTE les cases encore vides. Il ne
- * modifie pas une case qu'un arrondissement a remplie — en 2026 comme pour le
- * chiffre de 2025.
+ * Le chef BAC n'est pas concerné : il complète et corrige librement les
+ * tableaux du BAC.
  *
- * Avec l'ordre du DD — par chef et par trimestre, motivé, révocable — il
- * corrige aussi ces cases. Donner l'ordre FAIT TOMBER la validation du domaine
- * s'il était validé : le rapport départemental ne se finalise pas sur des
- * chiffres en cours de correction ; le chef revalide une fois fini.
+ * Ouvrir la révision FAIT TOMBER la validation de la section : on ne finalise
+ * pas sur des chiffres en cours de révision.
  *
- * Ce qui ne change JAMAIS ici : les cases calculées à partir du mensuel ne se
- * corrigent pas dans le trimestriel (elles se corrigent dans le rapport
- * mensuel, par son propre circuit, et le trimestre se recalcule seul).
- *
- * L'état se lit dans le journal (ordre, révocation) : chaque décision du DD y
- * reste, avec son auteur, sa date et son motif — sans table nouvelle.
+ * L'état se lit dans le journal (ouverture, fermeture, demande, refus) : chaque
+ * décision y reste, avec son auteur, sa date et son motif — sans table nouvelle.
+ * Les noms d'actions (« ORDRE_CORRECTION_CHEF »…) datent de la première version.
  */
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient, Role } from "@prisma/client";
 import type { Transactionnelle } from "@/lib/dbCloisonne";
 import type { Periode } from "../periodes/calendrier";
 import { libelleCourt } from "../periodes/calendrier";
 import { SECTIONS_CIRCUIT, RefusCircuit, annulerValidationSection, etatCircuit } from "./circuit";
 import { notifierEvenement } from "@/server/notifications/evenements";
+import { listerArrondissements, graphieCanevas } from "@/lib/arrondissements";
 
+/** L'ouverture de la révision d'une section. */
 export const ACTION_ORDRE = "ORDRE_CORRECTION_CHEF";
-/** Les chefs dont la correction des cases des arrondissements demande l'ordre du DD. */
+/** Les chefs dont la révision des tableaux des arrondissements s'ouvre par le DD. */
 export const CHEFS_SOUS_ORDRE = ["CHEF_PSA", "CHEF_SSV", "CHEF_SPAIH"];
+/** La fermeture de la révision d'une section. */
 export const ACTION_REVOCATION = "REVOCATION_ORDRE_CORRECTION_CHEF";
+/** La demande d'ouverture, par le chef. */
+export const ACTION_DEMANDE = "DEMANDE_ORDRE_CORRECTION";
+/** Le refus de la demande, par le DD. */
+export const ACTION_REFUS = "REFUS_DEMANDE_ORDRE_CORRECTION";
 
 export interface OrdreCorrection {
   /** « PSA ». */
@@ -45,16 +54,20 @@ export interface OrdreCorrection {
 }
 
 const cleTrimestre = (p: Periode) => `${p.annee}-${p.rang}`;
+const sectionDe = (code: string) => SECTIONS_CIRCUIT.find((x) => x.code === code);
 
-/** Les ordres EN COURS pour ce trimestre, par rôle de chef. */
-export async function ordresEnCours(db: PrismaClient, periode: Periode): Promise<Map<string, OrdreCorrection>> {
-  const lignes = await db.auditLog.findMany({
-    where: { action: { in: [ACTION_ORDRE, ACTION_REVOCATION] }, entite: "Trimestre", entiteId: cleTrimestre(periode) },
+async function journal(db: PrismaClient, periode: Periode, actions: string[]) {
+  return db.auditLog.findMany({
+    where: { action: { in: actions }, entite: "Trimestre", entiteId: cleTrimestre(periode) },
     orderBy: { createdAt: "asc" },
-    select: { action: true, details: true, createdAt: true, user: { select: { nom: true } } },
+    select: { action: true, details: true, createdAt: true, user: { select: { nom: true, username: true } } },
   });
+}
+
+/** Les révisions OUVERTES pour ce trimestre, par rôle de chef. */
+export async function ordresEnCours(db: PrismaClient, periode: Periode): Promise<Map<string, OrdreCorrection>> {
   const ordres = new Map<string, OrdreCorrection>();
-  for (const l of lignes) {
+  for (const l of await journal(db, periode, [ACTION_ORDRE, ACTION_REVOCATION])) {
     const d = l.details as { chef?: string; section?: string; motif?: string } | null;
     if (!d?.chef) continue;
     if (l.action === ACTION_REVOCATION) ordres.delete(d.chef);
@@ -63,13 +76,33 @@ export async function ordresEnCours(db: PrismaClient, periode: Periode): Promise
   return ordres;
 }
 
-/** Ce chef a-t-il, pour ce trimestre, l'ordre du DD de corriger ? */
+/** La révision de la section de ce chef est-elle ouverte, pour ce trimestre ? */
 export async function aOrdreDeCorrection(db: PrismaClient, periode: Periode, chef: string): Promise<boolean> {
   if (!CHEFS_SOUS_ORDRE.includes(chef)) return false;
   return (await ordresEnCours(db, periode)).has(chef);
 }
 
-/** Le DD ordonne à un chef de corriger les tableaux de sa section, pour ce trimestre. */
+/** Les arrondissements dont le DA n'a pas encore déposé le rapport. Vide : la révision peut s'ouvrir. */
+export async function depotsManquants(db: PrismaClient, periode: Periode): Promise<string[]> {
+  return (await etatCircuit(db, periode)).arrondissements.filter((a) => a.statut !== "TRANSMIS").map((a) => a.nom);
+}
+
+export const messageDepotsManquants = (manquants: string[]) =>
+  `La révision s'ouvre après le dépôt des rapports de tous les DA. Pas encore déposé : ${manquants.join(", ")}.`;
+
+async function exigerDepots(db: PrismaClient, periode: Periode) {
+  const manquants = await depotsManquants(db, periode);
+  if (manquants.length) throw new RefusCircuit(messageDepotsManquants(manquants));
+}
+
+const MOTIF_PAR_DEFAUT = "Révision des tableaux de la section, après le dépôt des rapports des DA.";
+
+async function notifierSection(db: PrismaClient, code: string, saufUserId: string, declencheur: string, message: string, lien: string) {
+  const s = await db.section.findFirst({ where: { code }, select: { id: true } });
+  if (s) await notifierEvenement(db, { sectionId: s.id, saufUserId }, { declencheur, message, lien });
+}
+
+/** Le DD ouvre la révision des tableaux d'une section, pour ce trimestre. */
 export async function donnerOrdreCorrection(
   db: PrismaClient,
   transaction: Transactionnelle,
@@ -79,14 +112,15 @@ export async function donnerOrdreCorrection(
   motif: string,
   auteurId: string
 ): Promise<{ validationAnnulee: boolean }> {
-  const s = SECTIONS_CIRCUIT.find((x) => x.code === section);
+  const s = sectionDe(section);
   if (!s) throw new RefusCircuit("Section inconnue.");
-  if (!CHEFS_SOUS_ORDRE.includes(s.chef)) throw new RefusCircuit("Le chef BAC complète et corrige déjà librement les tableaux du BAC : aucun ordre n'est nécessaire.");
-  const m = motif.trim();
-  if (!m) throw new RefusCircuit("Indiquez le motif : ce que le chef doit corriger, et pourquoi.");
-  if ((await ordresEnCours(db, periode)).has(s.chef)) throw new RefusCircuit("Un ordre de correction est déjà en cours pour ce chef.");
+  if (!CHEFS_SOUS_ORDRE.includes(s.chef)) throw new RefusCircuit("Le chef BAC complète et corrige déjà librement les tableaux du BAC : il n'y a pas de révision à ouvrir.");
+  if ((await ordresEnCours(db, periode)).has(s.chef)) throw new RefusCircuit(`La révision est déjà ouverte pour la section ${section}.`);
+  await exigerDepots(db, periode);
+  const demande = (await demandesEnCours(db, periode)).get(s.chef);
+  const m = motif.trim() || demande?.motif || MOTIF_PAR_DEFAUT;
 
-  // La validation du domaine tombe : on ne finalise pas sur des chiffres en cours de correction.
+  // La validation de la section tombe : on ne finalise pas sur des chiffres en cours de révision.
   const etat = await etatCircuit(db, periode);
   const validee = etat.sections.find((x) => x.code === section)?.statut === "VALIDE";
   if (validee) await annulerValidationSection(transaction, periodeId, section);
@@ -97,47 +131,167 @@ export async function donnerOrdreCorrection(
       action: ACTION_ORDRE,
       entite: "Trimestre",
       entiteId: cleTrimestre(periode),
-      details: { chef: s.chef, section, motif: m, periode: libelleCourt(periode), validationAnnulee: validee },
+      details: { chef: s.chef, section, motif: m, periode: libelleCourt(periode), validationAnnulee: validee, aLaDemande: Boolean(demande) },
     },
   });
-  const sectionEnBase = await db.section.findFirst({ where: { code: section }, select: { id: true } });
-  if (sectionEnBase) {
-    await notifierEvenement(db, { sectionId: sectionEnBase.id, saufUserId: auteurId }, {
-      declencheur: ACTION_ORDRE,
-      message:
-        `Le Délégué départemental vous demande de corriger les tableaux de votre section (${libelleCourt(periode)}) — motif : ${m}.` +
-        (validee ? " Votre validation est levée : validez à nouveau une fois les corrections faites." : ""),
-      lien: "/trimestre/saisie",
-    });
-  }
+  await notifierSection(
+    db,
+    section,
+    auteurId,
+    ACTION_ORDRE,
+    `Le Délégué départemental a ouvert la révision des tableaux de votre section (${libelleCourt(periode)}) — ${m} ` +
+      "Vous pouvez corriger les tableaux de votre section, pour tous les arrondissements. Validez votre section une fois fini : la révision se fermera." +
+      (validee ? " Votre validation est levée." : ""),
+    "/trimestre/saisie"
+  );
   return { validationAnnulee: validee };
 }
 
-/** Le DD révoque l'ordre : le chef ne corrige plus les cases remplies par les arrondissements. */
-export async function revoquerOrdreCorrection(db: PrismaClient, periode: Periode, section: string, auteurId: string) {
-  const s = SECTIONS_CIRCUIT.find((x) => x.code === section);
-  if (!s) throw new RefusCircuit("Section inconnue.");
-  if (!(await ordresEnCours(db, periode)).has(s.chef)) throw new RefusCircuit("Aucun ordre de correction en cours pour ce chef.");
-  await db.auditLog.create({
-    data: { userId: auteurId, action: ACTION_REVOCATION, entite: "Trimestre", entiteId: cleTrimestre(periode), details: { chef: s.chef, section, periode: libelleCourt(periode) } },
+/** Le DD ouvre la révision pour toutes les sections techniques d'un coup. Rend les sections ouvertes. */
+export async function ouvrirRevisionPourTous(
+  db: PrismaClient,
+  transaction: Transactionnelle,
+  periodeId: string,
+  periode: Periode,
+  motif: string,
+  auteurId: string
+): Promise<string[]> {
+  await exigerDepots(db, periode);
+  const ouvertes = await ordresEnCours(db, periode);
+  const aOuvrir = SECTIONS_CIRCUIT.filter((s) => CHEFS_SOUS_ORDRE.includes(s.chef) && !ouvertes.has(s.chef));
+  if (aOuvrir.length === 0) throw new RefusCircuit("La révision est déjà ouverte pour toutes les sections.");
+  for (const s of aOuvrir) await donnerOrdreCorrection(db, transaction, periodeId, periode, s.code, motif, auteurId);
+  return aOuvrir.map((s) => s.code);
+}
+
+// ------------------------------------------------------------------ bilan
+
+/** Ce que le chef a changé pendant sa révision : en tout, et par arrondissement. */
+export interface BilanRevision {
+  cases: number;
+  tableaux: number[];
+  parArrondissement: Record<string, { cases: number; tableaux: number[] }>;
+}
+
+const ACTIONS_REVISION = [
+  "SAISIE_TRIMESTRIELLE",
+  "EFFACEMENT_SAISIE_TRIMESTRIELLE",
+  "CORRECTION_CASE_TRIMESTRE",
+  "CORRECTION_CASE_TRIMESTRE_MODIFIEE",
+  "CORRECTION_CASE_TRIMESTRE_ANNULEE",
+  "CORRECTION_AN_PASSE",
+];
+
+/** Le bilan de la révision d'un chef depuis son ouverture, lu au journal. */
+export async function bilanRevision(db: PrismaClient, periode: Periode, chef: string, depuis: Date): Promise<BilanRevision> {
+  const lignes = await db.auditLog.findMany({
+    where: { action: { in: ACTIONS_REVISION }, createdAt: { gte: depuis }, user: { role: chef as Role } },
+    select: { details: true },
   });
-  const sectionEnBase = await db.section.findFirst({ where: { code: section }, select: { id: true } });
-  if (sectionEnBase) {
-    await notifierEvenement(db, { sectionId: sectionEnBase.id, saufUserId: auteurId }, {
+  const cles = new Set<string>();
+  const tableaux = new Set<number>();
+  const parArr = new Map<string, { cles: Set<string>; tableaux: Set<number> }>();
+  for (const l of lignes) {
+    const d = l.details as { annee?: number; trimestre?: number; numeroTableau?: number; ligne?: string; colonne?: string; arrondissement?: string; liste?: string } | null;
+    if (!d || d.annee !== periode.annee || d.trimestre !== periode.rang || d.numeroTableau == null) continue;
+    const cle = `${d.numeroTableau}|${d.ligne}|${d.colonne}|${d.liste ?? ""}`;
+    cles.add(cle);
+    tableaux.add(d.numeroTableau);
+    const arr = d.arrondissement ?? d.liste;
+    if (arr) {
+      const a = parArr.get(arr) ?? { cles: new Set<string>(), tableaux: new Set<number>() };
+      a.cles.add(cle);
+      a.tableaux.add(d.numeroTableau);
+      parArr.set(arr, a);
+    }
+  }
+  const trier = (s: Set<number>) => Array.from(s).sort((x, y) => x - y);
+  return {
+    cases: cles.size,
+    tableaux: trier(tableaux),
+    parArrondissement: Object.fromEntries(Array.from(parArr, ([nom, a]) => [nom, { cases: a.cles.size, tableaux: trier(a.tableaux) }])),
+  };
+}
+
+const enClair = (b: { cases: number; tableaux: number[] }) =>
+  b.cases === 0
+    ? "aucune case modifiée"
+    : `${b.cases} case${b.cases > 1 ? "s" : ""} modifiée${b.cases > 1 ? "s" : ""} — tableau${b.tableaux.length > 1 ? "x" : ""} n° ${b.tableaux.join(", ")}`;
+
+/**
+ * Ferme la révision d'une section : par le DD (cause « DD »), ou d'elle-même
+ * quand la section est validée (cause « validation »). Chaque DA concerné reçoit
+ * le bilan de ce qui a changé chez lui. Rend le bilan, ou null si rien n'était ouvert.
+ */
+export async function revoquerOrdreCorrection(
+  db: PrismaClient,
+  periode: Periode,
+  section: string,
+  auteurId: string,
+  cause: "DD" | "validation" = "DD"
+): Promise<BilanRevision | null> {
+  const s = sectionDe(section);
+  if (!s) throw new RefusCircuit("Section inconnue.");
+  const o = (await ordresEnCours(db, periode)).get(s.chef);
+  if (!o) {
+    if (cause === "validation") return null;
+    throw new RefusCircuit(`La révision n'est pas ouverte pour la section ${section}.`);
+  }
+  const bilan = await bilanRevision(db, periode, s.chef, new Date(o.le));
+  await db.auditLog.create({
+    data: {
+      userId: auteurId,
+      action: ACTION_REVOCATION,
+      entite: "Trimestre",
+      entiteId: cleTrimestre(periode),
+      details: { chef: s.chef, section, periode: libelleCourt(periode), cause, cases: bilan.cases, tableaux: bilan.tableaux },
+    },
+  });
+  if (cause === "DD") {
+    await notifierSection(
+      db,
+      section,
+      auteurId,
+      ACTION_REVOCATION,
+      `Le Délégué départemental a fermé la révision des tableaux de votre section (${libelleCourt(periode)}) : ${enClair(bilan)}.`,
+      "/trimestre/circuit"
+    );
+  } else {
+    await notifierEvenement(db, { roles: ["DD"], saufUserId: auteurId }, {
       declencheur: ACTION_REVOCATION,
-      message: `Le Délégué départemental a levé l'ordre de correction des tableaux de votre section (${libelleCourt(periode)}).`,
+      message: `Section ${section} validée : la révision des tableaux est close (${libelleCourt(periode)}) — ${enClair(bilan)}.`,
       lien: "/trimestre/circuit",
     });
   }
+  // Chaque DA apprend ce que le chef a changé dans SES tableaux.
+  const arrondissements = await listerArrondissements(db);
+  for (const [nom, b] of Object.entries(bilan.parArrondissement)) {
+    const arr = arrondissements.find((a) => a.nom === nom || a.nomCanevas === graphieCanevas(nom));
+    if (!arr) continue;
+    await notifierEvenement(db, { arrondissementId: arr.id, saufUserId: auteurId }, {
+      declencheur: "BILAN_REVISION_CHEF",
+      message:
+        `Révision du chef ${section} (${libelleCourt(periode)}) : ${b.cases} case${b.cases > 1 ? "s" : ""} de vos tableaux modifiée${b.cases > 1 ? "s" : ""} ` +
+        `(tableau${b.tableaux.length > 1 ? "x" : ""} n° ${b.tableaux.join(", ")}). Le détail est au journal d'activité.`,
+      lien: "/trimestre/saisie",
+    });
+  }
+  return bilan;
 }
 
-/**
- * LA DEMANDE D'ORDRE (21 octobre 2026) : le chef de section demande lui-même
- * au DD l'ordre de corriger — par exemple quand le vrai chiffre manque au
- * mensuel. Le DD est prévenu et la voit à l'écran du circuit ; il donne
- * l'ordre (ou non). Une demande tombe dès que l'ordre est donné ou révoqué.
- */
-export const ACTION_DEMANDE = "DEMANDE_ORDRE_CORRECTION";
+/** Le DD ferme toutes les révisions ouvertes. Rend les sections fermées. */
+export async function fermerRevisionPourTous(db: PrismaClient, periode: Periode, auteurId: string): Promise<string[]> {
+  const ouvertes = await ordresEnCours(db, periode);
+  if (ouvertes.size === 0) throw new RefusCircuit("Aucune révision n'est ouverte.");
+  const fermees: string[] = [];
+  for (const o of Array.from(ouvertes.values())) {
+    await revoquerOrdreCorrection(db, periode, o.section, auteurId);
+    fermees.push(o.section);
+  }
+  return fermees;
+}
+
+// ------------------------------------------------------------------ demandes
 
 export interface DemandeOrdre {
   chef: string;
@@ -149,41 +303,56 @@ export interface DemandeOrdre {
 
 /** Les demandes en attente pour ce trimestre, par rôle de chef. */
 export async function demandesEnCours(db: PrismaClient, periode: Periode): Promise<Map<string, DemandeOrdre>> {
-  const lignes = await db.auditLog.findMany({
-    where: { action: { in: [ACTION_DEMANDE, ACTION_ORDRE, ACTION_REVOCATION] }, entite: "Trimestre", entiteId: cleTrimestre(periode) },
-    orderBy: { createdAt: "asc" },
-    select: { action: true, details: true, createdAt: true, user: { select: { nom: true, username: true } } },
-  });
   const demandes = new Map<string, DemandeOrdre>();
-  for (const l of lignes) {
+  for (const l of await journal(db, periode, [ACTION_DEMANDE, ACTION_ORDRE, ACTION_REVOCATION, ACTION_REFUS])) {
     const d = l.details as { chef?: string; section?: string; motif?: string } | null;
     if (!d?.chef) continue;
     if (l.action === ACTION_DEMANDE) {
       demandes.set(d.chef, { chef: d.chef, section: d.section ?? "", motif: d.motif ?? "", le: l.createdAt.toISOString(), auteur: l.user?.nom?.trim() || l.user?.username || null });
     } else {
-      demandes.delete(d.chef); // l'ordre donné, ou révoqué, répond à la demande
+      demandes.delete(d.chef); // ouverte, fermée ou refusée : la demande a sa réponse
     }
   }
   return demandes;
 }
 
-/** Le chef demande au DD l'ordre de corriger les tableaux de sa section, pour ce trimestre. */
+/** Le chef demande au DD d'ouvrir la révision des tableaux de sa section. */
 export async function demanderOrdreCorrection(db: PrismaClient, periode: Periode, chef: string, motif: string, auteurId: string) {
   const s = SECTIONS_CIRCUIT.find((x) => x.chef === chef);
-  if (!s || !CHEFS_SOUS_ORDRE.includes(chef)) throw new RefusCircuit("Seul un chef de section technique (PSA, SSV, SPAIH) demande un ordre de correction.");
-  const m = motif.trim();
-  if (m.length < 5) throw new RefusCircuit("Dites au DD ce que vous voulez corriger, et pourquoi.");
-  if ((await ordresEnCours(db, periode)).has(chef)) throw new RefusCircuit("Vous avez déjà l'ordre de corriger ce trimestre.");
+  if (!s || !CHEFS_SOUS_ORDRE.includes(chef)) throw new RefusCircuit("Seul un chef de section technique (PSA, SSV, SPAIH) demande la révision.");
+  if ((await ordresEnCours(db, periode)).has(chef)) throw new RefusCircuit("La révision de votre section est déjà ouverte.");
+  if ((await demandesEnCours(db, periode)).has(chef)) throw new RefusCircuit("Votre demande est déjà chez le DD : il vous répondra.");
+  await exigerDepots(db, periode);
+  const m = motif.trim() || "Je souhaite réviser les tableaux de ma section.";
   await db.auditLog.create({
     data: { userId: auteurId, action: ACTION_DEMANDE, entite: "Trimestre", entiteId: cleTrimestre(periode), details: { chef, section: s.code, motif: m, periode: libelleCourt(periode) } },
   });
   await notifierEvenement(db, { roles: ["DD"], saufUserId: auteurId }, {
     declencheur: ACTION_DEMANDE,
-    message: `Le chef ${s.code} vous demande l'ordre de corriger les tableaux de sa section (${libelleCourt(periode)}) — motif : ${m}`,
+    message: `Le chef ${s.code} vous demande d'ouvrir la révision des tableaux de sa section (${libelleCourt(periode)}) — ${m}`,
     lien: "/trimestre/circuit",
   });
 }
 
+/** Le DD refuse la demande d'un chef — le chef est prévenu, avec le motif. */
+export async function refuserDemande(db: PrismaClient, periode: Periode, section: string, motif: string, auteurId: string) {
+  const s = sectionDe(section);
+  if (!s) throw new RefusCircuit("Section inconnue.");
+  if (!(await demandesEnCours(db, periode)).has(s.chef)) throw new RefusCircuit(`Aucune demande du chef ${section} n'attend de réponse.`);
+  const m = motif.trim();
+  await db.auditLog.create({
+    data: { userId: auteurId, action: ACTION_REFUS, entite: "Trimestre", entiteId: cleTrimestre(periode), details: { chef: s.chef, section, motif: m, periode: libelleCourt(periode) } },
+  });
+  await notifierSection(
+    db,
+    section,
+    auteurId,
+    ACTION_REFUS,
+    `Le Délégué départemental n'a pas ouvert la révision de votre section (${libelleCourt(periode)})${m ? ` — ${m}` : ""}. Signalez à l'arrondissement ce qui ne va pas.`,
+    "/trimestre/circuit"
+  );
+}
+
 export const MESSAGE_SANS_ORDRE =
-  "Cette case a été remplie par l'arrondissement : vous ne la corrigez que sur ordre du Délégué départemental. " +
-  "Touchez « Signaler une case à l'arrondissement » pour la lui faire corriger, ou demandez au DD un ordre de correction.";
+  "Cette case appartient à l'arrondissement : vous ne la modifiez que pendant la révision ouverte par le Délégué départemental. " +
+  "Touchez la case pour la signaler à l'arrondissement, ou demandez au DD d'ouvrir la révision.";
