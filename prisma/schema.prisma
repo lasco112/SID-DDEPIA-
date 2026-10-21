@@ -150,6 +150,7 @@ model Departement {
   textesDepartement      TexteDepartement[]
   photosEtablissements   PhotoEtablissement[]
   collectes              CollecteCampagne[]
+  correctionsTrimestre   CorrectionTrimestre[]
 
   @@index([regionId])
 }
@@ -337,6 +338,41 @@ model Etablissement {
   @@index([arrondissementId, typeCode, actif])
 }
 
+/// Une CORRECTION AU TRIMESTRE d'une case calculée à partir du mensuel
+/// (décision du Délégué, 21 octobre 2026) : quand le chiffre réel manque au
+/// mensuel (vaccinations, consultations, circulation, pisciculture…), le chef
+/// de la section l'inscrit, SUR ORDRE DU DD, avec son motif et sa source. Le
+/// SID l'applique en rassemblant les chiffres : totaux, écarts, autres tableaux
+/// du même champ, semestre et année suivent. Le mensuel n'est pas modifié.
+model CorrectionTrimestre {
+  departementId String?
+  departement   Departement? @relation(fields: [departementId], references: [id])
+
+  id              String   @id @default(cuid())
+  /// Le trimestre (PeriodeReporting TRIMESTRIEL).
+  periodeId       String
+  numeroTableau   Int
+  /// Les coordonnées de la case dans le canevas.
+  ligne           String
+  colonne         String
+  valeur          Float
+  /// Ce que donnait le mensuel au moment de la correction (null : rien).
+  /// S'il change ensuite, le SID le signale : la correction est à confirmer.
+  valeurMensuelle Float?
+  motif           String   @db.Text
+  /// D'où vient le vrai chiffre : registre du poste, fiche de campagne…
+  source          String
+  auteurId        String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  /// Une purge du trimestre emporte ses corrections (elles n'ont pas de sens seules).
+  periode PeriodeReporting @relation(fields: [periodeId], references: [id], onDelete: Cascade)
+
+  @@unique([periodeId, numeroTableau, ligne, colonne])
+  @@index([periodeId])
+}
+
 /// Une COLLECTE PONCTUELLE (21 octobre 2026) : le DD lance une petite collecte
 /// — le recensement des marchés, par exemple — comme activité prioritaire,
 /// pour des arrondissements et des rôles, entre deux dates. Les agents la
@@ -447,6 +483,7 @@ model PeriodeReporting {
   saisiesCanevas SaisieCanevas[]
   analyses       AnalyseCanevas[]
   circuit        CircuitTrimestre[]
+  correctionsTrimestre CorrectionTrimestre[]
 
   @@unique([type, annee, mois, trimestre, semestre])
   @@index([statut, dateLimiteDA])

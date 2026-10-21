@@ -58,6 +58,9 @@ export const PROTECTED_PREFIXES: Array<{ prefix: string; roles: string[] }> = [
   // Corriger un chiffre de l'an passé après transmission (15 octobre 2026) :
   // DA, chefs de section et DD — pas l'agent de saisie. Droits fins dans la route.
   { prefix: "/api/trimestre/an-passe", roles: ["DD", "DA", ...CHEF_ROLES] },
+  // Corriger au trimestre une case calculée (21 octobre 2026) : le chef de la
+  // section, sur ordre du DD — vérifié dans la route.
+  { prefix: "/api/trimestre/correction-case", roles: CHEF_ROLES },
   // Analyses du trimestre : l'agent valide pour son arrondissement, le chef de
   // section pour son domaine ; le DA et le DD relisent. Le ressort de chacun
   // est vérifié dans la route. AVANT la règle générale "/trimestre".

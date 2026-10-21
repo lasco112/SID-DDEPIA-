@@ -23,7 +23,15 @@ export interface ControleCategories {
   total: number;
   ecart: number;
   regle: "DERNIERE_VALEUR" | "SOMME";
-  mois: { periodeId: string | null; libelle: string; valeur: number | null; retenu: boolean; statutRapport: string | null }[];
+  mois: {
+    periodeId: string | null;
+    libelle: string;
+    valeur: number | null;
+    retenu: boolean;
+    statutRapport: string | null;
+    /** Listes du mensuel : inscrit dans un rapport pas encore transmis. */
+    enAttente?: number | null;
+  }[];
   mensuel: { code: string; numero: string; titre: string } | null;
 }
 

@@ -131,6 +131,59 @@ export async function revoquerOrdreCorrection(db: PrismaClient, periode: Periode
   }
 }
 
+/**
+ * LA DEMANDE D'ORDRE (21 octobre 2026) : le chef de section demande lui-même
+ * au DD l'ordre de corriger — par exemple quand le vrai chiffre manque au
+ * mensuel. Le DD est prévenu et la voit à l'écran du circuit ; il donne
+ * l'ordre (ou non). Une demande tombe dès que l'ordre est donné ou révoqué.
+ */
+export const ACTION_DEMANDE = "DEMANDE_ORDRE_CORRECTION";
+
+export interface DemandeOrdre {
+  chef: string;
+  section: string;
+  motif: string;
+  le: string;
+  auteur: string | null;
+}
+
+/** Les demandes en attente pour ce trimestre, par rôle de chef. */
+export async function demandesEnCours(db: PrismaClient, periode: Periode): Promise<Map<string, DemandeOrdre>> {
+  const lignes = await db.auditLog.findMany({
+    where: { action: { in: [ACTION_DEMANDE, ACTION_ORDRE, ACTION_REVOCATION] }, entite: "Trimestre", entiteId: cleTrimestre(periode) },
+    orderBy: { createdAt: "asc" },
+    select: { action: true, details: true, createdAt: true, user: { select: { nom: true, username: true } } },
+  });
+  const demandes = new Map<string, DemandeOrdre>();
+  for (const l of lignes) {
+    const d = l.details as { chef?: string; section?: string; motif?: string } | null;
+    if (!d?.chef) continue;
+    if (l.action === ACTION_DEMANDE) {
+      demandes.set(d.chef, { chef: d.chef, section: d.section ?? "", motif: d.motif ?? "", le: l.createdAt.toISOString(), auteur: l.user?.nom?.trim() || l.user?.username || null });
+    } else {
+      demandes.delete(d.chef); // l'ordre donné, ou révoqué, répond à la demande
+    }
+  }
+  return demandes;
+}
+
+/** Le chef demande au DD l'ordre de corriger les tableaux de sa section, pour ce trimestre. */
+export async function demanderOrdreCorrection(db: PrismaClient, periode: Periode, chef: string, motif: string, auteurId: string) {
+  const s = SECTIONS_CIRCUIT.find((x) => x.chef === chef);
+  if (!s || !CHEFS_SOUS_ORDRE.includes(chef)) throw new RefusCircuit("Seul un chef de section technique (PSA, SSV, SPAIH) demande un ordre de correction.");
+  const m = motif.trim();
+  if (m.length < 5) throw new RefusCircuit("Dites au DD ce que vous voulez corriger, et pourquoi.");
+  if ((await ordresEnCours(db, periode)).has(chef)) throw new RefusCircuit("Vous avez déjà l'ordre de corriger ce trimestre.");
+  await db.auditLog.create({
+    data: { userId: auteurId, action: ACTION_DEMANDE, entite: "Trimestre", entiteId: cleTrimestre(periode), details: { chef, section: s.code, motif: m, periode: libelleCourt(periode) } },
+  });
+  await notifierEvenement(db, { roles: ["DD"], saufUserId: auteurId }, {
+    declencheur: ACTION_DEMANDE,
+    message: `Le chef ${s.code} vous demande l'ordre de corriger les tableaux de sa section (${libelleCourt(periode)}) — motif : ${m}`,
+    lien: "/trimestre/circuit",
+  });
+}
+
 export const MESSAGE_SANS_ORDRE =
   "Cette case a été remplie par l'arrondissement : vous ne la corrigez que sur ordre du Délégué départemental. " +
   "Touchez « Signaler une case à l'arrondissement » pour la lui faire corriger, ou demandez au DD un ordre de correction.";

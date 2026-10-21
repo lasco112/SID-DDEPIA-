@@ -32,7 +32,7 @@ import { numerosSansMaille, TABLEAUX_BAC, chefDeSection } from "./canevas/sectio
 import { preparer, fournisseur, estCaseCalculee, estCaseHistorique, valeurReprise, versNombre } from "./remplissage";
 import { REPRISES, repriseDe } from "./canevas/reprises";
 import { champsMobilises, liaisonDe, estLiee, type Formule } from "./liaison";
-import { liaisonEvenementDe } from "./evenements";
+import { liaisonEvenementDe, detailEvenementCase } from "./evenements";
 import { listerArrondissements, graphieCanevas } from "@/lib/arrondissements";
 import { identiteDepartement } from "@/lib/departement";
 import { observationsTrimestre } from "@/server/observationsTrimestre";
@@ -402,6 +402,8 @@ export interface CaseGrille {
   propose: string | null;
   /** Chef de section : case remplie par l'arrondissement — à signaler, pas à modifier. */
   reservee?: boolean;
+  /** Case calculée, corrigée au trimestre par le chef de section, sur ordre du DD. */
+  corrigee?: CorrectionDeCase;
   /**
    * Case « TOTAL {P-1} » que ce profil doit remplir lui-même — le SID n'a pas
    * encore la même période de l'an passé (reprise d'historique). OBLIGATOIRE
@@ -643,6 +645,43 @@ export function messageAnPasseManquant(manquants: AnPasseManquant[], periodeN1: 
   );
 }
 
+/**
+ * La correction au trimestre d'une case, telle que l'écran la montre : le
+ * chiffre corrigé, ce que donnait le mensuel au moment de la correction et ce
+ * qu'il donne aujourd'hui. `conflit` : le mensuel a changé depuis — la
+ * correction est à confirmer ou à annuler.
+ */
+export interface CorrectionDeCase {
+  id: string;
+  valeur: number;
+  valeurMensuelle: number | null;
+  mensuelActuel: number | null;
+  motif: string;
+  source: string;
+  le: string;
+  auteurId: string | null;
+  conflit: boolean;
+}
+
+const memeChiffre = (a: number | null, b: number | null) => (a == null || b == null ? a == null && b == null : Math.abs(a - b) < 1e-6);
+
+export function correctionDeCase(donnees: Awaited<ReturnType<typeof preparer>>, numero: number, ligne: string, colonne: string): CorrectionDeCase | null {
+  const c = donnees.corrections.find((x) => x.numeroTableau === numero && x.ligne === ligne && x.colonne === colonne);
+  if (!c) return null;
+  const mensuelActuel = donnees.basesCorrigees.get(`${numero} | ${ligne} | ${colonne}`) ?? null;
+  return {
+    id: c.id,
+    valeur: c.valeur,
+    valeurMensuelle: c.valeurMensuelle,
+    mensuelActuel,
+    motif: c.motif,
+    source: c.source,
+    le: c.updatedAt.toISOString(),
+    auteurId: c.auteurId,
+    conflit: !memeChiffre(c.valeurMensuelle, mensuelActuel),
+  };
+}
+
 function construireGrille(
   bloc: BlocTableau,
   section: string,
@@ -669,8 +708,11 @@ function construireGrille(
       // DD (20 octobre 2026). Le chef BAC garde sa liberté : il complète et
       // corrige les tableaux du BAC.
       const reservee = etat === "saisie" && estChefTechnique(profil.role) && !ordreCorrection && remplieParLArrondissement(s);
+      // Une case calculée, corrigée au trimestre par le chef de section (21 octobre 2026).
+      const corrigee = etat === "calculee" ? correctionDeCase(donnees, numero, cle, colonne) : null;
       return {
         colonne,
+        ...(corrigee ? { corrigee } : {}),
         texte: !attendUnNombre(colonne),
         propose: reprise == null ? null : String(reprise),
         etat: reservee ? ("lecture" as const) : etat,
@@ -788,6 +830,21 @@ function verifierGrille(
       sortie.push({
         genre: "erreur",
         texte: `${l.libelle || l.cle}, « ${c.colonne} » : « ${c.saisi} » n'est pas un nombre — il ne compte dans aucun total.`,
+        cases: [{ ligne: l.cle, colonne: c.colonne }],
+      });
+    }
+  }
+
+  // Une correction au trimestre dont le mensuel a changé depuis : à confirmer ou à annuler (bloquant).
+  const nb = (v: number | null) => (v == null ? "rien" : nf(v));
+  for (const l of lignes) {
+    for (const c of l.cases) {
+      if (!c.corrigee?.conflit) continue;
+      sortie.push({
+        genre: "erreur",
+        texte:
+          `${l.libelle || l.cle}, « ${c.colonne} » : corrigé au trimestre à ${nf(c.corrigee.valeur)} ; le mensuel donnait ${nb(c.corrigee.valeurMensuelle)} ` +
+          `au moment de la correction, il donne maintenant ${nb(c.corrigee.mensuelActuel)}. Le chef de section confirme sa correction ou l'annule.`,
         cases: [{ ligne: l.cle, colonne: c.colonne }],
       });
     }
@@ -1151,7 +1208,11 @@ export interface ControleCategories {
     retenu: boolean;
     /** Le rapport mensuel de l'arrondissement : EN_SAISIE, SOUMIS, REJETE, CLOTURE — ou null s'il n'existe pas. */
     statutRapport: string | null;
+    /** Listes du mensuel : inscrit dans un rapport pas encore transmis, qui comptera à sa transmission. */
+    enAttente?: number | null;
   }[];
+  /** Listes du mensuel : les lignes que le SID n'a pas su ranger, mois par mois. */
+  nonClassees?: { mois: string; ligne: string; quantite: number | null }[];
   /** Le tableau du rapport mensuel qui porte ce total : pour l'ouvrir. */
   mensuel: { code: string; numero: string; titre: string } | null;
 }
@@ -1309,9 +1370,9 @@ export async function origineCase(
   const ctx = await contextePour(db, periode, profil);
   if (!estCaseCalculee(numero, ligne, colonne, ctx)) return { message: "Cette case ne vient pas des rapports mensuels." };
   const liaison = liaisonDe(numero);
-  if (!liaison) {
-    return { message: "Ce chiffre vient des listes du mensuel (vaccinations, consultations, circulation…) : vérifiez-les dans les rapports mensuels des trois mois." };
-  }
+  const evenement = liaisonEvenementDe(numero);
+  if (!liaison && evenement) return origineEvenement(db, periode, profil, ctx, numero, t.bloc.titre, ligne, colonne);
+  if (!liaison) return { message: "Cette case n'est alimentée par aucun champ du mensuel." };
   const [categorie, territoire] = liaison.orientation === "lignes" ? [colonne, ligne] : [ligne, colonne];
   if (estTotal(territoire) || /^ÉCART/i.test(territoire)) {
     return { message: "Touchez la case d'un arrondissement : le total du département additionne leurs chiffres." };
@@ -1353,6 +1414,64 @@ export async function origineCase(
       nature: categorie,
       explication: formule.explication,
       periodeLue: libelleCourt(periodeLue),
+    },
+  };
+}
+
+/**
+ * « D'où vient ce chiffre ? » pour un tableau des LISTES du mensuel
+ * (vaccinations, cliniques, circulation, lésions — 21 octobre 2026) : mois par
+ * mois, l'état du rapport, ce qui est compté, ce qui est inscrit dans un
+ * rapport pas encore transmis, et les lignes que le SID n'a pas su ranger. Le
+ * chef sait ainsi POURQUOI une ligne est vide avant de corriger quoi que ce soit.
+ */
+async function origineEvenement(
+  db: PrismaClient,
+  periode: Periode,
+  profil: Profil,
+  ctx: ContexteCanevas,
+  numero: number,
+  titre: string,
+  ligne: string,
+  colonne: string
+): Promise<{ origine: ControleCategories & { explication: string; periodeLue: string } } | { message: string }> {
+  const ev = liaisonEvenementDe(numero)!;
+  const [categorie, territoire] = ev.orientation === "lignes" ? [colonne, ligne] : [ligne, colonne];
+  if (estTotal(territoire) || /^ÉCART/i.test(territoire)) return { message: "Touchez la case d'un arrondissement : le total du département additionne leurs chiffres." };
+  if (estTotal(categorie)) return { message: "Ce total compte toutes les lignes du mensuel de l'arrondissement : touchez une case de la ligne pour voir d'où elle vient." };
+  const ressort =
+    profil.role === "DD" ||
+    (estArrondissement(profil) && territoire === profil.arrondissement) ||
+    (estChefTechnique(profil.role) && chefDuTableau(numero) === profil.role);
+  if (!ressort || !ctx.arrondissements.includes(territoire)) return { message: "Cette case n'est pas de votre ressort." };
+  const arr = (await listerArrondissements(db)).find((a) => a.nom === territoire || a.nomCanevas === graphieCanevas(territoire));
+  if (!arr) return { message: "Arrondissement inconnu." };
+  const mois = await detailEvenementCase(db, periode, numero, arr.id, categorie);
+  const libelleMois = (a: number, m: number) => `${MOIS_MAJ[m - 1].charAt(0)}${MOIS_MAJ[m - 1].slice(1).toLowerCase()} ${a}`;
+  const somme = mois.reduce((s, m) => s + (m.compte ?? 0), 0);
+  return {
+    origine: {
+      tableau: numero,
+      titreTableau: titre,
+      arrondissement: territoire,
+      nature: categorie,
+      categories: [],
+      somme,
+      total: somme,
+      ecart: 0,
+      regle: "SOMME",
+      mois: mois.map((m) => ({
+        periodeId: m.periodeId,
+        libelle: libelleMois(m.annee, m.mois),
+        valeur: m.compte,
+        retenu: m.compte != null,
+        statutRapport: m.statutRapport,
+        enAttente: m.enAttente,
+      })),
+      nonClassees: mois.flatMap((m) => m.nonClassees.map((n) => ({ mois: libelleMois(m.annee, m.mois), ...n }))),
+      mensuel: null,
+      explication: "les lignes des rapports mensuels TRANSMIS qui se rangent dans cette case, additionnées",
+      periodeLue: libelleCourt(periode),
     },
   };
 }

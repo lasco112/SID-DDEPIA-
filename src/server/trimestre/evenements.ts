@@ -486,6 +486,69 @@ function calculer(
   return resultat;
 }
 
+/**
+ * « D'OÙ VIENT CE CHIFFRE ? » pour un tableau des listes du mensuel (21 octobre
+ * 2026) : pour un arrondissement et une case, mois par mois — l'état du
+ * rapport, ce qui est compté, ce qui est inscrit mais pas encore compté (rapport
+ * non transmis), et les lignes que le SID n'a pas su ranger.
+ */
+export interface DetailMoisEvenement {
+  periodeId: string | null;
+  annee: number;
+  mois: number;
+  statutRapport: string | null;
+  /** Compté dans la case (rapport transmis). */
+  compte: number | null;
+  /** Inscrit dans un rapport pas encore transmis : il comptera à la transmission. */
+  enAttente: number | null;
+  /** Les lignes de ce mois que le SID n'a pas su ranger dans une case de ce tableau. */
+  nonClassees: { ligne: string; quantite: number | null }[];
+}
+
+export async function detailEvenementCase(
+  db: PrismaClient,
+  periode: Periode,
+  numero: number,
+  arrondissementId: string,
+  categorie: string
+): Promise<DetailMoisEvenement[]> {
+  const liaison = liaisonEvenementDe(numero);
+  if (!liaison) return [];
+  const etat = await inspecterPeriode(db, periode, { arrondissementId });
+  const sortie: DetailMoisEvenement[] = [];
+  // Les codes du référentiel (« MAL_AUTRE », « ESP_PRIMATE ») en clair pour le
+  // chef : « Autre maladie », « Primate ».
+  const referentiel = new Map((await db.referentielItem.findMany({ select: { code: true, libelle: true } })).map((r) => [r.code, r.libelle] as const));
+  const enClair = (s: string) => s.replace(/\b[A-Z]{2,6}_[A-Z0-9_]+\b/g, (code) => referentiel.get(code) ?? code);
+  for (const m of etat.mois) {
+    const ligne: DetailMoisEvenement = { periodeId: m.periodeId ?? null, annee: m.annee, mois: m.mois, statutRapport: null, compte: null, enAttente: null, nonClassees: [] };
+    sortie.push(ligne);
+    if (!m.periodeId) continue;
+    const rapport = await db.rapportArrondissement.findFirst({ where: { periodeId: m.periodeId, arrondissementId }, select: { id: true, statut: true } });
+    if (!rapport) continue;
+    ligne.statutRapport = rapport.statut;
+    const transmis = (STATUTS_TRANSMIS as readonly string[]).includes(rapport.statut);
+    const lignes = await db.saisieEvenement.findMany({
+      where: { rapportId: rapport.id, template: { code: { in: liaison.sources } } },
+      select: { payload: true, template: { select: { code: true } } },
+    });
+    for (const l of lignes) {
+      const payload = (l.payload ?? {}) as Ligne;
+      const cat = liaison.categorie(payload, l.template.code);
+      if (cat === undefined) continue;
+      const q = liaison.quantite(payload);
+      if (cat === null) {
+        ligne.nonClassees.push({ ligne: enClair(liaison.decrire(payload)), quantite: q });
+        continue;
+      }
+      if (cat !== categorie || q == null) continue;
+      if (transmis) ligne.compte = (ligne.compte ?? 0) + q;
+      else ligne.enAttente = (ligne.enAttente ?? 0) + q;
+    }
+  }
+  return sortie;
+}
+
 /** Additionne les listes mensuelles de la période et de la même période l'an passé. */
 export async function preparerEvenements(
   db: PrismaClient,

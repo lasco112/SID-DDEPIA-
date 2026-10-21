@@ -23,7 +23,7 @@ import {
   anPasseManquant, messageAnPasseManquant, nomArrondissement, erreursDeCoherence, messageErreursCoherence, type ErreurCoherence,
 } from "@/server/trimestre/saisieTrimestrielle";
 import type { Periode } from "@/server/periodes/calendrier";
-import { ordresEnCours, donnerOrdreCorrection, revoquerOrdreCorrection } from "@/server/trimestre/ordresCorrection";
+import { ordresEnCours, donnerOrdreCorrection, revoquerOrdreCorrection, demandesEnCours, demanderOrdreCorrection } from "@/server/trimestre/ordresCorrection";
 import { analysesARevoir, messageAnalysesARevoir } from "@/server/trimestre/analyse/ecranAnalyses";
 import { periodeTrimestrielle } from "@/server/trimestre/rubriques";
 import {
@@ -103,8 +103,8 @@ export async function GET(req: Request) {
             : etat.arrondissements,
       // Chaque domaine, avec l'ordre de correction du DD en cours, s'il y en a un.
       sections: await (async () => {
-        const ordres = await ordresEnCours(user.db, periode);
-        return etat.sections.map((s) => ({ ...s, ordre: ordres.get(s.chef) ?? null }));
+        const [ordres, demandes] = await Promise.all([ordresEnCours(user.db, periode), demandesEnCours(user.db, periode)]);
+        return etat.sections.map((s) => ({ ...s, ordre: ordres.get(s.chef) ?? null, demande: demandes.get(s.chef) ?? null }));
       })(),
       tousTransmis: etat.tousTransmis,
       complet: etat.complet,
@@ -194,6 +194,12 @@ export async function POST(req: Request) {
         if (!body.section) return erreur("Section non précisée.", 400);
         const r = await donnerOrdreCorrection(user.db, user.transaction, periodeId, periode, body.section, body.motif ?? "", user.id);
         details = { section: body.section, motif: body.motif, validationAnnulee: r.validationAnnulee };
+        break;
+      }
+      // Le chef demande lui-même l'ordre au DD (21 octobre 2026).
+      case "demanderOrdre": {
+        await demanderOrdreCorrection(user.db, periode, user.role, body.motif ?? "", user.id);
+        details = { chef: user.role, motif: body.motif };
         break;
       }
       case "revoquerOrdre": {

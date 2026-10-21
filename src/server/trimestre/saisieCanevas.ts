@@ -219,6 +219,10 @@ export async function saisiesVues(
  * Les chiffres venus du mensuel n'ont pas besoin de ce signal : s'ils
  * changent, le texte recalculé change, et l'analyse est déjà « à revoir ».
  */
+/** La même chose, pour une correction faite ailleurs (correction au trimestre d'une case calculée). */
+export const remettreAnalysesARevoir = (db: PrismaClient, periodeId: string, cellule: CelluleCanevas, portee: string) =>
+  analysesARevoirApresChangement(db, periodeId, cellule, portee);
+
 async function analysesARevoirApresChangement(db: PrismaClient, periodeId: string, cellule: CelluleCanevas, portee: string) {
   const portees = new Set<string>([""]);
   if (portee) portees.add(portee);

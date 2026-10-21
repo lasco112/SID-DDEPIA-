@@ -24,6 +24,7 @@ import { listerArrondissements, graphieCanevas } from "../../lib/arrondissements
 import { saisiesVues, cleCellule, type ValeurCellule } from "./saisieCanevas";
 import { numerosSansMaille } from "./canevas/sections";
 import { preparerEvenements, liaisonEvenementDe, type DonneesEvenements } from "./evenements";
+import { lireCorrections, appliquerCorrections, type CorrectionLue, type Surcharges } from "./correctionsTrimestre";
 
 const nf = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 3 });
 
@@ -73,6 +74,17 @@ export interface DonneesRemplissage {
    * ignore) et les tableaux saisis sans règle de calcul. Vides au trimestre.
    */
   consolidation: { trimestresSansSaisie: string[]; sansRegle: number[] };
+  /**
+   * Les CORRECTIONS AU TRIMESTRE des cases calculées (correctionsTrimestre.ts),
+   * déjà appliquées aux chiffres ci-dessus. `corrections` : celles de la période
+   * elle-même (un trimestre), pour l'écran ; `basesCorrigees` : ce que donnait
+   * le mensuel avant correction, par case.
+   */
+  corrections: CorrectionLue[];
+  basesCorrigees: Map<string, number | null>;
+  /** Les cases formules à plusieurs champs corrigées case par case (poissons de table). */
+  surcharges: Surcharges;
+  surchargesN1: Surcharges;
 }
 
 /**
@@ -92,8 +104,44 @@ export async function preparer(
      * saisi n'a besoin que des saisies : inutile d'agréger tout le trimestre.
      */
     sansAgregation?: boolean;
+    /** Les chiffres du mensuel SEULS, sans les corrections au trimestre (pour en connaître la base). */
+    sansCorrections?: boolean;
   } = {}
 ): Promise<DonneesRemplissage> {
+  const brut = await preparerSansCorrections(db, periode, champs, options);
+  if (options.sansCorrections || options.sansAgregation) return brut;
+
+  // Les corrections au trimestre : celles de la période, et celles de la même
+  // période l'an passé (qui nourrissent la comparaison).
+  const arrondissementNom = options.arrondissementId
+    ? (await listerArrondissements(db)).find((a) => a.id === options.arrondissementId)?.nom
+    : undefined;
+  const [courantes, anPasse] = await Promise.all([
+    lireCorrections(db, periode, arrondissementNom),
+    lireCorrections(db, memePeriodeAnneePrecedente(periode), arrondissementNom).catch(() => [] as CorrectionLue[]),
+  ]);
+  const basesCorrigees = appliquerCorrections(
+    { valeurs: brut.valeurs, evenements: brut.evenements.courant, surcharges: brut.surcharges },
+    courantes,
+    periode,
+    brut.codeParNom
+  );
+  appliquerCorrections(
+    { valeurs: brut.valeursN1, evenements: brut.evenements.precedent, surcharges: brut.surchargesN1 },
+    anPasse,
+    memePeriodeAnneePrecedente(periode),
+    brut.codeParNom
+  );
+  return { ...brut, corrections: periode.type === "TRIMESTRIEL" ? courantes : [], basesCorrigees };
+}
+
+async function preparerSansCorrections(
+  db: PrismaClient,
+  periode: Periode,
+  champs: string[],
+  options: { autoriserIncomplet?: boolean; arrondissementId?: string; sansAgregation?: boolean }
+): Promise<DonneesRemplissage> {
+  const sansCorrection = { corrections: [] as CorrectionLue[], basesCorrigees: new Map<string, number | null>(), surcharges: new Map() as Surcharges, surchargesN1: new Map() as Surcharges };
   const vide = () => new Map<string, Map<string | null, number | null>>();
 
   // Les arrondissements du département de l'appelant — `db` porte le
@@ -128,13 +176,13 @@ export async function preparer(
 
   if (options.sansAgregation) {
     const aucun: DonneesEvenements = { courant: new Map(), precedent: new Map(), nonClassees: [] };
-    return { valeurs: vide(), valeursN1: vide(), renseignees: 0, codeParNom, saisies, saisiesN1, evenements: aucun, consolidation };
+    return { valeurs: vide(), valeursN1: vide(), renseignees: 0, codeParNom, saisies, saisiesN1, evenements: aucun, consolidation, ...sansCorrection };
   }
 
   const evenements = await preparerEvenements(db, periode, { arrondissementId: options.arrondissementId });
 
   if (champs.length === 0) {
-    return { valeurs: vide(), valeursN1: vide(), renseignees: 0, codeParNom, saisies, saisiesN1, evenements, consolidation };
+    return { valeurs: vide(), valeursN1: vide(), renseignees: 0, codeParNom, saisies, saisiesN1, evenements, consolidation, ...sansCorrection };
   }
 
   const ranger = (agregees: ValeurAgregee[]) => {
@@ -179,7 +227,7 @@ export async function preparer(
   if (sien) {
     for (const m of [a.m, b.m]) m.forEach((parArr) => parArr.set(null, parArr.get(sien) ?? null));
   }
-  return { valeurs: a.m, valeursN1: b.m, renseignees: a.n, codeParNom, saisies, saisiesN1, evenements, consolidation };
+  return { valeurs: a.m, valeursN1: b.m, renseignees: a.n, codeParNom, saisies, saisiesN1, evenements, consolidation, ...sansCorrection };
 }
 
 /**
@@ -270,7 +318,7 @@ export function fournisseur(
   };
 
   /** La valeur d'une case liée : son champ, sa formule, ou une saisie d'un autre tableau. */
-  const valeurDe = (c: Correspondance, arr: string | null, n1: boolean): number | null =>
+  const valeurBrute = (c: Correspondance, arr: string | null, n1: boolean): number | null =>
     c.depuisSaisie
       ? depuisSaisie(c.depuisSaisie, arr, n1)
       : c.formule
@@ -278,6 +326,21 @@ export function fournisseur(
         : c.champ
           ? lire(c.champ, arr, n1)
           : null;
+  /**
+   * Avec les corrections au trimestre d'une case formule à plusieurs champs
+   * (poissons de table) : la case corrigée d'un arrondissement, et le
+   * département augmenté de ce que les corrections ont changé.
+   */
+  const valeurDe = (c: Correspondance, arr: string | null, n1: boolean): number | null => {
+    const s = (n1 ? donnees.surchargesN1 : donnees.surcharges).get(c);
+    if (!s) return valeurBrute(c, arr, n1);
+    if (arr != null) return s.has(arr) ? s.get(arr)! : valeurBrute(c, arr, n1);
+    let v = valeurBrute(c, null, n1);
+    s.forEach((corrigee, code) => {
+      v = (v ?? 0) + (corrigee - (valeurBrute(c, code, n1) ?? 0));
+    });
+    return v;
+  };
 
   /** Une case saisie, telle qu'elle s'affiche — ou, à défaut, reprise d'un autre tableau. */
   const saisieAffichee = (numeroTableau: number, ligne: string, colonne: string): string | null => {

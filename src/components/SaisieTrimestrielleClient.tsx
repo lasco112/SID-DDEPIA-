@@ -22,7 +22,16 @@ import { trimestreARapporter } from "@/lib/trimestreEchu";
 import { lireAvecCopie, garderCopie, envoyer, enAttente } from "@/lib/trimestreHorsLigne";
 import HorsLigneTrimestre from "@/components/HorsLigneTrimestre";
 import ComparaisonMensuel, { type ControleCategories } from "@/components/ComparaisonMensuel";
-import OrigineMensuelle, { type Origine } from "@/components/OrigineMensuelle";
+import OrigineMensuelle, { CorrectionAuTrimestre, type Origine, type InfoCorrection } from "@/components/OrigineMensuelle";
+
+/** « D'où vient ce chiffre ? » : la case touchée, son détail, et ce qu'on peut en faire au trimestre. */
+type EtatOrigine = {
+  chargement: boolean;
+  cellule?: { numero: number; ligne: string; colonne: string };
+  donnees?: Origine;
+  message?: string;
+  correction?: InfoCorrection | null;
+};
 import { cibles, cibleTrimestrielle } from "@/lib/surlignage";
 import VisiteGuidee from "@/components/VisiteGuidee";
 import SignalerPanneau, { envoyerObservation } from "@/components/SignalerPanneau";
@@ -43,6 +52,8 @@ interface CaseGrille {
   reservee?: boolean;
   /** Le chiffre de l'an passé que le SID n'a pas encore : OBLIGATOIRE avant de transmettre. */
   anPasse?: boolean;
+  /** Case calculée, corrigée au trimestre par le chef de section sur ordre du DD (21 octobre 2026). */
+  corrigee?: { valeur: number; conflit: boolean; motif: string };
 }
 
 interface Grille {
@@ -143,7 +154,7 @@ export default function SaisieTrimestrielleClient({
    * même rapport transmis. DA, chefs de section et DD ; jamais l'agent.
    */
   /** « D'où vient ce chiffre ? » d'une case grise (20 octobre 2026). */
-  const [origine, setOrigine] = useState<{ chargement: boolean; donnees?: Origine; message?: string } | null>(null);
+  const [origine, setOrigine] = useState<EtatOrigine | null>(null);
   const peutCorriger = ["DD", "DA", "CHEF_BAC", "CHEF_PSA", "CHEF_SPAIH", "CHEF_SSV"].includes(moi?.role ?? "");
   const [corriger, setCorriger] = useState(false);
   const [aSignaler, setASignaler] = useState<{ ligne: string; colonne: string; libelle: string; valeur: string | null } | null>(null);
@@ -602,17 +613,23 @@ export default function SaisieTrimestrielleClient({
               signalement={modeSignaler}
               onSignaler={(l, c) => setASignaler({ ligne: l.cle, colonne: c.colonne, libelle: `${l.libelle || l.cle} · ${c.colonne}`, valeur: c.saisi ?? c.affiche })}
               onOrigine={async (l, c) => {
-                setOrigine({ chargement: true });
+                const cellule = { numero: grille.numero, ligne: l.cle, colonne: c.colonne };
+                setOrigine({ chargement: true, cellule });
                 try {
                   const q = new URLSearchParams({ annee: String(annee), trimestre: String(trimestre), tableau: String(grille.numero), origine: "1", ligne: l.cle, colonne: c.colonne });
-                  const j = await (await fetch(`/api/trimestre/saisie?${q}`)).json();
-                  setOrigine(j.origine ? { chargement: false, donnees: j.origine } : { chargement: false, message: j.message ?? "Détail indisponible." });
+                  const j = await (await fetch(`/api/trimestre/saisie?${q}`, { cache: "no-store" })).json();
+                  setOrigine({ chargement: false, cellule, donnees: j.origine, message: j.origine ? undefined : j.message ?? "Détail indisponible.", correction: j.correction ?? null });
                 } catch {
-                  setOrigine({ chargement: false, message: "Le détail demande du réseau : réessayez une fois connecté." });
+                  setOrigine({ chargement: false, cellule, message: "Le détail demande du réseau : réessayez une fois connecté." });
                 }
               }}
               origine={origine}
               onFermerOrigine={() => setOrigine(null)}
+              periode={{ annee, trimestre }}
+              onCorrige={() => {
+                setOrigine(null);
+                void chargerGrille(grille.numero);
+              }}
             />
           )}
           {lignesSansAnPasse > 0 && (
@@ -933,12 +950,17 @@ function TableauSaisie({
   onOrigine,
   origine,
   onFermerOrigine,
+  periode,
+  onCorrige,
   entier = false,
 }: {
   /** Une case grise touchée : d'où vient son chiffre, mois par mois. */
   onOrigine?: (l: Grille["lignes"][number], c: CaseGrille) => void;
-  origine?: { chargement: boolean; donnees?: Origine; message?: string } | null;
+  origine?: EtatOrigine | null;
   onFermerOrigine?: () => void;
+  /** Le trimestre affiché, et la grille à recharger après une correction au trimestre. */
+  periode?: { annee: number; trimestre: number };
+  onCorrige?: () => void;
   /**
    * Toujours le tableau entier, jamais le formulaire d'une seule ligne : un
    * chef de section doit voir les six arrondissements, même s'il ne reste
@@ -1015,17 +1037,25 @@ function TableauSaisie({
         : c.etat === "total"
           ? "Total calculé"
           : "Hors de votre ressort";
-    // Une case calculée à partir du mensuel se touche : d'où vient son chiffre.
-    if (c.etat === "calculee" && onOrigine && c.affiche != null) {
+    // Une case calculée à partir du mensuel se touche : d'où vient son chiffre —
+    // vide comprise (21 octobre 2026) : c'est là qu'on apprend POURQUOI elle l'est.
+    if (c.etat === "calculee" && onOrigine) {
       return (
         <button
           type="button"
           data-visite="case-grise"
-          title="D'où vient ce chiffre ? Touchez pour voir les rapports mensuels, mois par mois."
+          title={
+            c.corrigee
+              ? `Corrigé au trimestre par le chef de section — ${c.corrigee.motif}. Touchez pour le détail.`
+              : "D'où vient ce chiffre ? Touchez pour voir les rapports mensuels, mois par mois."
+          }
           onClick={() => onOrigine(l, c)}
-          className="block w-full bg-gray-100 px-2 py-1 text-left text-gray-600 underline decoration-dotted underline-offset-2 hover:bg-primary-light hover:text-primary-dark"
+          className={`block w-full px-2 py-1 text-left underline decoration-dotted underline-offset-2 hover:bg-primary-light hover:text-primary-dark ${
+            c.corrigee ? (c.corrigee.conflit ? "bg-red-50 font-semibold text-red-900" : "bg-sky-50 font-semibold text-sky-900") : "bg-gray-100 text-gray-600"
+          }`}
         >
-          {c.affiche}
+          {c.affiche ?? "—"}
+          {c.corrigee && <span className="ml-1 align-super text-[10px] font-bold" aria-label="corrigé au trimestre">✎</span>}
         </button>
       );
     }
@@ -1058,14 +1088,24 @@ function TableauSaisie({
         (origine.chargement ? (
           <p className="mb-3 text-sm text-ink-muted">Recherche dans les rapports mensuels…</p>
         ) : origine.donnees ? (
-          <OrigineMensuelle origine={origine.donnees} onFermer={() => onFermerOrigine?.()} />
+          <OrigineMensuelle
+            origine={origine.donnees}
+            correction={origine.correction ?? null}
+            periode={periode}
+            cellule={origine.cellule}
+            onCorrige={onCorrige}
+            onFermer={() => onFermerOrigine?.()}
+          />
         ) : (
-          <p className="mb-3 rounded-md bg-appbg p-3 text-sm text-gray-800">
+          <div className="mb-3 rounded-md bg-appbg p-3 text-sm text-gray-800">
             {origine.message}{" "}
             <button type="button" onClick={() => onFermerOrigine?.()} className="text-xs text-ink-muted underline">
               Fermer
             </button>
-          </p>
+            {origine.correction && periode && origine.cellule && (
+              <CorrectionAuTrimestre correction={origine.correction} periode={periode} cellule={origine.cellule} onCorrige={onCorrige} />
+            )}
+          </div>
         ))}
       {(grille.alertes ?? grille.avertissements.map((texte) => ({ texte }))).length > 0 && (
         <ul className="mb-3 space-y-2 rounded-md bg-amber-50 p-3 text-sm text-amber-900">

@@ -39,6 +39,8 @@ interface Section {
   motif: string | null;
   /** L'ordre de correction du DD en cours pour ce chef (20 octobre 2026). */
   ordre?: { motif: string; le: string; auteur: string | null } | null;
+  /** La demande d'ordre du chef, en attente de la réponse du DD (21 octobre 2026). */
+  demande?: { motif: string; le: string; auteur: string | null } | null;
 }
 
 interface Etat {
@@ -476,6 +478,49 @@ export default function CircuitTrimestreClient({ username }: { username: string 
                     : "Le chef peut corriger les cases remplies par les arrondissements."}
                 </p>
               )}
+              {!s.ordre && s.demande && (
+                <p className="mt-2 rounded-input border border-sky-300 bg-sky-50 p-2 text-xs text-sky-950">
+                  <strong>{s.chef === etat.role ? "Votre demande d'ordre de correction" : `Le chef ${s.code} demande un ordre de correction`}</strong> depuis le {le(s.demande.le)} — {s.demande.motif}
+                  {s.chef === etat.role ? " · en attente de la réponse du DD." : ""}
+                </p>
+              )}
+              {/* Le chef demande lui-même l'ordre au DD (21 octobre 2026). */}
+              {s.chef === etat.role && s.code !== "BAC" && !s.ordre && !s.demande &&
+                (ordre?.code === s.code ? (
+                  <div className="mt-2">
+                    <textarea
+                      value={ordre.motif}
+                      onChange={(e) => setOrdre({ code: s.code, motif: e.target.value })}
+                      rows={2}
+                      placeholder="Ce que vous voulez corriger, et pourquoi (obligatoire)."
+                      className="w-full rounded border border-gray-300 p-2 text-sm"
+                    />
+                    <div className="mt-1 flex gap-2">
+                      <button
+                        type="button"
+                        disabled={occupe || ordre.motif.trim().length < 5}
+                        onClick={() => {
+                          void agir({ action: "demanderOrdre", motif: ordre.motif });
+                          setOrdre(null);
+                        }}
+                        className="flex-1 rounded-md bg-primary px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                      >
+                        Envoyer la demande au DD
+                      </button>
+                      <button type="button" onClick={() => setOrdre(null)} className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm">
+                        Annuler
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setOrdre({ code: s.code, motif: "" })}
+                    className="mt-2 rounded border border-primary px-2 py-1 text-xs font-semibold text-primary hover:bg-primary-light"
+                  >
+                    Demander au DD un ordre de correction
+                  </button>
+                ))}
               {etat.role === "DD" && s.code !== "BAC" &&
                 (s.ordre ? (
                   <button
@@ -524,10 +569,10 @@ export default function CircuitTrimestreClient({ username }: { username: string 
                   <button
                     type="button"
                     data-visite="circuit-ordre-correction"
-                    onClick={() => setOrdre({ code: s.code, motif: "" })}
-                    className="mt-2 ml-0 mr-2 rounded border border-amber-600 px-2 py-1 text-xs text-amber-900 hover:bg-amber-50"
+                    onClick={() => setOrdre({ code: s.code, motif: s.demande?.motif ?? "" })}
+                    className={`mt-2 ml-0 mr-2 rounded border px-2 py-1 text-xs hover:bg-amber-50 ${s.demande ? "border-amber-700 bg-amber-100 font-semibold text-amber-950" : "border-amber-600 text-amber-900"}`}
                   >
-                    Ordonner une correction au chef
+                    {s.demande ? "Donner l'ordre demandé" : "Ordonner une correction au chef"}
                   </button>
                 ))}
               {s.statut !== "VALIDE" && formulaireRelais(`sec-${s.code}`, "Valider en tant que DD", { action: "valider", section: s.code })}

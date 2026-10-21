@@ -21,6 +21,8 @@ import {
   type Profil,
 } from "@/server/trimestre/saisieTrimestrielle";
 import { preparerEvenements } from "@/server/trimestre/evenements";
+import { TABLEAUX_CORRIGEABLES } from "@/server/trimestre/correctionsTrimestre";
+import { infoCorrection } from "@/server/trimestre/corrigerCase";
 import { motifDeVerrou } from "@/server/trimestre/circuit";
 
 function periodeDe(annee: unknown, trimestre: unknown) {
@@ -61,8 +63,12 @@ export async function GET(req: Request) {
 
     // « D'où vient ce chiffre ? » : une case grise, mois par mois (lecture seule).
     if (params.get("origine") && params.get("tableau")) {
-      const r = await origineCase(user.db, periode, profil, Number(params.get("tableau")), params.get("ligne") ?? "", params.get("colonne") ?? "");
-      return NextResponse.json(r);
+      const numero = Number(params.get("tableau"));
+      const [ligne, colonne] = [params.get("ligne") ?? "", params.get("colonne") ?? ""];
+      const r = await origineCase(user.db, periode, profil, numero, ligne, colonne);
+      // Ce qu'on peut faire de cette case au trimestre (correction du chef, sur ordre du DD).
+      const correction = TABLEAUX_CORRIGEABLES.has(numero) ? await infoCorrection(user.db, periode, profil, numero, ligne, colonne) : null;
+      return NextResponse.json({ ...r, correction });
     }
 
     const numero = params.get("tableau");
