@@ -25,7 +25,7 @@ import {
 import type { Periode } from "@/server/periodes/calendrier";
 import {
   ordresEnCours, donnerOrdreCorrection, revoquerOrdreCorrection, demandesEnCours, demanderOrdreCorrection,
-  ouvrirRevisionPourTous, fermerRevisionPourTous, refuserDemande, bilanRevision, CHEFS_SOUS_ORDRE,
+  ouvrirRevisionPourTous, fermerRevisionPourTous, refuserDemande, bilanRevision, CHEFS_SOUS_ORDRE, estModeRevision,
 } from "@/server/trimestre/ordresCorrection";
 import { analysesARevoir, messageAnalysesARevoir } from "@/server/trimestre/analyse/ecranAnalyses";
 import { periodeTrimestrielle } from "@/server/trimestre/rubriques";
@@ -116,7 +116,7 @@ export async function GET(req: Request) {
               sousRevision: CHEFS_SOUS_ORDRE.includes(s.chef),
               ordre: o,
               demande: demandes.get(s.chef) ?? null,
-              ...(voitBilan ? { bilan: await bilanRevision(user.db, periode, s.chef, new Date(o.le)) } : {}),
+              ...(voitBilan ? { bilan: await bilanRevision(user.db, periode, s.chef, new Date(o.ouverteLe)) } : {}),
             };
           })
         );
@@ -155,6 +155,8 @@ export async function POST(req: Request) {
     assertRole(user, [...ROLES]);
     const body = (await req.json()) as {
       annee?: number; trimestre?: number; action?: string; arrondissementId?: string; motif?: string; section?: string;
+      /** La révision : « relecture » ou « correction » (directe). */
+      mode?: string;
     };
     const periode = periodeDe(body.annee, body.trimestre);
     if (!periode) return erreur("Période demandée invalide.", 400);
@@ -207,13 +209,15 @@ export async function POST(req: Request) {
       case "ordonnerCorrection": {
         if (user.role !== "DD") return erreur("Seul le Délégué départemental ouvre la révision des tableaux.", 403);
         if (!body.section) return erreur("Section non précisée.", 400);
-        const r = await donnerOrdreCorrection(user.db, user.transaction, periodeId, periode, body.section, body.motif ?? "", user.id);
-        details = { section: body.section, motif: body.motif, validationAnnulee: r.validationAnnulee };
+        const mode = estModeRevision(body.mode) ? body.mode : "correction";
+        const r = await donnerOrdreCorrection(user.db, user.transaction, periodeId, periode, body.section, body.motif ?? "", user.id, mode);
+        details = { section: body.section, motif: body.motif, mode, validationAnnulee: r.validationAnnulee };
         break;
       }
       case "ouvrirRevisionTous": {
         if (user.role !== "DD") return erreur("Seul le Délégué départemental ouvre la révision des tableaux.", 403);
-        details = { sections: await ouvrirRevisionPourTous(user.db, user.transaction, periodeId, periode, body.motif ?? "", user.id), motif: body.motif };
+        const mode = estModeRevision(body.mode) ? body.mode : "correction";
+        details = { sections: await ouvrirRevisionPourTous(user.db, user.transaction, periodeId, periode, body.motif ?? "", user.id, mode), motif: body.motif, mode };
         break;
       }
       // Le chef demande lui-même l'ouverture au DD (21 octobre 2026).

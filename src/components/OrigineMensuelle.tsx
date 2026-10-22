@@ -16,6 +16,7 @@
  */
 import { useState } from "react";
 import { allerAuMois } from "@/lib/allerAuMois";
+import { partirVersLeMois } from "@/lib/retourTrimestre";
 import { useUtilisateur } from "@/components/UtilisateurContexte";
 import type { ControleCategories } from "@/components/ComparaisonMensuel";
 
@@ -147,6 +148,8 @@ function DetailOrigine({ o, correction }: { o: Origine; correction: InfoCorrecti
     setErreur(null);
     setOuverture(periodeId);
     try {
+      // Le chemin du retour : la barre « Revenir au trimestre » ramènera ici.
+      partirVersLeMois();
       await allerAuMois(periodeId, chemin);
     } catch (e) {
       setErreur(e instanceof Error ? e.message : "Ouverture impossible.");
@@ -267,7 +270,7 @@ export function CorrectionAuTrimestre({
   return (
     <div className="rounded-md border border-sky-300 bg-sky-50 p-3 text-sm text-sky-950">
       <p className="font-bold">Corriger au trimestre</p>
-      {c.estChef && c.aOrdre && !c.raison && <p className="mt-1 font-semibold text-green-800">✓ Révision ouverte : vous pouvez corriger ce chiffre.</p>}
+      {c.estChef && c.aOrdre && !c.raison && <p className="mt-1 font-semibold text-green-800">✓ Correction directe ouverte : vous pouvez corriger ce chiffre.</p>}
       {!c.estChef && <OrdreDuDD correction={c} periode={periode} onFait={onCorrige} />}
 
       {e && (
@@ -389,9 +392,12 @@ export function CorrectionAuTrimestre({
           <p className="mt-2">Votre demande de révision est chez le DD : vous serez prévenu de sa réponse.</p>
         ) : demande == null ? (
           <div className="mt-2">
-            <p>Pour corriger ce chiffre, il faut que le Délégué départemental ouvre la révision de votre section (après le dépôt de tous les rapports des DA).</p>
+            <p>
+              Pour corriger ce chiffre vous-même, il faut que le Délégué départemental ouvre la <b>correction directe</b> de votre section (après le dépôt de tous
+              les rapports des DA). Sinon, le mois faux se corrige dans le rapport mensuel (« Ouvrir ce mois », plus bas).
+            </p>
             <button type="button" onClick={() => setDemande(c.motifPropose)} className="mt-2 min-h-[40px] rounded-btn border border-primary bg-white px-3 font-semibold text-primary">
-              Demander au DD d&apos;ouvrir la révision
+              Demander la correction directe au DD
             </button>
           </div>
         ) : (
@@ -452,7 +458,8 @@ function OrdreDuDD({ correction: c, periode, onFait }: { correction: InfoCorrect
       const r = await fetch("/api/trimestre/circuit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ annee: periode.annee, trimestre: periode.trimestre, action, section: c.section, motif: texte }),
+        // Corriger une case grise, c'est la correction directe (22 octobre 2026).
+        body: JSON.stringify({ annee: periode.annee, trimestre: periode.trimestre, action, section: c.section, motif: texte, mode: "correction" }),
       });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(j.message ?? "Impossible pour le moment.");
@@ -469,7 +476,7 @@ function OrdreDuDD({ correction: c, periode, onFait }: { correction: InfoCorrect
       {c.ordreEnCours ? (
         <>
           <p>
-            <b>Révision ouverte au chef {c.section}</b> : il corrige les tableaux de sa section pour ce trimestre.
+            <b>Correction directe ouverte au chef {c.section}</b> : il corrige les tableaux de sa section pour ce trimestre.
           </p>
           <button
             type="button"
@@ -489,14 +496,17 @@ function OrdreDuDD({ correction: c, periode, onFait }: { correction: InfoCorrect
               <b>Le chef {c.section} vous demande d&apos;ouvrir la révision</b> : « {c.demande.motif} »
             </p>
           ) : (
-            <p>C&apos;est le chef {c.section} qui corrige ce chiffre, pendant la révision que vous lui ouvrez (après le dépôt de tous les rapports des DA).</p>
+            <p>
+              C&apos;est le chef {c.section} qui corrige ce chiffre, en correction directe : vous la lui ouvrez (après le dépôt de tous les rapports des DA), ou
+              vous le passez en correction directe s&apos;il est en relecture.
+            </p>
           )}
           <button
             type="button"
             onClick={() => setMotif(c.demande?.motif ?? c.motifPropose)}
             className="mt-2 min-h-[44px] rounded-btn bg-green-700 px-4 font-semibold text-white hover:bg-green-800"
           >
-            Ouvrir la révision au chef {c.section}
+            Ouvrir la correction directe au chef {c.section}
           </button>
         </>
       ) : (
@@ -509,7 +519,7 @@ function OrdreDuDD({ correction: c, periode, onFait }: { correction: InfoCorrect
               onClick={() => void agir("ordonnerCorrection", motif)}
               className="min-h-[44px] flex-1 rounded-btn bg-green-700 px-3 font-semibold text-white disabled:opacity-50"
             >
-              {occupe ? "Envoi…" : "Ouvrir la révision"}
+              {occupe ? "Envoi…" : "Ouvrir la correction directe"}
             </button>
             <button type="button" onClick={() => setMotif(null)} className="min-h-[44px] flex-1 rounded-btn border border-gray-300 bg-white px-3">
               Annuler

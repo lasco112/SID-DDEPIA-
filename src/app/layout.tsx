@@ -6,6 +6,7 @@ import ServiceWorkerRegister from '@/components/ServiceWorkerRegister';
 import NavigationHorsLigne from '@/components/NavigationHorsLigne';
 import SplashScreen from '@/components/SplashScreen';
 import DemoBanner from '@/components/DemoBanner';
+import RetourTrimestre from '@/components/RetourTrimestre';
 
 const manrope = Manrope({ subsets: ['latin'], variable: '--font-manrope' });
 // Grands titres d'accueil seulement. Comme Manrope, la police est copiée dans
@@ -43,7 +44,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <SplashScreen />
         <Providers>
           <DemoBanner />
+          {/* Venu d'une case du trimestre corriger un mois : le chemin du retour, en haut et en bas. */}
+          <RetourTrimestre position="haut" />
           {children}
+          <RetourTrimestre position="bas" />
         </Providers>
       </body>
     </html>

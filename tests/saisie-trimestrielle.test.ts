@@ -333,7 +333,7 @@ test("un chef de section lit SA section ; les cases des arrondissements attenden
   periodeId = periodeId ?? (await periodeTrimestrielle(base, P));
   const da = await base.user.findFirstOrThrow({ where: { role: "DA", actif: true }, select: { id: true } });
   const chef = await base.user.findFirstOrThrow({ where: { role: "CHEF_PSA", actif: true }, select: { id: true } });
-  const REVISION = /révision ouverte/;
+  const REVISION = /correction directe ouverte/;
 
   // Sa section, et elle seule ; et même une case VIDE d'un arrondissement
   // attend la révision (discipline, décision du Délégué du 21 octobre 2026).

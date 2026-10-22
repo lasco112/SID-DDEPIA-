@@ -26,10 +26,14 @@ import OrigineMensuelle, { type Origine, type InfoCorrection } from "@/component
 
 /**
  * LE BANDEAU DE LA RÉVISION, en tête d'un tableau d'une section technique (21
- * octobre 2026) : le DD y ouvre ou ferme la révision de la section — sans
- * attendre de demande —, accepte ou refuse une demande ; le chef y voit si elle
- * est ouverte et la demande. Rien ne s'ouvre avant le dépôt de tous les DA.
+ * et 22 octobre 2026) : le DD y ouvre la révision de la section — en relecture
+ * ou en correction directe —, change de mode, accepte ou refuse une demande,
+ * ferme ; le chef y voit le mode et demande l'ouverture, ou la correction
+ * directe. Rien ne s'ouvre avant le dépôt des rapports de tous les DA.
  */
+type ModeRevision = "relecture" | "correction";
+const NOM_MODE: Record<ModeRevision, string> = { relecture: "relecture", correction: "correction directe" };
+
 function BandeauOrdre({
   ordre,
   role,
@@ -43,25 +47,28 @@ function BandeauOrdre({
   titre: string;
   onFait: () => void;
 }) {
-  const [motif, setMotif] = useState<string | null>(null);
+  /** La décision en cours de rédaction : l'action, le mode, et le mot (facultatif). */
+  const [choix, setChoix] = useState<{ action: string; mode?: ModeRevision; motif: string; libelle: string; couleur: string } | null>(null);
   const [occupe, setOccupe] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
   const [fait, setFait] = useState<string | null>(null);
   const dd = role === "DD";
   const depuis = (iso: string) => new Date(iso).toLocaleDateString("fr-FR", { day: "numeric", month: "long" });
+  const manquants = ordre.depotsManquants ?? [];
+  const mode = ordre.enCours?.mode ?? null;
 
-  async function agir(action: string, texte?: string, apres?: string) {
+  async function agir(action: string, texte?: string, apres?: string, m?: ModeRevision) {
     setErreur(null);
     setOccupe(true);
     try {
       const r = await fetch("/api/trimestre/circuit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ annee: periode.annee, trimestre: periode.trimestre, action, section: ordre.section, motif: texte }),
+        body: JSON.stringify({ annee: periode.annee, trimestre: periode.trimestre, action, section: ordre.section, motif: texte, mode: m }),
       });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(j.message ?? "Impossible pour le moment.");
-      setMotif(null);
+      setChoix(null);
       setFait(apres ?? null);
       onFait();
     } catch (e) {
@@ -71,53 +78,122 @@ function BandeauOrdre({
     }
   }
 
-  // Le mot qui accompagne une décision est facultatif : il ne doit jamais bloquer.
-  const formulaire = (envoyer: string, action: string, apres: string, couleur = "bg-green-700") => (
-    <div className="mt-2 space-y-2">
-      <textarea
-        rows={2}
-        value={motif ?? ""}
-        placeholder="Un mot (facultatif)"
-        onChange={(e) => setMotif(e.target.value)}
-        className="block w-full rounded-input border border-gray-300 bg-white px-3 py-2 text-sm"
-      />
-      <div className="flex gap-2">
-        <button
-          type="button"
-          disabled={occupe}
-          onClick={() => void agir(action, motif ?? "", apres)}
-          className={`min-h-[44px] flex-1 rounded-btn px-3 text-sm font-semibold text-white disabled:opacity-50 ${couleur}`}
-        >
-          {occupe ? "Envoi…" : envoyer}
-        </button>
-        <button type="button" onClick={() => setMotif(null)} className="min-h-[44px] flex-1 rounded-btn border border-gray-300 bg-white px-3 text-sm">
-          Annuler
-        </button>
-      </div>
-    </div>
+  const bouton = (libelle: string, action: string, couleur: string, m?: ModeRevision, motif = "") => (
+    <button
+      key={libelle}
+      type="button"
+      onClick={() => setChoix({ action, mode: m, motif, libelle, couleur })}
+      className={`min-h-[44px] rounded-btn px-4 text-sm font-semibold ${couleur}`}
+    >
+      {libelle}
+    </button>
   );
-  const [refus, setRefus] = useState(false);
-  const manquants = ordre.depotsManquants ?? [];
+  const VERT = "bg-green-700 text-white hover:bg-green-800";
+  const BLEU = "bg-sky-700 text-white hover:bg-sky-800";
 
   return (
     <div
       data-visite="bandeau-ordre"
       className={`mb-3 rounded-md border p-3 text-sm ${
-        ordre.enCours ? "border-green-300 bg-green-50 text-green-950" : manquants.length ? "border-gray-300 bg-gray-50 text-gray-800" : "border-amber-300 bg-amber-50 text-amber-950"
+        mode === "correction"
+          ? "border-green-300 bg-green-50 text-green-950"
+          : mode === "relecture"
+            ? "border-sky-300 bg-sky-50 text-sky-950"
+            : manquants.length
+              ? "border-gray-300 bg-gray-50 text-gray-800"
+              : "border-amber-300 bg-amber-50 text-amber-950"
       }`}
     >
-      {ordre.enCours ? (
-        <>
-          <p>
-            <b>{dd ? `Révision ouverte au chef ${ordre.section}` : "Révision ouverte : vous corrigez ce tableau"}</b> depuis le {depuis(ordre.enCours.le)} — {ordre.enCours.motif}
-          </p>
-          {!dd && (
-            <p className="mt-1">
-              Écrivez directement dans les cases des arrondissements. Une case grise (venue du mensuel) : touchez-la pour corriger son chiffre.
-              Une fois fini, validez votre section : la révision se fermera et chaque DA recevra le bilan.
-            </p>
+      {ordre.enCours && mode ? (
+        <p>
+          <b>{dd ? `Révision ouverte au chef ${ordre.section} : ${NOM_MODE[mode]}` : mode === "relecture" ? "Relecture ouverte par le DD" : "Correction directe ouverte par le DD"}</b> depuis
+          le {depuis(ordre.enCours.le)} — {ordre.enCours.motif}
+        </p>
+      ) : manquants.length ? (
+        <p>
+          <b>Révision fermée.</b> Elle s&apos;ouvre après le dépôt des rapports de tous les DA — pas encore déposé : {manquants.join(", ")}.
+          {!dd && " En attendant, touchez une case pour la signaler à son arrondissement."}
+        </p>
+      ) : dd ? (
+        <p>
+          {ordre.demande ? (
+            <>
+              <b>Le chef {ordre.section} vous demande d&apos;ouvrir la révision</b> depuis le {depuis(ordre.demande.le)} — {ordre.demande.motif}
+            </>
+          ) : (
+            <>
+              <b>Révision fermée pour la section {ordre.section}.</b> Ouvrez-la en relecture (le chef rejette au DA) ou en correction directe (il corrige lui-même).
+            </>
           )}
-          {dd && (
+        </p>
+      ) : ordre.demande ? (
+        <p>
+          <b>Votre demande est chez le DD</b> depuis le {depuis(ordre.demande.le)} — vous serez prévenu de sa réponse. En attendant, touchez une case pour la signaler
+          à son arrondissement.
+        </p>
+      ) : (
+        <p>
+          <b>Révision fermée.</b> Vous lisez ce tableau et signalez à l&apos;arrondissement ce qui ne va pas (touchez la case). Pour aller plus loin, demandez au DD
+          d&apos;ouvrir la révision.
+        </p>
+      )}
+
+      {/* Ce que le chef fait, dans le mode ouvert. */}
+      {!dd && mode === "relecture" && (
+        <p className="mt-1">
+          Touchez une case qui ne va pas : vous la <b>rejetez au DA</b> avec un motif, et c&apos;est lui qui corrige. « À revoir » vous mène de point en point.
+          {ordre.demande && " Votre demande de correction directe est chez le DD."}
+        </p>
+      )}
+      {!dd && mode === "correction" && (
+        <p className="mt-1">
+          Écrivez directement dans les cases des arrondissements. Une case grise (venue du mensuel) : touchez-la pour corriger son chiffre. Une fois fini, validez votre
+          section : la révision se fermera et chaque DA recevra le bilan.
+        </p>
+      )}
+
+      {choix ? (
+        <div className="mt-2 space-y-2">
+          <textarea
+            rows={2}
+            value={choix.motif}
+            placeholder="Un mot (facultatif)"
+            onChange={(e) => setChoix({ ...choix, motif: e.target.value })}
+            className="block w-full rounded-input border border-gray-300 bg-white px-3 py-2 text-sm"
+          />
+          <div className="flex gap-2">
+            <button
+              type="button"
+              disabled={occupe}
+              onClick={() => void agir(choix.action, choix.motif, `${choix.libelle} : c'est fait, le chef est prévenu.`, choix.mode)}
+              className={`min-h-[44px] flex-1 rounded-btn px-3 text-sm font-semibold disabled:opacity-50 ${choix.couleur}`}
+            >
+              {occupe ? "Envoi…" : `Confirmer : ${choix.libelle.toLowerCase()}`}
+            </button>
+            <button type="button" onClick={() => setChoix(null)} className="min-h-[44px] flex-1 rounded-btn border border-gray-300 bg-white px-3 text-sm">
+              Annuler
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="mt-2 flex flex-wrap gap-2">
+          {/* Le DD : ouvrir dans un mode, passer à l'autre, refuser, fermer. */}
+          {dd && (!manquants.length || mode) && (
+            <>
+              {mode !== "relecture" &&
+                bouton(mode ? "Passer en relecture" : ordre.demande ? "Accepter en relecture" : "Ouvrir en relecture", "ordonnerCorrection", BLEU, "relecture", ordre.demande?.motif ?? "")}
+              {mode !== "correction" &&
+                bouton(
+                  mode ? "Passer en correction directe" : ordre.demande ? "Accepter en correction directe" : "Ouvrir en correction directe",
+                  "ordonnerCorrection",
+                  VERT,
+                  "correction",
+                  ordre.demande?.motif ?? ""
+                )}
+              {ordre.demande && bouton("Refuser la demande", "refuserDemande", "border border-red-700 bg-white text-red-800")}
+            </>
+          )}
+          {dd && mode && (
             <button
               type="button"
               disabled={occupe}
@@ -126,84 +202,21 @@ function BandeauOrdre({
                   void agir("revoquerOrdre", undefined, "Révision fermée.");
                 }
               }}
-              className="mt-2 min-h-[40px] rounded-btn border border-gray-600 bg-white px-3 font-semibold text-gray-800"
+              className="min-h-[44px] rounded-btn border border-gray-600 bg-white px-3 font-semibold text-gray-800"
             >
               Fermer la révision
             </button>
           )}
-        </>
-      ) : manquants.length ? (
-        <p>
-          <b>Révision fermée.</b> Elle s&apos;ouvre après le dépôt des rapports de tous les DA — pas encore déposé : {manquants.join(", ")}.
-          {!dd && " En attendant, touchez une case pour la signaler à son arrondissement."}
-        </p>
-      ) : dd ? (
-        <>
-          <p>
-            {ordre.demande ? (
-              <>
-                <b>Le chef {ordre.section} vous demande d&apos;ouvrir la révision</b> depuis le {depuis(ordre.demande.le)} — {ordre.demande.motif}
-              </>
-            ) : (
-              <>
-                <b>Révision fermée pour la section {ordre.section}.</b> Ouvrez-la pour que le chef corrige ce tableau et les autres de sa section.
-              </>
+          {/* Le chef : demander l'ouverture, ou la correction directe. */}
+          {!dd && !ordre.demande && !manquants.length && mode !== "correction" &&
+            bouton(
+              mode === "relecture" ? "Demander la correction directe" : "Demander au DD d'ouvrir la révision",
+              "demanderOrdre",
+              "bg-primary text-white",
+              undefined,
+              `Réviser le tableau « ${titre} ».`
             )}
-          </p>
-          {motif == null ? (
-            <div className="mt-2 flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setRefus(false);
-                  setMotif(ordre.demande?.motif ?? "");
-                }}
-                className="min-h-[44px] rounded-btn bg-green-700 px-4 font-semibold text-white hover:bg-green-800"
-              >
-                {ordre.demande ? "Accepter et ouvrir la révision" : `Ouvrir la révision au chef ${ordre.section}`}
-              </button>
-              {ordre.demande && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setRefus(true);
-                    setMotif("");
-                  }}
-                  className="min-h-[44px] rounded-btn border border-red-700 bg-white px-4 font-semibold text-red-800"
-                >
-                  Refuser
-                </button>
-              )}
-            </div>
-          ) : refus ? (
-            formulaire("Refuser la demande", "refuserDemande", `Demande refusée : le chef ${ordre.section} est prévenu.`, "bg-red-700")
-          ) : (
-            formulaire("Ouvrir la révision", "ordonnerCorrection", `Révision ouverte : le chef ${ordre.section} est prévenu.`)
-          )}
-        </>
-      ) : ordre.demande ? (
-        <p>
-          <b>Votre demande de révision est chez le DD</b> depuis le {depuis(ordre.demande.le)} — vous serez prévenu de sa réponse. En attendant, touchez une case pour la
-          signaler à son arrondissement.
-        </p>
-      ) : (
-        <>
-          <p>
-            <b>Révision fermée.</b> Vous lisez ce tableau et signalez à l&apos;arrondissement ce qui ne va pas (touchez la case). Pour corriger vous-même,
-            demandez au DD d&apos;ouvrir la révision.
-          </p>
-          {motif == null ? (
-            <button
-              type="button"
-              onClick={() => setMotif(`Réviser le tableau « ${titre} ».`)}
-              className="mt-2 min-h-[44px] rounded-btn bg-primary px-4 font-semibold text-white"
-            >
-              Demander au DD d&apos;ouvrir la révision
-            </button>
-          ) : (
-            formulaire("Envoyer la demande", "demanderOrdre", "Demande envoyée au DD.", "bg-primary")
-          )}
-        </>
+        </div>
       )}
       {fait && <p className="mt-2 font-semibold text-green-800">{fait}</p>}
       {erreur && <p className="mt-2 font-semibold text-red-800">{erreur}</p>}
@@ -212,6 +225,109 @@ function BandeauOrdre({
 }
 
 const estRepereCalcule = (x: string) => /^(TOTAL|ÉCART|ECART)/i.test(x.trim());
+
+/** Un point de « À revoir » (src/server/trimestre/saisieTrimestrielle.ts, pointsARevoir). */
+interface PointRevue {
+  genre: "erreur" | "manque" | "ecart" | "variation";
+  texte: string;
+  cases: { ligne: string; colonne?: string }[];
+  numero: number;
+  titre: string;
+  arrondissement: string | null;
+}
+
+const GENRE_POINT: Record<PointRevue["genre"], { texte: string; classe: string }> = {
+  erreur: { texte: "erreur", classe: "bg-red-100 text-red-800" },
+  manque: { texte: "oubli", classe: "bg-amber-100 text-amber-900" },
+  ecart: { texte: "écart", classe: "bg-sky-100 text-sky-900" },
+  variation: { texte: "écart fort sur un an", classe: "bg-sky-100 text-sky-900" },
+};
+
+/**
+ * LA CARTE DU POINT EN COURS (« À revoir », 22 octobre 2026), en tête du
+ * tableau : ce qui ne va pas, puis le geste — corriger et « Enregistrer et
+ * suivant », ou, en relecture, « Rejeter au DA avec motif ». Les cases en cause
+ * sont encadrées dans le tableau, sur le bon arrondissement.
+ */
+function CartePoint({
+  point,
+  rang,
+  total,
+  mode,
+  motif,
+  onMotif,
+  onEnregistrerSuivant,
+  onSuivant,
+  onPrecedent,
+  onRejeter,
+  onQuitter,
+}: {
+  point: PointRevue;
+  rang: number;
+  total: number;
+  /** Null : révision fermée (le chef signale seulement). */
+  mode: ModeRevision | null;
+  motif: string;
+  onMotif: (m: string) => void;
+  onEnregistrerSuivant: () => void;
+  onSuivant: () => void;
+  onPrecedent: (() => void) | null;
+  onRejeter: () => void;
+  onQuitter: () => void;
+}) {
+  const g = GENRE_POINT[point.genre];
+  const corrige = mode === "correction";
+  return (
+    <div data-visite="revue-point" className="mb-3 rounded-md border-2 border-primary bg-white p-3">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs font-semibold uppercase tracking-wide text-primary">
+          À revoir · point {rang} sur {total}
+        </p>
+        <button type="button" onClick={onQuitter} className="min-h-[36px] px-2 text-xs text-gray-600 underline">
+          Quitter « À revoir »
+        </button>
+      </div>
+      <p className="mt-1 text-sm text-gray-900">
+        <span className={`mr-1 rounded px-1.5 py-0.5 text-xs font-semibold ${g.classe}`}>{g.texte}</span>
+        {point.texte}
+      </p>
+      <p className="mt-1 text-xs text-gray-600">
+        {corrige
+          ? "Corrigez dans les cases encadrées ci-dessous. Une case grise vient du mensuel : touchez-la pour voir le détail mois par mois et la corriger."
+          : mode === "relecture"
+            ? "Si c'est faux, rejetez au DA avec un motif : son rapport lui revient, c'est lui qui corrige."
+            : "Révision fermée : vous pouvez signaler la case à l'arrondissement."}
+      </p>
+      {corrige && (
+        <input
+          value={motif}
+          onChange={(e) => onMotif(e.target.value)}
+          placeholder="Pourquoi ce chiffre change (facultatif)"
+          className="mt-2 block min-h-[40px] w-full rounded-input border border-gray-300 px-3 text-sm"
+        />
+      )}
+      <div className="mt-2 grid gap-2 sm:flex sm:flex-wrap">
+        {corrige ? (
+          <button type="button" onClick={onEnregistrerSuivant} className="min-h-[48px] rounded-btn bg-primary px-4 text-sm font-semibold text-white">
+            Enregistrer et suivant →
+          </button>
+        ) : (
+          <button type="button" onClick={onRejeter} className="min-h-[48px] rounded-btn bg-amber-600 px-4 text-sm font-semibold text-white">
+            {mode === "relecture" ? "Rejeter au DA, avec motif" : "Signaler à l'arrondissement"}
+          </button>
+        )}
+        <button type="button" onClick={onSuivant} className="min-h-[48px] rounded-btn border border-gray-400 bg-white px-4 text-sm font-semibold text-gray-800">
+          {corrige ? "Le chiffre est juste, suivant" : "Rien à rejeter, suivant"}
+        </button>
+        {onPrecedent && (
+          <button type="button" onClick={onPrecedent} className="min-h-[44px] px-3 text-sm text-gray-700 underline">
+            ← Point précédent
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
 
 /**
  * UN ARRONDISSEMENT À LA FOIS (21 octobre 2026) : sur un téléphone, le tableau
@@ -282,10 +398,11 @@ function ChoixArrondissement({
 }
 
 /**
- * LA CASE D'UN ARRONDISSEMENT, touchée par le chef hors révision (21 octobre
- * 2026) : ce qu'il peut en faire, d'ici — la signaler à l'arrondissement, ou
- * demander au DD d'ouvrir la révision. Fenêtre par-dessus l'écran : sur un
- * téléphone, elle ne peut pas passer hors de vue.
+ * LA CASE D'UN ARRONDISSEMENT, touchée par le chef hors correction directe (21
+ * et 22 octobre 2026) : ce qu'il peut en faire, d'ici — la signaler (ou, en
+ * relecture, la REJETER au DA avec motif : son rapport lui revient), ou
+ * demander au DD l'ouverture ou la correction directe. Fenêtre par-dessus
+ * l'écran : sur un téléphone, elle ne peut pas passer hors de vue.
  */
 function FenetreCaseArrondissement({
   cellule,
@@ -307,6 +424,7 @@ function FenetreCaseArrondissement({
   const [erreur, setErreur] = useState<string | null>(null);
   const o = grille.ordreSection;
   const manquants = o?.depotsManquants ?? [];
+  const relecture = o?.enCours?.mode === "relecture";
 
   async function demander() {
     setOccupe(true);
@@ -343,32 +461,38 @@ function FenetreCaseArrondissement({
         <p className="mt-1 font-semibold text-gray-900">{cellule.libelle}</p>
         <p className="mt-2 text-2xl font-bold text-blue-900">{cellule.valeur ?? "—"}</p>
         <p className="mt-2 text-sm text-gray-700">
-          Cette case est le travail du DA{cellule.territoire ? ` de ${cellule.territoire}` : ""}. Vous la corrigez vous-même pendant la révision
-          ouverte par le DD.
+          Cette case est le travail du DA{cellule.territoire ? ` de ${cellule.territoire}` : ""}.{" "}
+          {relecture
+            ? "Relecture : si elle est fausse, rejetez-la au DA avec un motif — son rapport lui revient, c'est lui qui corrige."
+            : "Vous la corrigez vous-même seulement pendant la correction directe ouverte par le DD."}
         </p>
-        <p className="mt-2 rounded-md bg-gray-50 p-2 text-sm text-gray-800">
-          {manquants.length
-            ? `La révision s'ouvrira après le dépôt des rapports de tous les DA — pas encore déposé : ${manquants.join(", ")}.`
-            : o?.demande
-              ? "Votre demande de révision est chez le DD : vous serez prévenu de sa réponse."
-              : "La révision de votre section est fermée."}
-        </p>
+        {!relecture && (
+          <p className="mt-2 rounded-md bg-gray-50 p-2 text-sm text-gray-800">
+            {manquants.length
+              ? `La révision s'ouvrira après le dépôt des rapports de tous les DA — pas encore déposé : ${manquants.join(", ")}.`
+              : o?.demande
+                ? "Votre demande est chez le DD : vous serez prévenu de sa réponse."
+                : "La révision de votre section est fermée."}
+          </p>
+        )}
         <div className="mt-3 grid gap-2">
           <button
             type="button"
             onClick={onSignaler}
             className="min-h-[48px] rounded-btn bg-amber-600 px-4 text-sm font-semibold text-white hover:bg-amber-700"
           >
-            Signaler cette case {cellule.territoire ? `à ${cellule.territoire}` : "à l'arrondissement"}
+            {relecture
+              ? `Rejeter au DA${cellule.territoire ? ` de ${cellule.territoire}` : ""}, avec motif`
+              : `Signaler cette case ${cellule.territoire ? `à ${cellule.territoire}` : "à l'arrondissement"}`}
           </button>
-          {!manquants.length && !o?.demande && !o?.enCours && !fait && (
+          {!manquants.length && !o?.demande && o?.enCours?.mode !== "correction" && !fait && (
             <button
               type="button"
               disabled={occupe}
               onClick={() => void demander()}
               className="min-h-[48px] rounded-btn bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-dark disabled:opacity-50"
             >
-              {occupe ? "Envoi…" : "Demander au DD d'ouvrir la révision"}
+              {occupe ? "Envoi…" : relecture ? "Demander la correction directe au DD" : "Demander au DD d'ouvrir la révision"}
             </button>
           )}
           {fait && <p className="font-semibold text-green-800">{fait}</p>}
@@ -393,6 +517,7 @@ type EtatOrigine = {
 import { cibles, cibleTrimestrielle } from "@/lib/surlignage";
 import VisiteGuidee from "@/components/VisiteGuidee";
 import SignalerPanneau, { envoyerObservation } from "@/components/SignalerPanneau";
+import { preparerRetour, lireRetour, oublierRetour } from "@/lib/retourTrimestre";
 import { useUtilisateur } from "@/components/UtilisateurContexte";
 
 type EtatCase = "saisie" | "calculee" | "total" | "lecture";
@@ -421,7 +546,7 @@ interface Grille {
   ordreSection?: {
     chef: string;
     section: string;
-    enCours: { motif: string; le: string } | null;
+    enCours: { motif: string; le: string; mode: ModeRevision } | null;
     demande: { motif: string; le: string } | null;
     depotsManquants?: string[];
   };
@@ -540,6 +665,19 @@ export default function SaisieTrimestrielleClient({
   const [focus, setFocus] = useState<string | null>(null);
   /** La case d'un arrondissement touchée par le chef, hors révision : que peut-il en faire ? */
   const [caseArr, setCaseArr] = useState<{ ligne: string; colonne: string; libelle: string; valeur: string | null; territoire: string | null } | null>(null);
+  /**
+   * « À REVOIR » (décision du Délégué, 22 octobre 2026) : ce que le SID a
+   * repéré dans les tableaux de la section, point par point — le chef corrige
+   * (ou rejette au DA, en relecture), puis « suivant ». Gardé pour l'onglet :
+   * parti corriger un mois, il reprend au même point.
+   */
+  const [revue, setRevue] = useState<{ points: PointRevue[]; i: number; mode: ModeRevision | null } | null>(null);
+  const [revueChargement, setRevueChargement] = useState(false);
+  /** Pourquoi ce chiffre change : facultatif, part au journal avec les cases du point. */
+  const [motifRevue, setMotifRevue] = useState("");
+  const motifRevueRef = useRef("");
+  motifRevueRef.current = motifRevue;
+  const cleRevue = `sid-revue|${username}|${annee}-${trimestre}`;
 
   const urlGrille = useCallback(
     (numero: number, liste?: string | null) =>
@@ -626,14 +764,160 @@ export default function SaisieTrimestrielleClient({
   const tableauDemande = useRef<number | null>(
     typeof window === "undefined" ? null : Number(new URLSearchParams(window.location.search).get("tableau")) || null
   );
+  /**
+   * DE RETOUR DU MENSUEL (22 octobre 2026) : l'adresse porte la case d'où l'on
+   * était parti — `retour=1&ligne=…&colonne=…` (et `focus`, `version`, `revue`).
+   * Le tableau se rouvre sur le même arrondissement, puis la même case.
+   */
+  const retourDemande = useRef<{ ligne: string; colonne: string; focus: string | null; version: string | null } | null>(
+    (() => {
+      if (typeof window === "undefined") return null;
+      const p = new URLSearchParams(window.location.search);
+      if (!p.get("retour") || !p.get("ligne") || !p.get("colonne")) return null;
+      return { ligne: p.get("ligne")!, colonne: p.get("colonne")!, focus: p.get("focus"), version: p.get("version") };
+    })()
+  );
+  const revueDemandee = useRef(typeof window !== "undefined" && Boolean(new URLSearchParams(window.location.search).get("revue")));
+
   useEffect(() => {
     const n = tableauDemande.current;
     if (n == null || !liste?.tableaux.some((t) => t.numero === n)) return;
     tableauDemande.current = null;
+    const r = retourDemande.current;
+    if (r) {
+      versionRef.current = r.version;
+      setVersion(r.version);
+      setFocus(r.focus);
+    }
     setOuvert(n);
     setGrille(null);
     void chargerGrille(n);
   }, [liste, chargerGrille]);
+
+  // La grille est là : on rouvre la case, et l'on dit ce que le mensuel corrigé a changé.
+  useEffect(() => {
+    const r = retourDemande.current;
+    if (!r || !grille) return;
+    retourDemande.current = null;
+    const l = grille.lignes.find((x) => x.cle === r.ligne);
+    const c = l?.cases.find((x) => x.colonne === r.colonne);
+    const avant = lireRetour()?.avant ?? null;
+    oublierRetour();
+    if (!l || !c) return;
+    const maintenant = c.affiche ?? "—";
+    setInfo(
+      `De retour du mensuel — ${l.libelle || l.cle} · ${c.colonne} : ` +
+        (avant != null && avant !== maintenant ? `le trimestre affiche maintenant ${maintenant} (avant : ${avant}).` : `le trimestre affiche ${maintenant}.`) +
+        " Un mois corrigé ne compte qu'une fois son rapport transmis."
+    );
+    if (c.etat === "calculee") void ouvrirOrigine(grille.numero, l, c);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [grille]);
+
+  /** « D'où vient ce chiffre ? » d'une case grise — et le chemin du retour, si l'on part vers le mois. */
+  async function ouvrirOrigine(numero: number, l: Grille["lignes"][number], c: CaseGrille) {
+    const cellule = { numero, ligne: l.cle, colonne: c.colonne };
+    preparerRetour({ url: urlDeRetour(numero, l.cle, c.colonne), libelle: libelleDeRetour(numero, l, c), avant: c.affiche });
+    setOrigine({ chargement: true, cellule });
+    try {
+      const q = new URLSearchParams({ annee: String(annee), trimestre: String(trimestre), tableau: String(numero), origine: "1", ligne: l.cle, colonne: c.colonne });
+      const j = await (await fetch(`/api/trimestre/saisie?${q}`, { cache: "no-store" })).json();
+      setOrigine({ chargement: false, cellule, donnees: j.origine, message: j.origine ? undefined : j.message ?? "Détail indisponible.", correction: j.correction ?? null });
+    } catch {
+      setOrigine({ chargement: false, cellule, message: "Le détail demande du réseau : réessayez une fois connecté." });
+    }
+  }
+
+  /** L'adresse qui ramène à cette case : tableau, arrondissement affiché, liste, « À revoir ». */
+  function urlDeRetour(numero: number, ligne: string, colonne: string) {
+    const q = new URLSearchParams({ tableau: String(numero), retour: "1", ligne, colonne });
+    if (focus) q.set("focus", focus);
+    if (versionRef.current) q.set("version", versionRef.current);
+    if (revue) q.set("revue", "1");
+    return `/trimestre/saisie?${q}`;
+  }
+  function libelleDeRetour(numero: number, l: Grille["lignes"][number], c: CaseGrille) {
+    const ligne = l.libelle || l.cle;
+    const lieu = versionRef.current && !ligne.includes(versionRef.current) ? `${versionRef.current}, ` : "";
+    return `tableau n° ${numero} — ${lieu}${ligne} · ${c.colonne}`;
+  }
+
+  // Le panneau pour signaler (ou rejeter) : amené sous les yeux, même sur un téléphone.
+  useEffect(() => {
+    if (aSignaler) setTimeout(() => document.getElementById("panneau-signaler")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+  }, [aSignaler]);
+
+  // « À revoir » : gardé pour l'onglet, repris au retour du mensuel.
+  useEffect(() => {
+    try {
+      if (revue) sessionStorage.setItem(cleRevue, JSON.stringify(revue));
+      else sessionStorage.removeItem(cleRevue);
+    } catch {
+      // sans conséquence : la liste se recalcule
+    }
+  }, [revue, cleRevue]);
+
+  async function commencerRevue() {
+    setRevueChargement(true);
+    setErreur(null);
+    try {
+      const r = await fetch(`/api/trimestre/saisie?annee=${annee}&trimestre=${trimestre}&revue=1`, { cache: "no-store" });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.message ?? "La liste n'a pas pu être établie.");
+      // Seulement les tableaux que cet écran sait ouvrir.
+      const points = (j.points as PointRevue[]).filter((p) => liste?.tableaux.some((t) => t.numero === p.numero));
+      const r2 = { points, i: 0, mode: (j.mode ?? null) as ModeRevision | null };
+      setRevue(r2);
+      if (points.length) allerAuPoint(r2, 0);
+      else setInfo("Rien à revoir : le SID n'a repéré ni erreur, ni oubli, ni écart fort dans les tableaux de votre section.");
+    } catch (e) {
+      setErreur(typeof navigator !== "undefined" && !navigator.onLine ? "« À revoir » demande du réseau." : e instanceof Error ? e.message : "La liste n'a pas pu être établie.");
+    } finally {
+      setRevueChargement(false);
+    }
+  }
+
+  function allerAuPoint(r: { points: PointRevue[]; i: number; mode: ModeRevision | null }, i: number) {
+    setMotifRevue("");
+    setOrigine(null);
+    setInfo(null);
+    if (i >= r.points.length) {
+      setRevue({ ...r, i: r.points.length });
+      retourALaListe();
+      return;
+    }
+    setRevue({ ...r, i });
+    const p = r.points[i];
+    if (ouvert !== p.numero) ouvrir(p.numero, true);
+    setFocus(p.arrondissement ?? null);
+  }
+
+  /** « Enregistrer et suivant » : la case en cours de frappe part d'abord, puis le point suivant. */
+  async function enregistrerEtSuivant() {
+    if (!revue) return;
+    (document.activeElement as HTMLElement | null)?.blur?.();
+    await new Promise((r) => setTimeout(r, 0));
+    await fileEnregistrements.current;
+    allerAuPoint(revue, revue.i + 1);
+  }
+
+  // `?revue=1` : on reprend « À revoir » là où on l'avait laissé, sinon on le commence.
+  useEffect(() => {
+    if (!liste || !revueDemandee.current) return;
+    revueDemandee.current = false;
+    let gardee: typeof revue = null;
+    try {
+      gardee = JSON.parse(sessionStorage.getItem(cleRevue) ?? "null");
+    } catch {
+      gardee = null;
+    }
+    if (gardee?.points?.length) {
+      setRevue(gardee);
+      // De retour du mensuel, le tableau se rouvre déjà sur la case : on ne bouge pas.
+      if (!retourDemande.current && gardee.i < gardee.points.length) allerAuPoint(gardee, gardee.i);
+    } else if (!retourDemande.current) void commencerRevue();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [liste]);
 
   /** Changer de liste (tableau sans maille) : la grille se relit au serveur. */
   function choisirVersion(numero: number, liste: string | null) {
@@ -712,10 +996,16 @@ export default function SaisieTrimestrielleClient({
         cle: `saisie|${annee}|${trimestre}|${grille.numero}|${ligne}|${colonne}${liste ? `|${liste}` : ""}`,
         methode: "PUT",
         url: "/api/trimestre/saisie",
-        corps: { annee, trimestre, numeroTableau: grille.numero, ligne, colonne, valeur, ...(liste ? { version: liste } : {}) },
+        corps: {
+          annee, trimestre, numeroTableau: grille.numero, ligne, colonne, valeur,
+          ...(liste ? { version: liste } : {}),
+          ...(motifRevueRef.current.trim() ? { motif: motifRevueRef.current.trim() } : {}),
+        },
         libelle: `${grille.titre}${liste ? ` (liste de ${liste})` : ""} — ${ligne} / ${colonne} : ${valeur || "(effacé)"}`,
       });
       if (resultat.statut === "refuse") {
+        // Le refus peut mener au mois (« Ouvrir le mois ») : le chemin du retour, vers cette case.
+        preparerRetour({ url: urlDeRetour(grille.numero, ligne, colonne), libelle: `tableau n° ${grille.numero} — ${ligne} · ${colonne}`, avant: null });
         annuler(resultat.message);
         setControle((resultat.details?.controle as ControleCategories | undefined) ?? null);
         return;
@@ -910,6 +1200,35 @@ export default function SaisieTrimestrielleClient({
           </span>
         </p>
 
+        {revue && revue.i < revue.points.length && revue.points[revue.i].numero === courant.numero && (
+          <div className="mt-3">
+            <CartePoint
+              point={revue.points[revue.i]}
+              rang={revue.i + 1}
+              total={revue.points.length}
+              // Le mode du moment (le DD a pu le changer depuis le début de « À revoir ») ; le BAC corrige toujours.
+              mode={grille?.ordreSection ? grille.ordreSection.enCours?.mode ?? null : revue.mode}
+              motif={motifRevue}
+              onMotif={setMotifRevue}
+              onEnregistrerSuivant={() => void enregistrerEtSuivant()}
+              onSuivant={() => allerAuPoint(revue, revue.i + 1)}
+              onPrecedent={revue.i > 0 ? () => allerAuPoint(revue, revue.i - 1) : null}
+              onRejeter={() => {
+                // La case du point (la première) ; un point de ligne : sa première case non calculée.
+                const p = revue.points[revue.i];
+                const avecColonne = p.cases.find((x) => x.colonne);
+                const l = grille?.lignes.find((x) => x.cle === (avecColonne ?? p.cases[0])?.ligne);
+                const c = avecColonne ? l?.cases.find((x) => x.colonne === avecColonne.colonne) : l?.cases.find((x) => !estRepereCalcule(x.colonne));
+                if (!l || !c) {
+                  setErreur("Ce point ne vise pas une case précise : signalez-la depuis le tableau.");
+                  return;
+                }
+                setASignaler({ ligne: l.cle, colonne: c.colonne, libelle: `${l.libelle || l.cle} · ${c.colonne}`, valeur: c.saisi ?? c.affiche });
+              }}
+              onQuitter={() => setRevue(null)}
+            />
+          </div>
+        )}
         {erreur && <p className="mt-3 rounded-md bg-red-50 p-3 text-sm text-red-800">{erreur}</p>}
         {info && <p className="mt-3 rounded-md bg-blue-50 p-3 text-sm text-blue-900">{info}</p>}
         <div className="mt-3">
@@ -1011,10 +1330,15 @@ export default function SaisieTrimestrielleClient({
             </div>
           )}
           {aSignaler && grille && (
+            <div id="panneau-signaler" className="scroll-mt-20">
             <SignalerPanneau
               titre={`Tableau ${grille.numero} · ${aSignaler.libelle}`}
               valeur={aSignaler.valeur}
-              destinataire="l'arrondissement concerné"
+              destinataire={
+                grille.ordreSection?.enCours?.mode === "relecture"
+                  ? "le DA de l'arrondissement — son rapport lui revient pour correction"
+                  : "l'arrondissement concerné"
+              }
               onFermer={() => setASignaler(null)}
               onEnvoyer={async (texte) => {
                 const { erreur: e, donnees } = await envoyerObservation({
@@ -1024,10 +1348,17 @@ export default function SaisieTrimestrielleClient({
                 if (e) return e;
                 setASignaler(null);
                 setModeSignaler(false);
-                setInfo(donnees.rouvert ? "Observation envoyée. Le rapport de l'arrondissement était transmis : il lui est renvoyé." : "Observation envoyée à l'arrondissement.");
+                // « À revoir » : le point est traité, on passe au suivant.
+                if (revue && revue.i < revue.points.length) allerAuPoint(revue, revue.i + 1);
+                setInfo(
+                  donnees.rouvert
+                    ? "Rejet envoyé : le rapport de l'arrondissement lui est renvoyé pour correction, avec votre motif."
+                    : "Observation envoyée à l'arrondissement (son rapport lui était déjà rendu)."
+                );
                 return null;
               }}
             />
+            </div>
           )}
           {grille && grille.numero === courant.numero && (
             <TableauSaisie
@@ -1057,19 +1388,13 @@ export default function SaisieTrimestrielleClient({
               }
               signalement={modeSignaler}
               onSignaler={(l, c) => setASignaler({ ligne: l.cle, colonne: c.colonne, libelle: `${l.libelle || l.cle} · ${c.colonne}`, valeur: c.saisi ?? c.affiche })}
-              onOrigine={async (l, c) => {
-                const cellule = { numero: grille.numero, ligne: l.cle, colonne: c.colonne };
-                setOrigine({ chargement: true, cellule });
-                try {
-                  const q = new URLSearchParams({ annee: String(annee), trimestre: String(trimestre), tableau: String(grille.numero), origine: "1", ligne: l.cle, colonne: c.colonne });
-                  const j = await (await fetch(`/api/trimestre/saisie?${q}`, { cache: "no-store" })).json();
-                  setOrigine({ chargement: false, cellule, donnees: j.origine, message: j.origine ? undefined : j.message ?? "Détail indisponible.", correction: j.correction ?? null });
-                } catch {
-                  setOrigine({ chargement: false, cellule, message: "Le détail demande du réseau : réessayez une fois connecté." });
-                }
-              }}
+              onOrigine={(l, c) => void ouvrirOrigine(grille.numero, l, c)}
               origine={origine}
-              onFermerOrigine={() => setOrigine(null)}
+              onFermerOrigine={() => {
+                setOrigine(null);
+                preparerRetour(null);
+              }}
+              vises={revue && revue.i < revue.points.length && revue.points[revue.i].numero === grille.numero ? revue.points[revue.i].cases : undefined}
               periode={{ annee, trimestre }}
               onCorrige={() => {
                 setOrigine(null);
@@ -1173,6 +1498,55 @@ export default function SaisieTrimestrielleClient({
       </div>
 
       {erreur && <p className="mt-3 rounded-md bg-red-50 p-3 text-sm text-red-800">{erreur}</p>}
+      {info && <p className="mt-3 rounded-md bg-blue-50 p-3 text-sm text-blue-900">{info}</p>}
+
+      {/* « À revoir » : le chemin le plus court vers ce qui ne va pas (chefs de section, 22 octobre 2026). */}
+      {moi?.role.startsWith("CHEF_") && (
+        <section data-visite="revue-carte" className="mt-4 rounded-md border-2 border-primary bg-white p-4">
+          {revue && revue.i >= revue.points.length ? (
+            <>
+              <p className="font-semibold text-primary-dark">« À revoir » parcouru : {revue.points.length} point{revue.points.length > 1 ? "s" : ""} vu{revue.points.length > 1 ? "s" : ""}.</p>
+              <p className="mt-1 text-sm text-gray-700">
+                Relancez la liste pour voir ce qui reste après vos corrections. Quand tout est bon, validez votre section : la révision se fermera et chaque DA
+                recevra le bilan.
+              </p>
+              <div className="mt-3 grid gap-2 sm:flex">
+                <button type="button" disabled={revueChargement} onClick={() => void commencerRevue()} className="min-h-[48px] rounded-btn bg-primary px-4 text-sm font-semibold text-white disabled:opacity-50">
+                  {revueChargement ? "Recherche…" : "Voir ce qui reste à revoir"}
+                </button>
+                <a href="/trimestre/circuit" className="flex min-h-[48px] items-center justify-center rounded-btn border border-primary px-4 text-sm font-semibold text-primary">
+                  Valider ma section →
+                </a>
+              </div>
+            </>
+          ) : revue ? (
+            <>
+              <p className="font-semibold text-primary-dark">
+                « À revoir » en cours : point {revue.i + 1} sur {revue.points.length}.
+              </p>
+              <div className="mt-3 grid gap-2 sm:flex">
+                <button type="button" onClick={() => allerAuPoint(revue, revue.i)} className="min-h-[48px] rounded-btn bg-primary px-4 text-sm font-semibold text-white">
+                  Reprendre au point {revue.i + 1} →
+                </button>
+                <button type="button" onClick={() => setRevue(null)} className="min-h-[44px] px-3 text-sm text-gray-700 underline">
+                  Quitter « À revoir »
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="font-semibold text-primary-dark">À revoir</p>
+              <p className="mt-1 text-sm text-gray-700">
+                Le SID a relevé, dans les tableaux de votre section, les erreurs, les oublis des DA et les écarts forts sur un an. Il vous y mène un par un : vous
+                corrigez — ou, en relecture, vous rejetez au DA —, puis « suivant ».
+              </p>
+              <button type="button" disabled={revueChargement} onClick={() => void commencerRevue()} className="mt-3 min-h-[48px] w-full rounded-btn bg-primary px-4 text-sm font-semibold text-white disabled:opacity-50 sm:w-auto">
+                {revueChargement ? "Recherche des points…" : "Commencer au premier point →"}
+              </button>
+            </>
+          )}
+        </section>
+      )}
 
       {liste.nonClassees.length > 0 && (
         <div className="mt-4 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm">
@@ -1400,7 +1774,10 @@ function TableauSaisie({
   entier = false,
   focus = null,
   onCaseArrondissement,
+  vises,
 }: {
+  /** « À revoir » : les cases du point en cours, encadrées (colonne absente : toute la ligne). */
+  vises?: { ligne: string; colonne?: string }[];
   /** Un seul arrondissement à l'écran (sa ligne, ou sa colonne), en formulaire. */
   focus?: string | null;
   /** Le chef touche la case d'un arrondissement hors révision : signaler, demander la révision. */
@@ -1436,6 +1813,9 @@ function TableauSaisie({
 }) {
   const colonnes = grille.lignes[0]?.cases.map((c) => c.colonne) ?? [];
   const lignesSaisies = grille.lignes.filter((l) => l.cases.some((c) => c.etat === "saisie"));
+  /** La case est-elle en cause dans le point « À revoir » en cours ? */
+  const vise = (ligne: string, colonne: string) => Boolean(vises?.some((v) => v.ligne === ligne && (!v.colonne || v.colonne === colonne)));
+  const VISE = "rounded bg-amber-50 ring-2 ring-amber-500";
   // Les colonnes où ce profil saisit : une seule pour un DA quand les
   // arrondissements sont en colonnes (personnel, infrastructures…).
   const colonnesSaisies = Array.from(
@@ -1595,7 +1975,7 @@ function TableauSaisie({
             .filter((l) => l.cle === focus)
             .flatMap((l) =>
               l.cases.map((c) => (
-                <label key={c.colonne} className="grid grid-cols-[1fr,9rem] items-center gap-3 rounded text-sm">
+                <label key={c.colonne} className={`grid grid-cols-[1fr,9rem] items-center gap-3 rounded p-0.5 text-sm ${vise(l.cle, c.colonne) ? VISE : ""}`}>
                   <span className={c.etat === "saisie" ? "text-gray-800" : "font-medium text-gray-600"}>{c.colonne}</span>
                   {champ(l, c, true)}
                 </label>
@@ -1609,7 +1989,7 @@ function TableauSaisie({
             const c = l.cases.find((x) => x.colonne === focus);
             if (!c) return null;
             return (
-              <label key={l.cle} className="grid grid-cols-[1fr,9rem] items-center gap-3 rounded text-sm">
+              <label key={l.cle} className={`grid grid-cols-[1fr,9rem] items-center gap-3 rounded p-0.5 text-sm ${vise(l.cle, c.colonne) ? VISE : ""}`}>
                 <span className={c.etat === "saisie" ? "text-gray-800" : "font-medium text-gray-600"}>{l.libelle || l.cle}</span>
                 {champ(l, c, true)}
               </label>
@@ -1674,7 +2054,11 @@ function TableauSaisie({
                     {l.libelle || l.cle}
                   </th>
                   {l.cases.map((c) => (
-                    <td key={c.colonne} data-cible={cibleTrimestrielle.case(l.cle, c.colonne)} className="border border-gray-200 p-0">
+                    <td
+                      key={c.colonne}
+                      data-cible={cibleTrimestrielle.case(l.cle, c.colonne)}
+                      className={`border border-gray-200 p-0 ${vise(l.cle, c.colonne) ? "outline outline-2 -outline-offset-2 outline-amber-500" : ""}`}
+                    >
                       {champ(l, c)}
                     </td>
                   ))}

@@ -12,6 +12,7 @@
  */
 import { useState } from "react";
 import { allerAuMois } from "@/lib/allerAuMois";
+import { partirVersLeMois } from "@/lib/retourTrimestre";
 
 export interface ControleCategories {
   tableau: number;
@@ -67,6 +68,8 @@ export default function ComparaisonMensuel({
     setErreur(null);
     setOuverture(periodeId);
     try {
+      // Le chemin du retour : la barre « Revenir au trimestre » ramènera au tableau.
+      partirVersLeMois();
       await allerAuMois(periodeId, arrondissement && c.mensuel ? `/da/saisie/${c.mensuel.code}` : "/dd/donnees");
     } catch (e) {
       setErreur(e instanceof Error ? e.message : "Ouverture impossible.");

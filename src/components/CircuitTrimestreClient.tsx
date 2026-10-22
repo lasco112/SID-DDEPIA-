@@ -28,6 +28,9 @@ interface Arrondissement {
   corrections?: { cases: number; tableaux: number[] };
 }
 
+/** La révision : relecture (le chef rejette au DA) ou correction directe (il corrige). */
+type Mode = "relecture" | "correction";
+
 interface Section {
   code: string;
   chef: string;
@@ -39,8 +42,8 @@ interface Section {
   motif: string | null;
   /** Une section technique : sa révision des tableaux s'ouvre par le DD (pas le BAC). */
   sousRevision?: boolean;
-  /** La révision ouverte par le DD pour ce chef (20-21 octobre 2026). */
-  ordre?: { motif: string; le: string; auteur: string | null } | null;
+  /** La révision ouverte par le DD pour ce chef, et son mode (20-22 octobre 2026). */
+  ordre?: { motif: string; le: string; ouverteLe?: string; mode: Mode; auteur: string | null } | null;
   /** La demande d'ouverture du chef, en attente de la réponse du DD. */
   demande?: { motif: string; le: string; auteur: string | null } | null;
   /** Révision ouverte : ce que le chef a déjà changé. */
@@ -106,7 +109,12 @@ export default function CircuitTrimestreClient({ username }: { username: string 
   /** Le DD valide les corrections d'un rapport renvoyé (20 octobre 2026). */
   const [validation, setValidation] = useState<{ id: string; commentaire: string } | null>(null);
   /** La révision des tableaux : le DD l'ouvre (ou refuse la demande), le chef la demande — un mot facultatif. */
-  const [revision, setRevision] = useState<{ code: string; action: "ordonnerCorrection" | "refuserDemande" | "demanderOrdre" | "ouvrirRevisionTous"; motif: string } | null>(null);
+  const [revision, setRevision] = useState<{
+    code: string;
+    action: "ordonnerCorrection" | "refuserDemande" | "demanderOrdre" | "ouvrirRevisionTous";
+    motif: string;
+    mode?: Mode;
+  } | null>(null);
   /** Le DD prend le relais : quelle étape, et pourquoi. */
   const [relais, setRelais] = useState<{ cle: string; corps: Record<string, unknown>; motif: string } | null>(null);
 
@@ -207,10 +215,12 @@ export default function CircuitTrimestreClient({ username }: { username: string 
   const sien = etat.role === "DA" || etat.role === "AGENT_SAISIE" ? etat.arrondissements[0] : null;
 
   /**
-   * LA RÉVISION DES TABLEAUX (décision du Délégué, 21 octobre 2026) : le DD
-   * l'ouvre aux chefs de section — un par un, à leur demande ou non, ou à tous
-   * d'un coup —, jamais avant le dépôt des rapports de tous les DA. Elle se
-   * ferme quand le chef valide sa section, ou quand le DD la ferme.
+   * LA RÉVISION DES TABLEAUX (décisions du Délégué, 21 et 22 octobre 2026) : le
+   * DD l'ouvre aux chefs de section — un par un, à leur demande ou non, ou à
+   * tous d'un coup —, jamais avant le dépôt des rapports de tous les DA, dans
+   * le mode qu'il choisit : RELECTURE (le chef rejette au DA, qui corrige) ou
+   * CORRECTION DIRECTE (le chef corrige lui-même, quand le temps presse). Elle
+   * se ferme quand le chef valide sa section, ou quand le DD la ferme.
    */
   function blocRevision() {
     if (!etat) return null;
@@ -218,11 +228,14 @@ export default function CircuitTrimestreClient({ username }: { username: string 
     const techniques = etat.sections.filter((s) => s.sousRevision);
     const manquants = etat.arrondissements.filter((a) => a.statut !== "TRANSMIS").map((a) => a.nom);
     const ouvertes = techniques.filter((s) => s.ordre);
-    const fermees = techniques.filter((s) => !s.ordre);
     const enClair = (b: NonNullable<Section["bilan"]>) =>
       b.cases === 0
         ? "aucune case modifiée pour l'instant"
         : `${b.cases} case${b.cases > 1 ? "s" : ""} modifiée${b.cases > 1 ? "s" : ""} (tableau${b.tableaux.length > 1 ? "x" : ""} n° ${b.tableaux.join(", ")})`;
+    const MODE: Record<Mode, { texte: string; classe: string; bouton: string }> = {
+      relecture: { texte: "Relecture", classe: "bg-sky-100 text-sky-900", bouton: "bg-sky-700 hover:bg-sky-800" },
+      correction: { texte: "Correction directe", classe: "bg-green-100 text-green-800", bouton: "bg-green-700 hover:bg-green-800" },
+    };
     const formulaire = (code: string, envoyer: string, placeholder: string, classe: string) =>
       revision?.code === code && (
         <div className="mt-2">
@@ -237,7 +250,9 @@ export default function CircuitTrimestreClient({ username }: { username: string 
             <button
               type="button"
               disabled={occupe}
-              onClick={() => void agir({ action: revision.action, section: code === "tous" ? undefined : code, motif: revision.motif })}
+              onClick={() =>
+                void agir({ action: revision.action, section: code === "tous" ? undefined : code, motif: revision.motif, mode: revision.mode })
+              }
               className={`min-h-[44px] flex-1 rounded-md px-3 py-2 text-sm font-semibold text-white disabled:opacity-50 ${classe}`}
             >
               {envoyer}
@@ -248,58 +263,92 @@ export default function CircuitTrimestreClient({ username }: { username: string 
           </div>
         </div>
       );
+    /** Les deux boutons du DD : ouvrir (ou passer) en relecture, en correction directe. */
+    const deuxModes = (code: string, action: "ordonnerCorrection" | "ouvrirRevisionTous", sauf: Mode | null, prefixe: string, motif = "") => (
+      <div className="mt-2 flex flex-wrap gap-2">
+        {(["relecture", "correction"] as Mode[])
+          .filter((m) => m !== sauf)
+          .map((m) => (
+            <button
+              key={m}
+              type="button"
+              data-visite={m === "correction" ? "circuit-ordre-correction" : "circuit-ordre-relecture"}
+              onClick={() => setRevision({ code, action, motif, mode: m })}
+              className={`min-h-[44px] rounded-md px-3 py-2 text-sm font-semibold text-white ${MODE[m].bouton}`}
+            >
+              {prefixe} {m === "relecture" ? "en relecture" : "en correction directe"}
+            </button>
+          ))}
+      </div>
+    );
+    const formulaireMode = (code: string) =>
+      revision?.code === code &&
+      (revision.action === "ordonnerCorrection" || revision.action === "ouvrirRevisionTous") &&
+      revision.mode &&
+      formulaire(
+        code,
+        revision.mode === "relecture" ? "Confirmer : relecture" : "Confirmer : correction directe",
+        revision.mode === "relecture"
+          ? "Un mot pour le chef (facultatif) : ce qu'il doit relire et rejeter au DA."
+          : "Un mot pour le chef (facultatif) : ce qu'il doit corriger en priorité.",
+        MODE[revision.mode].bouton
+      );
 
     return (
       <section className="mt-5">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">Révision des tableaux par les chefs de section</h2>
         <div data-visite="circuit-revision" className="mt-2 rounded-md border border-gray-200 bg-white">
-          <p className={`m-3 rounded-md p-3 text-sm ${manquants.length ? "bg-gray-50 text-gray-700" : "bg-green-50 text-green-900"}`}>
-            {manquants.length
-              ? `La révision s'ouvre après le dépôt des rapports de tous les DA. Pas encore déposé : ${manquants.join(", ")}.`
-              : dd
-                ? "Tous les rapports des DA sont déposés. Ouvrez la révision : le chef corrige alors les tableaux de sa section, pour tous les arrondissements. Elle se ferme quand il valide sa section, ou quand vous la fermez."
-                : "Tous les rapports des DA sont déposés. Le DD ouvre la révision des tableaux : demandez-la s'il vous faut corriger."}
-          </p>
+          <div className={`m-3 rounded-md p-3 text-sm ${manquants.length ? "bg-gray-50 text-gray-700" : "bg-green-50 text-green-900"}`}>
+            {manquants.length ? (
+              <p>La révision s&apos;ouvre après le dépôt des rapports de tous les DA. Pas encore déposé : {manquants.join(", ")}.</p>
+            ) : dd ? (
+              <>
+                <p>Tous les rapports des DA sont déposés. Ouvrez la révision à un chef, dans le mode de votre choix :</p>
+                <ul className="mt-1 list-disc pl-5">
+                  <li>
+                    <strong>relecture</strong> : il relit et rejette au DA, avec un motif ; c&apos;est le DA qui corrige ;
+                  </li>
+                  <li>
+                    <strong>correction directe</strong> : quand le temps presse, il corrige lui-même, pour tous les arrondissements.
+                  </li>
+                </ul>
+                <p className="mt-1">Elle se ferme quand il valide sa section, ou quand vous la fermez.</p>
+              </>
+            ) : (
+              <p>Tous les rapports des DA sont déposés. Le DD ouvre la révision : en relecture ou en correction directe.</p>
+            )}
+          </div>
           {dd && !manquants.length && (
             <div className="px-3 pb-3">
-              <div className="flex flex-wrap gap-2">
-                {fermees.length > 0 && revision?.code !== "tous" && (
-                  <button
-                    type="button"
-                    data-visite="circuit-revision-tous"
-                    onClick={() => setRevision({ code: "tous", action: "ouvrirRevisionTous", motif: "" })}
-                    className="min-h-[44px] rounded-md bg-green-700 px-4 py-2 text-sm font-semibold text-white hover:bg-green-800"
-                  >
-                    Ouvrir la révision à toutes les sections
-                  </button>
-                )}
-                {ouvertes.length > 1 && (
-                  <button
-                    type="button"
-                    disabled={occupe}
-                    onClick={() =>
-                      void agir(
-                        { action: "fermerRevisionTous" },
-                        "Fermer toutes les révisions ouvertes ? Les chefs ne pourront plus corriger ; leurs corrections déjà faites restent, et chaque DA reçoit le bilan."
-                      )
-                    }
-                    className="min-h-[44px] rounded-md border border-gray-500 bg-white px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50"
-                  >
-                    Fermer toutes les révisions
-                  </button>
-                )}
-              </div>
-              {formulaire("tous", "Ouvrir à toutes les sections", "Un mot pour les chefs (facultatif) : ce qu'il faut revoir en priorité.", "bg-green-700 hover:bg-green-800")}
+              <p className="text-sm font-semibold text-gray-800">Toutes les sections d&apos;un coup :</p>
+              {revision?.code !== "tous" && deuxModes("tous", "ouvrirRevisionTous", null, "Ouvrir")}
+              {formulaireMode("tous")}
+              {ouvertes.length > 1 && (
+                <button
+                  type="button"
+                  disabled={occupe}
+                  onClick={() =>
+                    void agir(
+                      { action: "fermerRevisionTous" },
+                      "Fermer toutes les révisions ouvertes ? Les chefs ne pourront plus corriger ; leurs corrections déjà faites restent, et chaque DA reçoit le bilan."
+                    )
+                  }
+                  className="mt-2 min-h-[44px] rounded-md border border-gray-500 bg-white px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50"
+                >
+                  Fermer toutes les révisions
+                </button>
+              )}
             </div>
           )}
           <ul className="divide-y divide-gray-100 border-t border-gray-100">
             {techniques.map((s) => {
               const moi = s.chef === etat.role;
               if (!dd && !moi) return null;
-              const statut = s.ordre
-                ? { texte: "Révision ouverte", classe: "bg-green-100 text-green-800" }
+              const mode = s.ordre?.mode ?? null;
+              const statut = mode
+                ? MODE[mode]
                 : s.demande
-                  ? { texte: "Demandée", classe: "bg-sky-100 text-sky-900" }
+                  ? { texte: "Demandée", classe: "bg-amber-100 text-amber-900" }
                   : { texte: "Fermée", classe: "bg-gray-100 text-gray-700" };
               return (
                 <li key={s.code} className="px-3 py-3">
@@ -311,78 +360,82 @@ export default function CircuitTrimestreClient({ username }: { username: string 
                   </div>
                   {s.ordre && (
                     <p className="mt-1 text-sm text-gray-700">
-                      Ouverte le {le(s.ordre.le)} — {s.ordre.motif}
+                      Ouverte le {le(s.ordre.ouverteLe ?? s.ordre.le)} — {s.ordre.motif}
                       {s.bilan && <> · <strong>{enClair(s.bilan)}</strong></>}
                     </p>
                   )}
-                  {!s.ordre && s.demande && (
-                    <p className="mt-1 rounded-input border border-sky-300 bg-sky-50 p-2 text-sm text-sky-950">
-                      {moi ? "Votre demande attend la réponse du DD" : `Le chef ${s.code} demande la révision`} depuis le {le(s.demande.le)} — {s.demande.motif}
+                  {s.demande && (
+                    <p className="mt-1 rounded-input border border-amber-300 bg-amber-50 p-2 text-sm text-amber-950">
+                      {moi ? "Votre demande attend la réponse du DD" : `Le chef ${s.code} demande ${mode === "relecture" ? "la correction directe" : "la révision"}`} depuis le{" "}
+                      {le(s.demande.le)} — {s.demande.motif}
                     </p>
                   )}
 
-                  {/* Le DD : ouvrir, accepter ou refuser la demande, fermer. */}
-                  {dd && s.ordre && (
+                  {/* Le DD : ouvrir dans un mode, passer à l'autre, refuser une demande, fermer. */}
+                  {dd && !manquants.length && revision?.code !== s.code && (
+                    <>
+                      {deuxModes(s.code, "ordonnerCorrection", mode, mode ? "Passer" : s.demande ? "Accepter" : "Ouvrir", s.demande?.motif ?? "")}
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {s.demande && (
+                          <button
+                            type="button"
+                            onClick={() => setRevision({ code: s.code, action: "refuserDemande", motif: "" })}
+                            className="min-h-[40px] rounded-md border border-red-700 bg-white px-3 py-1 text-sm font-semibold text-red-800 hover:bg-red-50"
+                          >
+                            Refuser la demande
+                          </button>
+                        )}
+                        {s.ordre && (
+                          <button
+                            type="button"
+                            disabled={occupe}
+                            onClick={() =>
+                              void agir(
+                                { action: "revoquerOrdre", section: s.code },
+                                `Fermer la révision du chef ${s.code} ? Ses corrections déjà faites restent, et chaque DA reçoit le bilan.`
+                              )
+                            }
+                            className="min-h-[40px] rounded-md border border-gray-500 bg-white px-3 py-1 text-sm font-semibold text-gray-800 hover:bg-gray-50"
+                          >
+                            Fermer la révision
+                          </button>
+                        )}
+                      </div>
+                    </>
+                  )}
+                  {dd && s.ordre && manquants.length > 0 && (
                     <button
                       type="button"
                       disabled={occupe}
-                      onClick={() =>
-                        void agir(
-                          { action: "revoquerOrdre", section: s.code },
-                          `Fermer la révision du chef ${s.code} ? Il ne pourra plus corriger ; ses corrections déjà faites restent, et chaque DA reçoit le bilan.`
-                        )
-                      }
+                      onClick={() => void agir({ action: "revoquerOrdre", section: s.code }, `Fermer la révision du chef ${s.code} ?`)}
                       className="mt-2 min-h-[40px] rounded-md border border-gray-500 bg-white px-3 py-1 text-sm font-semibold text-gray-800 hover:bg-gray-50"
                     >
                       Fermer la révision
                     </button>
                   )}
-                  {dd && !s.ordre && !manquants.length && revision?.code !== s.code && (
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        data-visite="circuit-ordre-correction"
-                        onClick={() => setRevision({ code: s.code, action: "ordonnerCorrection", motif: s.demande?.motif ?? "" })}
-                        className="min-h-[40px] rounded-md bg-green-700 px-3 py-1 text-sm font-semibold text-white hover:bg-green-800"
-                      >
-                        {s.demande ? "Accepter et ouvrir la révision" : "Ouvrir la révision"}
-                      </button>
-                      {s.demande && (
-                        <button
-                          type="button"
-                          onClick={() => setRevision({ code: s.code, action: "refuserDemande", motif: "" })}
-                          className="min-h-[40px] rounded-md border border-red-700 bg-white px-3 py-1 text-sm font-semibold text-red-800 hover:bg-red-50"
-                        >
-                          Refuser
-                        </button>
-                      )}
-                    </div>
-                  )}
-                  {dd &&
-                    revision?.action === "ordonnerCorrection" &&
-                    formulaire(s.code, `Ouvrir la révision ${s.code}`, "Un mot pour le chef (facultatif) : ce qu'il doit revoir.", "bg-green-700 hover:bg-green-800")}
+                  {dd && formulaireMode(s.code)}
                   {dd && revision?.action === "refuserDemande" && formulaire(s.code, "Refuser la demande", "Pourquoi (facultatif) : le chef le lira.", "bg-red-700 hover:bg-red-800")}
                   {dd && !s.ordre && s.statut === "VALIDE" && revision?.code === s.code && revision.action === "ordonnerCorrection" && (
                     <p className="mt-1 text-xs text-amber-900">Cette section est validée : l&apos;ouverture lève la validation, le chef validera à nouveau.</p>
                   )}
 
-                  {/* Le chef : demander, attendre, réviser. */}
-                  {moi && s.ordre && (
+                  {/* Le chef : relire ou corriger, demander. */}
+                  {moi && mode && (
                     <a
-                      href="/trimestre/saisie"
+                      href="/trimestre/saisie?revue=1"
                       className="mt-2 inline-block min-h-[44px] rounded-md bg-primary px-4 py-3 text-sm font-semibold text-white hover:bg-primary-dark"
                     >
-                      Réviser les tableaux de ma section →
+                      {mode === "relecture" ? "Relire mes tableaux : « À revoir » →" : "Corriger mes tableaux : « À revoir » →"}
                     </a>
                   )}
-                  {moi && !s.ordre && !s.demande && !manquants.length && revision?.code !== s.code && (
+                  {moi && mode !== "correction" && !s.demande && !manquants.length && revision?.code !== s.code && (
                     <button
                       type="button"
                       data-visite="circuit-demander-revision"
                       onClick={() => setRevision({ code: s.code, action: "demanderOrdre", motif: "" })}
-                      className="mt-2 min-h-[44px] rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-dark"
+                      className={`mt-2 min-h-[44px] rounded-md px-4 py-2 text-sm font-semibold ${mode ? "ml-2 border border-primary bg-white text-primary" : "bg-primary text-white hover:bg-primary-dark"}`}
                     >
-                      Demander au DD d&apos;ouvrir la révision
+                      {mode ? "Demander la correction directe" : "Demander au DD d'ouvrir la révision"}
                     </button>
                   )}
                   {moi && revision?.action === "demanderOrdre" &&
@@ -670,7 +723,9 @@ export default function CircuitTrimestreClient({ username }: { username: string 
               )}
               {s.parLeDD && s.motif && <p className="mt-1 text-xs text-blue-800">Motif : {s.motif}</p>}
               {s.ordre && (
-                <p className="mt-1 text-xs font-semibold text-green-800">Révision des tableaux en cours — la validation de la section la fermera.</p>
+                <p className="mt-1 text-xs font-semibold text-green-800">
+                  Révision des tableaux en cours ({s.ordre.mode === "relecture" ? "relecture" : "correction directe"}) — la validation de la section la fermera.
+                </p>
               )}
               {s.statut !== "VALIDE" && formulaireRelais(`sec-${s.code}`, "Valider en tant que DD", { action: "valider", section: s.code })}
               {s.chef === etat.role && etat.peut.valider && (

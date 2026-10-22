@@ -85,7 +85,7 @@ test("correction de l'an passé : chacun dans son ressort, jamais l'agent", asyn
   // octobre 2026 — voir tests/ordres-correction.test.ts pour la révision ouverte).
   const chef = chefDuTableau(41)!;
   const autreChef = ["CHEF_PSA", "CHEF_SSV", "CHEF_SPAIH"].find((r) => r !== chef)!;
-  assert.match((await refusCorrectionAnPasse(base, P, { role: chef }, 41, "Fokoué", N1)) ?? "", /révision ouverte/);
+  assert.match((await refusCorrectionAnPasse(base, P, { role: chef }, 41, "Fokoué", N1)) ?? "", /correction directe ouverte/);
   assert.ok(await refusCorrectionAnPasse(base, P, { role: autreChef }, 41, "Fokoué", N1));
 });
 

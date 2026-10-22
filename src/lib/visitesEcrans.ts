@@ -123,8 +123,14 @@ export const VISITES: Record<string, DefinitionVisite> = {
 
   // ------------------------------------------------------------ Trimestriel
   "trimestre-saisie-liste": {
-    version: 1,
+    version: 2,
     etapes: [
+      {
+        cible: "revue-carte",
+        titre: "À revoir",
+        texte: "Les erreurs, les oublis des DA et les écarts forts de votre section, repérés par le SID. « Commencer » vous mène au premier point, puis au suivant.",
+        depuis: 2,
+      },
       {
         cible: "fil-etapes",
         titre: "Les étapes du rapport trimestriel",
@@ -142,13 +148,19 @@ export const VISITES: Record<string, DefinitionVisite> = {
     ],
   },
   "trimestre-saisie-tableau": {
-    version: 5,
+    version: 6,
     etapes: [
+      {
+        cible: "revue-point",
+        titre: "Le point à revoir",
+        texte: "Ce que le SID a repéré ici. Les cases en cause sont encadrées. Corrigez-les puis « Enregistrer et suivant » ; en relecture, « Rejeter au DA, avec motif ».",
+        depuis: 6,
+      },
       {
         cible: "bandeau-ordre",
         titre: "La révision des tableaux",
-        texte: "Les cases des arrondissements sont le travail des DA. Le chef de section les corrige pendant la révision que le DD ouvre, après le dépôt de tous les rapports. Ce cadre dit si elle est ouverte, et permet de la demander (chef) ou de l'ouvrir (DD).",
-        depuis: 5,
+        texte: "Les cases des arrondissements sont le travail des DA. Après le dépôt de tous les rapports, le DD ouvre la révision : en relecture (le chef rejette au DA) ou en correction directe (le chef corrige lui-même). Ce cadre dit où l'on en est.",
+        depuis: 6,
       },
       {
         cible: "choix-arrondissement",
@@ -165,8 +177,8 @@ export const VISITES: Record<string, DefinitionVisite> = {
       {
         cible: "case-arrondissement",
         titre: "Case bleutée : celle d'un arrondissement",
-        texte: "Révision fermée, vous ne la modifiez pas. Touchez-la : vous pouvez la signaler à l'arrondissement, ou demander au DD d'ouvrir la révision.",
-        depuis: 5,
+        texte: "Hors correction directe, vous ne la modifiez pas. Touchez-la : vous la signalez (ou, en relecture, la rejetez au DA avec motif), ou vous demandez la correction directe au DD.",
+        depuis: 6,
       },
       {
         cible: "an-passe-colonne",
@@ -288,7 +300,7 @@ export const VISITES: Record<string, DefinitionVisite> = {
     ],
   },
   circuit: {
-    version: 2,
+    version: 3,
     etapes: [
       {
         cible: "circuit-etapes",
@@ -307,8 +319,8 @@ export const VISITES: Record<string, DefinitionVisite> = {
       {
         cible: "circuit-revision",
         titre: "La révision des tableaux",
-        texte: "Après le dépôt de tous les rapports, le DD ouvre la révision aux chefs de section — un par un, à leur demande, ou à tous d'un coup. Elle se ferme quand le chef valide sa section ; chaque DA reçoit alors le bilan de ce qui a changé chez lui.",
-        depuis: 2,
+        texte: "Après le dépôt de tous les rapports, le DD ouvre la révision aux chefs de section — un par un, à leur demande, ou à tous d'un coup — en relecture (le chef rejette au DA, qui corrige) ou en correction directe (le chef corrige, quand le temps presse). Elle se ferme quand le chef valide sa section ; chaque DA reçoit le bilan.",
+        depuis: 3,
       },
       { cible: "circuit-sections", titre: "Les quatre domaines", texte: "Chaque chef de section valide son domaine (analyses et textes) quand tous les arrondissements ont transmis." },
       { cible: "circuit-valider", titre: "Valider ma section", texte: "Valide votre domaine du rapport trimestriel. Ses analyses et textes ne seront plus modifiables." },

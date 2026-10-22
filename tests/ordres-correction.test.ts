@@ -15,7 +15,7 @@ import { base, transaction } from "../src/lib/baseDeTravail";
 import { trimestrielle } from "../src/server/periodes/calendrier";
 import { periodeTrimestrielle } from "../src/server/trimestre/rubriques";
 import { ecrireSaisieCanevas } from "../src/server/trimestre/saisieCanevas";
-import { refusDeSaisie, refusCorrectionAnPasse, chefDuTableau, grille } from "../src/server/trimestre/saisieTrimestrielle";
+import { refusDeSaisie, refusCorrectionAnPasse, chefDuTableau, grille, pointsARevoir } from "../src/server/trimestre/saisieTrimestrielle";
 import { numerosSansMaille } from "../src/server/trimestre/canevas/sections";
 import { etatCircuit, validerSection, transmettreParLeDD } from "../src/server/trimestre/circuit";
 import {
@@ -46,7 +46,7 @@ after(async () => {
   await base.$disconnect();
 });
 
-const PAS_DE_REVISION = /révision ouverte par le Délégué/;
+const PAS_DE_REVISION = /correction directe ouverte par le Délégué/;
 
 test("discipline : rien avant le dépôt de tous les DA ; demande, refus, ouverture, bilan, fermeture", async () => {
   periodeId = await periodeTrimestrielle(base, P);
@@ -65,7 +65,7 @@ test("discipline : rien avant le dépôt de tous les DA ; demande, refus, ouvert
   // Révision fermée : ni la case remplie, ni la case VIDE d'un arrondissement, ni l'an passé.
   assert.match((await refusDeSaisie(base, P, { role: chef }, 41, "Dschang", "Viande")) ?? "", PAS_DE_REVISION);
   assert.match((await refusDeSaisie(base, P, { role: chef }, 41, "Fokoué", "Viande")) ?? "", PAS_DE_REVISION);
-  assert.match((await refusCorrectionAnPasse(base, P, { role: chef }, 41, "Dschang", N1)) ?? "", /révision ouverte/);
+  assert.match((await refusCorrectionAnPasse(base, P, { role: chef }, 41, "Dschang", N1)) ?? "", /correction directe ouverte/);
   const fermee = await grille(base, P, { role: chef }, 41);
   assert.equal(fermee!.ordreCorrection, false);
   assert.equal(fermee!.axe, "lignes");
@@ -175,12 +175,56 @@ test("ouvrir à toutes les sections, la liste d'un DA, puis tout fermer", async 
   const ouvertes = await ouvrirRevisionPourTous(base, transaction, periodeId!, P, "", dd.id);
   assert.deepEqual(ouvertes.sort(), ["PSA", "SPAIH", "SSV"]);
   assert.equal((await ordresEnCours(base, P)).size, 3);
-  await assert.rejects(ouvrirRevisionPourTous(base, transaction, periodeId!, P, "", dd.id), /déjà ouverte pour toutes/);
+  await assert.rejects(ouvrirRevisionPourTous(base, transaction, periodeId!, P, "", dd.id), /déjà ouverte en correction directe pour toutes/);
   assert.equal(await refusDeSaisie(base, P, { role: chef }, numero, ligne, colonne, dschang.id), null);
 
   assert.deepEqual((await fermerRevisionPourTous(base, P, dd.id)).sort(), ["PSA", "SPAIH", "SSV"]);
   assert.equal((await ordresEnCours(base, P)).size, 0);
   await assert.rejects(fermerRevisionPourTous(base, P, dd.id), /Aucune révision/);
+});
+
+test("relecture : le chef relit sans corriger ; il demande la correction directe ; le DD l'y fait passer", async () => {
+  const dd = await base.user.findFirstOrThrow({ where: { role: "DD", actif: true }, select: { id: true } });
+  const chef = chefDuTableau(41)!;
+  const section = chef.replace("CHEF_", "");
+  const chefUser = await base.user.findFirst({ where: { role: chef as never, actif: true }, select: { id: true } });
+
+  await donnerOrdreCorrection(base, transaction, periodeId!, P, section, "Relire la viande", dd.id, "relecture");
+  const o = (await ordresEnCours(base, P)).get(chef)!;
+  assert.equal(o.mode, "relecture");
+  // En relecture, le chef ne corrige pas : il rejette au DA.
+  assert.match((await refusDeSaisie(base, P, { role: chef }, 41, "Dschang", "Viande")) ?? "", PAS_DE_REVISION);
+  assert.equal((await grille(base, P, { role: chef }, 41))!.ordreCorrection, false);
+  assert.equal((await grille(base, P, { role: chef }, 41))!.ordreSection!.enCours!.mode, "relecture");
+  await assert.rejects(donnerOrdreCorrection(base, transaction, periodeId!, P, section, "", dd.id, "relecture"), /déjà ouverte en relecture/);
+
+  // Le chef demande la correction directe ; le DD l'y fait passer, sans refermer.
+  await demanderOrdreCorrection(base, P, chef, "", chefUser?.id ?? dd.id);
+  assert.ok((await demandesEnCours(base, P)).has(chef));
+  await donnerOrdreCorrection(base, transaction, periodeId!, P, section, "", dd.id, "correction");
+  const apres = (await ordresEnCours(base, P)).get(chef)!;
+  assert.equal(apres.mode, "correction");
+  assert.equal(apres.ouverteLe, o.ouverteLe, "le bilan part toujours de la première ouverture");
+  assert.equal((await demandesEnCours(base, P)).has(chef), false);
+  assert.equal(await refusDeSaisie(base, P, { role: chef }, 41, "Dschang", "Viande"), null);
+  await assert.rejects(demanderOrdreCorrection(base, P, chef, "", chefUser?.id ?? dd.id), /déjà ouverte/);
+
+  // Toutes en relecture : les trois sections passent ou s'ouvrent dans ce mode.
+  const touchees = await ouvrirRevisionPourTous(base, transaction, periodeId!, P, "", dd.id, "relecture");
+  assert.deepEqual(touchees.sort(), ["PSA", "SPAIH", "SSV"]);
+  assert.ok(Array.from((await ordresEnCours(base, P)).values()).every((x) => x.mode === "relecture"));
+  await fermerRevisionPourTous(base, P, dd.id);
+});
+
+test("« À revoir » : les points des seuls tableaux de la section, les erreurs d'abord", async () => {
+  const chef = chefDuTableau(41)!;
+  const points = await pointsARevoir(base, P, { role: chef });
+  assert.ok(points.length > 0, "Fokoué et les autres n'ont rien saisi : des oublis au moins");
+  assert.ok(points.every((p) => chefDuTableau(p.numero) === chef));
+  const rangs = points.map((p) => ({ erreur: 0, manque: 1, ecart: 2, variation: 3 })[p.genre as "erreur"]);
+  assert.deepEqual(rangs, [...rangs].sort((a, b) => a - b), "les erreurs d'abord, puis les oublis…");
+  const oubli = points.find((p) => p.genre === "manque" && p.numero === 41 && p.arrondissement);
+  assert.ok(oubli?.arrondissementId, "le point dit quel arrondissement, pour y mener le chef");
 });
 
 test("le chef BAC garde sa liberté : il corrige la colonne d'un arrondissement sans révision", async () => {

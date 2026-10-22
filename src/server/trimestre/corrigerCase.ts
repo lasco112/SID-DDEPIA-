@@ -141,7 +141,7 @@ export async function corrigerCase(
   const info = await infoCorrection(db, periode, profil, demande.numero, demande.ligne, demande.colonne);
   if (!info.corrigeable) throw new RefusCorrection("Cette case ne se corrige pas au trimestre.", 400);
   if (!info.estChef) throw new RefusCorrection("Seul le chef de la section corrige ce tableau, pendant la révision ouverte par le Délégué départemental.", 403);
-  if (!info.aOrdre) throw new RefusCorrection("La révision de votre section n'est pas ouverte : demandez au DD de l'ouvrir.", 403);
+  if (!info.aOrdre) throw new RefusCorrection("La correction directe de votre section n'est pas ouverte : demandez-la au DD.", 403);
   if (info.raison) throw new RefusCorrection(info.raison, 409);
 
   const brut = String(demande.valeur ?? "").replace(/[\s  ]/g, "").replace(",", ".");
@@ -181,7 +181,7 @@ export async function annulerCorrectionCase(
   const info = await infoCorrection(db, periode, profil, demande.numero, demande.ligne, demande.colonne);
   if (!info.existante) throw new RefusCorrection("Cette case n'est pas corrigée.", 404);
   if (!info.estChef) throw new RefusCorrection("Seul le chef de la section annule une correction, pendant la révision ouverte par le Délégué départemental.", 403);
-  if (!info.aOrdre) throw new RefusCorrection("La révision de votre section n'est pas ouverte : demandez au DD de l'ouvrir.", 403);
+  if (!info.aOrdre) throw new RefusCorrection("La correction directe de votre section n'est pas ouverte : demandez-la au DD.", 403);
   const motif = typeof demande.motif === "string" ? demande.motif.trim() : "";
   if (motif.length < 5) throw new RefusCorrection("Indiquez le motif de l'annulation.", 400);
   const periodeId = await periodeTrimestrielle(db, periode);

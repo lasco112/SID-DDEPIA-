@@ -37,7 +37,7 @@ import { listerArrondissements, graphieCanevas } from "@/lib/arrondissements";
 import { identiteDepartement } from "@/lib/departement";
 import { observationsTrimestre } from "@/server/observationsTrimestre";
 import { etatCircuit, codeSection } from "./circuit";
-import { aOrdreDeCorrection, MESSAGE_SANS_ORDRE, CHEFS_SOUS_ORDRE, ordresEnCours, demandesEnCours } from "./ordresCorrection";
+import { aOrdreDeCorrection, MESSAGE_SANS_ORDRE, CHEFS_SOUS_ORDRE, ordresEnCours, demandesEnCours, type ModeRevision } from "./ordresCorrection";
 import { TABLEAUX_CORRIGEABLES } from "./correctionsTrimestre";
 import {
   type Periode, libelleCourt, memePeriodeAnneePrecedente, moisDeLaPeriode,
@@ -478,7 +478,7 @@ export interface GrilleSaisie {
   ordreSection?: {
     chef: string;
     section: string;
-    enCours: { motif: string; le: string } | null;
+    enCours: { motif: string; le: string; mode: ModeRevision } | null;
     demande: { motif: string; le: string } | null;
     /** Les rapports des DA pas encore déposés : la révision ne s'ouvre qu'après. */
     depotsManquants: string[];
@@ -548,7 +548,7 @@ async function grilleEtContexte(db: PrismaClient, periode: Periode, profil: Prof
     g.ordreSection = {
       chef,
       section: code,
-      enCours: o ? { motif: o.motif, le: o.le } : null,
+      enCours: o ? { motif: o.motif, le: o.le, mode: o.mode } : null,
       demande: d ? { motif: d.motif, le: d.le } : null,
       depotsManquants: etat.arrondissements.filter((a) => a.statut !== "TRANSMIS").map((a) => a.nom),
     };
@@ -612,7 +612,7 @@ export async function refusCorrectionAnPasse(
   // Un chef de section technique ne corrige un chiffre déjà inscrit que pendant
   // la révision ouverte par le DD (20-21 octobre 2026) ; le chef BAC, librement.
   if (estChefTechnique(profil.role) && !(await aOrdreDeCorrection(db, periode, profil.role))) {
-    return "Un chef de section corrige un chiffre déjà inscrit seulement pendant la révision ouverte par le Délégué départemental. Demandez-lui de l'ouvrir, ou signalez la case à l'arrondissement.";
+    return "Un chef de section corrige un chiffre déjà inscrit seulement pendant la correction directe ouverte par le Délégué départemental. Demandez-la-lui, ou signalez la case à l'arrondissement.";
   }
   const t = tableauDe(numero);
   if (!t) return `Le tableau n° ${numero} n'existe pas au canevas.`;
@@ -1019,6 +1019,47 @@ export async function pointsParTableau(
     sortie.set(numero, verifierGrille(t.bloc, ctx, valeur, donnees.saisies, g.lignes, confirmees));
   }
   return sortie;
+}
+
+/** Un point de la liste « À revoir » du chef : le tableau, l'arrondissement en cause. */
+export interface PointARevoir extends PointAVerifier {
+  numero: number;
+  titre: string;
+  arrondissement: string | null;
+  arrondissementId: string | null;
+}
+
+const GRAVITE: Partial<Record<GenrePoint, number>> = { erreur: 0, manque: 1, ecart: 2, variation: 3 };
+
+/**
+ * « À REVOIR » (décision du Délégué, 22 octobre 2026) : tout ce que le SID a
+ * repéré dans les tableaux de la section du chef — erreurs d'abord, puis
+ * oublis, écarts, variations fortes —, pour qu'il aille de point en point sans
+ * chercher dans quarante tableaux. Mêmes points que sous les analyses.
+ */
+export async function pointsARevoir(db: PrismaClient, periode: Periode, profil: Profil): Promise<PointARevoir[]> {
+  const DD: Profil = { role: "DD" };
+  const ctx = await contextePour(db, periode, DD);
+  const donnees = await preparer(db, periode, champsMobilises(), { autoriserIncomplet: true });
+  const valeur = fournisseur(donnees, ctx);
+  const confirmees = await reprisesConfirmees(db, periode);
+  const arrondissements = await listerArrondissements(db);
+  const sortie: PointARevoir[] = [];
+  for (const { bloc, section } of tableaux()) {
+    const numero = bloc.numero!;
+    const sien =
+      profil.role === "DD" || (profil.role === "CHEF_BAC" ? TABLEAUX_BAC.has(numero) : estChefTechnique(profil.role) && chefDuTableau(numero) === profil.role);
+    if (!sien) continue;
+    const g = construireGrille(bloc, section, ctx, DD, donnees, valeur, confirmees);
+    for (const p of verifierGrille(bloc, ctx, valeur, donnees.saisies, g.lignes, confirmees)) {
+      if (GRAVITE[p.genre] == null) continue;
+      const c = p.cases[0];
+      const arr = c ? ctx.arrondissements.find((a) => a === c.ligne || a === c.colonne) ?? null : null;
+      sortie.push({ ...p, numero, titre: bloc.titre, arrondissement: arr, arrondissementId: arr ? arrondissements.find((a) => a.nom === arr)?.id ?? null : null });
+    }
+  }
+  // Les erreurs d'abord (elles bloquent la validation), dans l'ordre des tableaux.
+  return sortie.map((p, i) => ({ p, i })).sort((a, b) => GRAVITE[a.p.genre]! - GRAVITE[b.p.genre]! || a.i - b.i).map((x) => x.p);
 }
 
 /**

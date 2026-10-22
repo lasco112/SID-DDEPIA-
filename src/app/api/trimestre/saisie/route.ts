@@ -18,8 +18,9 @@ import { periodeTrimestrielle } from "@/server/trimestre/rubriques";
 import { ecrireSaisieCanevas, cleCellule, dateAppareil } from "@/server/trimestre/saisieCanevas";
 import {
   ROLES_SAISIE, resumer, grille, grilles, refusDeSaisie, origineCase, nomArrondissement, attendUnNombre, incoherenceCategories, porteeDeSaisie,
-  versionDuChef, tableauDe, territoireDeCase, contextePour, estChefTechnique, type Profil,
+  versionDuChef, tableauDe, territoireDeCase, contextePour, estChefTechnique, pointsARevoir, type Profil,
 } from "@/server/trimestre/saisieTrimestrielle";
+import { ordresEnCours } from "@/server/trimestre/ordresCorrection";
 import { preparerEvenements } from "@/server/trimestre/evenements";
 import { TABLEAUX_CORRIGEABLES } from "@/server/trimestre/correctionsTrimestre";
 import { infoCorrection } from "@/server/trimestre/corrigerCase";
@@ -59,6 +60,17 @@ export async function GET(req: Request) {
     // Toutes les grilles d'un coup : le téléphone les garde pour saisir sans réseau.
     if (params.get("toutes")) {
       return NextResponse.json({ periode: libelleOfficiel(periode), grilles: await grilles(user.db, periode, profil) });
+    }
+
+    // « À revoir » : ce que le SID a repéré dans les tableaux de la section (22 octobre 2026).
+    if (params.get("revue")) {
+      if (user.role !== "DD" && !user.role.startsWith("CHEF_")) return NextResponse.json({ message: "Réservé aux chefs de section et au DD." }, { status: 403 });
+      const ordre = (await ordresEnCours(user.db, periode)).get(user.role) ?? null;
+      return NextResponse.json({
+        periode: libelleOfficiel(periode),
+        points: await pointsARevoir(user.db, periode, profil),
+        mode: user.role === "CHEF_BAC" || user.role === "DD" ? "correction" : ordre?.mode ?? null,
+      });
     }
 
     // « D'où vient ce chiffre ? » : une case grise, mois par mois (lecture seule).
@@ -110,6 +122,8 @@ export async function PUT(req: Request) {
       modifieLe?: string;
       /** Un chef de section : la liste de cet arrondissement, qu'il complète (21 octobre 2026). */
       version?: string | null;
+      /** Le chef en correction directe : pourquoi ce chiffre change (facultatif, au journal). */
+      motif?: string;
     };
     const periode = periodeDe(body.annee, body.trimestre);
     if (!periode) return NextResponse.json({ message: "Période demandée invalide." }, { status: 400 });
@@ -198,6 +212,7 @@ export async function PUT(req: Request) {
           trimestre: periode.rang,
           ...(versionArr ? { liste: versionArr.nom } : {}),
           ...(arrondissement ? { arrondissement, ancien: anciens ?? null, nouveau: brut == null || brut === "" ? null : String(brut) } : {}),
+          ...(body.motif?.trim() ? { motif: body.motif.trim().slice(0, 500) } : {}),
         },
       },
     });
