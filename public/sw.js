@@ -18,7 +18,7 @@
 // nom diffère : c'est le seul mécanisme qui purge réellement l'ancien contenu
 // sur les appareils déjà installés. Doit rester identique à CACHE_NAME dans
 // src/lib/offlineStore.ts.
-const CACHE_NAME = "sid-ddepia-v15";
+const CACHE_NAME = "sid-ddepia-v16";
 const OFFLINE_URL = "/offline.html";
 const PRECACHE = ["/", OFFLINE_URL, "/manifest.json"];
 
