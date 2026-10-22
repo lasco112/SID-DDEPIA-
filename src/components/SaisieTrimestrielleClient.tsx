@@ -518,6 +518,7 @@ import { cibles, cibleTrimestrielle } from "@/lib/surlignage";
 import VisiteGuidee from "@/components/VisiteGuidee";
 import SignalerPanneau, { envoyerObservation } from "@/components/SignalerPanneau";
 import { preparerRetour, lireRetour, oublierRetour } from "@/lib/retourTrimestre";
+import HorsCanevasNote, { type HorsCanevas } from "@/components/HorsCanevas";
 import { useUtilisateur } from "@/components/UtilisateurContexte";
 
 type EtatCase = "saisie" | "calculee" | "total" | "lecture";
@@ -555,6 +556,8 @@ interface Grille {
   /** Un tableau en liste de la section du chef : les listes des arrondissements, et celle ouverte (null : le département). */
   versions?: string[];
   version?: string | null;
+  /** Ce que le mensuel déclare sans ligne dans ce tableau (non compté dans le TOTAL). */
+  horsCanevas?: HorsCanevas[];
   numero: number;
   titre: string;
   section: string;
@@ -2083,6 +2086,7 @@ function TableauSaisie({
           </table>
         </div>
       )}
+      <HorsCanevasNote hors={grille.horsCanevas} />
       <p className="mt-2 text-xs text-gray-500">
         Cases grises : calculées automatiquement — à partir des rapports mensuels, ou comme totaux. Elles ne se saisissent pas.
         Une valeur pâle dans une case vide est reprise d&apos;un autre tableau : elle compte telle quelle tant que vous ne la changez pas.

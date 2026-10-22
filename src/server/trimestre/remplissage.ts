@@ -23,7 +23,7 @@ import type { Bloc, ContexteCanevas } from "./canevas/types";
 import { listerArrondissements, graphieCanevas } from "../../lib/arrondissements";
 import { saisiesVues, cleCellule, type ValeurCellule } from "./saisieCanevas";
 import { numerosSansMaille } from "./canevas/sections";
-import { preparerEvenements, liaisonEvenementDe, type DonneesEvenements } from "./evenements";
+import { preparerEvenements, liaisonEvenementDe, horsCanevasDe, type DonneesEvenements, type HorsCanevas } from "./evenements";
 import { lireCorrections, appliquerCorrections, type CorrectionLue, type Surcharges } from "./correctionsTrimestre";
 
 const nf = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 3 });
@@ -241,7 +241,10 @@ async function preparerSansCorrections(
 export function fournisseur(
   donnees: DonneesRemplissage,
   ctx: ContexteCanevas
-): FournisseurValeur & { /** Sans la reprise d’historique. */ sid: FournisseurValeur } {
+): FournisseurValeur & {
+  /** Sans la reprise d’historique. */ sid: FournisseurValeur;
+  /** Les lignes du mensuel sans case dans ce tableau, par arrondissement. */ horsCanevas: (numero: number) => HorsCanevas[];
+} {
   /** Nom d'arrondissement → code, pour retrouver la valeur consolidée. */
   const codeDe = new Map<string, string>();
   // Appariement par le NOM, ramené à la graphie du canevas de part et d'autre.
@@ -612,7 +615,10 @@ export function fournisseur(
     return null;
   }
 
-  return Object.assign(valeurComplete, { sid: valeurSID });
+  // Les lignes du mensuel qu'un tableau n'a pas de case pour recevoir : dites
+  // sous le tableau et dans son analyse (22 octobre 2026).
+  const horsCanevas = (numero: number) => horsCanevasDe(donnees.evenements.nonClassees, numero);
+  return Object.assign(valeurComplete, { sid: valeurSID, horsCanevas });
 }
 
 /**

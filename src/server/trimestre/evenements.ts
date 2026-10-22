@@ -59,9 +59,14 @@ export interface LiaisonEvenement {
   /** Libellé de la ligne quand elle n'est pas classée — pour le Délégué. */
   decrire: (l: Ligne) => string;
   /**
-   * Le total ne compte que les lignes CLASSÉES. Vrai pour la circulation : une
-   * ligne « petits ruminants » n'est pas sûrement ovine, elle ne doit pas
-   * grossir le total des ovins.
+   * Ce qu'une ligne non classée déclare, en peu de mots, pour la phrase sous
+   * le tableau (« Rage — Félins ») ; à défaut, `decrire`.
+   */
+  nature?: (l: Ligne) => string;
+  /**
+   * Historique : le total ne comptait que les lignes classées pour la seule
+   * circulation. Depuis le 22 octobre 2026, c'est la règle de TOUS les
+   * tableaux (voir `calculer`) ; le champ ne change plus rien.
    */
   totalClasseesSeulement?: boolean;
   /**
@@ -173,6 +178,9 @@ function affection(maladie: string, espece: string): string | null {
       return "Maladies de New Castle";
     case "MAL_PASTEURELLOSE":
       return "Pasteurelloses";
+    // Même maladie des deux côtés, restée sans lien jusqu'au 22 octobre 2026.
+    case "MAL_PARVOVIROSE":
+      return "Parvovirose";
     case "MAL_PPR":
       return "PPR";
     default:
@@ -318,6 +326,8 @@ export const LIAISONS_EVENEMENTS: LiaisonEvenement[] = [
     quantite: (l) => nombre(l.effectifVaccine ?? l.effectif),
     decrire: (l) =>
       `vaccination ${texte(l.maladie)}${texte(l.maladie__PRECISION) ? ` (« ${texte(l.maladie__PRECISION)} »)` : ""} · ${texte(l.espece)}`,
+    nature: (l) =>
+      `${texte(l.maladie__PRECISION) || texte(l.maladie)} — ${texte(l.espece)}`,
   },
   clinique(65, "Situation générale des consultations par espèces et par arrondissement", "ACTE_CONSULTATION", "Lapin", true),
   clinique(66, "Situation générale des déparasitages par espèces et par arrondissement", "ACTE_DEPARASITAGE", "Lapine", true),
@@ -373,6 +383,7 @@ export const LIAISONS_EVENEMENTS: LiaisonEvenement[] = [
     },
     quantite: (l) => nombre(l.effectif),
     decrire: decrireClinique,
+    nature: (l) => `${texte(l.maladie__PRECISION) || texte(l.maladie)} — ${texte(l.espece)}`,
   },
 ];
 
@@ -387,16 +398,63 @@ export function liaisonEvenementDe(numero: number | null): LiaisonEvenement | un
 /** Les cases d'un tableau pour une période : catégorie → arrondissement (null = département) → valeur. */
 export interface CasesEvenement {
   nombres: Map<string, Map<string | null, number>>;
-  /** Total de TOUTES les lignes de la source, classées ou non. */
+  /**
+   * Total des lignes CLASSÉES : il égale la somme des lignes du tableau
+   * (décision du Délégué, 22 octobre 2026 — un TOTAL de 80 sous des lignes
+   * toutes vides ne se comprenait pas). Les lignes sans case sont dites sous
+   * le tableau et dans son analyse (`nonClassees`).
+   */
   totaux: Map<string | null, number>;
   textes: Map<string, Map<string | null, Set<string>>>;
 }
 
 export interface LigneNonClassee {
   tableau: string;
+  /** Le numéro du tableau du canevas. */
+  numero: number;
+  /** Code de l'arrondissement (« DSC »). */
   arrondissement: string;
+  /** Son nom (« Dschang »), une fois la période préparée. */
+  arrondissementNom?: string;
+  /** La ligne du mensuel, en clair une fois la période préparée. */
   ligne: string;
+  /** Ce qu'elle déclare, en peu de mots (« Rage — Félins »). */
+  nature: string;
   quantite: number | null;
+}
+
+/** Les lignes sans case d'un tableau, par arrondissement : le total, et le détail par nature. */
+export interface HorsCanevas {
+  arrondissement: string;
+  quantite: number;
+  details: { nature: string; quantite: number }[];
+}
+
+export function horsCanevasDe(nonClassees: LigneNonClassee[], numero: number): HorsCanevas[] {
+  const parArr = new Map<string, Map<string, number>>();
+  for (const n of nonClassees) {
+    if (n.numero !== numero || n.quantite == null) continue;
+    const nom = n.arrondissementNom ?? n.arrondissement;
+    const m = parArr.get(nom) ?? new Map<string, number>();
+    m.set(n.nature, (m.get(n.nature) ?? 0) + n.quantite);
+    parArr.set(nom, m);
+  }
+  return Array.from(parArr, ([arrondissement, m]) => {
+    const details = Array.from(m, ([nature, quantite]) => ({ nature, quantite })).sort((a, b) => b.quantite - a.quantite);
+    return { arrondissement, quantite: details.reduce((s, d) => s + d.quantite, 0), details };
+  });
+}
+
+/** La phrase sous le tableau : ce que le mensuel déclare et que le canevas n'a pas de ligne pour recevoir. */
+export function phraseHorsCanevas(hors: HorsCanevas[], unite = "cas"): string | null {
+  if (!hors.length) return null;
+  const nf = (n: number) => n.toLocaleString("fr-FR");
+  const total = hors.reduce((s, h) => s + h.quantite, 0);
+  const parties = hors.map((h) => `${h.arrondissement} ${nf(h.quantite)} (${h.details.map((d) => `${d.nature} : ${nf(d.quantite)}`).join(", ")})`);
+  return (
+    `Par ailleurs, ${nf(total)} ${unite} déclarés dans les rapports mensuels ne correspondent à aucune ligne de ce tableau ` +
+    `et ne sont donc pas comptés dans son total : ${parties.join(" ; ")}.`
+  );
 }
 
 export interface DonneesEvenements {
@@ -456,12 +514,20 @@ function calculer(
       const cat = liaison.categorie(payload, source);
       if (cat === undefined) continue;
       const q = liaison.quantite(payload);
-      if (q != null && (cat !== null || !liaison.totalClasseesSeulement)) {
+      // Le total ne compte que ce qui a une case : il égale la somme des lignes.
+      if (q != null && cat !== null) {
         ajouter(cases.totaux, arrondissement, q);
         ajouter(cases.totaux, null, q);
       }
       if (cat === null) {
-        nonClassees?.push({ tableau: liaison.titre, arrondissement, ligne: liaison.decrire(payload), quantite: q });
+        nonClassees?.push({
+          tableau: liaison.titre,
+          numero: liaison.numero,
+          arrondissement,
+          ligne: liaison.decrire(payload),
+          nature: (liaison.nature ?? liaison.decrire)(payload),
+          quantite: q,
+        });
         continue;
       }
       if (q != null) {
@@ -563,6 +629,17 @@ export async function preparerEvenements(
     precedent = calculer(await lignesDe(db, memePeriodeAnneePrecedente(periode), sources, options.arrondissementId), null);
   } catch {
     // L'an passé absent prive le rapport de sa comparaison, pas de la période.
+  }
+  // En clair pour qui les lit : « Rage — Félins », « Dschang », pas des codes.
+  if (nonClassees.length) {
+    const referentiel = new Map((await db.referentielItem.findMany({ select: { code: true, libelle: true } })).map((r) => [r.code, r.libelle] as const));
+    const enClair = (s: string) => s.replace(/\b[A-Z]{2,6}_[A-Z0-9_]+\b/g, (code) => referentiel.get(code) ?? code);
+    const noms = new Map((await db.arrondissement.findMany({ select: { code: true, nom: true } })).map((a) => [a.code, a.nom] as const));
+    for (const n of nonClassees) {
+      n.ligne = enClair(n.ligne);
+      n.nature = enClair(n.nature).replace(/ — $/, "");
+      n.arrondissementNom = noms.get(n.arrondissement) ?? n.arrondissement;
+    }
   }
   return { courant, precedent, nonClassees };
 }

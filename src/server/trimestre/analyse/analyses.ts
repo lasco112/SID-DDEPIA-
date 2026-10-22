@@ -21,6 +21,7 @@ import { SECTIONS_CANEVAS, chefDeSection, type ChefDeSection } from "../canevas/
 import { analyserTableau, type PhraseAnalyse } from "./analyseTableau";
 import { SUJETS } from "./sujets";
 import { ANALYSES_PARTICULIERES, analyserParticulier } from "./analysesParticulieres";
+import { phraseHorsCanevas, type HorsCanevas } from "../evenements";
 
 type BlocTableau = Extract<Bloc, { type: "tableau" }>;
 
@@ -57,14 +58,22 @@ export function propositions(ctx: ContexteCanevas, valeur: FournisseurValeur): P
           ? analyserParticulier(bloc as BlocTableau, ctx, valeur)
           : null;
       if (!a) continue;
-      const vide = a.phrases.length === 1 && /^Aucune donnée n’a été renseignée pour ce tableau/.test(a.phrases[0].texte);
+      let vide = a.phrases.length === 1 && /^Aucune donnée n’a été renseignée pour ce tableau/.test(a.phrases[0].texte);
+      // Ce que le mensuel déclare et que le tableau n'a pas de ligne pour
+      // recevoir : cité, puisque le total ne le compte pas (22 octobre 2026).
+      const hors = (valeur as { horsCanevas?: (n: number) => HorsCanevas[] }).horsCanevas?.(bloc.numero) ?? [];
+      const phraseHors = phraseHorsCanevas(hors, SUJETS[bloc.numero]?.unite);
+      const phrases = phraseHors
+        ? [...(vide ? [] : a.phrases), { texte: phraseHors, calcul: "lignes des rapports mensuels transmis sans case dans ce tableau, additionnées par arrondissement" }]
+        : a.phrases;
+      if (phraseHors) vide = false;
       sortie.push({
         numero: bloc.numero,
         titre: bloc.titre,
         section: section.titre,
         chef: chefDeSection(section.cle),
-        phrases: a.phrases,
-        texte: a.phrases.map((p) => p.texte).join(" "),
+        phrases,
+        texte: phrases.map((p) => p.texte).join(" "),
         vide,
         sansComparaison: a.sansComparaison,
         evolution: a.evolution,

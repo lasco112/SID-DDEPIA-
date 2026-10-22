@@ -32,7 +32,7 @@ import { numerosSansMaille, TABLEAUX_BAC, chefDeSection } from "./canevas/sectio
 import { preparer, fournisseur, estCaseCalculee, estCaseHistorique, valeurReprise, versNombre } from "./remplissage";
 import { REPRISES, repriseDe } from "./canevas/reprises";
 import { champsMobilises, liaisonDe, estLiee, type Formule } from "./liaison";
-import { liaisonEvenementDe, detailEvenementCase } from "./evenements";
+import { liaisonEvenementDe, detailEvenementCase, type HorsCanevas } from "./evenements";
 import { listerArrondissements, graphieCanevas } from "@/lib/arrondissements";
 import { identiteDepartement } from "@/lib/departement";
 import { observationsTrimestre } from "@/server/observationsTrimestre";
@@ -490,6 +490,12 @@ export interface GrilleSaisie {
    */
   versions?: string[];
   version?: string | null;
+  /**
+   * Ce que le mensuel déclare et que ce tableau n'a pas de ligne pour recevoir
+   * (une rage soignée en clinique au tableau des affections) : non compté dans
+   * le TOTAL, dit sous le tableau (22 octobre 2026).
+   */
+  horsCanevas?: HorsCanevas[];
 }
 
 /** La grille d'un tableau, telle que ce profil la voit et la remplit. */
@@ -533,6 +539,8 @@ async function grilleEtContexte(db: PrismaClient, periode: Periode, profil: Prof
   const confirmees = await reprisesConfirmees(db, periode);
   const ordre = await aOrdreDeCorrection(db, periode, profil.role);
   const g = construireGrille(bloc, section, ctx, profil, donnees, valeur, confirmees, ordre, versionArr?.nom ?? null);
+  const hors = valeur.horsCanevas(numero);
+  if (hors.length) g.horsCanevas = hors;
   // Un tableau en liste de sa section : le chef choisit la liste qu'il complète.
   if (estChefTechnique(profil.role) && chefDuTableau(numero) === profil.role && numerosSansMaille().has(numero)) {
     g.versions = (await listerArrondissements(db)).map((a) => a.nom);
@@ -870,6 +878,8 @@ export interface ConsultationTableau {
   points: PointAVerifier[];
   /** Ce profil peut y remplir une case ou en signaler une : l'écran de saisie lui ouvre ce tableau. */
   modifiable: boolean;
+  /** Ce que le mensuel déclare sans ligne dans ce tableau : non compté dans le TOTAL. */
+  horsCanevas: HorsCanevas[];
 }
 
 const enLecture = (g: GrilleSaisie): TableauLu => ({
@@ -1179,6 +1189,7 @@ export async function consulterTableau(db: PrismaClient, periode: Periode, profi
     versions,
     points,
     modifiable: departement && g.lignes.some((l) => l.cases.some((c) => c.etat === "saisie" || c.reservee)),
+    horsCanevas: g.horsCanevas ?? [],
   };
 }
 
@@ -1555,7 +1566,13 @@ async function origineEvenement(
   const ev = liaisonEvenementDe(numero)!;
   const [categorie, territoire] = ev.orientation === "lignes" ? [colonne, ligne] : [ligne, colonne];
   if (estTotal(territoire) || /^ÉCART/i.test(territoire)) return { message: "Touchez la case d'un arrondissement : le total du département additionne leurs chiffres." };
-  if (estTotal(categorie)) return { message: "Ce total compte toutes les lignes du mensuel de l'arrondissement : touchez une case de la ligne pour voir d'où elle vient." };
+  if (estTotal(categorie)) {
+    return {
+      message:
+        "Ce total additionne les cases de l'arrondissement dans ce tableau : touchez l'une d'elles pour voir d'où elle vient. " +
+        "Ce que le mensuel déclare sans ligne dans ce tableau n'y est pas compté : c'est dit sous le tableau.",
+    };
+  }
   const ressort =
     profil.role === "DD" ||
     (estArrondissement(profil) && territoire === profil.arrondissement) ||

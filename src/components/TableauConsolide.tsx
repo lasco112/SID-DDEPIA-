@@ -10,6 +10,7 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { lireAvecCopie } from "@/lib/trimestreHorsLigne";
+import HorsCanevasNote, { type HorsCanevas } from "@/components/HorsCanevas";
 
 interface TableauLu {
   enteteLigne: string;
@@ -35,6 +36,8 @@ interface Consultation {
   points?: Point[];
   /** Ce compte peut y remplir une case, ou en signaler une : l'écran de saisie lui ouvre ce tableau. */
   modifiable?: boolean;
+  /** Ce que le mensuel déclare sans ligne dans ce tableau (non compté dans le TOTAL). */
+  horsCanevas?: HorsCanevas[];
 }
 
 /** Dans l'ordre de gravité : une case marquée deux fois prend la marque la plus grave. */
@@ -192,6 +195,7 @@ export default function TableauConsolide({
               </a>
             )}
             <Grille t={c.tableau} axe={c.axe} marques={marques} encadrees={encadrees} />
+            <HorsCanevasNote hors={c.horsCanevas} />
             {marques.size > 0 && (
               <p className="mt-1 flex flex-wrap gap-1 text-[11px] text-gray-600">
                 Cases colorées :

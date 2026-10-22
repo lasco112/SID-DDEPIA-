@@ -204,8 +204,12 @@ export function analyserTableau(
       });
     }
 
-    // Arrondissements muets.
-    const muets = territoires.filter((t) => courant.get(t) == null);
+    // Arrondissements muets. Celui qui a déclaré des cas sans ligne dans ce
+    // tableau n'est pas muet : la phrase « Par ailleurs… » le dit (analyses.ts).
+    const sansLigne = new Set(
+      ((valeur as { horsCanevas?: (n: number) => { arrondissement: string }[] }).horsCanevas?.(numero) ?? []).map((h) => h.arrondissement)
+    );
+    const muets = territoires.filter((t) => courant.get(t) == null && !sansLigne.has(t));
     if (muets.length > 0 && muets.length < territoires.length) {
       phrases.push({
         texte: `Aucune donnée n’a été renseignée pour ${muets.length > 1 ? "les arrondissements de " + liste(muets) : "l’arrondissement de " + muets[0]}.`,
