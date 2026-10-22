@@ -128,12 +128,22 @@ function DetailOrigine({ o, correction }: { o: Origine; correction: InfoCorrecti
   const stock = o.regle === "DERNIERE_VALEUR";
   const liste = o.nonClassees !== undefined; // un tableau des listes du mensuel
 
+  // Le chef va DROIT au tableau mensuel d'origine, sur l'arrondissement de la
+  // case — rien d'autre à l'écran (décision du Délégué, 22 octobre 2026).
+  const sources = o.sources?.length ? o.sources : o.mensuel ? [o.mensuel] : [];
+  const versLeControle = () => {
+    if (!sources.length) return "/section/controle";
+    const q = new URLSearchParams({ tableau: sources[0].code, origine: "1" });
+    if (sources.length > 1) q.set("sources", sources.map((s) => s.code).join(","));
+    if (o.arrondissementCode) q.set("arrondissement", o.arrondissementCode);
+    return `/section/controle?${q}`;
+  };
   const chemin =
     role === "DA" || role === "AGENT_SAISIE"
       ? o.mensuel ? `/da/saisie/${o.mensuel.code}` : "/da/saisie"
       : role === "DD"
         ? "/dd/donnees"
-        : "/section/controle";
+        : versLeControle();
 
   const queFaire =
     role === "DA" || role === "AGENT_SAISIE"
@@ -141,7 +151,7 @@ function DetailOrigine({ o, correction }: { o: Origine; correction: InfoCorrecti
       : role === "DD"
         ? "Si un mois est faux, corrigez-le dans les données de l'arrondissement ou renvoyez son rapport ; s'il est clôturé, rouvrez d'abord le mois dans « Ouvrir et clôturer les mois »."
         : correction?.corrigeable
-          ? "Si le vrai chiffre manque au mensuel (rien d'inscrit, ou inscrit faux), corrigez-le au trimestre pendant la révision ouverte par le DD (cadre bleu, en haut)."
+          ? "Une ligne oubliée par le DA (une maladie vaccinée mais pas inscrite…) : « Ouvrir ce mois », puis « Ajouter une ligne oubliée par le DA » — pendant la correction directe ouverte par le DD. Le trimestre se recalcule seul. À défaut, corrigez le chiffre au trimestre (cadre bleu, en haut)."
           : "Si un mois est faux, ouvrez-le : dans « Contrôler les chiffres des arrondissements », vous corrigez la case de votre section (correction tracée, motif obligatoire). Si le mois est clôturé, demandez au DD de le rouvrir.";
 
   async function ouvrir(periodeId: string) {

@@ -21,6 +21,8 @@ import {
   versionDuChef, tableauDe, territoireDeCase, contextePour, estChefTechnique, pointsARevoir, type Profil,
 } from "@/server/trimestre/saisieTrimestrielle";
 import { ordresEnCours } from "@/server/trimestre/ordresCorrection";
+import { liaisonEvenementDe } from "@/server/trimestre/evenements";
+import { listerArrondissements } from "@/lib/arrondissements";
 import { preparerEvenements } from "@/server/trimestre/evenements";
 import { TABLEAUX_CORRIGEABLES } from "@/server/trimestre/correctionsTrimestre";
 import { infoCorrection } from "@/server/trimestre/corrigerCase";
@@ -80,6 +82,16 @@ export async function GET(req: Request) {
       const r = await origineCase(user.db, periode, profil, numero, ligne, colonne);
       // Ce qu'on peut faire de cette case au trimestre (correction du chef, sur ordre du DD).
       const correction = TABLEAUX_CORRIGEABLES.has(numero) ? await infoCorrection(user.db, periode, profil, numero, ligne, colonne) : null;
+      // D'où elle vient, pour y mener directement (22 octobre 2026) : les
+      // tableaux mensuels d'origine, et le code de l'arrondissement.
+      if ("origine" in r && r.origine) {
+        const arr = (await listerArrondissements(user.db)).find((a) => a.nom === r.origine.arrondissement);
+        const codes = liaisonEvenementDe(numero)?.sources ?? (r.origine.mensuel ? [r.origine.mensuel.code] : []);
+        const sources = codes.length
+          ? await user.db.formTemplate.findMany({ where: { code: { in: codes } }, select: { code: true, numero: true, titre: true }, orderBy: { code: "asc" } })
+          : [];
+        return NextResponse.json({ origine: { ...r.origine, arrondissementCode: arr?.code ?? null, sources }, correction });
+      }
       return NextResponse.json({ ...r, correction });
     }
 

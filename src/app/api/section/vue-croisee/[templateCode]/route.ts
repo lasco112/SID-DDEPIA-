@@ -8,6 +8,8 @@ import { NextResponse } from "next/server";
 import { requireUser, ROLES_CHEF, permissionErrorResponse, ForbiddenError, peutConsulterTableauSection } from "@/lib/permissions";
 import type { PrismaClient } from "@prisma/client";
 import { observationsDes } from "@/server/observations";
+import { refusAjoutLigne } from "@/server/mensuel/ajoutLigneChef";
+import { STATUT_CLOTUREE } from "@/server/periodes/gel";
 
 /** Les observations déjà faites sur ce tableau ce mois-ci, par donnée : le chef voit où il en est. */
 async function observationsDuTableau(db: PrismaClient, periodeId: string, templateCode: string) {
@@ -113,7 +115,8 @@ export async function GET(req: Request, { params }: { params: { templateCode: st
     // EVENEMENT
     const evenements = await db.saisieEvenement.findMany({
       where: { templateId: template.id, rapport: { periodeId } },
-      include: { rapport: { include: { arrondissement: true } } },
+      // `saisiPar` : une ligne ajoutée par un chef (ligne oubliée par le DA) se voit comme telle.
+      include: { rapport: { include: { arrondissement: true } }, saisiPar: { select: { role: true } } },
       orderBy: { syncedAt: "desc" },
     });
 
@@ -127,7 +130,22 @@ export async function GET(req: Request, { params }: { params: { templateCode: st
     const refLibelle: Record<string, string> = {};
     for (const r of refItems) refLibelle[`${r.categorie}:${r.code}`] = r.libelle;
 
-    return NextResponse.json({ template, arrondissements, evenements, refLibelle, observations: await observationsDuTableau(db as PrismaClient, periodeId, template.code) });
+    // Ajouter une ligne oubliée par le DA : possible ou non, et pourquoi — dit
+    // AVANT que le chef ne remplisse (22 octobre 2026, ajoutLigneChef.ts).
+    const raisonAjout = await refusAjoutLigne(db as PrismaClient, { id: user.id, role: user.role, username: user.username, sectionId: user.sectionId ?? null }, template, periode);
+    const clos = periode.statut === STATUT_CLOTUREE;
+    // Les rapports du mois : un arrondissement sans ligne doit pouvoir en recevoir une.
+    const rapports = await db.rapportArrondissement.findMany({ where: { periodeId }, select: { arrondissementId: true, statut: true } });
+
+    return NextResponse.json({
+      template, arrondissements, evenements, refLibelle,
+      observations: await observationsDuTableau(db as PrismaClient, periodeId, template.code),
+      ajout: {
+        possible: !raisonAjout && !clos,
+        raison: raisonAjout ?? (clos ? "Ce mois est clôturé : le Délégué départemental doit le rouvrir (« Ouvrir et clôturer les mois ») avant qu'une ligne y soit ajoutée." : null),
+        arrondissementsAvecRapport: rapports.map((r) => r.arrondissementId),
+      },
+    });
   } catch (e) {
     const { status, message } = permissionErrorResponse(e);
     return NextResponse.json({ message }, { status });

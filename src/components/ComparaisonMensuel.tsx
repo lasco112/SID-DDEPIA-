@@ -34,6 +34,9 @@ export interface ControleCategories {
     enAttente?: number | null;
   }[];
   mensuel: { code: string; numero: string; titre: string } | null;
+  /** Les tableaux mensuels d'origine (ex. 3.2 et 3.3 pour la vaccination), et l'arrondissement : pour y mener directement. */
+  sources?: { code: string; numero: string; titre: string }[];
+  arrondissementCode?: string | null;
 }
 
 const f = (n: number) => n.toLocaleString("fr-FR");

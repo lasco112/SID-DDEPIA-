@@ -819,7 +819,7 @@ export default function SaisieTrimestrielleClient({
   /** « D'où vient ce chiffre ? » d'une case grise — et le chemin du retour, si l'on part vers le mois. */
   async function ouvrirOrigine(numero: number, l: Grille["lignes"][number], c: CaseGrille) {
     const cellule = { numero, ligne: l.cle, colonne: c.colonne };
-    preparerRetour({ url: urlDeRetour(numero, l.cle, c.colonne), libelle: libelleDeRetour(numero, l, c), avant: c.affiche });
+    preparerRetour({ url: urlDeRetour(numero, l.cle, c.colonne), libelle: libelleDeRetour(numero, l, c), avant: c.affiche ?? "—" });
     setOrigine({ chargement: true, cellule });
     try {
       const q = new URLSearchParams({ annee: String(annee), trimestre: String(trimestre), tableau: String(numero), origine: "1", ligne: l.cle, colonne: c.colonne });

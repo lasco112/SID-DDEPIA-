@@ -94,6 +94,60 @@ export default function SectionControleClient() {
   const tableauDemande = useRef<string | null>(
     typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("tableau")
   );
+  /**
+   * VENU D'UNE CASE DU TRIMESTRE (décision du Délégué, 22 octobre 2026) :
+   * `?origine=1&tableau=T32&sources=T32,T33&arrondissement=PKM`. L'écran ne
+   * montre que le ou les tableaux d'origine, déjà sur l'arrondissement de la
+   * case — le chef ne cherche rien parmi tous les tableaux de sa section.
+   */
+  const arrondissementDemande = useRef<string | null>(
+    typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("arrondissement")
+  );
+  const [focusOrigine, setFocusOrigine] = useState<string[] | null>(null);
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search);
+    if (!p.get("origine")) return;
+    const codes = (p.get("sources") ?? p.get("tableau") ?? "").split(",").filter(Boolean);
+    if (codes.length) setFocusOrigine(codes);
+  }, []);
+  /** Ajouter une ligne oubliée par le DA (correction directe ouverte par le DD, motif obligatoire). */
+  const [ajout, setAjout] = useState<{ arrondissementId: string; payload: Record<string, string>; motif: string } | null>(null);
+  const [ajoutEnCours, setAjoutEnCours] = useState(false);
+  const [ajoutErreur, setAjoutErreur] = useState<string | null>(null);
+
+  /** Ouvre un tableau en gardant l'arrondissement choisi (passer de 3.2 à 3.3 sur Penka). */
+  async function ouvrirEnGardantLeFiltre(code: string, filtre: string | null) {
+    await chargerVue(code);
+    setArrondissementFiltre(filtre);
+  }
+
+  async function ajouterLigne() {
+    if (!ajout || !vue?.template || !periodeId) return;
+    setAjoutEnCours(true);
+    setAjoutErreur(null);
+    try {
+      const r = await fetch("/api/section/ajout-ligne", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ templateCode: vue.template.code, periodeId, arrondissementId: ajout.arrondissementId, payload: ajout.payload, motif: ajout.motif }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        setAjoutErreur(d.message ?? "La ligne n'a pas pu être ajoutée.");
+        return;
+      }
+      const code = vue.arrondissements?.find((a: any) => a.id === ajout.arrondissementId)?.code ?? null;
+      setAjout(null);
+      await ouvrirEnGardantLeFiltre(vue.template.code, code);
+      setMessageAction(
+        "Ligne ajoutée au rapport du mois, avec votre motif ; le DA et le DD sont prévenus. Le trimestre la compte de lui-même : « Revenir au trimestre » pour le voir."
+      );
+    } catch {
+      setAjoutErreur("Pas de réseau : la ligne n'est pas partie.");
+    } finally {
+      setAjoutEnCours(false);
+    }
+  }
 
   const groupes = useMemo(() => {
     const m = new Map<string, TemplateSummary[]>();
@@ -160,7 +214,9 @@ export default function SectionControleClient() {
     const code = tableauDemande.current;
     if (!code || !periodeId || !templates.some((t) => t.code === code)) return;
     tableauDemande.current = null;
-    void chargerVue(code);
+    // Venu d'une case du trimestre : déjà sur son arrondissement.
+    void ouvrirEnGardantLeFiltre(code, arrondissementDemande.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [periodeId, templates, chargerVue]);
 
   async function validerSection() {
@@ -268,8 +324,11 @@ export default function SectionControleClient() {
     return base;
   }
 
+  // Tous les arrondissements, même sans ligne : c'est souvent là qu'il en manque une.
   const arrondissementsEvenements: string[] = vue?.evenements
-    ? Array.from(new Set<string>(vue.evenements.map((e: any) => e.rapport.arrondissement.code))).sort()
+    ? vue.arrondissements?.length
+      ? vue.arrondissements.map((a: any) => a.code)
+      : Array.from(new Set<string>(vue.evenements.map((e: any) => e.rapport.arrondissement.code))).sort()
     : [];
   const evenementsFiltres: any[] = vue?.evenements
     ? arrondissementFiltre
@@ -293,7 +352,38 @@ export default function SectionControleClient() {
         </div>
       </div>
 
-      <div className="mt-6 overflow-x-auto rounded-lg border border-gray-200 bg-white">
+      {/* Venu d'une case du trimestre : seulement le ou les tableaux d'origine. */}
+      {focusOrigine && (
+        <div data-visite="origine-trimestre" className="mt-4 rounded-lg border-2 border-primary bg-white p-3">
+          <p className="font-semibold text-primary-dark">Le tableau d&apos;origine du chiffre du trimestre</p>
+          <p className="mt-1 text-sm text-gray-700">
+            Corrigez la ligne fausse (touchez-la), ou ajoutez la ligne que le DA a oubliée (bouton sous le tableau). Puis « Revenir au trimestre » : le chiffre s&apos;y
+            recalcule seul.
+          </p>
+          {focusOrigine.length > 1 && (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {focusOrigine.map((code) => {
+                const t = templates.find((x) => x.code === code);
+                return (
+                  <button
+                    key={code}
+                    type="button"
+                    onClick={() => void ouvrirEnGardantLeFiltre(code, arrondissementFiltre)}
+                    className={`min-h-[44px] rounded-md border px-3 py-2 text-left text-sm font-semibold ${selection === code ? "border-primary bg-primary text-white" : "border-gray-300 bg-white text-gray-800"}`}
+                  >
+                    {t ? `${t.numero} ${t.titre}` : code}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          <button type="button" onClick={() => { setFocusOrigine(null); setListeOuverte(true); }} className="mt-2 min-h-[40px] text-sm text-gray-700 underline">
+            Voir tous les tableaux de ma section
+          </button>
+        </div>
+      )}
+
+      <div className={`mt-6 overflow-x-auto rounded-lg border border-gray-200 bg-white ${focusOrigine ? "hidden" : ""}`}>
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr className="bg-gray-50 text-left">
@@ -336,7 +426,7 @@ export default function SectionControleClient() {
       {/* Barre de navigation du tableau ouvert : le bouton « Tableaux » à
           gauche rouvre la liste sans quitter la page, et le titre rappelle en
           permanence ce que l'on est en train de contrôler. */}
-      {selection && vue?.template && (
+      {selection && vue?.template && !focusOrigine && (
         <div id="barre-tableau-section" className="mt-6 flex scroll-mt-20 flex-wrap items-center gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2">
           <button
             onClick={() => setListeOuverte((v) => !v)}
@@ -358,7 +448,7 @@ export default function SectionControleClient() {
         </div>
       )}
 
-      <div className={`mt-6 space-y-3 ${listeOuverte ? "" : "hidden"}`}>
+      <div className={`mt-6 space-y-3 ${listeOuverte && !focusOrigine ? "" : "hidden"}`}>
         {groupes.map(([nom, liste]) => {
           const ouvert = !groupesFermes.has(nom);
           return (
@@ -498,7 +588,13 @@ export default function SectionControleClient() {
                     const payload = e.payload ?? {};
                     return (
                       <tr key={e.id} data-cible={jeton("vc", e.id)} className="cursor-pointer hover:bg-blue-50" onClick={() => ouvrirCorrectionEvenement(e)}>
-                        <td className="border-b px-3 py-2 font-medium">{e.rapport.arrondissement.code}<MarqueObservation obs={vue.observations?.[e.id]} /></td>
+                        <td className="border-b px-3 py-2 font-medium">
+                          {e.rapport.arrondissement.code}
+                          <MarqueObservation obs={vue.observations?.[e.id]} />
+                          {(e.saisiPar?.role?.startsWith("CHEF_") || e.saisiPar?.role === "DD") && (
+                            <span className="ml-1 rounded bg-sky-100 px-1.5 py-0.5 text-[11px] font-semibold text-sky-900">ajoutée par le {e.saisiPar.role === "DD" ? "DD" : "chef"}</span>
+                          )}
+                        </td>
                         {schema.map((c) => {
                           const raw = payload[c.key];
                           const texte = c.type === "ref" ? libelleRef(c.ref, raw, c.key, payload) : raw == null || raw === "" ? "—" : String(raw);
@@ -511,6 +607,98 @@ export default function SectionControleClient() {
                   })}
                 </tbody>
               </table>
+            </div>
+          )}
+
+          {/* LA LIGNE OUBLIÉE PAR LE DA (22 octobre 2026) : seulement en correction directe, motif obligatoire. */}
+          {vue.ajout && (
+            <div data-visite="ajout-ligne" className="mt-4 max-w-lg">
+              {!vue.ajout.possible ? (
+                vue.ajout.raison && <p className="rounded-md bg-gray-50 p-3 text-sm text-gray-700">Ajouter une ligne oubliée : {vue.ajout.raison}</p>
+              ) : !ajout ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAjoutErreur(null);
+                    const choisi = vue.arrondissements?.find((a: any) => a.code === arrondissementFiltre);
+                    setAjout({ arrondissementId: choisi?.id ?? "", payload: {}, motif: "" });
+                  }}
+                  className="min-h-[48px] w-full rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white sm:w-auto"
+                >
+                  + Ajouter une ligne oubliée par le DA
+                </button>
+              ) : (
+                <div className="rounded-lg border-2 border-primary bg-white p-4">
+                  <h3 className="font-semibold text-primary-dark">Ajouter une ligne oubliée par le DA</h3>
+                  <p className="mt-1 text-xs text-gray-600">
+                    Elle entre dans le rapport du mois de l&apos;arrondissement, marquée « ajoutée par le chef » ; le DA et le DD sont prévenus.
+                  </p>
+                  <label className="mt-3 block text-xs font-semibold text-gray-600">Arrondissement</label>
+                  <select
+                    className="min-h-[44px] w-full rounded border border-gray-300 px-2"
+                    value={ajout.arrondissementId}
+                    onChange={(e) => setAjout({ ...ajout, arrondissementId: e.target.value })}
+                  >
+                    <option value="">—</option>
+                    {(vue.arrondissements ?? [])
+                      .filter((a: any) => vue.ajout.arrondissementsAvecRapport?.includes(a.id))
+                      .map((a: any) => (
+                        <option key={a.id} value={a.id}>{a.nom}</option>
+                      ))}
+                  </select>
+                  <div className="mt-2 space-y-2">
+                    {(vue.template.schemaEvenement as Array<{ key: string; label: string; type: string; ref?: string }>).map((c) => (
+                      <div key={c.key}>
+                        <label className="mb-1 block text-xs font-semibold text-gray-600">{c.label}</label>
+                        {c.type === "ref" ? (
+                          <select
+                            className="min-h-[44px] w-full rounded border border-gray-300 px-2"
+                            value={ajout.payload[c.key] ?? ""}
+                            onChange={(e) => setAjout({ ...ajout, payload: { ...ajout.payload, [c.key]: e.target.value } })}
+                          >
+                            <option value="">—</option>
+                            {Object.entries(vue.refLibelle ?? {})
+                              .filter(([cle]) => cle.startsWith(`${c.ref}:`))
+                              .map(([cle, libelle]) => (
+                                <option key={cle} value={cle.split(":")[1]}>{String(libelle)}</option>
+                              ))}
+                          </select>
+                        ) : (
+                          <input
+                            type="text"
+                            inputMode={c.type === "entier" || c.type === "decimal" ? "decimal" : "text"}
+                            className="min-h-[44px] w-full rounded border border-gray-300 px-2"
+                            value={ajout.payload[c.key] ?? ""}
+                            onChange={(e) => setAjout({ ...ajout, payload: { ...ajout.payload, [c.key]: e.target.value } })}
+                          />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <label className="mt-3 block text-xs font-semibold text-gray-600">Motif (obligatoire)</label>
+                  <input
+                    type="text"
+                    className="min-h-[44px] w-full rounded border border-gray-300 px-2"
+                    placeholder="Ex. : PPCB vaccinée en août, omise par le DA"
+                    value={ajout.motif}
+                    onChange={(e) => setAjout({ ...ajout, motif: e.target.value })}
+                  />
+                  {ajoutErreur && <p className="mt-2 text-sm font-semibold text-red-700">{ajoutErreur}</p>}
+                  <div className="mt-3 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void ajouterLigne()}
+                      disabled={ajoutEnCours || !ajout.arrondissementId || ajout.motif.trim().length < 5}
+                      className="min-h-[44px] flex-1 rounded-md bg-primary px-3 text-sm font-semibold text-white disabled:bg-gray-300"
+                    >
+                      {ajoutEnCours ? "Ajout…" : "Ajouter la ligne"}
+                    </button>
+                    <button type="button" onClick={() => setAjout(null)} className="min-h-[44px] flex-1 rounded-md border border-gray-300 px-3 text-sm">
+                      Annuler
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
