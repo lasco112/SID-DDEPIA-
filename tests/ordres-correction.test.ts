@@ -15,7 +15,9 @@ import { base, transaction } from "../src/lib/baseDeTravail";
 import { trimestrielle } from "../src/server/periodes/calendrier";
 import { periodeTrimestrielle } from "../src/server/trimestre/rubriques";
 import { ecrireSaisieCanevas } from "../src/server/trimestre/saisieCanevas";
-import { refusDeSaisie, refusCorrectionAnPasse, chefDuTableau, grille, pointsARevoir } from "../src/server/trimestre/saisieTrimestrielle";
+import { refusDeSaisie, refusCorrectionAnPasse, chefDuTableau, grille, pointsARevoir, resumer } from "../src/server/trimestre/saisieTrimestrielle";
+import { TABLEAUX_CORRIGEABLES } from "../src/server/trimestre/correctionsTrimestre";
+import { infoCorrection } from "../src/server/trimestre/corrigerCase";
 import { numerosSansMaille } from "../src/server/trimestre/canevas/sections";
 import { etatCircuit, validerSection, transmettreParLeDD } from "../src/server/trimestre/circuit";
 import {
@@ -225,6 +227,57 @@ test("« À revoir » : les points des seuls tableaux de la section, les erreurs
   assert.deepEqual(rangs, [...rangs].sort((a, b) => a - b), "les erreurs d'abord, puis les oublis…");
   const oubli = points.find((p) => p.genre === "manque" && p.numero === 41 && p.arrondissement);
   assert.ok(oubli?.arrondissementId, "le point dit quel arrondissement, pour y mener le chef");
+});
+
+test("les trois chefs (PSA, SSV, SPAIH) : fermée, relecture, correction directe — chacun dans SA section", async () => {
+  const dd = await base.user.findFirstOrThrow({ where: { role: "DD", actif: true }, select: { id: true } });
+  const chefs = ["CHEF_PSA", "CHEF_SSV", "CHEF_SPAIH"];
+  for (const chef of chefs) {
+    const section = chef.replace("CHEF_", "");
+    const numeros = (await resumer(base, P, { role: chef })).map((t) => t.numero);
+    assert.ok(numeros.length > 0, `${chef} : des tableaux`);
+    assert.ok(numeros.every((n) => chefDuTableau(n) === chef), `${chef} : seulement sa section`);
+
+    // Une case d'arrondissement d'un de ses tableaux : réservée, révision fermée.
+    let cible: { numero: number; ligne: string; colonne: string } | null = null;
+    for (const n of numeros) {
+      const g = await grille(base, P, { role: chef }, n);
+      for (const l of g?.lignes ?? []) {
+        const c = l.cases.find((x) => x.reservee);
+        if (c) { cible = { numero: n, ligne: l.cle, colonne: c.colonne }; break; }
+      }
+      if (cible) break;
+    }
+    assert.ok(cible, `${chef} : une case d'arrondissement`);
+    const { numero, ligne, colonne } = cible!;
+    assert.match((await refusDeSaisie(base, P, { role: chef }, numero, ligne, colonne)) ?? "", PAS_DE_REVISION, `${chef} : fermée`);
+    // Un autre chef n'a jamais la main sur ce tableau.
+    const autre = chefs.find((r) => r !== chef)!;
+    assert.match((await refusDeSaisie(base, P, { role: autre }, numero, ligne, colonne)) ?? "", /ressort/, `${autre} sur le tableau ${numero}`);
+
+    // Relecture : toujours rien à écrire, mais « À revoir » mène à ses tableaux.
+    await donnerOrdreCorrection(base, transaction, periodeId!, P, section, "", dd.id, "relecture");
+    assert.match((await refusDeSaisie(base, P, { role: chef }, numero, ligne, colonne)) ?? "", PAS_DE_REVISION, `${chef} : relecture`);
+    const points = await pointsARevoir(base, P, { role: chef });
+    assert.ok(points.every((p) => chefDuTableau(p.numero) === chef), `${chef} : « À revoir » de sa section seulement`);
+
+    // Correction directe : la case s'écrit, la case grise d'un tableau corrigeable aussi (sur le principe).
+    await donnerOrdreCorrection(base, transaction, periodeId!, P, section, "", dd.id, "correction");
+    assert.equal(await refusDeSaisie(base, P, { role: chef }, numero, ligne, colonne), null, `${chef} : correction directe`);
+    assert.notEqual((await grille(base, P, { role: chef }, numero))!.lignes.find((l) => l.cle === ligne)!.cases.find((c) => c.colonne === colonne)!.reservee, true);
+    const corrigeable = numeros.find((n) => TABLEAUX_CORRIGEABLES.has(n));
+    if (corrigeable) {
+      const g = await grille(base, P, { role: chef }, corrigeable);
+      const grise = g!.lignes.flatMap((l) => l.cases.filter((c) => c.etat === "calculee").map((c) => ({ ligne: l.cle, colonne: c.colonne })))
+        .find((x) => !/^(TOTAL|ÉCART)/.test(x.ligne) && !/^(TOTAL|ÉCART)/.test(x.colonne));
+      if (grise) {
+        const info = await infoCorrection(base, P, { role: chef }, corrigeable, grise.ligne, grise.colonne);
+        assert.equal(info.estChef && info.aOrdre, true, `${chef} : case grise du tableau ${corrigeable}, correction ouverte`);
+      }
+    }
+    await revoquerOrdreCorrection(base, P, section, dd.id);
+    assert.match((await refusDeSaisie(base, P, { role: chef }, numero, ligne, colonne)) ?? "", PAS_DE_REVISION, `${chef} : refermée`);
+  }
 });
 
 test("le chef BAC garde sa liberté : il corrige la colonne d'un arrondissement sans révision", async () => {

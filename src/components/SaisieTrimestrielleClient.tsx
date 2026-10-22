@@ -673,6 +673,8 @@ export default function SaisieTrimestrielleClient({
    */
   const [revue, setRevue] = useState<{ points: PointRevue[]; i: number; mode: ModeRevision | null } | null>(null);
   const [revueChargement, setRevueChargement] = useState(false);
+  /** Le panneau « signaler / rejeter » vient du point « À revoir » : il s'ouvre dans sa carte. */
+  const [signalerDuPoint, setSignalerDuPoint] = useState(false);
   /** Pourquoi ce chiffre change : facultatif, part au journal avec les cases du point. */
   const [motifRevue, setMotifRevue] = useState("");
   const motifRevueRef = useRef("");
@@ -844,7 +846,8 @@ export default function SaisieTrimestrielleClient({
 
   // Le panneau pour signaler (ou rejeter) : amené sous les yeux, même sur un téléphone.
   useEffect(() => {
-    if (aSignaler) setTimeout(() => document.getElementById("panneau-signaler")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+    // Sans animation : un défilement « doux » peut ne pas aboutir sur un téléphone lent.
+    if (aSignaler) setTimeout(() => document.getElementById("panneau-signaler")?.scrollIntoView({ block: "start" }), 150);
   }, [aSignaler]);
 
   // « À revoir » : gardé pour l'onglet, repris au retour du mensuel.
@@ -880,6 +883,8 @@ export default function SaisieTrimestrielleClient({
   function allerAuPoint(r: { points: PointRevue[]; i: number; mode: ModeRevision | null }, i: number) {
     setMotifRevue("");
     setOrigine(null);
+    setASignaler(null);
+    setSignalerDuPoint(false);
     setInfo(null);
     if (i >= r.points.length) {
       setRevue({ ...r, i: r.points.length });
@@ -1160,6 +1165,44 @@ export default function SaisieTrimestrielleClient({
       if (paires.length === 0 || paires.some((p) => p.c.etat === "saisie" || p.c.reservee)) return 0;
       return paires.filter((p) => p.c.affiche == null && p.l.cases.some((x) => x.etat === "saisie" || x.reservee)).length;
     })();
+    // Signaler une case — ou, en relecture, la rejeter au DA. Ouvert depuis le
+    // point « À revoir », il s'affiche DANS sa carte : toujours sous les yeux.
+    const relecture = grille?.ordreSection?.enCours?.mode === "relecture";
+    const panneauSignaler = aSignaler && grille && (
+      <div id="panneau-signaler" className="scroll-mt-20">
+        <SignalerPanneau
+          titre={`Tableau ${grille.numero} · ${aSignaler.libelle}`}
+          valeur={aSignaler.valeur}
+          destinataire="l'arrondissement concerné"
+          entete={relecture ? "Rejeter au DA — son rapport lui revient pour correction" : undefined}
+          bouton={relecture ? "Rejeter au DA" : undefined}
+          exemple={relecture ? "Ex. : la somme des catégories ne retombe pas sur le cheptel du mensuel : revoyez les veaux." : undefined}
+          onFermer={() => {
+            setASignaler(null);
+            setSignalerDuPoint(false);
+          }}
+          onEnvoyer={async (texte) => {
+            const { erreur: e, donnees } = await envoyerObservation({
+              action: "signaler_t", type: "case", annee, trimestre, numero: grille.numero, ligne: aSignaler.ligne, colonne: aSignaler.colonne, texte,
+              ...(versionRef.current ? { version: versionRef.current } : {}),
+            });
+            if (e) return e;
+            const duPoint = signalerDuPoint;
+            setASignaler(null);
+            setSignalerDuPoint(false);
+            setModeSignaler(false);
+            // « À revoir » : le point est traité, on passe au suivant.
+            if (duPoint && revue && revue.i < revue.points.length) allerAuPoint(revue, revue.i + 1);
+            setInfo(
+              donnees.rouvert
+                ? "Rejet envoyé : le rapport de l'arrondissement lui est renvoyé pour correction, avec votre motif."
+                : "Observation envoyée à l'arrondissement (son rapport lui était déjà rendu)."
+            );
+            return null;
+          }}
+        />
+      </div>
+    );
     return (
       <div className="max-w-full">
         {retourVers && (
@@ -1223,10 +1266,12 @@ export default function SaisieTrimestrielleClient({
                   setErreur("Ce point ne vise pas une case précise : signalez-la depuis le tableau.");
                   return;
                 }
+                setSignalerDuPoint(true);
                 setASignaler({ ligne: l.cle, colonne: c.colonne, libelle: `${l.libelle || l.cle} · ${c.colonne}`, valeur: c.saisi ?? c.affiche });
               }}
               onQuitter={() => setRevue(null)}
             />
+            {signalerDuPoint && panneauSignaler}
           </div>
         )}
         {erreur && <p className="mt-3 rounded-md bg-red-50 p-3 text-sm text-red-800">{erreur}</p>}
@@ -1329,37 +1374,7 @@ export default function SaisieTrimestrielleClient({
               )}
             </div>
           )}
-          {aSignaler && grille && (
-            <div id="panneau-signaler" className="scroll-mt-20">
-            <SignalerPanneau
-              titre={`Tableau ${grille.numero} · ${aSignaler.libelle}`}
-              valeur={aSignaler.valeur}
-              destinataire={
-                grille.ordreSection?.enCours?.mode === "relecture"
-                  ? "le DA de l'arrondissement — son rapport lui revient pour correction"
-                  : "l'arrondissement concerné"
-              }
-              onFermer={() => setASignaler(null)}
-              onEnvoyer={async (texte) => {
-                const { erreur: e, donnees } = await envoyerObservation({
-                  action: "signaler_t", type: "case", annee, trimestre, numero: grille.numero, ligne: aSignaler.ligne, colonne: aSignaler.colonne, texte,
-                  ...(versionRef.current ? { version: versionRef.current } : {}),
-                });
-                if (e) return e;
-                setASignaler(null);
-                setModeSignaler(false);
-                // « À revoir » : le point est traité, on passe au suivant.
-                if (revue && revue.i < revue.points.length) allerAuPoint(revue, revue.i + 1);
-                setInfo(
-                  donnees.rouvert
-                    ? "Rejet envoyé : le rapport de l'arrondissement lui est renvoyé pour correction, avec votre motif."
-                    : "Observation envoyée à l'arrondissement (son rapport lui était déjà rendu)."
-                );
-                return null;
-              }}
-            />
-            </div>
-          )}
+          {!signalerDuPoint && panneauSignaler}
           {grille && grille.numero === courant.numero && (
             <TableauSaisie
               refus={refus}
