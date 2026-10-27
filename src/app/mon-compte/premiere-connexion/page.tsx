@@ -10,6 +10,7 @@
 import { useState } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import { LONGUEUR_MIN_MOT_DE_PASSE, MESSAGE_LONGUEUR_MOT_DE_PASSE } from "@/lib/motDePasse";
 
 export default function PremiereConnexionPage() {
   const { data: session, update } = useSession();
@@ -28,8 +29,8 @@ export default function PremiereConnexionPage() {
     e.preventDefault();
     setErreur(null);
 
-    if (motDePasse.length < 8) {
-      setErreur("Le mot de passe doit contenir au moins 8 caractères.");
+    if (motDePasse.length < LONGUEUR_MIN_MOT_DE_PASSE) {
+      setErreur(MESSAGE_LONGUEUR_MOT_DE_PASSE);
       return;
     }
     if (motDePasse !== confirmation) {
@@ -115,7 +116,7 @@ export default function PremiereConnexionPage() {
             required
             value={motDePasse}
             onChange={(e) => setMotDePasse(e.target.value)}
-            placeholder="8 caractères minimum"
+            placeholder={`${LONGUEUR_MIN_MOT_DE_PASSE} caractères minimum`}
             className="mb-4 w-full rounded-[7px] border border-[#c3ccd6] px-[13px] py-[11px] text-[15px]"
           />
 

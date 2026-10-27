@@ -187,6 +187,92 @@ export async function genererIdentifiants(departementId: string, ids?: string[])
 }
 
 // ---------------------------------------------------------------------------
+// Les mots de passe de tous les comptes (demande du Délégué, 27 octobre 2026)
+// ---------------------------------------------------------------------------
+
+/** L'ordre d'affichage des fonctions : le DD, les DA, les agents, puis les chefs. */
+const ORDRE_ROLE: Role[] = ["DD", "DA", "AGENT_SAISIE", "CHEF_BAC", "CHEF_PSA", "CHEF_SSV", "CHEF_SPAIH"];
+
+export interface CompteAdministre {
+  id: string;
+  nom: string;
+  username: string;
+  role: Role;
+  fonction: string;
+  actif: boolean;
+  jamaisConnecte: boolean;
+  /** Mot de passe provisoire pas encore remplacé par son titulaire. */
+  doitChanger: boolean;
+  derniereConnexion: string | null;
+  /** Le compte de l'administrateur : il ne se réinitialise pas d'ici. */
+  estMoi: boolean;
+}
+
+/**
+ * Les comptes d'un département, lus dans SON cloisonnement. Le compte
+ * technique (ADMIN_TECH) n'y figure pas : il ne relève pas du métier.
+ */
+export async function comptesDuDepartement(departementId: string, monId: string) {
+  const d = await departementVise(departementId);
+  const c = clientCloisonne(db, d.id);
+  const users = await c.user.findMany({
+    where: { role: { not: "ADMIN_TECH" } },
+    include: { arrondissement: { select: { nom: true, ordre: true } } },
+  });
+  users.sort(
+    (a, b) =>
+      ORDRE_ROLE.indexOf(a.role) - ORDRE_ROLE.indexOf(b.role) ||
+      (a.arrondissement?.ordre ?? 99) - (b.arrondissement?.ordre ?? 99) ||
+      a.username.localeCompare(b.username)
+  );
+  const comptes: CompteAdministre[] = users.map((u) => ({
+    id: u.id,
+    nom: u.nom,
+    username: u.username,
+    role: u.role,
+    fonction: fonctionDe(u.role, d, u.arrondissement?.nom ?? null),
+    actif: u.actif,
+    jamaisConnecte: !u.lastLoginAt,
+    doitChanger: u.mustChangePassword,
+    derniereConnexion: u.lastLoginAt?.toISOString() ?? null,
+    estMoi: u.id === monId,
+  }));
+  return { departement: { id: d.id, code: d.code, nom: d.nom, nomAvecArticle: composerIdentite(d).nomAvecArticle, actif: d.actif }, motDePasse: motDePasseProvisoire(d.code), comptes };
+}
+
+/**
+ * Remet le mot de passe provisoire du département (« BTOS123 ») sur les comptes
+ * choisis, ou sur tous ses comptes actifs ; chacun devra le changer à sa
+ * prochaine connexion. Contrairement aux fiches d'identifiants, cela vaut AUSSI
+ * pour un compte déjà utilisé : c'est le remède au mot de passe oublié.
+ *
+ * Jamais le compte de l'administrateur lui-même (il s'enfermerait dehors), ni le
+ * compte technique. Un compte désactivé le reste : on ne rallume rien d'ici.
+ */
+export async function reinitialiserMotsDePasse(departementId: string, cible: { ids: string[] } | { tous: true }, monId: string) {
+  const d = await departementVise(departementId);
+  if ("ids" in cible && cible.ids.length === 0) throw new ErreurAdministration("Aucun compte choisi.");
+  const motDePasse = motDePasseProvisoire(d.code);
+  const passwordHash = await bcrypt.hash(motDePasse, 10);
+  const comptes = await transactionCloisonnee(db, d.id, async (tx) => {
+    const vises = await tx.user.findMany({
+      where: { AND: [{ role: { not: "ADMIN_TECH" } }, { id: { not: monId } }, "ids" in cible ? { id: { in: cible.ids } } : { actif: true }] },
+      select: { id: true, username: true, actif: true },
+    });
+    if (vises.length === 0) throw new ErreurAdministration("Aucun compte à réinitialiser.");
+    await tx.user.updateMany({ where: { id: { in: vises.map((u) => u.id) } }, data: { passwordHash, mustChangePassword: true } });
+    return vises.sort((a, b) => a.username.localeCompare(b.username));
+  });
+  return {
+    departement: d,
+    motDePasse,
+    comptes: comptes.map((u) => u.username),
+    /** Réinitialisés mais toujours fermés : il faut encore les ouvrir (fiches d'identifiants). */
+    desactives: comptes.filter((u) => !u.actif).map((u) => u.username),
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Les données d'essai
 // ---------------------------------------------------------------------------
 
@@ -304,6 +390,7 @@ export const ACTIONS_ADMINISTRATION = [
   "ACTIVATION_DEPARTEMENT",
   "EXTINCTION_DEPARTEMENT",
   "IDENTIFIANTS_GENERES",
+  "MOTS_DE_PASSE_REINITIALISES",
   "PURGE_DONNEES_TEST",
   "SUPPRESSION_ETABLISSEMENTS_DEMO",
   "VALIDATION_REFERENTIEL",

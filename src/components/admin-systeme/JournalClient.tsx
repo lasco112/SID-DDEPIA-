@@ -15,6 +15,7 @@ const LIBELLES: Record<string, string> = {
   ACTIVATION_DEPARTEMENT: "Département lancé",
   EXTINCTION_DEPARTEMENT: "Département éteint",
   IDENTIFIANTS_GENERES: "Fiches d'identifiants produites",
+  MOTS_DE_PASSE_REINITIALISES: "Mots de passe réinitialisés",
   PURGE_DONNEES_TEST: "Données d'essai purgées",
   SUPPRESSION_ETABLISSEMENTS_DEMO: "Établissements de démonstration retirés",
   VALIDATION_REFERENTIEL: "Nouvelle espèce validée",

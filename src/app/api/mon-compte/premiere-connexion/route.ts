@@ -11,6 +11,7 @@ import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { clientCloisonne } from "@/lib/dbCloisonne";
 import { compteParId } from "@/lib/comptes";
+import { LONGUEUR_MIN_MOT_DE_PASSE, MESSAGE_LONGUEUR_MOT_DE_PASSE } from "@/lib/motDePasse";
 
 interface Body {
   nom: string;
@@ -30,8 +31,8 @@ export async function POST(req: Request) {
   if (!body.nom?.trim()) {
     return NextResponse.json({ message: "Le nom est obligatoire." }, { status: 400 });
   }
-  if (!body.nouveauMotDePasse || body.nouveauMotDePasse.length < 8) {
-    return NextResponse.json({ message: "Le mot de passe doit contenir au moins 8 caractères." }, { status: 400 });
+  if (!body.nouveauMotDePasse || body.nouveauMotDePasse.length < LONGUEUR_MIN_MOT_DE_PASSE) {
+    return NextResponse.json({ message: MESSAGE_LONGUEUR_MOT_DE_PASSE }, { status: 400 });
   }
 
   const userId = (session.user as any).id as string;

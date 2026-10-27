@@ -15,7 +15,7 @@ import type { PrismaClient } from "@prisma/client";
 import { baseBrute, base, exigerDepartementDeTravail } from "../src/lib/baseDeTravail";
 import { transactionCloisonnee } from "../src/lib/dbCloisonne";
 import {
-  basculerDepartement, compterDonnees, etatDesDepartements, fonctionDe, genererIdentifiants, purgerDonnees, ErreurAdministration,
+  basculerDepartement, comptesDuDepartement, compterDonnees, etatDesDepartements, fonctionDe, genererIdentifiants, purgerDonnees, reinitialiserMotsDePasse, ErreurAdministration,
 } from "../src/server/administration/systeme";
 import { cleMarqueurPurge, dernierePurge } from "../src/lib/marqueurPurge";
 import { rendreFichesIdentifiants } from "../src/server/administration/fichesIdentifiants";
@@ -113,6 +113,48 @@ test("le mot de passe provisoire : l'abréviation du département suivie de 123"
 test("les libellés de fonction suivent l'article du département", () => {
   assert.equal(fonctionDe("DD", { nom: "Bamboutos", nomAvecArticle: "des Bamboutos" }, null), "Délégué départemental des Bamboutos");
   assert.equal(fonctionDe("DA", { nom: "Bamboutos", nomAvecArticle: "des Bamboutos" }, "Mbouda"), "Délégué d'arrondissement de Mbouda");
+});
+
+test("l'administrateur voit les comptes d'un autre département, le DD en tête", async () => {
+  const { comptes, motDePasse } = await comptesDuDepartement(DEP, "u_admin_ailleurs");
+  assert.equal(motDePasse, "ZZD123");
+  assert.deepEqual(comptes.map((c) => c.username), ["dd.zzd.controle", "da.zzd.controle", "agent.zzd.controle"]);
+  const agent = comptes.find((c) => c.username === "agent.zzd.controle")!;
+  assert.equal(agent.jamaisConnecte, false);
+  assert.equal(agent.fonction, "Agent de saisie d'Ebolowa-Controle");
+});
+
+test("réinitialiser : un compte déjà utilisé retrouve le mot de passe provisoire, les autres ne bougent pas", async () => {
+  const avant = await dans((tx) => tx.user.findMany({ select: { username: true, passwordHash: true } }));
+  const r = await reinitialiserMotsDePasse(DEP, { ids: ["u_zzd_connu"] }, "u_admin_ailleurs");
+  assert.deepEqual(r.comptes, ["agent.zzd.controle"]);
+  const apres = await dans((tx) => tx.user.findMany({ select: { username: true, passwordHash: true, mustChangePassword: true } }));
+  const agent = apres.find((u) => u.username === "agent.zzd.controle")!;
+  assert.ok(await bcrypt.compare("ZZD123", agent.passwordHash), "le mot de passe oublié est remplacé par le provisoire");
+  assert.equal(agent.mustChangePassword, true, "il devra le changer à sa prochaine connexion");
+  for (const u of apres.filter((x) => x.username !== "agent.zzd.controle")) {
+    assert.equal(u.passwordHash, avant.find((a) => a.username === u.username)!.passwordHash, `${u.username} n'a pas bougé`);
+  }
+  await assert.rejects(() => reinitialiserMotsDePasse(DEP, { ids: [] }, "u_admin_ailleurs"), ErreurAdministration);
+});
+
+test("réinitialiser tout un département : jamais son propre compte, ni un compte désactivé, ni la Menoua", async () => {
+  await dans((tx) => tx.user.update({ where: { id: "u_zzd_da" }, data: { actif: false, passwordHash: "desactive" } }));
+  const menouaAvant = await transactionCloisonnee(baseBrute, "dep_menoua", (tx) => tx.user.findMany({ select: { id: true, passwordHash: true } }));
+  // L'administrateur est ici le DD du département visé : il ne s'enferme pas dehors.
+  const r = await reinitialiserMotsDePasse(DEP, { tous: true }, "u_zzd_dd");
+  assert.deepEqual(r.comptes, ["agent.zzd.controle"]);
+  const seul = await reinitialiserMotsDePasse(DEP, { ids: ["u_zzd_da"] }, "u_zzd_dd");
+  assert.deepEqual(seul.desactives, ["da.zzd.controle"], "l'écran prévient : réinitialisé, mais toujours fermé");
+  await dans((tx) => tx.user.update({ where: { id: "u_zzd_da" }, data: { passwordHash: "desactive" } }));
+  const da = await dans((tx) => tx.user.findUniqueOrThrow({ where: { id: "u_zzd_da" } }));
+  assert.equal(da.passwordHash, "desactive");
+  assert.equal(da.actif, false, "un compte désactivé n'est pas rallumé");
+  // Un compte d'un autre département, désigné par erreur, est ignoré : le cloisonnement tient.
+  const menouaId = menouaAvant[0].id;
+  await assert.rejects(() => reinitialiserMotsDePasse(DEP, { ids: [menouaId] }, "u_zzd_dd"), ErreurAdministration);
+  const menouaApres = await transactionCloisonnee(baseBrute, "dep_menoua", (tx) => tx.user.findMany({ select: { id: true, passwordHash: true } }));
+  assert.deepEqual(menouaApres, menouaAvant, "aucun mot de passe de la Menoua n'a bougé");
 });
 
 test("la purge d'un département n'efface que ses données, et ne touche pas la Menoua", async () => {

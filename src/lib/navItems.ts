@@ -270,6 +270,7 @@ export const MENU_ADMIN_SYSTEME: NavGroupe = {
   titre: "Administration du système",
   items: [
     { href: "/admin-systeme", label: "Départements et lancements" },
+    { href: "/admin-systeme/comptes", label: "Comptes et mots de passe" },
     { href: "/admin-systeme/textes", label: "Textes permanents des départements" },
     { href: "/admin-systeme/especes", label: "Nouvelles espèces (nouvelles colonnes)" },
     { href: "/admin-systeme/demonstration", label: "Démonstration (formation)" },
