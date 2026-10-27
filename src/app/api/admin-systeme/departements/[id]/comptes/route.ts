@@ -7,12 +7,13 @@
  *   GET  → les comptes, et le mot de passe provisoire du département.
  *   POST { ids: string[] }                           → ces comptes-là.
  *   POST { tous: true, confirmation: "REINITIALISER" } → tous les comptes actifs.
+ *   POST { reactiver: id }                           → rouvre un compte désactivé.
  *
  * Le mot de passe provisoire n'est pas écrit dans le journal : seulement les
  * identifiants concernés.
  */
 import { NextResponse } from "next/server";
-import { comptesDuDepartement, reinitialiserMotsDePasse, tracer } from "@/server/administration/systeme";
+import { comptesDuDepartement, reactiverCompte, reinitialiserMotsDePasse, tracer } from "@/server/administration/systeme";
 import { administrateur, reponseErreur } from "../../../garde";
 
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
@@ -27,7 +28,12 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   try {
     const admin = await administrateur();
-    const body = (await req.json().catch(() => ({}))) as { ids?: unknown; tous?: unknown; confirmation?: unknown };
+    const body = (await req.json().catch(() => ({}))) as { ids?: unknown; tous?: unknown; confirmation?: unknown; reactiver?: unknown };
+    if (body.reactiver !== undefined) {
+      const r = await reactiverCompte(params.id, body.reactiver, admin.id);
+      await tracer(admin.db, admin.id, "COMPTE_REACTIVE", r.departement, { compte: r.compte });
+      return NextResponse.json({ ok: true, reactive: r.compte });
+    }
     let cible: { ids: string[] } | { tous: true };
     if (body.tous === true) {
       if (body.confirmation !== "REINITIALISER") {

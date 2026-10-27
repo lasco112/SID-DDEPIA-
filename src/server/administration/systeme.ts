@@ -272,6 +272,26 @@ export async function reinitialiserMotsDePasse(departementId: string, cible: { i
   };
 }
 
+/**
+ * Rouvre un compte désactivé, dans n'importe quel département (demande du
+ * Délégué, 27 octobre 2026 : un DD avait désactivé son propre compte et
+ * personne ne pouvait le rouvrir). Le mot de passe n'est pas touché : la
+ * personne se reconnecte avec le sien ; s'il est oublié, « Réinitialiser ».
+ */
+export async function reactiverCompte(departementId: string, compteId: unknown, monId: string) {
+  const d = await departementVise(departementId);
+  if (typeof compteId !== "string" || !compteId) throw new ErreurAdministration("Aucun compte choisi.");
+  const compte = await transactionCloisonnee(db, d.id, async (tx) => {
+    const u = await tx.user.findFirst({ where: { id: compteId, role: { not: "ADMIN_TECH" } }, select: { id: true, username: true, actif: true } });
+    if (!u) throw new ErreurAdministration("Compte introuvable dans ce département.");
+    if (u.id === monId) throw new ErreurAdministration("C'est votre propre compte.");
+    if (u.actif) throw new ErreurAdministration(`${u.username} est déjà actif.`);
+    await tx.user.update({ where: { id: u.id }, data: { actif: true } });
+    return u.username;
+  });
+  return { departement: d, compte };
+}
+
 // ---------------------------------------------------------------------------
 // Les données d'essai
 // ---------------------------------------------------------------------------
@@ -391,6 +411,7 @@ export const ACTIONS_ADMINISTRATION = [
   "EXTINCTION_DEPARTEMENT",
   "IDENTIFIANTS_GENERES",
   "MOTS_DE_PASSE_REINITIALISES",
+  "COMPTE_REACTIVE",
   "PURGE_DONNEES_TEST",
   "SUPPRESSION_ETABLISSEMENTS_DEMO",
   "VALIDATION_REFERENTIEL",

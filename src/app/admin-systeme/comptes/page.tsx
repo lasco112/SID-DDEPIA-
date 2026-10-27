@@ -13,7 +13,8 @@ export default function ComptesSystemePage() {
         <p className="mt-1 max-w-3xl text-gray-600">
           Les comptes de chaque département. « Réinitialiser » remet le mot de passe provisoire du département (BTOS123 pour les
           Bamboutos, password123 pour la Menoua) ; la personne le remplace à sa prochaine connexion. Cela vaut aussi pour un compte
-          déjà utilisé : c&apos;est le remède au mot de passe oublié.
+          déjà utilisé : c&apos;est le remède au mot de passe oublié. « Réactiver » rouvre un compte désactivé, avec son mot de
+          passe habituel.
         </p>
         <div className="mt-6">
           <ComptesSystemeClient />

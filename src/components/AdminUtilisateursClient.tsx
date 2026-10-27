@@ -110,6 +110,7 @@ export default function AdminUtilisateursClient() {
   }
 
   async function changerStatut(id: string, actif: boolean) {
+    if (!actif && !window.confirm("Désactiver ce compte ? La personne ne pourra plus se connecter tant qu'il n'est pas réactivé.")) return;
     const res = await fetch(`/api/admin/utilisateurs/${id}/statut`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

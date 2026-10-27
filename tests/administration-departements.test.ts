@@ -15,7 +15,7 @@ import type { PrismaClient } from "@prisma/client";
 import { baseBrute, base, exigerDepartementDeTravail } from "../src/lib/baseDeTravail";
 import { transactionCloisonnee } from "../src/lib/dbCloisonne";
 import {
-  basculerDepartement, comptesDuDepartement, compterDonnees, etatDesDepartements, fonctionDe, genererIdentifiants, purgerDonnees, reinitialiserMotsDePasse, ErreurAdministration,
+  basculerDepartement, comptesDuDepartement, compterDonnees, etatDesDepartements, fonctionDe, genererIdentifiants, purgerDonnees, reactiverCompte, reinitialiserMotsDePasse, ErreurAdministration,
 } from "../src/server/administration/systeme";
 import { cleMarqueurPurge, dernierePurge } from "../src/lib/marqueurPurge";
 import { rendreFichesIdentifiants } from "../src/server/administration/fichesIdentifiants";
@@ -155,6 +155,19 @@ test("réinitialiser tout un département : jamais son propre compte, ni un comp
   await assert.rejects(() => reinitialiserMotsDePasse(DEP, { ids: [menouaId] }, "u_zzd_dd"), ErreurAdministration);
   const menouaApres = await transactionCloisonnee(baseBrute, "dep_menoua", (tx) => tx.user.findMany({ select: { id: true, passwordHash: true } }));
   assert.deepEqual(menouaApres, menouaAvant, "aucun mot de passe de la Menoua n'a bougé");
+});
+
+test("réactiver : l'administrateur rouvre un compte désactivé, sans toucher à son mot de passe", async () => {
+  // u_zzd_da est désactivé depuis le test précédent, avec le mot de passe « desactive ».
+  const r = await reactiverCompte(DEP, "u_zzd_da", "u_admin_ailleurs");
+  assert.equal(r.compte, "da.zzd.controle");
+  const da = await dans((tx) => tx.user.findUniqueOrThrow({ where: { id: "u_zzd_da" } }));
+  assert.equal(da.actif, true);
+  assert.equal(da.passwordHash, "desactive", "il garde son mot de passe habituel");
+  await assert.rejects(() => reactiverCompte(DEP, "u_zzd_da", "u_admin_ailleurs"), /déjà actif/);
+  await assert.rejects(() => reactiverCompte(DEP, "u_zzd_dd", "u_zzd_dd"), /votre propre compte/);
+  const menouaId = (await transactionCloisonnee(baseBrute, "dep_menoua", (tx) => tx.user.findFirstOrThrow({ select: { id: true } }))).id;
+  await assert.rejects(() => reactiverCompte(DEP, menouaId, "u_admin_ailleurs"), /introuvable dans ce département/, "le cloisonnement tient");
 });
 
 test("la purge d'un département n'efface que ses données, et ne touche pas la Menoua", async () => {

@@ -112,12 +112,36 @@ export default function ComptesSystemeClient() {
             ? `${j.comptes[0]} : mot de passe remis à « ${j.motDePasse} ». La personne le changera à sa prochaine connexion.`
             : `${n} comptes remis au mot de passe « ${j.motDePasse} ». Chacun le changera à sa prochaine connexion.`) +
           (fermes.length
-            ? ` Attention : ${fermes.join(", ")} ${fermes.length > 1 ? "restent désactivés et ne peuvent" : "reste désactivé et ne peut"} pas encore se connecter. Pour l'ouvrir : Départements et lancements → « Fiches d'identifiants ».`
+            ? ` Attention : ${fermes.join(", ")} ${fermes.length > 1 ? "restent désactivés et ne peuvent" : "reste désactivé et ne peut"} pas encore se connecter. Pour l'ouvrir : bouton « Réactiver » sur sa ligne.`
             : ""),
       });
       setAConfirmer(null);
       setTousOuvert(false);
       setSaisie("");
+      charger();
+    } catch (e) {
+      setMessage({ ok: false, texte: e instanceof Error ? e.message : "Échec." });
+    } finally {
+      setEnCours(false);
+    }
+  }
+
+  async function reactiver(c: Compte) {
+    if (!window.confirm(`Réactiver le compte ${c.username} ? La personne pourra de nouveau se connecter, avec son mot de passe habituel.`)) return;
+    setEnCours(true);
+    setMessage(null);
+    try {
+      const r = await fetch(`/api/admin-systeme/departements/${choisi}/comptes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reactiver: c.id }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.message ?? "Échec de la réactivation.");
+      setMessage({
+        ok: true,
+        texte: `${j.reactive} est réactivé : il peut se reconnecter avec son mot de passe habituel. S'il l'a oublié, cliquez sur « Réinitialiser ».`,
+      });
       charger();
     } catch (e) {
       setMessage({ ok: false, texte: e instanceof Error ? e.message : "Échec." });
@@ -219,16 +243,28 @@ export default function ComptesSystemeClient() {
                         </button>
                       </span>
                     ) : (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setAConfirmer(c);
-                          setMessage(null);
-                        }}
-                        className="min-h-[38px] rounded-btn border border-primary px-3 text-[13.5px] font-semibold text-primary hover:bg-primary-light"
-                      >
-                        Réinitialiser
-                      </button>
+                      <span className="inline-flex flex-wrap justify-end gap-2">
+                        {!c.actif && (
+                          <button
+                            type="button"
+                            onClick={() => reactiver(c)}
+                            disabled={enCours}
+                            className="min-h-[38px] rounded-btn bg-primary px-3 text-[13.5px] font-semibold text-white hover:bg-primary-hover disabled:opacity-50"
+                          >
+                            Réactiver
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAConfirmer(c);
+                            setMessage(null);
+                          }}
+                          className="min-h-[38px] rounded-btn border border-primary px-3 text-[13.5px] font-semibold text-primary hover:bg-primary-light"
+                        >
+                          Réinitialiser
+                        </button>
+                      </span>
                     )}
                   </td>
                 </tr>
