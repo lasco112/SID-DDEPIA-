@@ -15,7 +15,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { offlineDB } from "@/lib/dexie";
-import { envoyerSaisiesEnAttente } from "@/lib/synchronisation";
+import { envoyerSaisiesEnAttente, RefusDeMois } from "@/lib/synchronisation";
 import { synchroniserEtablissements } from "@/lib/etablissementsLocal";
 import { avecCible, jeton } from "@/lib/surlignage";
 import { oublierServeur } from "@/lib/aCorriger";
@@ -113,9 +113,18 @@ export default function SyncButton({
   const envoyerFile = useCallback(async (): Promise<number> => {
     // Implémentation partagée avec l'écran de synchronisation (lib/synchronisation)
     // pour que les deux ne puissent jamais diverger.
-    const confirmees = await envoyerSaisiesEnAttente(username, periodeId);
-    // Les établissements créés/supprimés hors ligne partent dans le même geste.
+    let confirmees = 0;
+    let moisRefuse: RefusDeMois | null = null;
+    try {
+      confirmees = await envoyerSaisiesEnAttente(username, periodeId);
+    } catch (e) {
+      if (!(e instanceof RefusDeMois)) throw e;
+      moisRefuse = e;
+    }
+    // Les établissements créés/supprimés hors ligne partent dans le même geste,
+    // même quand un autre mois a été refusé.
     await synchroniserEtablissements();
+    if (moisRefuse) throw moisRefuse;
     return confirmees;
   }, [periodeId, username]);
 
@@ -161,17 +170,32 @@ export default function SyncButton({
     setEnErreur(false);
 
     try {
-      const confirmed = await envoyerFile();
+      let confirmed = 0;
+      /** Un AUTRE mois a été refusé en entier : ce mois-ci part quand même. */
+      let autreMoisRefuse: RefusDeMois | null = null;
+      try {
+        confirmed = await envoyerFile();
+      } catch (e) {
+        // Décision du Délégué (3 novembre 2026) : une erreur sur un mois
+        // précédent ne doit plus empêcher de transmettre le mois en cours. Les
+        // saisies de ce mois-là restent sur l'appareil, signalées dans « À corriger ».
+        if (e instanceof RefusDeMois && peutSoumettre && !e.periodesRefusees.includes(periodeId)) autreMoisRefuse = e;
+        else throw e;
+      }
 
       if (peutSoumettre) {
         const { deja } = await soumettreRapport();
-        setState("done");
+        setState(autreMoisRefuse ? "error" : "done");
+        setEnErreur(Boolean(autreMoisRefuse));
         setMessage(
-          deja
+          (deja
             ? "Rapport déjà transmis."
             : confirmed > 0
               ? `${confirmed} donnée(s) envoyée(s) et rapport transmis au ${destinataire}.`
-              : `Rapport transmis au ${destinataire}.`
+              : `Rapport transmis au ${destinataire}.`) +
+            (autreMoisRefuse
+              ? ` Attention : ${autreMoisRefuse.saisiesRestees} correction(s) d'un autre mois n'ont pas pu partir (${autreMoisRefuse.message}) Elles restent sur ce téléphone.`
+              : "")
         );
       } else if (confirmed > 0) {
         setState("done");

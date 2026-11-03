@@ -134,8 +134,13 @@ export async function POST(req: Request) {
     }
 
     if (rapport.statut === "SOUMIS" || rapport.statut === "CLOTURE") {
+      // Le mois est NOMMÉ : sans lui, le téléphone affichait « un autre mois »
+      // et le DD ne savait pas quel rapport renvoyer (constaté le 3 novembre 2026).
+      const nomMois = periode.mois
+        ? new Date(Date.UTC(periode.annee, periode.mois - 1, 1)).toLocaleDateString("fr-FR", { month: "long", year: "numeric", timeZone: "UTC" })
+        : null;
       return NextResponse.json(
-        { message: "Rapport déjà soumis : verrouillé pour la saisie DA." },
+        { message: `Rapport${nomMois ? (/^[aeiou]/i.test(nomMois) ? ` d'${nomMois}` : ` de ${nomMois}`) : ""} déjà soumis : verrouillé pour la saisie DA.` },
         { status: 423 }
       );
     }

@@ -196,7 +196,10 @@ async function pointsMensuels(username: string, periodeActiveId: string | null, 
     const [periodeId, templateCode, nature] = cle.split("¦") as [string, string, ReturnType<typeof natureDuRefus>];
     const t = tableau.get(templateCode);
     const nomTableau = t ? `${t.numero} ${t.titre}` : templateCode;
-    const mois = libelle(periodeId);
+    // Mois inconnu de l'appareil : le serveur l'a nommé dans son refus
+    // (« Rapport d'octobre 2026 déjà soumis… »). Sans cela, « un autre mois ».
+    const nommeParLeServeur = /Rapport d(?:e |')(\S+ \d{4}) déjà soumis/i.exec(liste[0].erreurSynchro ?? "")?.[1];
+    const mois = moisDe(periodeId) || !nommeParLeServeur ? libelle(periodeId) : majuscule(nommeParLeServeur);
     const conseil = CONSEIL[nature];
     const cibles = liste.map((s) =>
       s.famille === "MATRICE" && s.fieldCode

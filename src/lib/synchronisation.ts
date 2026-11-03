@@ -75,6 +75,26 @@ export async function etatSynchronisation(username: string): Promise<EtatSynchro
 }
 
 /**
+ * Un ou plusieurs MOIS ENTIERS ont été refusés (rapport déjà transmis, mois
+ * verrouillé ou clôturé) ; tous les autres mois sont partis. Celui qui envoie
+ * un mois qui n'est pas dans la liste peut donc le transmettre quand même
+ * (décision du Délégué, 3 novembre 2026 : une erreur sur un mois précédent
+ * empêchait d'envoyer le mois en cours).
+ */
+export class RefusDeMois extends Error {
+  constructor(
+    message: string,
+    /** Les périodes dont les saisies sont restées sur l'appareil. */
+    readonly periodesRefusees: string[],
+    /** Le nombre de saisies restées sur l'appareil. */
+    readonly saisiesRestees: number
+  ) {
+    super(message);
+    this.name = "RefusDeMois";
+  }
+}
+
+/**
  * Pousse la file locale des saisies vers /api/sync. Renvoie le nombre de
  * saisies confirmées par le serveur. Une saisie n'est marquée SYNCHRONISE que
  * si le serveur l'a explicitement confirmée (`confirmedIds`) — jamais par
@@ -109,6 +129,8 @@ export async function envoyerSaisiesEnAttente(username: string, periodeId: strin
   let refusees = 0;
   /** Premier refus d'un mois entier : les AUTRES mois partent quand même. */
   let refusDUnMois: string | null = null;
+  const periodesRefusees: string[] = [];
+  let saisiesRestees = 0;
   for (const [periodeDuLot, file] of Array.from(parPeriode.entries())) {
   for (let i = 0; i < file.length; i += TAILLE_LOT) {
     const lot = file.slice(i, i + TAILLE_LOT);
@@ -145,6 +167,8 @@ export async function envoyerSaisiesEnAttente(username: string, periodeId: strin
       // tout le travail du mois suivant sur le téléphone).
       if (res.status !== 423) throw new Error(message);
       refusDUnMois ??= message;
+      periodesRefusees.push(periodeDuLot);
+      saisiesRestees += restant.length;
       break;
     }
 
@@ -174,8 +198,10 @@ export async function envoyerSaisiesEnAttente(username: string, periodeId: strin
 
   // « Dernier envoi réussi » ne doit être mis à jour que si TOUT est passé,
   // sans quoi l'écran de synchronisation affiche un succès trompeur.
-  if (refusDUnMois) throw new Error(refusDUnMois);
-  if (refusees === 0) memoriserSynchroReussie();
-  else throw new Error(`${refusees} saisie(s) refusée(s) par le serveur. Elles restent sur cet appareil.`);
+  // Des LIGNES refusées (motif manquant…) bloquent toujours : le mois partirait
+  // sans elles. Seul le refus d'un mois ENTIER laisse partir les autres mois.
+  if (refusees > 0) throw new Error(`${refusees} saisie(s) refusée(s) par le serveur. Elles restent sur cet appareil.`);
+  if (refusDUnMois) throw new RefusDeMois(refusDUnMois, periodesRefusees, saisiesRestees);
+  memoriserSynchroReussie();
   return confirmees;
 }
