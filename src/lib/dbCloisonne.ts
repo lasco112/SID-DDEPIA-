@@ -139,8 +139,21 @@ export function transactionCloisonnee<T>(
  * `departementId` nul — l'ADMIN_TECH, qui n'a aucun droit métier — rend le
  * client tel quel.
  */
-export function clientCloisonne(base: PrismaClient, departementId: string | null): PrismaClient {
+export function clientCloisonne(
+  base: PrismaClient,
+  departementId: string | null,
+  /**
+   * Intervention à distance de l'administrateur (lib/intervention.ts) : chaque
+   * ligne du journal écrite par ce client reçoit `details.intervention`, qui
+   * dit le vrai auteur. Posé ICI, dans le même client, pour qu'il reste
+   * reconnu comme cloisonné (departementDeClient).
+   */
+  marqueJournal?: Record<string, unknown>
+): PrismaClient {
   if (!departementId) return base;
+
+  const marquer = (details: unknown) =>
+    details && typeof details === "object" && !Array.isArray(details) ? { ...(details as object), intervention: marqueJournal } : { intervention: marqueJournal };
 
   const etendu = base.$extends({
     query: {
@@ -149,6 +162,11 @@ export function clientCloisonne(base: PrismaClient, departementId: string | null
         // passent pas par une table : les envelopper n'apporterait rien et
         // casserait les requêtes d'administration.
         if (!model) return query(args);
+
+        if (marqueJournal && model === "AuditLog" && (operation === "create" || operation === "createMany")) {
+          const a = args as { data: Record<string, unknown> | Record<string, unknown>[] };
+          a.data = Array.isArray(a.data) ? a.data.map((l) => ({ ...l, details: marquer(l.details) })) : { ...a.data, details: marquer(a.data.details) };
+        }
 
         const dejaOuverte = transactionCourante.getStore();
         if (dejaOuverte) {

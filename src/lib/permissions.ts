@@ -17,6 +17,9 @@ import { Prisma } from "@prisma/client";
 import { clientCloisonne, transactionCloisonnee, type Transactionnelle } from "./dbCloisonne";
 import { compteParId } from "./comptes";
 import { MESSAGE_DEPARTEMENT_ETEINT } from "./messagesConnexion";
+import { cookies } from "next/headers";
+import { composerIdentite } from "./departement";
+import { COOKIE_INTERVENTION, type Intervention } from "./intervention";
 
 export interface SessionUser {
   id: string;
@@ -57,6 +60,12 @@ export interface SessionUser {
    * n'a jamais à manipuler l'un ni l'autre.
    */
   transaction: Transactionnelle;
+  /**
+   * L'administrateur du système intervient à distance dans ce département
+   * (lib/intervention.ts) : la session agit sous l'identité de son DD. Absent
+   * en temps normal.
+   */
+  intervention?: Intervention;
 }
 
 export class ForbiddenError extends Error {
@@ -214,6 +223,12 @@ async function resoudreContexte(sessionUser: any): Promise<SessionUser> {
       ? Boolean((await cloisonne.user.findUnique({ where: { id: user.id }, select: { adminSysteme: true } }))?.adminSysteme)
       : false;
 
+  // L'administrateur intervient à distance dans un autre département.
+  if (adminSysteme) {
+    const intervention = await contexteIntervention(client, user);
+    if (intervention) return intervention;
+  }
+
   return {
     id: user.id,
     role: user.role,
@@ -225,6 +240,67 @@ async function resoudreContexte(sessionUser: any): Promise<SessionUser> {
     adminSysteme,
     db: cloisonne,
     transaction: (travail) => transactionCloisonnee(client, user.departementId, travail),
+  };
+}
+
+/** Le cookie d'intervention, s'il y en a un (hors requête Next — scripts, tests : aucun). */
+function cibleIntervention(): string | null {
+  try {
+    return cookies().get(COOKIE_INTERVENTION)?.value || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * La session de l'administrateur qui intervient dans un autre département
+ * (lib/intervention.ts) : l'identité du DD de ce département, son
+ * cloisonnement, et chaque ligne du journal marquée du vrai auteur. Rien si
+ * le cookie est absent, vise son propre département, ou un département sans
+ * DD actif.
+ */
+async function contexteIntervention(
+  client: PrismaClient,
+  admin: { id: string; username: string; departementId: string | null }
+): Promise<SessionUser | null> {
+  const cible = cibleIntervention();
+  if (!cible || cible === admin.departementId) return null;
+  const [dep, domicile] = await Promise.all([
+    db.departement.findUnique({ where: { id: cible } }),
+    admin.departementId ? db.departement.findUnique({ where: { id: admin.departementId } }) : null,
+  ]);
+  if (!dep) return null;
+  const dd = await clientCloisonne(client, dep.id).user.findFirst({
+    where: { role: "DD", actif: true },
+    orderBy: { createdAt: "asc" },
+    select: { id: true, username: true },
+  });
+  if (!dd) return null;
+
+  const intervention: Intervention = {
+    departementId: dep.id,
+    departementNomAvecArticle: composerIdentite(dep).nomAvecArticle,
+    administrateurId: admin.id,
+    administrateur: admin.username,
+    domicileId: admin.departementId,
+    domicileNom: domicile?.nom ?? "",
+  };
+  // Chaque ligne du journal écrite pendant l'intervention dit qui l'a faite.
+  const cloisonne = clientCloisonne(client, dep.id, { administrateur: admin.username, departement: dep.code });
+
+  return {
+    id: dd.id,
+    role: "DD",
+    username: dd.username,
+    arrondissementId: null,
+    sectionId: null,
+    departementId: dep.id,
+    isDemo: false,
+    // L'administration du système se fait depuis son propre département.
+    adminSysteme: false,
+    db: cloisonne,
+    transaction: (travail) => transactionCloisonnee(client, dep.id, travail),
+    intervention,
   };
 }
 

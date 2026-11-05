@@ -164,8 +164,11 @@ export async function envoyerSaisiesEnAttente(username: string, periodeId: strin
       // Pas de réseau ou serveur en difficulté : inutile d'essayer les autres
       // mois maintenant. Un mois verrouillé ou déjà transmis, lui, ne doit
       // pas empêcher les autres de partir (constaté : un mois bloqué gardait
-      // tout le travail du mois suivant sur le téléphone).
-      if (res.status !== 423) throw new Error(message);
+      // tout le travail du mois suivant sur le téléphone). Refus d'un mois
+      // ENTIER : 423 (rapport transmis, mois verrouillé), 409 (mois clôturé),
+      // 404 (mois supprimé) — constaté le 4 novembre 2026 : un mois clôturé
+      // avec une correction en attente bloquait encore l'envoi du mois en cours.
+      if (res.status !== 423 && res.status !== 409 && res.status !== 404) throw new Error(message);
       refusDUnMois ??= message;
       periodesRefusees.push(periodeDuLot);
       saisiesRestees += restant.length;

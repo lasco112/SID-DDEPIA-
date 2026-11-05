@@ -92,7 +92,18 @@ export default function TechniqueAuditClient() {
                   <td className="whitespace-nowrap border-b border-gray-100 px-3 py-2 text-xs text-gray-500">
                     {new Date(e.createdAt).toLocaleString("fr-FR")}
                   </td>
-                  <td className="border-b border-gray-100 px-3 py-2">{e.user ? `${e.user.nom} (${e.user.username})` : "—"}</td>
+                  <td className="border-b border-gray-100 px-3 py-2">
+                    {/* Intervention à distance de l'administrateur (lib/intervention.ts) : le vrai auteur d'abord. */}
+                    {(e.details as { intervention?: { administrateur?: string } } | null)?.intervention?.administrateur ? (
+                      <span className="font-semibold text-amber-800">
+                        L&apos;administrateur {(e.details as { intervention: { administrateur: string } }).intervention.administrateur}, à distance
+                      </span>
+                    ) : e.user ? (
+                      `${e.user.nom} (${e.user.username})`
+                    ) : (
+                      "—"
+                    )}
+                  </td>
                   <td className="border-b border-gray-100 px-3 py-2 font-mono text-xs">{e.action}</td>
                   <td className="border-b border-gray-100 px-3 py-2 text-xs text-gray-500">{e.entite ?? "—"}</td>
                   <td className="max-w-xs truncate border-b border-gray-100 px-3 py-2 font-mono text-xs text-gray-500" title={JSON.stringify(e.details)}>

@@ -29,6 +29,8 @@ import { FournisseurUtilisateur } from "@/components/UtilisateurContexte";
 import EcranPassage from "@/components/EcranPassage";
 import InvitationNotifications from "@/components/InvitationNotifications";
 import FriseNdop from "@/components/FriseNdop";
+import { MESSAGE_TRAVAIL_EN_ATTENTE, travailEnAttente, viderCopieLocale } from "@/lib/interventionLocale";
+import FicheNouveautes from "@/components/FicheNouveautes";
 
 const LIBELLES_ROLE: Record<string, string> = {
   DD: "Délégué Départemental",
@@ -40,6 +42,37 @@ const LIBELLES_ROLE: Record<string, string> = {
   CHEF_SPAIH: "Chef de section — SPAIH",
   ADMIN_TECH: "Administrateur technique",
 };
+
+/**
+ * Le bandeau de l'intervention à distance : toujours visible, sur tous les
+ * écrans, pour que l'administrateur ne confonde jamais le département où il
+ * agit avec le sien.
+ */
+function BandeauIntervention({ departement, domicile }: { departement: string; domicile: string }) {
+  const [enCours, setEnCours] = useState(false);
+  async function revenir() {
+    // Étanchéité sur l'appareil : rien de ce département ne doit attendre d'envoi (lib/interventionLocale.ts).
+    const attente = await travailEnAttente();
+    if (attente > 0) return window.alert(MESSAGE_TRAVAIL_EN_ATTENTE(attente));
+    setEnCours(true);
+    await fetch("/api/admin-systeme/intervention", { method: "DELETE" }).catch(() => undefined);
+    await viderCopieLocale();
+    window.location.href = "/admin-systeme";
+  }
+  return (
+    <div className="sticky top-0 z-[60] flex flex-wrap items-center justify-center gap-x-3 gap-y-1 bg-amber-600 px-3 py-1.5 text-center text-[13.5px] font-bold text-white">
+      <span>Intervention à distance — Département {departement} : vous agissez comme son DD, tout est inscrit au journal.</span>
+      <button
+        type="button"
+        onClick={revenir}
+        disabled={enCours}
+        className="rounded-full border border-white/80 bg-white/15 px-3 py-0.5 text-[13px] font-bold hover:bg-white/25 disabled:opacity-60"
+      >
+        {enCours ? "Retour…" : `Revenir ${domicile ? `à la ${domicile}` : "chez moi"}`}
+      </button>
+    </div>
+  );
+}
 
 export default function AppShellClient({
   role,
@@ -53,8 +86,11 @@ export default function AppShellClient({
   periodes = [],
   couranteId = null,
   adminSysteme = false,
+  intervention = null,
   children,
 }: {
+  /** L'administrateur intervient à distance dans ce département (lib/intervention.ts). */
+  intervention?: { departement: string; domicile: string } | null;
   role: string;
   username: string;
   /** Le nom de la personne (écran de passage). */
@@ -84,6 +120,8 @@ export default function AppShellClient({
     <PinGate>
     <div className="flex min-h-screen flex-col">
       <BootstrapPreload />
+      <FicheNouveautes username={username} role={role} adminSysteme={adminSysteme} />
+      {intervention &&<BandeauIntervention departement={intervention.departement} domicile={intervention.domicile} />}
       <header className="flex h-[58px] shrink-0 items-center gap-1.5 bg-primary px-2 text-white shadow-[0_1px_0_rgba(0,0,0,.12)] sm:gap-4 sm:px-[18px]">
         <button
           type="button"

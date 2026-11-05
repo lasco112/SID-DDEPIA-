@@ -159,6 +159,15 @@ export default function Sidebar({
           <span className="h-[7px] w-[7px] shrink-0 rounded-full bg-white/25" />
           Aide
         </Link>
+        {/* Ajouté en fin de liste (4 novembre 2026) : rien de ce qui existait ne bouge. */}
+        <Link
+          href="/nouveautes"
+          onClick={onNavigate}
+          className="flex min-h-[44px] items-center gap-2.5 rounded-md pl-4 pr-3 text-[14px] font-medium text-white/75 hover:bg-white/5"
+        >
+          <span className="h-[7px] w-[7px] shrink-0 rounded-full bg-white/25" />
+          Nouveautés
+        </Link>
       </div>
 
       {periodeLabel && (

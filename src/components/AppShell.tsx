@@ -68,6 +68,7 @@ export default async function AppShell({
       }))}
       couranteId={periode?.id ?? null}
       adminSysteme={user.adminSysteme}
+      intervention={user.intervention ? { departement: user.intervention.departementNomAvecArticle, domicile: user.intervention.domicileNom } : null}
     >
       {children}
     </AppShellClient>

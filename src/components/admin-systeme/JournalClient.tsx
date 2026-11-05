@@ -17,6 +17,8 @@ const LIBELLES: Record<string, string> = {
   IDENTIFIANTS_GENERES: "Fiches d'identifiants produites",
   MOTS_DE_PASSE_REINITIALISES: "Mots de passe réinitialisés",
   COMPTE_REACTIVE: "Compte réactivé",
+  INTERVENTION_DEBUT: "Intervention à distance : début",
+  INTERVENTION_FIN: "Intervention à distance : fin",
   PURGE_DONNEES_TEST: "Données d'essai purgées",
   SUPPRESSION_ETABLISSEMENTS_DEMO: "Établissements de démonstration retirés",
   VALIDATION_REFERENTIEL: "Nouvelle espèce validée",

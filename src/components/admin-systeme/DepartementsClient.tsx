@@ -8,6 +8,7 @@
  * et on y allume un département le jour de son lancement.
  */
 import { useCallback, useEffect, useState } from "react";
+import { MESSAGE_TRAVAIL_EN_ATTENTE, travailEnAttente, viderCopieLocale } from "@/lib/interventionLocale";
 
 interface Etat {
   id: string;
@@ -95,6 +96,28 @@ function Fiche({ d, recharger }: { d: Etat; recharger: () => void }) {
     }
   }
 
+  /** Entrer dans ce département comme son DD, pour dépanner à distance (lib/intervention.ts). */
+  async function intervenir() {
+    // Étanchéité sur l'appareil : rien ne doit attendre d'envoi (lib/interventionLocale.ts).
+    const attente = await travailEnAttente();
+    if (attente > 0) {
+      setMessage({ ok: false, texte: MESSAGE_TRAVAIL_EN_ATTENTE(attente) });
+      return;
+    }
+    if (!window.confirm(`Intervenir dans le département ${d.nomAvecArticle} ? Vous agirez comme son DD ; il en sera prévenu et tout sera inscrit au journal.`)) return;
+    setEnCours(true);
+    setMessage(null);
+    try {
+      const r = await fetch("/api/admin-systeme/intervention", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ departementId: d.id }) });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).message ?? "Échec.");
+      await viderCopieLocale();
+      window.location.href = "/dashboard";
+    } catch (e) {
+      setMessage({ ok: false, texte: e instanceof Error ? e.message : "Échec." });
+      setEnCours(false);
+    }
+  }
+
   const pret = d.manques.length === 0;
   return (
     <div className={`rounded-card border bg-surface p-5 shadow-card ${d.actif ? "border-green-200" : "border-line"}`}>
@@ -150,6 +173,16 @@ function Fiche({ d, recharger }: { d: Etat; recharger: () => void }) {
         >
           Fiches d&apos;identifiants (PDF)
         </button>
+        {!d.estLeMien && (
+          <button
+            type="button"
+            onClick={intervenir}
+            disabled={enCours}
+            className="min-h-[42px] rounded-btn bg-amber-600 px-4 text-[14px] font-semibold text-white hover:bg-amber-700 disabled:opacity-50"
+          >
+            Intervenir dans ce département
+          </button>
+        )}
         {!d.actif && (
           <button
             type="button"
