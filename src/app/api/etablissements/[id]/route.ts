@@ -18,6 +18,7 @@ import { Prisma } from "@prisma/client";
 import { requireUser, assertRole, permissionErrorResponse } from "@/lib/permissions";
 import { identiteDepartement } from "@/lib/departement";
 import { SELECTION_ETABLISSEMENT, preparerEcriture, versClient } from "@/server/etablissements/donnees";
+import { preparerLocalisation } from "@/server/etablissements/localisation";
 
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
   try {
@@ -68,6 +69,10 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     });
     if ("erreur" in prepare) return NextResponse.json({ message: prepare.erreur }, { status: 400 });
     Object.assign(data, prepare.data);
+    // Le CZV et le village (facultatifs) : la localité prend le nom du village.
+    const lieu = await preparerLocalisation(user.db, body as unknown as Record<string, unknown>, etablissement.arrondissementId);
+    if ("erreur" in lieu) return NextResponse.json({ message: lieu.erreur }, { status: 400 });
+    Object.assign(data, lieu.data);
 
     const mis_a_jour = await user.db.etablissement.update({ where: { id: params.id }, data, select: SELECTION_ETABLISSEMENT });
 

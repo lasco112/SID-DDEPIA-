@@ -16,6 +16,7 @@ import type { Prisma } from "@prisma/client";
 import { CODES_ACTEURS } from "@/lib/acteurs";
 import { identiteDepartement } from "@/lib/departement";
 import { SELECTION_ETABLISSEMENT, TYPE_MARCHE, preparerEcriture, versClient } from "@/server/etablissements/donnees";
+import { preparerLocalisation } from "@/server/etablissements/localisation";
 
 // Les neuf types d'acteurs de la liste de référence (20 octobre 2026) — les
 // quatre premiers servent aux tableaux nominatifs du mensuel, les autres
@@ -88,9 +89,6 @@ export async function POST(req: Request) {
     if (!body.typeCode || !TYPES_VALIDES.includes(body.typeCode)) {
       return NextResponse.json({ message: "typeCode invalide" }, { status: 400 });
     }
-    if (!body.nom?.trim() || !body.localite?.trim()) {
-      return NextResponse.json({ message: "Nom et localité requis" }, { status: 400 });
-    }
 
     let arrondissementId: string;
     if (user.role === "DA" || user.role === "AGENT_SAISIE") {
@@ -98,7 +96,21 @@ export async function POST(req: Request) {
       arrondissementId = user.arrondissementId;
     } else {
       if (!body.arrondissementId) return NextResponse.json({ message: "arrondissementId requis" }, { status: 400 });
-      arrondissementId = body.arrondissementId;
+      // Étanchéité entre départements : l'arrondissement envoyé par l'écran est
+      // relu DANS le département de la session. Un identifiant d'un autre
+      // département n'y est pas visible : refus, au lieu d'une ligne de ce
+      // département rattachée à un arrondissement d'ailleurs.
+      const arr = await user.db.arrondissement.findUnique({ where: { id: body.arrondissementId }, select: { id: true } });
+      if (!arr) return NextResponse.json({ message: "Cet arrondissement n'appartient pas à votre département." }, { status: 403 });
+      arrondissementId = arr.id;
+    }
+
+    // Le CZV et le village (facultatifs) : la localité prend le nom du village.
+    const lieu = await preparerLocalisation(user.db, body as unknown as Record<string, unknown>, arrondissementId);
+    if ("erreur" in lieu) return NextResponse.json({ message: lieu.erreur }, { status: 400 });
+    const localite = lieu.data.localite ?? body.localite?.trim() ?? "";
+    if (!body.nom?.trim() || !localite) {
+      return NextResponse.json({ message: "Nom et localité (ou village) requis" }, { status: 400 });
     }
 
     // Un renvoi d'appareil réécrit SA création — jamais l'établissement d'un
@@ -120,9 +132,10 @@ export async function POST(req: Request) {
     const estMarche = body.typeCode === TYPE_MARCHE;
     const donnees = {
       ...prepare.data,
+      ...lieu.data,
       typeCode: body.typeCode,
       nom: body.nom.trim(),
-      localite: body.localite.trim(),
+      localite,
       // Un marché n'a ni propriétaire ni téléphone : c'est la commune qui le gère.
       proprietaire: estMarche ? null : body.proprietaire?.trim() || null,
       telephone: estMarche ? null : body.telephone?.trim() || null,

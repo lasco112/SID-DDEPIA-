@@ -71,6 +71,7 @@ export async function GET(req: Request) {
         latitude: true, longitude: true, precisionGPS: true, dateCollecteGPS: true, sourceGPS: true,
         especes: true, joursMarche: true, infrastructures: true, observations: true, fiche: true,
         arrondissement: { select: { nom: true, ordre: true } },
+        centre: { select: { nom: true } },
         photo: { select: { prisLe: true } },
       },
     });
@@ -109,6 +110,7 @@ export async function GET(req: Request) {
         speculation: SPECULATIONS[l.typeCode] ?? l.typeCode,
         nom: l.nom,
         localite: l.localite,
+        czv: l.centre?.nom ?? null,
         // Un marché n'a ni propriétaire ni téléphone : c'est la commune qui le gère.
         proprietaire: marche ? null : l.proprietaire,
         telephone: marche ? null : l.telephone,
@@ -210,16 +212,16 @@ export async function GET(req: Request) {
     feuille.addRow([`${identite.intituleCourt} · état au ${etatAu}${seulementActifs ? " · établissements en activité" : ""}`]);
     feuille.addRow([]);
     styleEntete(feuille.addRow([
-      "N°", "Arrondissement", "Type d'acteur", "Nom", "Localité", "Gestionnaire / propriétaire", "Téléphone", "Statut",
+      "N°", "Arrondissement", "Type d'acteur", "Nom", "Localité (village)", "CZV", "Gestionnaire / propriétaire", "Téléphone", "Statut",
       "Latitude", "Longitude", "Précision GPS (m)", "Espèces", "Jours de marché", "Équipements", "Observations",
     ]));
     rangees.forEach((r, i) =>
       feuille.addRow([
-        i + 1, r.arrondissement, r.speculation, r.nom, r.localite, r.gestionnaire ?? r.proprietaire ?? "", r.telephone ?? "", r.actif ? "En activité" : "Désactivé",
+        i + 1, r.arrondissement, r.speculation, r.nom, r.localite, r.czv ?? "", r.gestionnaire ?? r.proprietaire ?? "", r.telephone ?? "", r.actif ? "En activité" : "Désactivé",
         r.latitude ?? "", r.longitude ?? "", r.precisionGPS ?? "", r.especes, r.joursMarche, r.infrastructures, r.observations ?? "",
       ])
     );
-    [6, 18, 26, 32, 22, 26, 16, 13, 12, 12, 12, 30, 34, 34, 40].forEach((w, i) => (feuille.getColumn(i + 1).width = w));
+    [6, 18, 26, 32, 22, 20, 26, 16, 13, 12, 12, 12, 30, 34, 34, 40].forEach((w, i) => (feuille.getColumn(i + 1).width = w));
 
     const marches = rangees.filter((r) => r.marche);
     if (marches.length) {

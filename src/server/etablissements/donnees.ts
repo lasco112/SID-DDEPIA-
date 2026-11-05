@@ -33,6 +33,9 @@ export const SELECTION_ETABLISSEMENT = {
   infrastructures: true,
   observations: true,
   fiche: true,
+  centreId: true,
+  villageId: true,
+  villageAutre: true,
   photo: { select: { prisLe: true } },
 } satisfies Prisma.EtablissementSelect;
 

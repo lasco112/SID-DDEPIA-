@@ -151,6 +151,8 @@ model Departement {
   photosEtablissements   PhotoEtablissement[]
   collectes              CollecteCampagne[]
   correctionsTrimestre   CorrectionTrimestre[]
+  centresZootechniques   CentreZootechnique[]
+  villages               Village[]
 
   @@index([regionId])
 }
@@ -175,6 +177,7 @@ model Arrondissement {
   assignations   AssignationSaisie[]
   exports        ExportDocument[]
   rubriques      RubriqueNarrative[]
+  centres        CentreZootechnique[]
 }
 
 model Section {
@@ -330,12 +333,58 @@ model Etablissement {
   /// lieu principal), équipements et leur état, contrôle vétérinaire, accès.
   /// Forme et codes : src/lib/marches.ts (FicheMarche).
   fiche            Json?
+  /// Le CZV et le village (découpage MINEPIA, 4 novembre 2026). Facultatifs :
+  /// les établissements plus anciens n'en ont pas. Un village absent de la
+  /// liste s'écrit dans `villageAutre` (« Autre village, à préciser »).
+  /// `localite` reste remplie avec le nom du village.
+  centreId         String?
+  villageId        String?
+  villageAutre     String?
 
-  arrondissement Arrondissement     @relation(fields: [arrondissementId], references: [id])
+  arrondissement Arrondissement      @relation(fields: [arrondissementId], references: [id])
+  centre         CentreZootechnique? @relation(fields: [centreId], references: [id])
+  village        Village?            @relation(fields: [villageId], references: [id])
   saisies        SaisieNominative[]
   photo          PhotoEtablissement?
 
   @@index([arrondissementId, typeCode, actif])
+}
+
+/// Un Centre zootechnique et vétérinaire (CZV) et l'arrondissement qu'il sert
+/// (découpage MINEPIA de l'Ouest, 2026). Liste inscrite par la migration
+/// 20261104120000_villages_czv, produite par scripts/referentiel-villages-czv.cjs.
+model CentreZootechnique {
+  departementId String?
+  departement   Departement? @relation(fields: [departementId], references: [id])
+
+  id               String  @id
+  nom              String
+  arrondissementId String
+  ordre            Int     @default(0)
+  actif            Boolean @default(true)
+
+  arrondissement Arrondissement  @relation(fields: [arrondissementId], references: [id], onDelete: Cascade)
+  villages       Village[]
+  etablissements Etablissement[]
+
+  @@index([arrondissementId])
+}
+
+/// Un village ou quartier couvert par un CZV.
+model Village {
+  departementId String?
+  departement   Departement? @relation(fields: [departementId], references: [id])
+
+  id       String  @id
+  nom      String
+  centreId String
+  ordre    Int     @default(0)
+  actif    Boolean @default(true)
+
+  centre         CentreZootechnique @relation(fields: [centreId], references: [id], onDelete: Cascade)
+  etablissements Etablissement[]
+
+  @@index([centreId])
 }
 
 /// Une CORRECTION AU TRIMESTRE d'une case calculée à partir du mensuel

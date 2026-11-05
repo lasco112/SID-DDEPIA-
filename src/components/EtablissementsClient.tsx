@@ -13,7 +13,7 @@
  */
 
 import { useEffect, useState, useCallback } from "react";
-import type { EtablissementOffline } from "@/lib/dexie";
+import { offlineDB, type EtablissementOffline } from "@/lib/dexie";
 import {
   listerEtablissements,
   creerEtablissement,
@@ -27,6 +27,7 @@ import VisiteGuidee from "@/components/VisiteGuidee";
 import ListeFermes from "@/components/ListeFermes";
 import InfosActeurForm from "@/components/InfosActeurForm";
 import QuestionnaireMarche, { type ReponsesMarche } from "@/components/QuestionnaireMarche";
+import ChoixVillage, { LIEU_VIDE, lieuComplet, type Lieu } from "@/components/ChoixVillage";
 import { useUtilisateur } from "@/components/UtilisateurContexte";
 import { Store, MapPin, FileDown } from "lucide-react";
 import { TYPES_ACTEURS, nettoyerInfos, libellesEspeces, type InfosStructurelles } from "@/lib/acteurs";
@@ -96,6 +97,21 @@ export default function EtablissementsClient({
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
   const [nouveau, setNouveau] = useState({ nom: "", localite: "", proprietaire: "", telephone: "" });
+  /** Le CZV et le village (4 novembre 2026) ; sans les listes sur l'appareil, la localité libre d'avant. */
+  const [lieu, setLieu] = useState<Lieu>(LIEU_VIDE);
+  const [listesVillages, setListesVillages] = useState(false);
+  // Le DD change d'arrondissement : le CZV choisi n'y est plus.
+  useEffect(() => setLieu(LIEU_VIDE), [arrondissementId]);
+  /** Le nom de chaque CZV, pour l'afficher sous la localité dans la liste. */
+  const [nomsCzv, setNomsCzv] = useState<Map<string, string>>(new Map());
+  useEffect(() => {
+    offlineDB.referentiels
+      .where("categorie")
+      .equals("CZV")
+      .toArray()
+      .then((cs) => setNomsCzv(new Map(cs.map((c) => [c.code, c.libelle]))))
+      .catch(() => undefined);
+  }, []);
   const [infosNouveau, setInfosNouveau] = useState<InfosStructurelles>({});
   const [ajout, setAjout] = useState(false);
   const [aSupprimer, setASupprimer] = useState<{ id: string; nom: string } | null>(null);
@@ -130,8 +146,8 @@ export default function EtablissementsClient({
   async function ajouter(e: React.FormEvent) {
     e.preventDefault();
     setMessage(null);
-    if (!nouveau.nom.trim() || !nouveau.localite.trim()) {
-      setMessage("Nom et localité requis.");
+    if (!nouveau.nom.trim() || (listesVillages ? !lieuComplet(lieu) : !nouveau.localite.trim())) {
+      setMessage(listesVillages ? "Nom, CZV et village requis (« Autre village » si le village n'est pas dans la liste)." : "Nom et localité requis.");
       return;
     }
     const infos = nettoyerInfos(infosNouveau as Record<string, unknown>);
@@ -141,8 +157,18 @@ export default function EtablissementsClient({
     }
     setAjout(true);
     try {
-      const cree = await creerEtablissement({ typeCode, arrondissementId, ...nouveau, ...infos.donnees });
+      const cree = await creerEtablissement({
+        typeCode,
+        arrondissementId,
+        ...nouveau,
+        ...(listesVillages
+          ? { localite: lieu.localite, centreId: lieu.centreId, villageId: lieu.villageId, villageAutre: lieu.villageAutre?.trim() || null }
+          : {}),
+        ...infos.donnees,
+      });
       setNouveau({ nom: "", localite: "", proprietaire: "", telephone: "" });
+      // Le CZV reste choisi : on enregistre souvent plusieurs fermes d'un même secteur.
+      setLieu({ ...LIEU_VIDE, centreId: lieu.centreId });
       setInfosNouveau({});
       // On se fie au RÉSULTAT réel, pas à navigator.onLine : celui-ci reste
       // « en ligne » quand l'appareil est connecté au Wi-Fi sans Internet.
@@ -311,12 +337,15 @@ export default function EtablissementsClient({
             onChange={(e) => setNouveau({ ...nouveau, nom: e.target.value })}
             className="rounded-md border border-gray-300 px-3 py-2 text-sm"
           />
-          <input
-            placeholder="Localité *"
-            value={nouveau.localite}
-            onChange={(e) => setNouveau({ ...nouveau, localite: e.target.value })}
-            className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-          />
+          <ChoixVillage key={arrondissementId} arrondissementId={arrondissementId} valeur={lieu} onChange={setLieu} onDisponible={setListesVillages} />
+          {!listesVillages && (
+            <input
+              placeholder="Localité *"
+              value={nouveau.localite}
+              onChange={(e) => setNouveau({ ...nouveau, localite: e.target.value })}
+              className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+            />
+          )}
           <input
             placeholder="Propriétaire (optionnel)"
             value={nouveau.proprietaire}
@@ -380,8 +409,10 @@ export default function EtablissementsClient({
             <tbody>
               {liste.map((etab) => (
                 <LigneEtablissement
-                  key={etab.id}
+                  // La localité change quand on choisit un village : la ligne se relit.
+                  key={`${etab.id}|${etab.localite}|${etab.villageId ?? ""}`}
                   etab={etab}
+                  nomCzv={etab.centreId ? nomsCzv.get(etab.centreId) ?? null : null}
                   onMessage={setMessage}
                   onModifier={(patch) => modifier(etab.id, patch)}
                   onSupprimer={() => setASupprimer({ id: etab.id, nom: etab.nom })}
@@ -399,6 +430,7 @@ export default function EtablissementsClient({
 
 function LigneEtablissement({
   etab,
+  nomCzv,
   onModifier,
   onSupprimer,
   onMessage,
@@ -406,6 +438,8 @@ function LigneEtablissement({
   onOuvrirQuestionnaire,
 }: {
   etab: Etablissement;
+  /** Le CZV de l'établissement, s'il est renseigné. */
+  nomCzv: string | null;
   onModifier: (patch: Partial<Etablissement>) => void;
   onSupprimer: () => void;
   onMessage: (m: string | null) => void;
@@ -432,6 +466,14 @@ function LigneEtablissement({
   ].filter(Boolean).join(" · ");
   const [nom, setNom] = useState(etab.nom);
   const [localite, setLocalite] = useState(etab.localite);
+  /** Le CZV et le village, complétables dans la fiche (4 novembre 2026). */
+  const [lieu, setLieu] = useState<Lieu>({
+    centreId: etab.centreId ?? null,
+    villageId: etab.villageId ?? null,
+    villageAutre: etab.villageAutre ?? null,
+    localite: etab.localite,
+  });
+  const [listesVillages, setListesVillages] = useState(false);
   const [proprietaire, setProprietaire] = useState(etab.proprietaire ?? "");
   const [telephone, setTelephone] = useState(etab.telephone ?? "");
 
@@ -445,6 +487,7 @@ function LigneEtablissement({
       </td>
       <td className="border-b border-gray-100 px-3 py-2">
         <input value={localite} disabled={!etab.actif} onChange={(e) => setLocalite(e.target.value)} onBlur={() => localite !== etab.localite && onModifier({ localite })} className={champCommun} />
+        {nomCzv && <span className="block px-1 text-[11px] text-ink-muted">{nomCzv}</span>}
       </td>
       {onOuvrirQuestionnaire ? (
         <td className="border-b border-gray-100 px-3 py-2 text-[13px]">
@@ -503,6 +546,12 @@ function LigneEtablissement({
     {ficheOuverte && (
       <tr>
         <td colSpan={7} className="border-b border-gray-200 bg-gray-50 px-3 py-3">
+          <div className={listesVillages ? "mb-3" : ""}>
+            {listesVillages && <p className="mb-1 text-[13px] font-bold text-ink">CZV et village</p>}
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+              <ChoixVillage arrondissementId={etab.arrondissementId} valeur={lieu} onChange={setLieu} onDisponible={setListesVillages} />
+            </div>
+          </div>
           <InfosActeurForm typeCode={etab.typeCode} valeur={infos} onChange={setInfos} desactive={!etab.actif} />
           <button
             type="button"
@@ -510,7 +559,15 @@ function LigneEtablissement({
             onClick={() => {
               const r = nettoyerInfos(infos as Record<string, unknown>);
               if ("erreur" in r) return onMessage(r.erreur);
-              onModifier(r.donnees);
+              // Le CZV et le village : seulement s'ils sont complets et ont changé.
+              const lieuChange =
+                lieuComplet(lieu) &&
+                (lieu.centreId !== (etab.centreId ?? null) || lieu.villageId !== (etab.villageId ?? null) || (lieu.villageAutre?.trim() || null) !== (etab.villageAutre ?? null));
+              if (lieu.centreId && !lieuComplet(lieu)) return onMessage("Choisissez le village, ou « Autre village » en le précisant.");
+              onModifier({
+                ...r.donnees,
+                ...(lieuChange ? { centreId: lieu.centreId, villageId: lieu.villageId, villageAutre: lieu.villageAutre?.trim() || null, localite: lieu.localite } : {}),
+              });
               onMessage(`Fiche de « ${etab.nom} » enregistrée.`);
               setFicheOuverte(false);
             }}

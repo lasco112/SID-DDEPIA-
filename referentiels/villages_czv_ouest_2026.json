@@ -1,0 +1,1834 @@
+[
+ {
+  "departement": "BAM",
+  "arrondissement": "MBD",
+  "centre": {
+   "id": "czv_mbd_mbouda",
+   "nom": "CZV Mbouda"
+  },
+  "villages": [
+   "BABETE",
+   "BAFOUNDA",
+   "BAMEDJINDA",
+   "BAMEDJO",
+   "BAMENKOMBOU",
+   "BAMESSINGUE",
+   "BAMESSO"
+  ]
+ },
+ {
+  "departement": "BAM",
+  "arrondissement": "GLM",
+  "centre": {
+   "id": "czv_glm_galim",
+   "nom": "CZV Galim"
+  },
+  "villages": [
+   "Bazingang I",
+   "Bazingang II",
+   "Centre urbain",
+   "Kiénéghang",
+   "King place Bati",
+   "Mbeffo Mendakap",
+   "Mbekong Magap Mbefou",
+   "Menbong Sessé",
+   "Mengoh",
+   "Mifi",
+   "Ngogoup",
+   "Ngossong",
+   "Quartier Haoussa",
+   "Tassé Yeyep",
+   "Tata",
+   "Tissap Mbedjinpop"
+  ]
+ },
+ {
+  "departement": "BAM",
+  "arrondissement": "GLM",
+  "centre": {
+   "id": "czv_glm_bamenyam",
+   "nom": "CZV Bamenyam"
+  },
+  "villages": [
+   "BAFREU",
+   "BAKE",
+   "BAMOUGON",
+   "BASSIETA",
+   "BATIEUGOU",
+   "BEKA",
+   "BORORO 1",
+   "BORORO 2",
+   "CAMPS DES ASSUJETTIS",
+   "KING-PLACE",
+   "LASSIEH",
+   "LONFO",
+   "MBATSAH",
+   "MBEFFOUO",
+   "MEZAAH",
+   "NGWABUT",
+   "NKIEUPEKOUO",
+   "NKOSSAP",
+   "NZEUBA",
+   "NZEUNELEUP 2",
+   "NZEUNELEUP 1"
+  ]
+ },
+ {
+  "departement": "BAM",
+  "arrondissement": "GLM",
+  "centre": {
+   "id": "czv_glm_bamendjing",
+   "nom": "CZV Bamendjing"
+  },
+  "villages": [
+   "Bambalang",
+   "Baza’a 1",
+   "Baza’a 2",
+   "Baza’a 3",
+   "Baza’a 4",
+   "Ngossong",
+   "Terminator",
+   "Tsiego 1",
+   "Tsiego 2",
+   "Mbeghuié"
+  ]
+ },
+ {
+  "departement": "BAM",
+  "arrondissement": "GLM",
+  "centre": {
+   "id": "czv_glm_bagam",
+   "nom": "CZV Bagam"
+  },
+  "villages": [
+   "BAGAM-CHEFFERIE",
+   "BETSOUO",
+   "FEGHONG",
+   "KIENVE",
+   "MBAMEKOUPERE",
+   "MBEFO",
+   "MBEPEH",
+   "MBESSA",
+   "MBEVE I",
+   "MBEVE II ou MBORORO II",
+   "MBORORO I",
+   "MBORORO III",
+   "MBORORO IV",
+   "MEVOBO",
+   "MOMBAP",
+   "NGOYO"
+  ]
+ },
+ {
+  "departement": "BAM",
+  "arrondissement": "BBJ",
+  "centre": {
+   "id": "czv_bbj_babadjou",
+   "nom": "CZV Babadjou"
+  },
+  "villages": [
+   "BACHUA",
+   "BALEPO",
+   "BALEPO-BORORO",
+   "BAMEDJI",
+   "BAMEDJIGHA",
+   "BAMEDOU",
+   "BAMEDOUSSO",
+   "BAMEGNIA",
+   "BAMEKOUE",
+   "BAMELO",
+   "BAMEPA’A",
+   "BAMETOGOUNG",
+   "BAWA CHEFFERIE",
+   "BAWA-BORORO",
+   "DJINGHA",
+   "KING-PLACE",
+   "MADJUI",
+   "MANSEIT",
+   "MOGNI",
+   "NGANGON",
+   "NTOUNGHA",
+   "SO’OHMOPI",
+   "TOPELOU"
+  ]
+ },
+ {
+  "departement": "BAM",
+  "arrondissement": "BTC",
+  "centre": {
+   "id": "czv_btc_batcham",
+   "nom": "CZV Batcham"
+  },
+  "villages": [
+   "BABAMEKA 1",
+   "BABEKOUO",
+   "BADENGANG",
+   "BADINGOUO",
+   "BAGHANG 1",
+   "BAGHANG 2",
+   "BAGWA",
+   "BAKOUM",
+   "BAKUI",
+   "BALATCHUET III",
+   "BALATCHUET I",
+   "BALATCHUET II",
+   "BALEFAT",
+   "BALEFO",
+   "BALEFOUET",
+   "BALEGHANG 1",
+   "BALEGHANG 2",
+   "BALENA",
+   "BALEPA",
+   "BALETSI",
+   "BAMBI 1",
+   "BAMBI 2",
+   "BAMBI 3",
+   "BAMBOUE 1",
+   "BAMBOUE 2",
+   "BAMEFFO",
+   "BAMEKA 1",
+   "BAMEKA 2",
+   "BAMELA",
+   "BAMELAN",
+   "BAMELEU",
+   "BAMENBOU",
+   "BAMENDOU",
+   "BAMENGHANG",
+   "BAMENGHO",
+   "BAMESSANG",
+   "BAMETIM",
+   "BAMETSA",
+   "BANDJA",
+   "BANGOUANNG",
+   "BANGUEALA",
+   "BANGUIE",
+   "BAPEPA",
+   "BATAKI 1",
+   "BATAKI 2",
+   "BATAKI 3",
+   "BATCHEUTSI",
+   "BATCHUETIM",
+   "BATCHUETIO",
+   "BATEGOUNG",
+   "BATENG",
+   "BATOLONG",
+   "BATOMETSA",
+   "BATOSSESSONG",
+   "BATOUGOUANG",
+   "BATOUGUIE",
+   "BATOULA",
+   "BATOULETING",
+   "BATOUMBI 1",
+   "BATOUMBI 2",
+   "BATOUMEGOUO",
+   "BATOUMOCK 1",
+   "BATOUMOCK 2",
+   "BATOUOKO",
+   "BATOUTIA",
+   "BATOUTSA 1",
+   "BATOUTSA 2",
+   "BATSINLA (Groupement Bamegong)",
+   "BATSINLA (Groupement Batcham)",
+   "BAZIMBAP 1",
+   "BAZIMBAP 2",
+   "BAZINTIA",
+   "BAZZA",
+   "CENTRE URBAIN 1",
+   "CENTRE URBAIN 2",
+   "FOUOMEKOUP",
+   "FOUOSSONG",
+   "FOUOTSUA",
+   "KING-PLACE (Groupement Bamegang)",
+   "KING-PLACE",
+   "KONTSI",
+   "LAKEM",
+   "MEDOUMGONG",
+   "MENA",
+   "METIO",
+   "NTIO",
+   "NZINMEGONG I",
+   "NZINMEGONG II",
+   "NZINMEGUEA",
+   "TAA’LA",
+   "TOKEM"
+  ]
+ },
+ {
+  "departement": "BAM",
+  "arrondissement": "BTC",
+  "centre": {
+   "id": "czv_btc_bangang",
+   "nom": "CZV Bangang"
+  },
+  "villages": [
+   "BABOUGHANG",
+   "BACHIO",
+   "BADATCHIO",
+   "BADENGANG",
+   "BAGHANG 1",
+   "BAGHANG 2",
+   "BAKOFONG",
+   "BALADJUITSA",
+   "BALAFOTIO",
+   "BALEKEU",
+   "BALEPIE",
+   "BALEWA",
+   "BALIE",
+   "BAMBOUE",
+   "BAMEBA",
+   "BAMEBORO",
+   "BAMEGHUIE 1",
+   "BAMEGHUIE 2",
+   "BAMEGUIA 1",
+   "BAMEGUIA 2",
+   "BAMELANG",
+   "BAMELIO",
+   "BAMETIM",
+   "BANGOUO",
+   "BANKAK",
+   "BANTSA",
+   "BATOMOGO 1",
+   "BATOMOGO 2",
+   "BATOULA",
+   "BATSEPOU",
+   "BATSIET",
+   "BATSINLA",
+   "BAZIMTIM",
+   "BORORO",
+   "KING PLACE",
+   "KONMELEKOUET",
+   "LAH TEIDJEUDJI",
+   "MADAH",
+   "MBA",
+   "NJUINLA 1",
+   "NJUINLA 2",
+   "NZIE",
+   "NZONG",
+   "TCHUELEKOUET 1",
+   "TCHUELEKOUET 2",
+   "TSOPIA",
+   "ZEMEZONG"
+  ]
+ },
+ {
+  "departement": "BAM",
+  "arrondissement": "BTC",
+  "centre": {
+   "id": "czv_btc_balatchi",
+   "nom": "CZV Balatchi"
+  },
+  "villages": [
+   "BAGADINGT",
+   "BAKIE",
+   "BAMEBIM",
+   "BAMEKAN",
+   "BAMELA",
+   "BAMOUGOUM",
+   "BANEFOUA",
+   "BATIAMEKI",
+   "BATOMENI",
+   "BAZINLA",
+   "BAZINMEGONG",
+   "BAZINTCHUET",
+   "KING PLEACE",
+   "KOUNGU",
+   "NGATCHIO",
+   "TSELLA",
+   "TSINLA"
+  ]
+ },
+ {
+  "departement": "HNK",
+  "arrondissement": "BFG",
+  "centre": {
+   "id": "czv_bfg_bafang",
+   "nom": "CZV Bafang"
+  },
+  "villages": [
+   "BABOATE",
+   "BABONE",
+   "BABOUTCHA NINTCHEU",
+   "BABOUTCHEU NGALEU",
+   "BAFANG",
+   "BAKONDJI"
+  ]
+ },
+ {
+  "departement": "HNK",
+  "arrondissement": "BNK",
+  "centre": {
+   "id": "czv_bnk_banka",
+   "nom": "CZV Banka"
+  },
+  "villages": [
+   "BANFELOUK",
+   "BANKA",
+   "BASSAP",
+   "BATCHO",
+   "FOLENTCHA",
+   "MANILA"
+  ]
+ },
+ {
+  "departement": "HNK",
+  "arrondissement": "BNA",
+  "centre": {
+   "id": "czv_bna_bana",
+   "nom": "CZV Bana"
+  },
+  "villages": [
+   "BAKASSA",
+   "BANA",
+   "BANDOUMKASSA"
+  ]
+ },
+ {
+  "departement": "HNK",
+  "arrondissement": "BNA",
+  "centre": {
+   "id": "czv_bna_batcha",
+   "nom": "CZV Batcha"
+  },
+  "villages": [
+   "Fimbi",
+   "Kallack",
+   "Kwack",
+   "Ndouk"
+  ]
+ },
+ {
+  "departement": "HNK",
+  "arrondissement": "BKU",
+  "centre": {
+   "id": "czv_bku_bakou",
+   "nom": "CZV Bakou"
+  },
+  "villages": [
+   "FOPOUANGA",
+   "BABOUTCHA FONGAM",
+   "Badjieko",
+   "BAKAMBE",
+   "BAKOU FONTSINGA",
+   "Bakuini",
+   "Balack loum 1",
+   "Balack loum 2",
+   "BALOUK",
+   "Bandja komako",
+   "Bangouaka",
+   "Bapoungue",
+   "Bapoutchie",
+   "Basiepi",
+   "Batchamamo",
+   "Batchamdjie",
+   "Bate",
+   "Djiendjeu",
+   "Djimbe",
+   "Doumla",
+   "Doumla sissichi",
+   "Doumtcho",
+   "Doun Kouena",
+   "FONDJANTI",
+   "Koba",
+   "Kolen",
+   "KOMAKO",
+   "Kounou",
+   "Liebeu",
+   "Louke",
+   "Makouk",
+   "Mboma",
+   "Ndomtena",
+   "Nkock",
+   "Poungue",
+   "Pounkoua",
+   "Poutchie",
+   "Souma",
+   "Tcheneuko"
+  ]
+ },
+ {
+  "departement": "HNK",
+  "arrondissement": "BDJ",
+  "centre": {
+   "id": "czv_bdj_bandja",
+   "nom": "CZV Bandja"
+  },
+  "villages": [
+   "bano",
+   "batchicheu-fondanti",
+   "deumtchang",
+   "menguet",
+   "Babouantou",
+   "Bakapou",
+   "Bakeu",
+   "bakoua",
+   "bakouecha",
+   "bakouotcha",
+   "bakouotou",
+   "balafi",
+   "Balagueu",
+   "Balako",
+   "Balassie",
+   "balatchie",
+   "bamendjo",
+   "Baminchi",
+   "bandenla",
+   "Bandja",
+   "Bangoko",
+   "bankwop",
+   "Basseu",
+   "batcham",
+   "batchicheu",
+   "batoukon",
+   "Batoula",
+   "dakven",
+   "djamkouo",
+   "djemla",
+   "faptchieu",
+   "fondanti",
+   "fondjomekwet",
+   "fotouni",
+   "kouobong",
+   "latchieu",
+   "loum",
+   "mendah djah",
+   "ngonfet",
+   "ngouapi",
+   "nguieu",
+   "nteuh",
+   "Quartier 1",
+   "Quartier 2",
+   "Quartier 3",
+   "Quartier 4",
+   "Quartier 5",
+   "Quartier 6",
+   "Quartier 7",
+   "sesseuk",
+   "tack",
+   "tchieu",
+   "tchoula",
+   "toula"
+  ]
+ },
+ {
+  "departement": "HNK",
+  "arrondissement": "KKM",
+  "centre": {
+   "id": "czv_kkm_kekem",
+   "nom": "CZV Kekem"
+  },
+  "villages": [
+   "Balembo",
+   "bamegui",
+   "beobo",
+   "fondjomoko",
+   "fonkouakem",
+   "Foyemtcha",
+   "kekem"
+  ]
+ },
+ {
+  "departement": "HNK",
+  "arrondissement": "BNW",
+  "centre": {
+   "id": "czv_bnw_banwa",
+   "nom": "CZV Banwa"
+  },
+  "villages": [
+   "BAKONTI",
+   "BAPOUNGUE",
+   "FOMESSA 1",
+   "FOMESSA 2",
+   "FONTI",
+   "FOYAVE"
+  ]
+ },
+ {
+  "departement": "HPL",
+  "arrondissement": "BHM",
+  "centre": {
+   "id": "czv_bhm_baham",
+   "nom": "CZV Baham"
+  },
+  "villages": [
+   "BANKA",
+   "BAPI",
+   "BATOUOSSOUO",
+   "CHENGNE"
+  ]
+ },
+ {
+  "departement": "HPL",
+  "arrondissement": "BHM",
+  "centre": {
+   "id": "czv_bhm_gougoua",
+   "nom": "CZV Gougoua"
+  },
+  "villages": [
+   "BAHO’O",
+   "CHEFFOU",
+   "CHENGNE",
+   "DJEMGHEU",
+   "KAFFO",
+   "MEDJO",
+   "NGOUGOUA"
+  ]
+ },
+ {
+  "departement": "HPL",
+  "arrondissement": "BMJ",
+  "centre": {
+   "id": "czv_bmj_bamendjou",
+   "nom": "CZV Bamendjou"
+  },
+  "villages": [
+   "Baboum 1",
+   "Baboum 2",
+   "Bachukang",
+   "Badang",
+   "Badentcha",
+   "Bagheu",
+   "Bahela",
+   "Bahiala",
+   "Bajupa",
+   "Bakang 1",
+   "Bakang 2",
+   "Bakouokeu",
+   "Balatsit 1",
+   "Balatsit 2",
+   "Balatsit 3",
+   "Bambou",
+   "Bameya 1",
+   "Bameya 2",
+   "Bamohie",
+   "Batchang",
+   "Batchaveu",
+   "Batchit",
+   "Batchonouo",
+   "Batchum 1",
+   "Batchum 2",
+   "Bateufang",
+   "Batindong",
+   "Batogueu",
+   "Batoke",
+   "Batougoung",
+   "Batoumi",
+   "Batounta 1",
+   "Batounta 2",
+   "Djeugo"
+  ]
+ },
+ {
+  "departement": "HPL",
+  "arrondissement": "BMJ",
+  "centre": {
+   "id": "czv_bmj_bameka",
+   "nom": "CZV Bameka"
+  },
+  "villages": [
+   "BAPENGSS",
+   "KOUOGOUOH",
+   "LATSIT",
+   "MEIJI",
+   "MESSING",
+   "NGOUANG",
+   "NJUT"
+  ]
+ },
+ {
+  "departement": "HPL",
+  "arrondissement": "BGU",
+  "centre": {
+   "id": "czv_bgu_bangou",
+   "nom": "CZV Bangou"
+  },
+  "villages": [
+   "BABETE",
+   "BALAMBO",
+   "BALANGOUE",
+   "BALOUMGOU",
+   "BANKONGOUE",
+   "BATOUGONG",
+   "BOUTIO",
+   "CENTRE ADMINISTRATIF",
+   "DENGHEN",
+   "KAAKA",
+   "KANGOUE",
+   "KENONG",
+   "MEDJEU",
+   "NGOUTCHA",
+   "TCHETCHOU",
+   "TOP",
+   "TOUKONG",
+   "TOUZOU",
+   "TSITSI"
+  ]
+ },
+ {
+  "departement": "HPL",
+  "arrondissement": "BGU",
+  "centre": {
+   "id": "czv_bgu_badenkop",
+   "nom": "CZV Badenkop"
+  },
+  "villages": [
+   "DEMLOU",
+   "DENGOU",
+   "DJEUKOU",
+   "DJEUWANG",
+   "HIALA",
+   "LAGOU",
+   "LOUG",
+   "NDENPA",
+   "PACKEM",
+   "TOP",
+   "TSELA 1",
+   "TSELA 2",
+   "TSEMEUHIA"
+  ]
+ },
+ {
+  "departement": "HPL",
+  "arrondissement": "BTE",
+  "centre": {
+   "id": "czv_bte_batie",
+   "nom": "CZV Batié"
+  },
+  "villages": [
+   "BAFAMGOUM 1",
+   "BAFAMGOUM 2",
+   "BAHIALA",
+   "BALAGOU 1",
+   "BAMETCHETCHA"
+  ]
+ },
+ {
+  "departement": "HPL",
+  "arrondissement": "BTE",
+  "centre": {
+   "id": "czv_bte_batie_col",
+   "nom": "CZV Batié Col"
+  },
+  "villages": [
+   "BACHEPANG",
+   "BADJEUGOU",
+   "BALAGOU 2",
+   "BALIG",
+   "BAMETCHUE-FODOM"
+  ]
+ },
+ {
+  "departement": "KKH",
+  "arrondissement": "PMG",
+  "centre": {
+   "id": "czv_pmg_bandjoun",
+   "nom": "CZV Bandjoun"
+  },
+  "villages": [
+   "DENGBEM",
+   "DJIOGUE",
+   "DOMLO",
+   "FAMLENG",
+   "HA’A",
+   "HIALA",
+   "HOUA",
+   "HOUPOUO",
+   "KAKOUO",
+   "KAMGO",
+   "KATSELA",
+   "KAYO",
+   "KENG",
+   "KING PLACE",
+   "LEMGO",
+   "LEMLA",
+   "MAGOM",
+   "MBIENG 1",
+   "MBEM",
+   "MBIENG 2",
+   "MBOUO 1",
+   "MBOUO 2",
+   "MOUWE",
+   "MTIEKI",
+   "PETE",
+   "SOUNG",
+   "TOKOUO",
+   "TOTSELA",
+   "TOUOBA",
+   "TSE",
+   "TSECHA",
+   "TSEGHEM",
+   "YOM"
+  ]
+ },
+ {
+  "departement": "KKH",
+  "arrondissement": "BYG",
+  "centre": {
+   "id": "czv_byg_bayangam",
+   "nom": "CZV Bayangam"
+  },
+  "villages": [
+   "DEPTSE",
+   "DJA TOCHOUE",
+   "DJEGOUE",
+   "DJEMGANG",
+   "DJEUVE",
+   "FAMLA",
+   "FIEUTCHIP",
+   "GUIHOP",
+   "KAASSE",
+   "KAKO",
+   "KAKOUONGOUE",
+   "KANKIEU",
+   "KASSAP",
+   "KOUOPOU",
+   "LEKOUA",
+   "MBA",
+   "MBE",
+   "MBENG",
+   "NKE",
+   "TOCHON",
+   "TONGHEM",
+   "TONKIEU",
+   "TOUEGOUE MPOU",
+   "TOUEGOUR MIJU",
+   "TOUGOUE BEN",
+   "TOULA",
+   "TOUNANG",
+   "TSEP",
+   "TSOUGOUI I",
+   "TSOUGOUI II",
+   "YENOM"
+  ]
+ },
+ {
+  "departement": "KKH",
+  "arrondissement": "BYG",
+  "centre": {
+   "id": "czv_byg_bandrefam",
+   "nom": "CZV Bandrefam"
+  },
+  "villages": [
+   "BAGONKONG",
+   "BAKALA",
+   "BATCHI",
+   "BATCHIEU",
+   "POUMGHEU",
+   "TOULA"
+  ]
+ },
+ {
+  "departement": "KKH",
+  "arrondissement": "DJB",
+  "centre": {
+   "id": "czv_djb_demdeng",
+   "nom": "CZV Demdeng"
+  },
+  "villages": [
+   "Bangang",
+   "djebem",
+   "djiko",
+   "djiogo",
+   "Famla 1",
+   "Famla 2",
+   "fomayum",
+   "fondji",
+   "mague",
+   "mpou"
+  ]
+ },
+ {
+  "departement": "MEN",
+  "arrondissement": "DSC",
+  "centre": {
+   "id": "czv_dsc_dschang",
+   "nom": "CZV Dschang"
+  },
+  "villages": [
+   "Fongo-ndeng",
+   "Foréké",
+   "Fossong-wentcheng",
+   "Fotetsa",
+   "Foto"
+  ]
+ },
+ {
+  "departement": "MEN",
+  "arrondissement": "NKN",
+  "centre": {
+   "id": "czv_nkn_baleveng",
+   "nom": "CZV Baleveng"
+  },
+  "villages": [
+   "BANZA",
+   "MENKA",
+   "TOUZA",
+   "TSOBING",
+   "ZEM"
+  ]
+ },
+ {
+  "departement": "MEN",
+  "arrondissement": "NKN",
+  "centre": {
+   "id": "czv_nkn_bafou",
+   "nom": "CZV Bafou"
+  },
+  "villages": [
+   "Balefe",
+   "Baleng",
+   "Bassessa",
+   "Batsingla",
+   "Bawouwa",
+   "Baziefeng",
+   "Fokamezo",
+   "Fomock",
+   "MBENG",
+   "Meloung",
+   "Mezet",
+   "Ndoh",
+   "Nkoho",
+   "NZIIH",
+   "Nzinkop",
+   "Tsinbeu"
+  ]
+ },
+ {
+  "departement": "MEN",
+  "arrondissement": "PKM",
+  "centre": {
+   "id": "czv_pkm_penka_michel",
+   "nom": "CZV Penka Michel"
+  },
+  "villages": [
+   "BADJEUGHANG",
+   "BADJONG",
+   "BAKASSA",
+   "BALATSIT",
+   "BAMETSEM",
+   "BANOCK",
+   "BANSOA",
+   "BASSONKENG",
+   "BASSOSSIA",
+   "BATCHANG",
+   "BATCHEU",
+   "PENKA-MICHEL"
+  ]
+ },
+ {
+  "departement": "MEN",
+  "arrondissement": "PKM",
+  "centre": {
+   "id": "czv_pkm_bamendou",
+   "nom": "CZV Bamendou"
+  },
+  "villages": [
+   "BALOUM",
+   "BAMENDOU",
+   "BATOULA",
+   "NDOUTSET"
+  ]
+ },
+ {
+  "departement": "MEN",
+  "arrondissement": "PKM",
+  "centre": {
+   "id": "czv_pkm_balessing",
+   "nom": "CZV Balessing"
+  },
+  "villages": [
+   "BAKENG",
+   "BALEFET",
+   "BAMEDOU",
+   "BASSO",
+   "BAWOUNWA"
+  ]
+ },
+ {
+  "departement": "MEN",
+  "arrondissement": "FGT",
+  "centre": {
+   "id": "czv_fgt_fongotongo",
+   "nom": "CZV FongoTongo"
+  },
+  "villages": [
+   "Fongo-Tongo",
+   "Fosson Elellem"
+  ]
+ },
+ {
+  "departement": "MEN",
+  "arrondissement": "STC",
+  "centre": {
+   "id": "czv_stc_santchou",
+   "nom": "CZV Santchou"
+  },
+  "villages": [
+   "BAFOU",
+   "BALE",
+   "BAMIA",
+   "BEBONG",
+   "BESSOUCK",
+   "BOKOU",
+   "ECHIOCK",
+   "ETAMBA",
+   "FIALA",
+   "FOMBAP",
+   "FONGOUO",
+   "FONGUELETAFOU",
+   "FONGWAN",
+   "KASSALAFARM",
+   "LAFIE",
+   "MABE",
+   "MADAGASCAR",
+   "MANKAM",
+   "MBONGO",
+   "MBOUKOK",
+   "MENA",
+   "MIALA",
+   "MICHIMIA",
+   "MOGONGA",
+   "MOKELEWOUM",
+   "MOKOT",
+   "MOYONG",
+   "NDENMATOCK",
+   "NDJINDJAN",
+   "NDOUNLA",
+   "NDOUNTSA",
+   "NFONTSAM",
+   "NGANG",
+   "NGANZONG",
+   "NGWATTA",
+   "NKEKAK",
+   "NTIEM",
+   "NZELEPOU",
+   "SEKOU",
+   "SINGAIM",
+   "TELO",
+   "TSALA"
+  ]
+ },
+ {
+  "departement": "MEN",
+  "arrondissement": "STC",
+  "centre": {
+   "id": "czv_stc_fondonera",
+   "nom": "CZV Fondonera"
+  },
+  "villages": [
+   "ABOU",
+   "AFEH",
+   "AKO",
+   "ALACHUET",
+   "ASSONG",
+   "Awa",
+   "AZONG",
+   "FAMMELAH",
+   "FIALA",
+   "LEFOCK",
+   "LETIEU",
+   "LETOP",
+   "MEKET",
+   "MELA",
+   "MELEU",
+   "NDA",
+   "NGUIANGO",
+   "NKA",
+   "NZIE",
+   "NZONG",
+   "SITEU",
+   "TAWONG",
+   "TSADENG"
+  ]
+ },
+ {
+  "departement": "MEN",
+  "arrondissement": "FOK",
+  "centre": {
+   "id": "czv_fok_fokoue",
+   "nom": "CZV Fokoué"
+  },
+  "villages": [
+   "BANDOUM",
+   "BANGOUET",
+   "EJWET",
+   "EKOU",
+   "FOKOUE CENTRE URBAIN",
+   "FOTCHOUFFEU",
+   "FOTSAGHO",
+   "FOUEMELO",
+   "LAFFIE",
+   "LANLOH",
+   "LENLAH",
+   "LEPOUNG",
+   "MANDONG",
+   "MEKA",
+   "MINLA",
+   "MINTSO",
+   "MZALLA",
+   "NDOUNDE",
+   "NKA",
+   "NKO ‘O",
+   "TOUFFAM",
+   "TSENLAH",
+   "YANTOU"
+  ]
+ },
+ {
+  "departement": "MIF",
+  "arrondissement": "BFA",
+  "centre": {
+   "id": "czv_bfa_bafoussam",
+   "nom": "CZV Bafoussam"
+  },
+  "villages": [
+   "Bamendzi 1",
+   "Banengo",
+   "Ndiendam"
+  ]
+ },
+ {
+  "departement": "MIF",
+  "arrondissement": "BFA",
+  "centre": {
+   "id": "czv_bfa_banefo",
+   "nom": "CZV Banefo"
+  },
+  "villages": [
+   "Bamendzi 3",
+   "Bamendzi 2",
+   "Banefo",
+   "Batoukop",
+   "Famcep",
+   "Kam-Tesse",
+   "Kuekong",
+   "Melam",
+   "Mvoutsaha",
+   "Ndemsiem",
+   "Njinga",
+   "Tayim",
+   "Tchio",
+   "Togniet"
+  ]
+ },
+ {
+  "departement": "MIF",
+  "arrondissement": "BFB",
+  "centre": {
+   "id": "czv_bfb_baleng",
+   "nom": "CZV Baleng"
+  },
+  "villages": [
+   "BADIONTONG",
+   "BAKAJOU",
+   "BAKELAC",
+   "BALAVENG",
+   "Baleng",
+   "Bandeng",
+   "BANEFO MIFI",
+   "Bapi",
+   "BAYE",
+   "BAZEGAM",
+   "DJASSA",
+   "Djeleng 1A",
+   "Djeleng 1B",
+   "Djeleng 1C",
+   "Djeleng 2",
+   "Djeleng 3",
+   "Djeleng 4A",
+   "Djeleng 4B",
+   "Djeleng 4C",
+   "Djeleng 4D",
+   "DJONKOU 1",
+   "DJONKOU 2",
+   "DJONKOU 3",
+   "DOUPE 1",
+   "DOUPE 2",
+   "DOUPE 3",
+   "FAMPIE 1",
+   "FAMPIE 2",
+   "FAMTCHUET 1",
+   "FAMTCHUET 2",
+   "FAMTCHUET 3",
+   "FAMTCHUET 4",
+   "KEULEU",
+   "KING PLACE (Baleng)",
+   "KING PLACE (Bapi)",
+   "KING PLACE (Badeng)",
+   "KONTI 1",
+   "KONTI 2",
+   "KOPTCHOU 1",
+   "KOPTCHOU 2",
+   "LAFE 1",
+   "LAFE 2",
+   "LAGOUENG 1",
+   "LAGOUENG 2",
+   "LAGOUENG 3",
+   "NEFOLOUM",
+   "NGONLE",
+   "SINTE",
+   "TAKOUCHE",
+   "TCHADA 1",
+   "TCHADA 2",
+   "TCHITCHAP 1",
+   "TCHITCHAP 2",
+   "TOUNGANG 2A",
+   "TOUNGANG 1",
+   "TOUNGANG 2",
+   "TOUNGANG 3",
+   "TOUNGANG 4",
+   "TOUNGANG 5",
+   "TOUNGANG 6",
+   "TOUNGANG Village 1",
+   "TOUNGANG Village 2",
+   "TOUNGANG Village 3",
+   "TYO LAGOUENG 1",
+   "TYO LAGOUENG 2",
+   "TYO LAGOUENG 3",
+   "TYO Ville 1",
+   "TYO Village 1",
+   "TYO Ville 2",
+   "TYO Village 3A",
+   "TYO Village 3B",
+   "TYO Village 4",
+   "TYO Ville 3"
+  ]
+ },
+ {
+  "departement": "MIF",
+  "arrondissement": "BFC",
+  "centre": {
+   "id": "czv_bfc_bamougoum",
+   "nom": "CZV Bamougoum"
+  },
+  "villages": [
+   "BASSE",
+   "CHIPOU",
+   "DJUNANG LATSIT",
+   "DJUNANG METE",
+   "DOUMDI",
+   "DZE 1",
+   "DZE 2",
+   "FAMKOUO 1",
+   "FAMKOUO 2",
+   "GOUACHE 1",
+   "GOUACHE 2",
+   "GOUACHE 3",
+   "GOUACHE 4",
+   "HOUONG 1",
+   "HOUONG 2",
+   "HOUONG 3",
+   "HOUONG 4",
+   "KAMKOP 1",
+   "KAMKOP 2",
+   "KAMKOP 3",
+   "KAMKOP 4",
+   "KAMKOP 5",
+   "KAMKOP 6",
+   "KAMKOP 7",
+   "KENA 1",
+   "KENA 2",
+   "KEULEU",
+   "KONGSO 1",
+   "KONGSO 2",
+   "KOUABANG 1",
+   "KOUABANG 2",
+   "KOUABANG 3",
+   "KOUOGOUO SUD",
+   "KOUOGOUO VILLAGE 1",
+   "KOUOGOUO VILLAGE 2",
+   "KOUOGOUO VILLE A",
+   "KOUOGOUO VILLE A1",
+   "KOUOGOUO VILLE A2",
+   "KOUOGOUO VILLE B1",
+   "KOUOGOUO VILLE B2",
+   "LAFIE 1",
+   "LAFIE 2",
+   "LATSIT 1",
+   "LATSIT 2",
+   "LATSIT 4",
+   "LATSIT DJUTCHA",
+   "LOUMGOUO",
+   "MBI 1",
+   "MBI 2",
+   "METOH 1",
+   "METOH 2",
+   "TCHOUO",
+   "TCHOUWONG 1",
+   "TCHOUWONG 2",
+   "TCHU",
+   "TOCKET 1",
+   "TOCKET 2",
+   "TOLOUM DEDEUH",
+   "TOUTSIF"
+  ]
+ },
+ {
+  "departement": "NDE",
+  "arrondissement": "BGT",
+  "centre": {
+   "id": "czv_bgt_bangangte",
+   "nom": "CZV Bangangté"
+  },
+  "villages": [
+   "BABOU",
+   "BADJUIDJON",
+   "BAHOUOCK",
+   "BAMETCHA",
+   "BANEKANE",
+   "BANTOUM",
+   "BAPOUMPA",
+   "BATELA",
+   "BOUNKEU",
+   "FEUBATH",
+   "FEUGNOUN",
+   "FEUTAP",
+   "KOPDA",
+   "LAFENG",
+   "MADJA",
+   "MADOUM",
+   "MAHAM",
+   "NENGA",
+   "NENTA",
+   "NOUMFAM 1",
+   "NOUMFAM 2",
+   "NOUMKO",
+   "NOUMTCHOUET",
+   "QUARTIER 1",
+   "QUARTIER 2",
+   "QUARTIER 3",
+   "QUARTIER 4",
+   "QUARTIER 5",
+   "QUARTIER 6",
+   "QUARTIER 7",
+   "QUARTIER 8",
+   "SAGNA",
+   "SANKI",
+   "TALEUM"
+  ]
+ },
+ {
+  "departement": "NDE",
+  "arrondissement": "BGT",
+  "centre": {
+   "id": "czv_bgt_kamna",
+   "nom": "CZV Kamna"
+  },
+  "villages": [
+   "Baloue",
+   "Bandienseu",
+   "Bangang fokam",
+   "Bangoua",
+   "Famdulop",
+   "Famveu",
+   "Kamna",
+   "Langwi",
+   "Mveu",
+   "Ndepnoun",
+   "Ndounkong",
+   "Nteu",
+   "Peup",
+   "Sasseu",
+   "Toungui",
+   "Yanga"
+  ]
+ },
+ {
+  "departement": "NDE",
+  "arrondissement": "BGT",
+  "centre": {
+   "id": "czv_bgt_bamena",
+   "nom": "CZV Bamena"
+  },
+  "villages": [
+   "BANGWEU-BAMENA",
+   "BANGWEU-BATCHINGOU",
+   "FOOPLOUH",
+   "LAGWEU-BAMENA",
+   "LOUH",
+   "POCKZOU",
+   "TCHOUGOU",
+   "TCHOUPLANG",
+   "TOUGWEU-BATCHINGOU",
+   "TOUSSEU"
+  ]
+ },
+ {
+  "departement": "NDE",
+  "arrondissement": "BGT",
+  "centre": {
+   "id": "czv_bgt_ndet",
+   "nom": "CZV Ndet"
+  },
+  "villages": [
+   "BANOUBIN",
+   "NKONG GAM"
+  ]
+ },
+ {
+  "departement": "NDE",
+  "arrondissement": "BZU",
+  "centre": {
+   "id": "czv_bzu_bazou",
+   "nom": "CZV Bazou"
+  },
+  "villages": [
+   "BAGNOU",
+   "BAMAHA",
+   "BASSOUNDJAN",
+   "BOUODDJO",
+   "CONFORT",
+   "FEMTCHEUT",
+   "FETBA",
+   "KOUBA",
+   "NDIFEP",
+   "NDIONZOU",
+   "NDIPTA I",
+   "NDIPTA II",
+   "NTANGA",
+   "NTANZE",
+   "PLATEAU",
+   "SOURCE",
+   "TERGAL"
+  ]
+ },
+ {
+  "departement": "NDE",
+  "arrondissement": "BZU",
+  "centre": {
+   "id": "czv_bzu_balengou",
+   "nom": "CZV Balengou"
+  },
+  "villages": [
+   "Kassang",
+   "Lagoue-kafoze",
+   "Manga",
+   "Mbeudja",
+   "Mbou",
+   "Mboufam",
+   "Ndiop",
+   "Ngondio",
+   "Sagna"
+  ]
+ },
+ {
+  "departement": "NDE",
+  "arrondissement": "TNG",
+  "centre": {
+   "id": "czv_tng_tonga",
+   "nom": "CZV Tonga"
+  },
+  "villages": [
+   "BABITCHOUA",
+   "BALOUA",
+   "BANDOUNGA",
+   "BITCHOUA-NORD",
+   "FAGNO",
+   "MEDIMA",
+   "NOUTSE",
+   "QUARTIER 1",
+   "QUARTIER 2",
+   "QUARTIER 3",
+   "QUARTIER 4",
+   "QUARTIER 5",
+   "QUARTIER 6",
+   "QUARTIER 7",
+   "QUARTIER 8",
+   "QUARTIER 9",
+   "QUARTIER 10",
+   "QUARTIER 11",
+   "QUARTIER 12",
+   "QUARTIER 13",
+   "QUARTIER 14",
+   "QUARTIER 15",
+   "QUARTIER 16",
+   "QUARTIER 17",
+   "QUARTIER 18",
+   "QUARTIER 19",
+   "QUARTIER 20",
+   "QUARTIER 21"
+  ]
+ },
+ {
+  "departement": "NDE",
+  "arrondissement": "BSB",
+  "centre": {
+   "id": "czv_bsb_bassamba",
+   "nom": "CZV Bassamba"
+  },
+  "villages": [
+   "Babossa",
+   "Badoumbo",
+   "Banyabo",
+   "Batabo",
+   "Ntakou"
+  ]
+ },
+ {
+  "departement": "NOU",
+  "arrondissement": "FMB",
+  "centre": {
+   "id": "czv_fmb_foumban",
+   "nom": "CZV Foumban"
+  },
+  "villages": [
+   "Kouanmeka",
+   "Koudounka",
+   "Kouffen",
+   "Koufomchout",
+   "Koufomloum",
+   "Koukouat",
+   "Koundoum",
+   "Kounga",
+   "Koupa nganom",
+   "Koupa-matapit",
+   "Macharou",
+   "Machimbain",
+   "Machinka",
+   "Malatam",
+   "Mambain",
+   "Mambouo",
+   "Manga I",
+   "Manga II",
+   "Manga koundoum",
+   "Manka",
+   "Matibain",
+   "Mekouane",
+   "Mfetame",
+   "Njibam I",
+   "Njibam II",
+   "Njiketkie",
+   "Njiloum",
+   "Njimatic",
+   "Njindare",
+   "Njinka",
+   "Njissamtouen",
+   "Njisse",
+   "Njisse koundoum",
+   "Nkouongouponet",
+   "Palais"
+  ]
+ },
+ {
+  "departement": "NOU",
+  "arrondissement": "NJM",
+  "centre": {
+   "id": "czv_njm_njimon",
+   "nom": "CZV Njimon"
+  },
+  "villages": [
+   "MAKOUNVI",
+   "MANKI",
+   "MAYA",
+   "MAYOUM",
+   "NJIMOM"
+  ]
+ },
+ {
+  "departement": "NOU",
+  "arrondissement": "KTB",
+  "centre": {
+   "id": "czv_ktb_koutaba",
+   "nom": "CZV Koutaba"
+  },
+  "villages": [
+   "BAFOLE",
+   "DIDANGO 1",
+   "DIDANGO 2",
+   "KOUNCHAKAP",
+   "KOUNDJA",
+   "KOUTIE",
+   "MAMOVOUI",
+   "MAPARE",
+   "MATABA",
+   "NGOUNDOUP",
+   "NJITIE"
+  ]
+ },
+ {
+  "departement": "NOU",
+  "arrondissement": "KTB",
+  "centre": {
+   "id": "czv_ktb_koupa_kagnam_1",
+   "nom": "CZV Koupa Kagnam 1"
+  },
+  "villages": [
+   "Kagnam",
+   "Koumelap",
+   "Koumenké",
+   "Pondimoun"
+  ]
+ },
+ {
+  "departement": "NOU",
+  "arrondissement": "KTB",
+  "centre": {
+   "id": "czv_ktb_koupa_kagnam_2",
+   "nom": "CZV Koupa Kagnam 2"
+  },
+  "villages": [
+   "MAMOGNAM",
+   "MANCHA",
+   "MANCHA YOLO",
+   "MANTOUFA"
+  ]
+ },
+ {
+  "departement": "NOU",
+  "arrondissement": "FBT",
+  "centre": {
+   "id": "czv_fbt_foumbot",
+   "nom": "CZV Foumbot"
+  },
+  "villages": [
+   "BAIGOM",
+   "FOSSANG",
+   "MBANJOU",
+   "MBANTOU",
+   "NKOUNDOUMBAIN"
+  ]
+ },
+ {
+  "departement": "NOU",
+  "arrondissement": "FBT",
+  "centre": {
+   "id": "czv_fbt_momo",
+   "nom": "CZV Momo"
+  },
+  "villages": [
+   "BAHAM",
+   "FONGOU",
+   "KOUFFEN",
+   "KOUKPA",
+   "KWETVU",
+   "MOMO",
+   "NJOUENE",
+   "SOUKPEN",
+   "TEJOUENOUN"
+  ]
+ },
+ {
+  "departement": "NOU",
+  "arrondissement": "KPT",
+  "centre": {
+   "id": "czv_kpt_kouoptamo",
+   "nom": "CZV Kouoptamo"
+  },
+  "villages": [
+   "DOUMKAIN",
+   "KOUOMBOUM",
+   "KOUOPTAMO",
+   "KOUPARE",
+   "NGBETSOUEN",
+   "NGOUONDAM",
+   "NJINDOUN"
+  ]
+ },
+ {
+  "departement": "NOU",
+  "arrondissement": "KPT",
+  "centre": {
+   "id": "czv_kpt_bankouop",
+   "nom": "CZV Bankouop"
+  },
+  "villages": [
+   "Bankouop"
+  ]
+ },
+ {
+  "departement": "NOU",
+  "arrondissement": "KPT",
+  "centre": {
+   "id": "czv_kpt_njitapon",
+   "nom": "CZV Njitapon"
+  },
+  "villages": [
+   "NJITAPON"
+  ]
+ },
+ {
+  "departement": "NOU",
+  "arrondissement": "KPT",
+  "centre": {
+   "id": "czv_kpt_manchoutnoun",
+   "nom": "CZV Manchoutnoun"
+  },
+  "villages": [
+   "NDOUMKAIN",
+   "NGAMBOUO",
+   "NGBETNSOUEN"
+  ]
+ },
+ {
+  "departement": "NOU",
+  "arrondissement": "KPT",
+  "centre": {
+   "id": "czv_kpt_njingoumbe",
+   "nom": "CZV Njingoumbe"
+  },
+  "villages": [
+   "NCHOUTNOUN",
+   "NJIAMGBIE",
+   "NJINGOUMBE"
+  ]
+ },
+ {
+  "departement": "NOU",
+  "arrondissement": "MLT",
+  "centre": {
+   "id": "czv_mlt_malentouen",
+   "nom": "CZV Malentouen"
+  },
+  "villages": [
+   "MACHU",
+   "MAFOUATIE",
+   "MAGHAM",
+   "MAHOUA",
+   "MAKOUTAM",
+   "MALANTOUEN",
+   "MAMBICHAM",
+   "MANDAH",
+   "MANJE-KOUTOU",
+   "MANJOUOM",
+   "MANTOUM",
+   "MAPOU-NJIPOUTE",
+   "MARAH",
+   "MARAPNDOUM",
+   "MATACHOM",
+   "MATIAPON",
+   "MATOUPOU"
+  ]
+ },
+ {
+  "departement": "NOU",
+  "arrondissement": "MLT",
+  "centre": {
+   "id": "czv_mlt_manguiembou",
+   "nom": "CZV Manguiembou"
+  },
+  "villages": [
+   "MAKPA 1",
+   "MAKPA 2",
+   "MALIEN",
+   "MANBOUOMBOU",
+   "MANDINGA CHEFFERIE",
+   "MANDINGA PLATEAU",
+   "MANGUIEMBOU",
+   "MANKOUTMBOU"
+  ]
+ },
+ {
+  "departement": "NOU",
+  "arrondissement": "MSG",
+  "centre": {
+   "id": "czv_msg_massangam",
+   "nom": "CZV Massangam"
+  },
+  "villages": [
+   "MACHATOUM",
+   "MAKAKOUM",
+   "MAKEMBOUOT",
+   "MAKOM",
+   "MAKOUKOU",
+   "MAKOUOMBI",
+   "MANSOUEN",
+   "MASSANGAM",
+   "MATAM",
+   "NJIGOUOT"
+  ]
+ },
+ {
+  "departement": "NOU",
+  "arrondissement": "MSG",
+  "centre": {
+   "id": "czv_msg_yolo",
+   "nom": "CZV Yolo"
+  },
+  "villages": [
+   "MAMOGNAM",
+   "MANCHA",
+   "MANCHA-YOLO",
+   "MATOUFA"
+  ]
+ },
+ {
+  "departement": "NOU",
+  "arrondissement": "MSG",
+  "centre": {
+   "id": "czv_msg_malanden",
+   "nom": "CZV Malanden"
+  },
+  "villages": [
+   "MACHOUTMBI I",
+   "MACHOUTMBI II",
+   "MAGNA",
+   "MAKOUOPCHICHI",
+   "MAKOUOPSAP",
+   "MALANDEN",
+   "MALOUA",
+   "MANDIYANG",
+   "MARIPA",
+   "MASSEN",
+   "MASSOUENDJA",
+   "MAYAKOUE"
+  ]
+ },
+ {
+  "departement": "NOU",
+  "arrondissement": "MGB",
+  "centre": {
+   "id": "czv_mgb_magba",
+   "nom": "CZV Magba"
+  },
+  "villages": [
+   "FOROUONGAIN",
+   "KOULA",
+   "MABOUNGAM",
+   "MACHOUTVI",
+   "MAGBA",
+   "MAKOUPA",
+   "MALOUNGOURE",
+   "MAMBONKO",
+   "MAMOKIMO",
+   "MAMOSSAFON",
+   "MANDA",
+   "MANTE LE GRAND",
+   "MANTE LE PETIT",
+   "MASSAROUM",
+   "MATTA",
+   "MBAKOP",
+   "NGOUNSO"
+  ]
+ },
+ {
+  "departement": "NOU",
+  "arrondissement": "BGR",
+  "centre": {
+   "id": "czv_bgr_bangourain",
+   "nom": "CZV Bangourain"
+  },
+  "villages": [
+   "BANGAMBI",
+   "KOUAHOUAT",
+   "KOUMBAM ET KOUAHOUAT",
+   "KOUMENGBA",
+   "KOUROM CHEFFERIE",
+   "KOUROM MARCHE"
+  ]
+ },
+ {
+  "departement": "NOU",
+  "arrondissement": "BGR",
+  "centre": {
+   "id": "czv_bgr_bangambi",
+   "nom": "CZV Bangambi"
+  },
+  "villages": [
+   "MENKEFU",
+   "NGOUNDOUOM NGWENFON",
+   "NGWENFONGUIE",
+   "NJILUM",
+   "NJINTOUT",
+   "NKANTAIN"
+  ]
+ }
+]

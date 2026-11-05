@@ -22,6 +22,28 @@ export async function GET() {
     const user = await requireUser();
     const db = user.db;
 
+    // Les CZV et villages du périmètre (découpage MINEPIA, 4 novembre 2026) :
+    // l'arrondissement du DA ou de l'agent, tout le département pour le DD.
+    // Jamais bloquant : une base pas encore migrée (la démonstration est migrée
+    // à part, après le démarrage) rend des listes vides, pas une erreur qui
+    // priverait le téléphone de tout le reste.
+    const [centres, villages] = await Promise.all([
+      db.centreZootechnique
+        .findMany({
+          where: { actif: true, ...(user.arrondissementId ? { arrondissementId: user.arrondissementId } : {}) },
+          orderBy: { ordre: "asc" },
+          select: { id: true, nom: true, ordre: true, arrondissementId: true },
+        })
+        .catch(() => []),
+      db.village
+        .findMany({
+          where: { actif: true, ...(user.arrondissementId ? { centre: { arrondissementId: user.arrondissementId } } : {}) },
+          orderBy: { ordre: "asc" },
+          select: { id: true, nom: true, ordre: true, centreId: true },
+        })
+        .catch(() => []),
+    ]);
+
     const [moi, arrondissement, templates, etablissements, referentiels, periode, marqueurPurge] = await Promise.all([
       db.user.findUnique({ where: { id: user.id }, select: { nom: true } }),
       user.arrondissementId ? db.arrondissement.findUnique({ where: { id: user.arrondissementId } }) : null,
@@ -129,13 +151,19 @@ export async function GET() {
       // Informations structurelles et fiche d'un marché (20–21 octobre 2026) :
       // consultables sans réseau. La photo, elle, n'est jamais envoyée ici.
       etablissements: etablissements.map(versClient),
-      referentiels: referentiels.map((r) => ({
-        id: `${r.categorie}:${r.code}`,
-        categorie: r.categorie,
-        code: r.code,
-        libelle: r.libelle,
-        ordre: r.ordre,
-      })),
+      referentiels: [
+        ...referentiels.map((r) => ({
+          id: `${r.categorie}:${r.code}`,
+          categorie: r.categorie,
+          code: r.code,
+          libelle: r.libelle,
+          ordre: r.ordre,
+        })),
+        // Rangés avec les référentiels (catégories « CZV » et « VILLAGE ») : la
+        // base locale des téléphones n'a pas à changer de structure.
+        ...centres.map((c) => ({ id: `CZV:${c.id}`, categorie: "CZV", code: c.id, libelle: c.nom, ordre: c.ordre, parent: c.arrondissementId })),
+        ...villages.map((v) => ({ id: `VILLAGE:${v.id}`, categorie: "VILLAGE", code: v.id, libelle: v.nom, ordre: v.ordre, parent: v.centreId })),
+      ],
       // Mises au format exact de SaisieOffline (lib/dexie.ts) pour être
       // fusionnées telles quelles dans la base locale. `updatedAt` reprend la
       // date de modification sur l'appareil d'origine quand elle est connue,

@@ -31,6 +31,10 @@ export interface NouvelEtablissement extends InfosStructurelles {
   fiche?: FicheMarche | null;
   /** Une photo prise à l'ajout (data URL JPEG). */
   photo?: string | null;
+  /** Le CZV et le village (4 novembre 2026) ; « Autre village » en clair. */
+  centreId?: string | null;
+  villageId?: string | null;
+  villageAutre?: string | null;
 }
 
 function nouvelIdentifiant(): string {
@@ -69,6 +73,8 @@ export async function creerEtablissement(data: NouvelEtablissement): Promise<Eta
     infrastructures: data.infrastructures ?? [],
     observations: data.observations ?? null,
     ...(data.fiche !== undefined ? { fiche: data.fiche } : {}),
+    // Seulement s'ils sont donnés : l'ancien chemin (saisie du mois) n'envoie que la localité.
+    ...(data.centreId !== undefined ? { centreId: data.centreId, villageId: data.villageId ?? null, villageAutre: data.villageAutre ?? null } : {}),
     photoLocale: data.photo ?? null,
     actif: true,
     enAttenteSynchro: true,
@@ -215,6 +221,7 @@ async function envoyerOperation(op: OperationEnAttente): Promise<boolean> {
         infrastructures: e.infrastructures ?? [],
         observations: e.observations ?? null,
         ...(e.fiche !== undefined ? { fiche: e.fiche } : {}),
+        ...(e.centreId !== undefined ? { centreId: e.centreId, villageId: e.villageId ?? null, villageAutre: e.villageAutre ?? null } : {}),
       }),
     });
     if (res.ok) return true;

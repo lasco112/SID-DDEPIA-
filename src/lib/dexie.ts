@@ -132,6 +132,10 @@ export interface EtablissementOffline {
   sourceGPS?: string | null;
   /** La fiche d'un marché — src/lib/marches.ts (FicheMarche). */
   fiche?: import("@/lib/marches").FicheMarche | null;
+  /** Le CZV et le village (découpage MINEPIA, 4 novembre 2026) ; « Autre village » en clair. */
+  centreId?: string | null;
+  villageId?: string | null;
+  villageAutre?: string | null;
   /** Le serveur a une photo de cet établissement. */
   aPhoto?: boolean;
   photoLe?: string | null;
@@ -205,6 +209,12 @@ export interface ReferentielOffline {
   code: string;
   libelle: string;
   ordre: number;
+  /**
+   * Le rattachement, pour les deux listes du découpage MINEPIA (4 novembre
+   * 2026) : l'arrondissement d'un CZV (catégorie « CZV »), le CZV d'un village
+   * (catégorie « VILLAGE »). Absent pour les autres référentiels.
+   */
+  parent?: string | null;
 }
 
 export interface PeriodeOffline {
