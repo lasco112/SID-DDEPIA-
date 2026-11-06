@@ -40,7 +40,45 @@ export interface Edition {
 const TOUS: RoleNouveaute[] = [];
 const ICI = "/nouveautes/2026-11-04";
 
+const CHEFS_ET_DD: RoleNouveaute[] = ["CHEF_BAC", "CHEF_PSA", "CHEF_SSV", "CHEF_SPAIH", "DD"];
+const ICI_06 = "/nouveautes/2026-11-06";
+
 export const EDITIONS: Edition[] = [
+  {
+    id: "2026-11-06",
+    titre: "Mise à jour du 6 novembre 2026",
+    nouveautes: [
+      {
+        id: "chef-case-vide",
+        titre: "Compléter une donnée oubliée par le DA",
+        roles: CHEFS_ET_DD,
+        etapes: [
+          {
+            image: `${ICI_06}/chef-case-vide.jpg`,
+            faire: "Rapport mensuel → « Contrôler les chiffres des arrondissements » → un tableau de chiffres de votre section. Une case laissée vide par un DA qui a transmis son mois porte « — + saisir » : touchez-la.",
+            obtenir: "Une petite fenêtre s'ouvre sous le tableau. Les DA qui n'ont pas encore transmis gardent la main : leurs cases vides restent « — ».",
+          },
+          {
+            image: `${ICI_06}/chef-case-vide-panneau.jpg`,
+            faire: "Inscrivez le chiffre et le motif (d'où il vient), puis « Enregistrer ».",
+            obtenir: "Le chiffre entre dans le rapport du mois de l'arrondissement, tracé « case vide → valeur » avec votre motif ; le DA et le DD sont prévenus ; le trimestre le compte de lui-même.",
+          },
+        ],
+      },
+      {
+        id: "chef-ligne-oubliee",
+        titre: "Ajouter une ligne oubliée (une maladie, une vaccination…), sans attendre le trimestre",
+        roles: CHEFS_ET_DD,
+        etapes: [
+          {
+            image: `${ICI_06}/chef-ligne-oubliee.jpg`,
+            faire: "Dans un tableau en liste de votre section (3.2 vaccinations, 3.1 foyers…) : « + Ajouter une ligne oubliée par le DA », choisissez l'arrondissement, remplissez la ligne et le motif, puis « Ajouter la ligne ».",
+            obtenir: "La ligne entre dans le rapport du mois, marquée « ajoutée par le chef » ; le DA est prévenu de ne pas la ressaisir. Plus besoin d'attendre la correction directe du trimestre : il suffit que le DA ait transmis son mois.",
+          },
+        ],
+      },
+    ],
+  },
   {
     id: "2026-11-04",
     titre: "Mise à jour du 4 novembre 2026",

@@ -8,8 +8,12 @@ import { NextResponse } from "next/server";
 import { requireUser, ROLES_CHEF, permissionErrorResponse, ForbiddenError, peutConsulterTableauSection } from "@/lib/permissions";
 import type { PrismaClient } from "@prisma/client";
 import { observationsDes } from "@/server/observations";
-import { refusAjoutLigne } from "@/server/mensuel/ajoutLigneChef";
+import { refusAjoutLigne, STATUTS_TRANSMIS } from "@/server/mensuel/ajoutLigneChef";
+import { refusSaisieManquante } from "@/server/mensuel/saisieManquanteChef";
 import { STATUT_CLOTUREE } from "@/server/periodes/gel";
+import type { SessionUser } from "@/lib/permissions";
+
+const auteurDe = (user: SessionUser) => ({ id: user.id, role: user.role, username: user.username, sectionId: user.sectionId ?? null });
 
 /** Les observations déjà faites sur ce tableau ce mois-ci, par donnée : le chef voit où il en est. */
 async function observationsDuTableau(db: PrismaClient, periodeId: string, templateCode: string) {
@@ -92,6 +96,11 @@ export async function GET(req: Request, { params }: { params: { templateCode: st
         variationForte[f.code] = av ? Math.abs((ap - av) / av) > SEUIL_VARIATION : false;
       }
 
+      // Remplir une case laissée vide par le DA (6 novembre 2026, saisieManquanteChef.ts) :
+      // possible ou non, et où — dit AVANT que le chef ne touche une case.
+      const raisonCase = refusSaisieManquante(auteurDe(user), template);
+      const rapportsCase = await db.rapportArrondissement.findMany({ where: { periodeId }, select: { arrondissementId: true, statut: true } });
+
       return NextResponse.json({
         template,
         arrondissements,
@@ -100,6 +109,11 @@ export async function GET(req: Request, { params }: { params: { templateCode: st
         totauxPrecedent: totauxPrec,
         variationForte,
         observations: await observationsDuTableau(db as PrismaClient, periodeId, template.code),
+        saisieManquante: {
+          possible: !raisonCase && periode.statut !== STATUT_CLOTUREE,
+          raison: raisonCase ?? (periode.statut === STATUT_CLOTUREE ? "Ce mois est clôturé : le Délégué départemental doit le rouvrir avant qu'une case y soit remplie." : null),
+          arrondissementsTransmis: rapportsCase.filter((r) => STATUTS_TRANSMIS.includes(r.statut)).map((r) => r.arrondissementId),
+        },
       });
     }
 
@@ -132,17 +146,27 @@ export async function GET(req: Request, { params }: { params: { templateCode: st
 
     // Ajouter une ligne oubliée par le DA : possible ou non, et pourquoi — dit
     // AVANT que le chef ne remplisse (22 octobre 2026, ajoutLigneChef.ts).
-    const raisonAjout = await refusAjoutLigne(db as PrismaClient, { id: user.id, role: user.role, username: user.username, sectionId: user.sectionId ?? null }, template, periode);
+    const raisonAjout = await refusAjoutLigne(db as PrismaClient, auteurDe(user), template, periode);
     const clos = periode.statut === STATUT_CLOTUREE;
-    // Les rapports du mois : un arrondissement sans ligne doit pouvoir en recevoir une.
-    const rapports = await db.rapportArrondissement.findMany({ where: { periodeId }, select: { arrondissementId: true, statut: true } });
+    // Les rapports du mois TRANSMIS par leur DA (6 novembre 2026) : un
+    // arrondissement sans ligne doit pouvoir en recevoir une, mais pas tant
+    // que son DA y saisit encore.
+    const rapports = (await db.rapportArrondissement.findMany({ where: { periodeId }, select: { arrondissementId: true, statut: true } })).filter((r) =>
+      STATUTS_TRANSMIS.includes(r.statut)
+    );
 
     return NextResponse.json({
       template, arrondissements, evenements, refLibelle,
       observations: await observationsDuTableau(db as PrismaClient, periodeId, template.code),
       ajout: {
-        possible: !raisonAjout && !clos,
-        raison: raisonAjout ?? (clos ? "Ce mois est clôturé : le Délégué départemental doit le rouvrir (« Ouvrir et clôturer les mois ») avant qu'une ligne y soit ajoutée." : null),
+        possible: !raisonAjout && !clos && rapports.length > 0,
+        raison:
+          raisonAjout ??
+          (clos
+            ? "Ce mois est clôturé : le Délégué départemental doit le rouvrir (« Ouvrir et clôturer les mois ») avant qu'une ligne y soit ajoutée."
+            : rapports.length === 0
+              ? "Aucun DA n'a encore transmis ce mois : une ligne oubliée s'ajoute une fois le mois transmis. D'ici là, signalez l'oubli au DA."
+              : null),
         arrondissementsAvecRapport: rapports.map((r) => r.arrondissementId),
       },
     });

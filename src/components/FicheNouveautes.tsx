@@ -37,20 +37,22 @@ export function EtapesNouveaute({ n }: { n: Nouveaute }) {
 }
 
 export default function FicheNouveautes({ username, role, adminSysteme }: { username: string; role: string; adminSysteme: boolean }) {
-  const edition = EDITIONS[0];
-  const [liste, setListe] = useState<Nouveaute[] | null>(null);
+  const derniere = EDITIONS[0];
+  const [liste, setListe] = useState<{ edition: string; n: Nouveaute }[] | null>(null);
   const [rang, setRang] = useState(0);
 
   useEffect(() => {
-    if (!edition) return;
-    let deja = false;
+    if (!derniere) return;
+    // Toutes les éditions pas encore vues sur cet appareil (identifiants datés,
+    // donc comparables) : celui qui a manqué une mise à jour la voit aussi.
+    let vue: string | null = null;
     try {
-      deja = localStorage.getItem(cleNouveautesVues(username)) === edition.id;
+      vue = localStorage.getItem(cleNouveautesVues(username));
     } catch {
-      deja = true; // stockage indisponible : on ne la montre pas sans fin
+      return; // stockage indisponible : on ne la montre pas sans fin
     }
-    const pour = nouveautesPour(edition, role, adminSysteme);
-    if (deja || pour.length === 0) return;
+    const pour = EDITIONS.filter((e) => !vue || e.id > vue).flatMap((e) => nouveautesPour(e, role, adminSysteme).map((n) => ({ edition: e.titre, n })));
+    if (pour.length === 0) return;
     // Attendre un écran libre : ni visite guidée, ni écran de passage.
     let essais = 0;
     const t = window.setInterval(() => {
@@ -63,14 +65,14 @@ export default function FicheNouveautes({ username, role, adminSysteme }: { user
       }
     }, 1000);
     return () => window.clearInterval(t);
-  }, [edition, username, role, adminSysteme]);
+  }, [derniere, username, role, adminSysteme]);
 
-  if (!liste || !edition) return null;
-  const n = liste[rang];
+  if (!liste || !derniere) return null;
+  const { edition: titreEdition, n } = liste[rang];
 
   function fermer() {
     try {
-      localStorage.setItem(cleNouveautesVues(username), edition.id);
+      localStorage.setItem(cleNouveautesVues(username), derniere.id);
     } catch {
       // sans conséquence
     }
@@ -81,7 +83,7 @@ export default function FicheNouveautes({ username, role, adminSysteme }: { user
     <div className="fixed inset-0 z-[180] flex items-end justify-center bg-black/50 sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-label="Nouveautés">
       <div className="flex max-h-[96vh] w-full max-w-[560px] flex-col rounded-t-xl bg-surface shadow-xl sm:rounded-xl">
         <div className="border-b border-line px-4 py-3">
-          <p className="text-[12px] font-bold uppercase tracking-wide text-cuivre">Nouveautés · {edition.titre}</p>
+          <p className="text-[12px] font-bold uppercase tracking-wide text-cuivre">Nouveautés · {titreEdition}</p>
           <h2 className="text-[18px] font-bold leading-tight text-primary-dark">{n.titre}</h2>
           {liste.length > 1 && <p className="text-[12.5px] text-ink-muted">{rang + 1} sur {liste.length}</p>}
         </div>

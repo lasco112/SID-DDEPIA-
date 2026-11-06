@@ -4,13 +4,15 @@
  * rage dans les vaccinations du mois (tableau 3.2) ; la PPCB, vaccinée elle
  * aussi, manque. Le chef de la section l'ajoute dans la liste du mois.
  *
- * Seulement pour CORRIGER, et seulement dans le cadre que le DD a ouvert :
- *  - un chef de section technique (PSA, SSV, SPAIH), dans un tableau en liste
- *    de SA section ;
- *  - pendant la CORRECTION DIRECTE que le DD a ouverte à sa section pour le
- *    trimestre de ce mois (ordresCorrection.ts) — jamais en relecture, jamais
- *    hors révision ;
+ * Seulement pour CORRIGER :
+ *  - un chef de section, dans un tableau en liste de SA section (le DD : tous) ;
+ *  - une fois que le DA a TRANSMIS son mois (rapport SOUMIS ou CLOTURE) : tant
+ *    qu'il saisit encore, son téléphone et le chef écriraient au même endroit ;
  *  - motif obligatoire ; mois non clôturé (sinon le DD le rouvre d'abord).
+ *
+ * Décision du Délégué du 6 novembre 2026 (choix « A ») : libre, comme
+ * « Corriger moi-même » — la correction directe du trimestre n'est plus
+ * nécessaire (règle du 22 octobre, levée).
  *
  * La ligne entre dans le rapport mensuel de l'arrondissement comme celles du
  * DA : le trimestre, le semestre et l'année la comptent d'eux-mêmes. Elle reste
@@ -25,8 +27,6 @@ import { randomUUID } from "node:crypto";
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { assertPeriodeModifiable } from "@/server/periodes/gel";
 import { notifierEvenement } from "@/server/notifications/evenements";
-import { trimestrielle, libelleCourt } from "@/server/periodes/calendrier";
-import { aOrdreDeCorrection, CHEFS_SOUS_ORDRE } from "@/server/trimestre/ordresCorrection";
 import { jeton } from "@/lib/surlignage";
 
 const NOMS_MOIS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
@@ -63,18 +63,27 @@ export async function refusAjoutLigne(
 ): Promise<string | null> {
   if (template.type !== "EVENEMENT") return "On n'ajoute une ligne que dans un tableau en liste (vaccinations, foyers, consultations…).";
   if (periode.type !== "MENSUEL" || !periode.mois) return "Une ligne s'ajoute dans le rapport d'un mois.";
+  return refusAuteur(auteur, template, "ajoute une ligne oubliée par le DA");
+}
+
+/** Le chef de la section du tableau, ou le DD. */
+export function refusAuteur(auteur: Auteur, template: { sectionId: string }, geste: string): string | null {
   if (auteur.role === "DD") return null;
-  if (!CHEFS_SOUS_ORDRE.includes(auteur.role) || auteur.sectionId !== template.sectionId) {
-    return "Seul le chef de la section de ce tableau ajoute une ligne oubliée par le DA.";
-  }
-  const trimestre = trimestrielle(periode.annee, Math.ceil(periode.mois / 3));
-  if (!(await aOrdreDeCorrection(db, trimestre, auteur.role))) {
-    return (
-      `Ajouter une ligne oubliée par le DA n'est possible que pendant la correction directe que le DD ouvre à votre section ` +
-      `pour le ${libelleCourt(trimestre)}. Demandez-la-lui, ou signalez l'oubli au DA.`
-    );
+  if (!auteur.role.startsWith("CHEF_") || auteur.sectionId !== template.sectionId) {
+    return `Seul le chef de la section de ce tableau ${geste}.`;
   }
   return null;
+}
+
+/** Le DA a transmis son mois : il n'écrit plus dans son rapport, le chef peut le compléter. */
+export const STATUTS_TRANSMIS = ["SOUMIS", "CLOTURE"];
+
+/** Refus si le DA saisit encore ce mois-là. */
+export function refusRapportNonTransmis(rapport: { statut: string; arrondissement: { nom: string } }): string | null {
+  return STATUTS_TRANSMIS.includes(rapport.statut)
+    ? null
+    : `Le DA de ${rapport.arrondissement.nom} n'a pas encore transmis ce mois : il y saisit encore, et vos écritures se mêleraient aux siennes. ` +
+        "Signalez-lui l'oubli (« Signaler au DA »), ou attendez sa transmission.";
 }
 
 /** La ligne, vérifiée contre les colonnes du tableau : rien d'inventé, rien d'oublié. */
@@ -145,6 +154,8 @@ export async function ajouterLigneOubliee(
     include: { arrondissement: { select: { nom: true } } },
   });
   if (!rapport) throw new RefusAjout("Cet arrondissement n'a pas de rapport pour ce mois : rien à compléter.", 409);
+  const nonTransmis = refusRapportNonTransmis(rapport);
+  if (nonTransmis) throw new RefusAjout(nonTransmis, 409);
 
   const schema = (template.schemaEvenement as ChampSchema[] | null) ?? [];
   const payload = await payloadVerifie(db, schema, demande.payload ?? {});

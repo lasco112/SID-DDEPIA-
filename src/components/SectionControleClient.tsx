@@ -110,10 +110,45 @@ export default function SectionControleClient() {
     const codes = (p.get("sources") ?? p.get("tableau") ?? "").split(",").filter(Boolean);
     if (codes.length) setFocusOrigine(codes);
   }, []);
-  /** Ajouter une ligne oubliée par le DA (correction directe ouverte par le DD, motif obligatoire). */
+  /** Ajouter une ligne oubliée par le DA (mois transmis par le DA, motif obligatoire). */
   const [ajout, setAjout] = useState<{ arrondissementId: string; payload: Record<string, string>; motif: string } | null>(null);
   const [ajoutEnCours, setAjoutEnCours] = useState(false);
   const [ajoutErreur, setAjoutErreur] = useState<string | null>(null);
+
+  /** Une case laissée vide par le DA, que le chef remplit à sa place (6 novembre 2026). */
+  const [caseVide, setCaseVide] = useState<{ fieldCode: string; libelle: string; arrondissementId: string; valeur: string; motif: string } | null>(null);
+  const [caseVideEnCours, setCaseVideEnCours] = useState(false);
+  const [caseVideErreur, setCaseVideErreur] = useState<string | null>(null);
+  const caseVideRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (caseVide) setTimeout(() => caseVideRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [caseVide?.fieldCode, caseVide?.arrondissementId]);
+
+  async function enregistrerCaseVide() {
+    if (!caseVide || !vue?.template || !periodeId) return;
+    setCaseVideEnCours(true);
+    setCaseVideErreur(null);
+    try {
+      const r = await fetch("/api/section/saisie-manquante", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ templateCode: vue.template.code, periodeId, arrondissementId: caseVide.arrondissementId, fieldCode: caseVide.fieldCode, valeur: caseVide.valeur, motif: caseVide.motif }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        setCaseVideErreur(d.message ?? "Le chiffre n'a pas pu être enregistré.");
+        return;
+      }
+      setCaseVide(null);
+      await ouvrirEnGardantLeFiltre(vue.template.code, arrondissementFiltre);
+      setMessageAction("Chiffre inscrit dans le rapport du mois, avec votre motif ; le DA et le DD sont prévenus.");
+    } catch {
+      setCaseVideErreur("Pas de réseau : le chiffre n'est pas parti.");
+    } finally {
+      setCaseVideEnCours(false);
+    }
+  }
 
   /** Ouvre un tableau en gardant l'arrondissement choisi (passer de 3.2 à 3.3 sur Penka). */
   async function ouvrirEnGardantLeFiltre(code: string, filtre: string | null) {
@@ -196,6 +231,7 @@ export default function SectionControleClient() {
     setSelection(templateCode);
     setArrondissementFiltre(null);
     setCorrection(null);
+    setCaseVide(null);
     setListeOuverte(false);
     const res = await fetch(`/api/section/vue-croisee/${templateCode}?periodeId=${periodeId}`);
     if (!res.ok) {
@@ -513,6 +549,27 @@ export default function SectionControleClient() {
                   </td>
                   {vue.arrondissements.map((a: any) => {
                     const cell = vue.cells[f.code]?.[a.code];
+                    // Case vide d'un arrondissement qui a transmis : le chef peut la remplir (6 novembre 2026).
+                    const remplissable =
+                      !cell && vue.saisieManquante?.possible && vue.saisieManquante.arrondissementsTransmis?.includes(a.id) && !regleDuChamp(f.code) && f.typeValeur !== "TEXTE";
+                    if (remplissable) {
+                      return (
+                        <td key={a.code} className="border-b px-3 py-2 text-center">
+                          <button
+                            data-visite="case-vide-section"
+                            title="Case laissée vide par le DA : la remplir à sa place, avec un motif"
+                            className="rounded border border-dashed border-primary/50 px-2 py-1 text-[12px] font-semibold text-primary hover:bg-primary-light"
+                            onClick={() => {
+                              setCorrection(null);
+                              setCaseVide({ fieldCode: f.code, libelle: `${a.nom ?? a.code} · ${f.libelle}`, arrondissementId: a.id, valeur: "", motif: "" });
+                              setCaseVideErreur(null);
+                            }}
+                          >
+                            — + saisir
+                          </button>
+                        </td>
+                      );
+                    }
                     return (
                       <td key={a.code} className="border-b px-3 py-2 text-center">
                         <button
@@ -528,13 +585,63 @@ export default function SectionControleClient() {
                     );
                   })}
                   <td className="border-b px-3 py-2 text-center font-semibold">
-                    {vue.totaux[f.code]}
+                    {/* Affichage seulement : 465.09999999999997 → 465.1 (somme de décimaux en virgule flottante). */}
+                    {typeof vue.totaux[f.code] === "number" ? Number(vue.totaux[f.code].toFixed(3)) : vue.totaux[f.code]}
                     {vue.variationForte[f.code] && <span title="Variation forte vs mois précédent"> ⚠</span>}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {vue?.template?.type === "MATRICE" && vue.saisieManquante && !vue.saisieManquante.possible && vue.saisieManquante.raison && (
+        <p className="mt-2 text-xs text-gray-600">Cases laissées vides : {vue.saisieManquante.raison}</p>
+      )}
+      {vue?.template?.type === "MATRICE" && vue.saisieManquante?.possible && (
+        <p className="mt-2 text-xs text-gray-600">
+          « — + saisir » : une case laissée vide par le DA d&apos;un arrondissement qui a transmis son mois. Vous pouvez la remplir à sa place, avec un motif ; il en est prévenu.
+        </p>
+      )}
+
+      {caseVide && (
+        <div ref={caseVideRef} data-visite="panneau-case-vide" className="mt-4 max-w-lg scroll-mt-4 rounded-lg border-2 border-primary bg-white p-4">
+          <h3 className="font-semibold text-primary-dark">Saisir à la place du DA</h3>
+          <p className="mt-0.5 font-semibold text-gray-900">{caseVide.libelle}</p>
+          <p className="mt-1 text-xs text-gray-600">
+            La case est vide dans le rapport du DA. Le chiffre entre dans son rapport du mois, tracé « case vide → valeur » avec votre motif ; le DA et le DD sont prévenus.
+          </p>
+          <label className="mt-3 block text-xs font-semibold text-gray-600">Chiffre</label>
+          <input
+            type="text"
+            inputMode="decimal"
+            className="min-h-[44px] w-full rounded border border-gray-300 px-2"
+            value={caseVide.valeur}
+            onChange={(e) => setCaseVide({ ...caseVide, valeur: e.target.value })}
+          />
+          <label className="mt-3 block text-xs font-semibold text-gray-600">Motif (obligatoire) : d&apos;où vient ce chiffre</label>
+          <input
+            type="text"
+            className="min-h-[44px] w-full rounded border border-gray-300 px-2"
+            placeholder="Ex. : rapport papier du CZV, confirmé par le DA au téléphone"
+            value={caseVide.motif}
+            onChange={(e) => setCaseVide({ ...caseVide, motif: e.target.value })}
+          />
+          {caseVideErreur && <p className="mt-2 text-sm font-semibold text-red-700">{caseVideErreur}</p>}
+          <div className="mt-3 flex gap-2">
+            <button
+              type="button"
+              onClick={() => void enregistrerCaseVide()}
+              disabled={caseVideEnCours || caseVide.valeur.trim() === "" || caseVide.motif.trim().length < 5}
+              className="min-h-[44px] flex-1 rounded-md bg-primary px-3 text-sm font-semibold text-white disabled:bg-gray-300"
+            >
+              {caseVideEnCours ? "Enregistrement…" : "Enregistrer"}
+            </button>
+            <button type="button" onClick={() => setCaseVide(null)} className="min-h-[44px] flex-1 rounded-md border border-gray-300 px-3 text-sm">
+              Annuler
+            </button>
+          </div>
         </div>
       )}
 
@@ -610,7 +717,7 @@ export default function SectionControleClient() {
             </div>
           )}
 
-          {/* LA LIGNE OUBLIÉE PAR LE DA (22 octobre 2026) : seulement en correction directe, motif obligatoire. */}
+          {/* LA LIGNE OUBLIÉE PAR LE DA : une fois le mois transmis par le DA, motif obligatoire (6 novembre 2026). */}
           {vue.ajout && (
             <div data-visite="ajout-ligne" className="mt-4 max-w-lg">
               {!vue.ajout.possible ? (
