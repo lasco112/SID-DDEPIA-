@@ -6,7 +6,9 @@
 //
 // Jetons : sessions forgées (méthode du CLAUDE.md) de l'administrateur et d'un
 // DA de la Menoua. Le DD des Bamboutos doit être actif en local le temps de
-// l'épreuve (sinon l'intervention est refusée, faute de DD).
+// l'épreuve (sinon l'intervention est refusée, faute de DD), et les Bamboutos
+// doivent avoir un mois mensuel ouvert avec au moins un rapport transmis
+// (sinon les contrôles 3 bis / 3 ter n'éprouvent rien : « mois non précisé »).
 //
 // Usage : node scripts/verifier-intervention.mjs <jetonAdmin> <jetonDA>
 const [jetonAdmin, jetonDA] = process.argv.slice(2);
@@ -46,6 +48,34 @@ const czv = (dedans.j?.referentiels ?? []).filter((r) => r.categorie === "CZV").
 ok(czv.length === 9 && czv.every((n) => !/Dschang|Fokoué|Santchou/.test(n)), `en intervention : les 9 CZV des Bamboutos seulement (${czv.slice(0, 3).join(", ")}…)`);
 const liste = await appel(jetonAdmin, "/api/etablissements/liste?typeCode=TOUS", { intervention: BAM });
 ok(liste.status === 200 && (liste.j?.lignes ?? []).every((l) => ["Babadjou", "Batcham", "Galim", "Mbouda"].includes(l.arrondissement)), `liste des acteurs en intervention : ${liste.j?.lignes?.length ?? "?"} ligne(s), toutes des Bamboutos`);
+
+// 3 bis (6 novembre 2026). Le chef qui complète une ferme oubliée : le registre
+// des fermes (vue croisée 1.4) en intervention ne montre rien de la Menoua, et
+// une ferme de la Menoua ne se remplit pas depuis les Bamboutos.
+const periodeBam = dedans.j?.periode?.id;
+if (periodeBam) {
+  const vue14 = await appel(jetonAdmin, `/api/section/vue-croisee/T14?periodeId=${periodeBam}`, { intervention: BAM });
+  const reg = vue14.j?.registre ?? [];
+  ok(vue14.status === 200 && reg.every((e) => !idsMenoua.has(e.id)), `registre des fermes (1.4) en intervention : ${reg.length} ferme(s), aucune de la Menoua`);
+} else {
+  ok(false, "registre des fermes (1.4) en intervention : pas de mois en cours dans les Bamboutos pour l'épreuve");
+}
+const fermeMenoua = (chezMoi.j?.etablissements ?? []).find((e) => e.typeCode === "ETAB_FERME_PONTE");
+if (fermeMenoua) {
+  const remplir = await appel(jetonAdmin, "/api/section/saisie-manquante", {
+    intervention: BAM, methode: "POST",
+    corps: { templateCode: "T14", periodeId: periodeBam, arrondissementId: fermeMenoua.arrondissementId, etablissementId: fermeMenoua.id, fieldCode: "T14_PONDEUSES_DEBUT", valeur: "1", motif: "épreuve d'étanchéité" },
+  });
+  ok(remplir.status >= 400 && remplir.status < 500, `remplir, depuis les Bamboutos, une ferme de la Menoua : refusé (${remplir.status} ${remplir.j?.message ?? ""})`);
+}
+// 3 ter (7 novembre 2026). Le chef inscrit une ferme absente du registre :
+// jamais dans un arrondissement d'un autre département.
+const arrMenouaFerme = (chezMoi.j?.etablissements ?? [])[0]?.arrondissementId;
+const inscrire = await appel(jetonAdmin, "/api/section/etablissement-oublie", {
+  intervention: BAM, methode: "POST",
+  corps: { templateCode: "T14", periodeId: periodeBam, arrondissementId: arrMenouaFerme, nom: "INTRUS ETANCHEITE", localite: "X", motif: "épreuve d'étanchéité" },
+});
+ok(inscrire.status === 403, `inscrire, depuis les Bamboutos, une ferme dans un arrondissement de la Menoua : refusé (${inscrire.status} ${inscrire.j?.message ?? ""})`);
 
 // 4. Écrire dans un arrondissement de la Menoua depuis les Bamboutos : refusé.
 const arrMenoua = (chezMoi.j?.etablissements ?? [])[0]?.arrondissementId;

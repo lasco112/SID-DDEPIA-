@@ -42,8 +42,37 @@ const ICI = "/nouveautes/2026-11-04";
 
 const CHEFS_ET_DD: RoleNouveaute[] = ["CHEF_BAC", "CHEF_PSA", "CHEF_SSV", "CHEF_SPAIH", "DD"];
 const ICI_06 = "/nouveautes/2026-11-06";
+const ICI_07 = "/nouveautes/2026-11-07";
 
 export const EDITIONS: Edition[] = [
+  {
+    id: "2026-11-07",
+    titre: "Mise à jour du 7 novembre 2026",
+    nouveautes: [
+      {
+        id: "chef-ferme-oubliee",
+        titre: "Compléter une ferme, un couvoir ou une provenderie oubliés par le DA, même absents du registre",
+        roles: ["CHEF_PSA", "DD"],
+        etapes: [
+          {
+            image: `${ICI_07}/chef-ferme-bouton.jpg`,
+            faire: "Rapport mensuel → « Contrôler les chiffres des arrondissements » → un tableau par établissement (1.3 couvoirs, 1.4 fermes de ponte, 1.5 poulets de chair, 2.3 provenderies). Si la ferme oubliée n'est pas dans le registre, touchez « + Inscrire une ferme de ponte absente du registre ».",
+            obtenir: "Une fenêtre s'ouvre sous le tableau. Le bouton n'apparaît que si au moins un DA a transmis son mois. Une ferme déjà au registre, mais sans chiffres, est déjà dans le tableau avec ses cases « — + saisir ».",
+          },
+          {
+            image: `${ICI_07}/chef-ferme-formulaire.jpg`,
+            faire: "Choisissez l'arrondissement, écrivez le nom, choisissez le CZV et le village, puis le motif (d'où vient cette ferme). Touchez « Inscrire au registre ».",
+            obtenir: "La ferme entre au registre de l'arrondissement ; le DA et le DD sont prévenus. Une ferme du même nom déjà inscrite est refusée, pour éviter les doublons.",
+          },
+          {
+            image: `${ICI_07}/chef-ferme-ligne.jpg`,
+            faire: "La nouvelle ferme apparaît dans le tableau. Touchez « — + saisir » sur chacune de ses cases, inscrivez le chiffre et le motif, puis « Enregistrer ».",
+            obtenir: "Les chiffres entrent dans le rapport du mois de l'arrondissement, tracés avec votre motif. Pour les fermes de ponte et de poulets de chair, l'effectif « élevage moderne » du tableau 1.2 se recalcule seul.",
+          },
+        ],
+      },
+    ],
+  },
   {
     id: "2026-11-06",
     titre: "Mise à jour du 6 novembre 2026",

@@ -11,6 +11,7 @@ import { observationsDes } from "@/server/observations";
 import { refusAjoutLigne, STATUTS_TRANSMIS } from "@/server/mensuel/ajoutLigneChef";
 import { refusSaisieManquante } from "@/server/mensuel/saisieManquanteChef";
 import { STATUT_CLOTUREE } from "@/server/periodes/gel";
+import { NOMINATIF_ETABLISSEMENT_TYPE } from "@/lib/nominatifTypes";
 import type { SessionUser } from "@/lib/permissions";
 
 const auteurDe = (user: SessionUser) => ({ id: user.id, role: user.role, username: user.username, sectionId: user.sectionId ?? null });
@@ -123,7 +124,31 @@ export async function GET(req: Request, { params }: { params: { templateCode: st
         include: { etablissement: true, rapport: { include: { arrondissement: true } } },
         orderBy: [{ etablissement: { arrondissementId: "asc" } }, { etablissement: { nom: "asc" } }],
       });
-      return NextResponse.json({ template, arrondissements, saisiesNominatives: saisies, observations: await observationsDuTableau(db as PrismaClient, periodeId, template.code) });
+      // Les établissements DU REGISTRE pour ce tableau (6 novembre 2026) : une
+      // ferme dont le DA a oublié tous les chiffres apparaît aussi, ses cases
+      // vides à compléter si le DA a transmis son mois.
+      const typeEtab = NOMINATIF_ETABLISSEMENT_TYPE[template.code];
+      const registre = typeEtab
+        ? await db.etablissement.findMany({
+            where: { typeCode: typeEtab, actif: true },
+            select: { id: true, nom: true, arrondissementId: true },
+            orderBy: { nom: "asc" },
+          })
+        : [];
+      const raisonCase = refusSaisieManquante(auteurDe(user), template);
+      const rapportsCase = await db.rapportArrondissement.findMany({ where: { periodeId }, select: { arrondissementId: true, statut: true } });
+      return NextResponse.json({
+        template,
+        arrondissements,
+        saisiesNominatives: saisies,
+        registre,
+        observations: await observationsDuTableau(db as PrismaClient, periodeId, template.code),
+        saisieManquante: {
+          possible: !raisonCase && periode.statut !== STATUT_CLOTUREE,
+          raison: raisonCase ?? (periode.statut === STATUT_CLOTUREE ? "Ce mois est clôturé : le Délégué départemental doit le rouvrir avant qu'une case y soit remplie." : null),
+          arrondissementsTransmis: rapportsCase.filter((r) => STATUTS_TRANSMIS.includes(r.statut)).map((r) => r.arrondissementId),
+        },
+      });
     }
 
     // EVENEMENT

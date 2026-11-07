@@ -19,7 +19,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ message: "Réservé aux chefs de section." }, { status: 403 });
     }
     const body = (await req.json().catch(() => ({}))) as {
-      templateCode?: string; periodeId?: string; arrondissementId?: string; fieldCode?: string; valeur?: unknown; motif?: string;
+      templateCode?: string; periodeId?: string; arrondissementId?: string; fieldCode?: string; valeur?: unknown; motif?: string; etablissementId?: string;
     };
     if (!body.templateCode || !body.periodeId || !body.arrondissementId || !body.fieldCode) {
       return NextResponse.json({ message: "Tableau, mois, arrondissement ou ligne non précisé." }, { status: 400 });
@@ -27,7 +27,7 @@ export async function POST(req: Request) {
     const saisie = await saisirCaseManquante(
       user.db as PrismaClient,
       { id: user.id, role: user.role, username: user.username, sectionId: user.sectionId ?? null },
-      { templateCode: body.templateCode, periodeId: body.periodeId, arrondissementId: body.arrondissementId, fieldCode: body.fieldCode, valeur: body.valeur, motif: body.motif }
+      { templateCode: body.templateCode, periodeId: body.periodeId, arrondissementId: body.arrondissementId, fieldCode: body.fieldCode, valeur: body.valeur, motif: body.motif, etablissementId: body.etablissementId ?? null }
     );
     return NextResponse.json({ saisie: { id: saisie.id } });
   } catch (e) {

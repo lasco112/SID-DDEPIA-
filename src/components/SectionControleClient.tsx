@@ -16,6 +16,15 @@ import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { regleDuChamp, numeroTableau } from "@/lib/champsDerives";
 import { jeton } from "@/lib/surlignage";
 import VisiteGuidee from "@/components/VisiteGuidee";
+import ChoixVillage, { LIEU_VIDE, lieuComplet, type Lieu } from "@/components/ChoixVillage";
+
+/** Ce que chaque tableau par établissement appelle un établissement. */
+const NOM_ETAB_TABLEAU: Record<string, string> = {
+  T13: "un couvoir",
+  T14: "une ferme de ponte",
+  T15: "une ferme de poulets de chair",
+  T23: "une provenderie",
+};
 
 interface TemplateSummary {
   code: string;
@@ -116,7 +125,7 @@ export default function SectionControleClient() {
   const [ajoutErreur, setAjoutErreur] = useState<string | null>(null);
 
   /** Une case laissée vide par le DA, que le chef remplit à sa place (6 novembre 2026). */
-  const [caseVide, setCaseVide] = useState<{ fieldCode: string; libelle: string; arrondissementId: string; valeur: string; motif: string } | null>(null);
+  const [caseVide, setCaseVide] = useState<{ fieldCode: string; libelle: string; arrondissementId: string; etablissementId?: string; valeur: string; motif: string } | null>(null);
   const [caseVideEnCours, setCaseVideEnCours] = useState(false);
   const [caseVideErreur, setCaseVideErreur] = useState<string | null>(null);
   const caseVideRef = useRef<HTMLDivElement | null>(null);
@@ -133,7 +142,7 @@ export default function SectionControleClient() {
       const r = await fetch("/api/section/saisie-manquante", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ templateCode: vue.template.code, periodeId, arrondissementId: caseVide.arrondissementId, fieldCode: caseVide.fieldCode, valeur: caseVide.valeur, motif: caseVide.motif }),
+        body: JSON.stringify({ templateCode: vue.template.code, periodeId, arrondissementId: caseVide.arrondissementId, fieldCode: caseVide.fieldCode, valeur: caseVide.valeur, motif: caseVide.motif, etablissementId: caseVide.etablissementId ?? null }),
       });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) {
@@ -147,6 +156,49 @@ export default function SectionControleClient() {
       setCaseVideErreur("Pas de réseau : le chiffre n'est pas parti.");
     } finally {
       setCaseVideEnCours(false);
+    }
+  }
+
+  /** Un établissement absent du registre, que le chef y inscrit (7 novembre 2026). */
+  const [nouvelEtab, setNouvelEtab] = useState<{ arrondissementId: string; nom: string; lieu: Lieu; localite: string; proprietaire: string; telephone: string; motif: string } | null>(null);
+  const [listesVillages, setListesVillages] = useState(true);
+  const [nouvelEtabEnCours, setNouvelEtabEnCours] = useState(false);
+  const [nouvelEtabErreur, setNouvelEtabErreur] = useState<string | null>(null);
+  const nouvelEtabRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (nouvelEtab) setTimeout(() => nouvelEtabRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [Boolean(nouvelEtab)]);
+
+  async function enregistrerNouvelEtab() {
+    if (!nouvelEtab || !vue?.template || !periodeId) return;
+    setNouvelEtabEnCours(true);
+    setNouvelEtabErreur(null);
+    try {
+      const lieu = listesVillages
+        ? { centreId: nouvelEtab.lieu.centreId, villageId: nouvelEtab.lieu.villageId, villageAutre: nouvelEtab.lieu.villageAutre }
+        : { localite: nouvelEtab.localite };
+      const r = await fetch("/api/section/etablissement-oublie", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          templateCode: vue.template.code, periodeId, arrondissementId: nouvelEtab.arrondissementId,
+          nom: nouvelEtab.nom, proprietaire: nouvelEtab.proprietaire, telephone: nouvelEtab.telephone, motif: nouvelEtab.motif, ...lieu,
+        }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        setNouvelEtabErreur(d.message ?? "L'établissement n'a pas pu être inscrit.");
+        return;
+      }
+      const arr = (vue.arrondissements ?? []).find((a: any) => a.id === nouvelEtab.arrondissementId);
+      setNouvelEtab(null);
+      await ouvrirEnGardantLeFiltre(vue.template.code, arr?.code ?? arrondissementFiltre);
+      setMessageAction(`« ${d.etablissement?.nom ?? "L'établissement"} » est inscrit au registre ; le DA et le DD sont prévenus. Touchez « — + saisir » sur sa ligne pour remplir ses chiffres.`);
+    } catch {
+      setNouvelEtabErreur("Pas de réseau : l'établissement n'est pas parti.");
+    } finally {
+      setNouvelEtabEnCours(false);
     }
   }
 
@@ -651,8 +703,91 @@ export default function SectionControleClient() {
           arrondissementFiltre={arrondissementFiltre}
           onFiltrer={setArrondissementFiltre}
           onCorriger={(id, valeur, libelle) => ouvrirCorrectionValeur(id, valeur, libelle)}
+          onSaisirVide={(c) => {
+            setCorrection(null);
+            setCaseVideErreur(null);
+            setCaseVide({ fieldCode: c.fieldCode, libelle: c.libelle, arrondissementId: c.arrondissementId, etablissementId: c.etablissementId, valeur: "", motif: "" });
+          }}
+          onAjouterEtablissement={(arrondissementId) => {
+            setCorrection(null);
+            setCaseVide(null);
+            setNouvelEtabErreur(null);
+            setNouvelEtab({ arrondissementId, nom: "", lieu: LIEU_VIDE, localite: "", proprietaire: "", telephone: "", motif: "" });
+          }}
         />
       )}
+
+      {vue?.template?.type === "NOMINATIF" && nouvelEtab && (() => {
+        const transmis: any[] = (vue.arrondissements ?? []).filter((a: any) => vue.saisieManquante?.arrondissementsTransmis?.includes(a.id));
+        const genre = NOM_ETAB_TABLEAU[vue.template.code] ?? "un établissement";
+        const fem = genre.startsWith("une");
+        const lieuOk = listesVillages ? lieuComplet(nouvelEtab.lieu) : nouvelEtab.localite.trim().length > 0;
+        const champ = "min-h-[44px] w-full rounded border border-gray-300 px-2 text-sm";
+        return (
+          <div ref={nouvelEtabRef} data-visite="panneau-etablissement-oublie" className="mt-4 max-w-lg scroll-mt-4 rounded-lg border-2 border-primary bg-white p-4">
+            <h3 className="font-semibold text-primary-dark">Inscrire {genre} absent{fem ? "e" : ""} du registre</h3>
+            <p className="mt-1 text-xs text-gray-600">
+              {fem ? "Elle" : "Il"} n&apos;est pas au registre de l&apos;arrondissement : le DA l&apos;a oublié{fem ? "e" : ""}. Une fois inscrit{fem ? "e" : ""}, sa ligne apparaît dans le tableau et vous remplissez ses chiffres avec « — + saisir ». Le DA et le DD sont prévenus.
+            </p>
+            <label className="mt-3 block text-xs font-semibold text-gray-600">Arrondissement</label>
+            <select
+              className={champ}
+              value={nouvelEtab.arrondissementId}
+              onChange={(e) => setNouvelEtab({ ...nouvelEtab, arrondissementId: e.target.value, lieu: LIEU_VIDE })}
+            >
+              {transmis.map((a) => (
+                <option key={a.id} value={a.id}>{a.nom}</option>
+              ))}
+            </select>
+            <label className="mt-3 block text-xs font-semibold text-gray-600">Nom de l&apos;établissement</label>
+            <input type="text" className={champ} value={nouvelEtab.nom} onChange={(e) => setNouvelEtab({ ...nouvelEtab, nom: e.target.value })} />
+            <label className="mt-3 block text-xs font-semibold text-gray-600">CZV et village</label>
+            <ChoixVillage
+              key={nouvelEtab.arrondissementId}
+              arrondissementId={nouvelEtab.arrondissementId}
+              valeur={nouvelEtab.lieu}
+              onChange={(l) => setNouvelEtab((n) => (n ? { ...n, lieu: l } : n))}
+              onDisponible={setListesVillages}
+              classeChamp={champ}
+            />
+            {!listesVillages && (
+              <input type="text" className={champ} placeholder="Localité" value={nouvelEtab.localite} onChange={(e) => setNouvelEtab({ ...nouvelEtab, localite: e.target.value })} />
+            )}
+            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <div>
+                <label className="block text-xs font-semibold text-gray-600">Propriétaire (facultatif)</label>
+                <input type="text" className={champ} value={nouvelEtab.proprietaire} onChange={(e) => setNouvelEtab({ ...nouvelEtab, proprietaire: e.target.value })} />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-600">Téléphone (facultatif)</label>
+                <input type="tel" className={champ} value={nouvelEtab.telephone} onChange={(e) => setNouvelEtab({ ...nouvelEtab, telephone: e.target.value })} />
+              </div>
+            </div>
+            <label className="mt-3 block text-xs font-semibold text-gray-600">Motif (obligatoire) : d&apos;où vient cet établissement</label>
+            <input
+              type="text"
+              className={champ}
+              placeholder="Ex. : rapport papier du CZV, confirmé par le DA au téléphone"
+              value={nouvelEtab.motif}
+              onChange={(e) => setNouvelEtab({ ...nouvelEtab, motif: e.target.value })}
+            />
+            {nouvelEtabErreur && <p className="mt-2 text-sm font-semibold text-red-700">{nouvelEtabErreur}</p>}
+            <div className="mt-3 flex gap-2">
+              <button
+                type="button"
+                onClick={() => void enregistrerNouvelEtab()}
+                disabled={nouvelEtabEnCours || nouvelEtab.nom.trim().length < 2 || !lieuOk || nouvelEtab.motif.trim().length < 5}
+                className="min-h-[44px] flex-1 rounded-md bg-primary px-3 text-sm font-semibold text-white disabled:bg-gray-300"
+              >
+                {nouvelEtabEnCours ? "Inscription…" : "Inscrire au registre"}
+              </button>
+              <button type="button" onClick={() => setNouvelEtab(null)} className="min-h-[44px] flex-1 rounded-md border border-gray-300 px-3 text-sm">
+                Annuler
+              </button>
+            </div>
+          </div>
+        );
+      })()}
 
       {vue?.template?.type === "EVENEMENT" && (
         <div className="mt-6">
@@ -989,15 +1124,22 @@ function TableauNominatifCroise({
   arrondissementFiltre,
   onFiltrer,
   onCorriger,
+  onSaisirVide,
+  onAjouterEtablissement,
 }: {
   vue: any;
   arrondissementFiltre: string | null;
   onFiltrer: (code: string | null) => void;
   onCorriger: (id: string, valeur: string, libelle: string) => void;
+  /** Une case vide d'un établissement, que le chef peut remplir (6 novembre 2026). */
+  onSaisirVide?: (c: { etablissementId: string; arrondissementId: string; fieldCode: string; libelle: string }) => void;
+  /** Un établissement absent du registre, que le chef y inscrit (7 novembre 2026). */
+  onAjouterEtablissement?: (arrondissementId: string) => void;
 }) {
   const champs = (vue.template.fields as Array<{ code: string; libelle: string; typeValeur?: string }>).filter(
     (f) => f.typeValeur !== "TEXTE"
   );
+  const remplissable = (arrId: string, fieldCode: string) => peutCompleter(arrId) && !regleDuChamp(fieldCode);
   const champsTexte = (vue.template.fields as Array<{ code: string; libelle: string; typeValeur?: string }>).filter(
     (f) => f.typeValeur === "TEXTE"
   );
@@ -1005,7 +1147,7 @@ function TableauNominatifCroise({
 
   // Regroupement par établissement, en conservant l'ordre d'arrivée (déjà trié
   // par arrondissement puis par nom côté serveur).
-  const lignes: Array<{ etabId: string; nom: string; arrCode: string; arrNom: string; cellules: Record<string, any> }> = [];
+  const lignes: Array<{ etabId: string; nom: string; arrId: string; arrCode: string; arrNom: string; cellules: Record<string, any> }> = [];
   const index = new Map<string, number>();
   for (const s of saisies) {
     const cle = s.etablissement.id;
@@ -1014,6 +1156,7 @@ function TableauNominatifCroise({
       lignes.push({
         etabId: cle,
         nom: s.etablissement.nom,
+        arrId: s.rapport.arrondissementId,
         arrCode: s.rapport.arrondissement.code,
         arrNom: s.rapport.arrondissement.nom,
         cellules: {},
@@ -1021,6 +1164,19 @@ function TableauNominatifCroise({
     }
     lignes[index.get(cle)!].cellules[s.fieldCode] = s;
   }
+  // Les établissements du registre dont le DA n'a rien saisi ce mois-ci : ils
+  // apparaissent aussi, pour que l'oubli se voie (6 novembre 2026) — seulement
+  // là où le chef peut les compléter (DA ayant transmis), pour ne pas encombrer.
+  const peutCompleter = (arrId: string) =>
+    Boolean(onSaisirVide && vue.saisieManquante?.possible && vue.saisieManquante.arrondissementsTransmis?.includes(arrId));
+  for (const e of (vue.registre ?? []) as Array<{ id: string; nom: string; arrondissementId: string }>) {
+    if (index.has(e.id) || !peutCompleter(e.arrondissementId)) continue;
+    const a = (vue.arrondissements ?? []).find((x: any) => x.id === e.arrondissementId);
+    if (!a) continue;
+    index.set(e.id, lignes.length);
+    lignes.push({ etabId: e.id, nom: e.nom, arrId: a.id, arrCode: a.code, arrNom: a.nom, cellules: {} });
+  }
+  lignes.sort((x, y) => x.arrCode.localeCompare(y.arrCode) || x.nom.localeCompare(y.nom, "fr"));
 
   const arrondissements = Array.from(new Set(lignes.map((l) => l.arrCode))).sort();
   const visibles = arrondissementFiltre ? lignes.filter((l) => l.arrCode === arrondissementFiltre) : lignes;
@@ -1033,16 +1189,36 @@ function TableauNominatifCroise({
       return Number.isFinite(n) ? somme + n : somme;
     }, 0);
 
+  // Inscrire un établissement absent du registre : là où le chef peut compléter.
+  const transmis = ((vue.arrondissements ?? []) as Array<{ id: string; code: string }>).filter((a) => peutCompleter(a.id));
+  const arrDuFiltre = transmis.find((a) => a.code === arrondissementFiltre);
+  const genre = NOM_ETAB_TABLEAU[vue.template.code] ?? "un établissement";
+  const boutonAjout =
+    onAjouterEtablissement && transmis.length > 0 ? (
+      <button
+        type="button"
+        data-visite="ajout-etablissement-section"
+        onClick={() => onAjouterEtablissement((arrDuFiltre ?? transmis[0]).id)}
+        className="mb-3 min-h-[44px] rounded-md border border-dashed border-primary px-3 text-sm font-semibold text-primary hover:bg-primary-light"
+      >
+        + Inscrire {genre} absent{genre.startsWith("une") ? "e" : ""} du registre
+      </button>
+    ) : null;
+
   if (lignes.length === 0) {
     return (
-      <p className="mt-6 rounded-lg border border-gray-200 bg-white p-4 text-sm text-gray-500">
-        Aucune donnée saisie pour ce tableau ce mois-ci.
-      </p>
+      <div className="mt-6">
+        {boutonAjout}
+        <p className="rounded-lg border border-gray-200 bg-white p-4 text-sm text-gray-500">
+          Aucune donnée saisie pour ce tableau ce mois-ci.
+        </p>
+      </div>
     );
   }
 
   return (
     <div className="mt-6">
+      {boutonAjout}
       {arrondissements.length > 1 && (
         <div className="mb-3 flex flex-wrap gap-2">
           <button
@@ -1090,6 +1266,15 @@ function TableauNominatifCroise({
                         <button data-visite="valeur-section" data-cible={jeton("vc", c.id)} className="rounded px-2 py-1 hover:bg-blue-50" onClick={() => onCorriger(c.id, String(c.valeur ?? ""), `${l.nom} (${l.arrNom}) · ${f.libelle}`)}>
                           {c.nonRenseigne ? "N/D" : c.valeur ?? "—"}
                           <MarqueObservation obs={vue.observations?.[c.id]} />
+                        </button>
+                      ) : remplissable(l.arrId, f.code) ? (
+                        <button
+                          data-visite="case-vide-section"
+                          title="Case laissée vide par le DA : la remplir à sa place, avec un motif"
+                          className="rounded border border-dashed border-primary/50 px-2 py-1 text-[12px] font-semibold text-primary hover:bg-primary-light"
+                          onClick={() => onSaisirVide!({ etablissementId: l.etabId, arrondissementId: l.arrId, fieldCode: f.code, libelle: `${l.nom} (${l.arrNom}) · ${f.libelle}` })}
+                        >
+                          — + saisir
                         </button>
                       ) : (
                         <span className="text-gray-300">—</span>
