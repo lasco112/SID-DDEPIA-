@@ -74,6 +74,11 @@ test("la fiche du répertoire : seules les colonnes du canevas du type passent, 
   assert.deepEqual(r, { fiche: { sexe: "F", experience: 12, mode: "Extensif", homologuee: "OUI" } });
   assert.ok("erreur" in nettoyerFicheRepertoire("ETAB_BOVINS", { experience: "beaucoup" }));
   assert.ok("erreur" in nettoyerFicheRepertoire("ETAB_ABATTOIR", {}), "un abattoir n'a pas de fiche de répertoire");
+  // Les propriétaires de chiens (12 novembre 2026) : la rage d'abord.
+  assert.deepEqual(nettoyerFicheRepertoire("ETAB_CHIEN", { effectifM: "2", vaccinRage: "oui", garde: "en liberté" }), {
+    fiche: { effectifM: 2, vaccinRage: "OUI", garde: "En liberté" },
+  });
+  assert.equal(typeDeFiliere("PROPRIETAIRES DE CHIENS DE L'ARRONDISSEMENT"), "ETAB_CHIEN");
   // Le serveur : une fiche de répertoire sur un type qui n'en a pas est refusée ; la fiche d'un marché suit son chemin.
   assert.ok("erreur" in preparerEcriture({ fiche: { sexe: "M" } }, { typeCode: "ETAB_ABATTOIR", codeDepartement: null, username: "t" }));
   const ok = preparerEcriture({ fiche: { ruches: "60" } }, { typeCode: "ETAB_APICULTEUR", codeDepartement: null, username: "t" });

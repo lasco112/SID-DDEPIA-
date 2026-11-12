@@ -88,6 +88,17 @@ export const CHAMPS_REPERTOIRE: Record<string, ChampRepertoire[]> = {
     { code: "qualite", libelle: "Qualité", genre: "choix", options: ["Boucher", "Charcutier", "Boucher-charcutier"] },
     { code: "cni", libelle: "N° de CNI", genre: "texte" },
   ],
+  // Propriétaires de chiens (12 novembre 2026) : pas de filière au répertoire
+  // régional ; mêmes colonnes de base, et ce qui compte pour la rage.
+  ETAB_CHIEN: [
+    { ...SEXE, libelle: "Sexe du propriétaire" },
+    { code: "effectifM", libelle: "Chiens — mâles", genre: "nombre" },
+    { code: "effectifF", libelle: "Chiens — femelles", genre: "nombre" },
+    { ...RACES, libelle: "Races", exemple: "Ex. : berger allemand, race locale" },
+    { code: "vaccinRage", libelle: "Vacciné(s) contre la rage ?", genre: "ouiNon" },
+    { code: "dateVaccin", libelle: "Date de la dernière vaccination antirabique", genre: "texte", exemple: "Ex. : 15/09/2026" },
+    { code: "garde", libelle: "Mode de garde", genre: "choix", options: ["Attaché", "En enclos", "En liberté"] },
+  ],
   ETAB_PECHEUR: [
     { code: "permis", libelle: "Permis de pêche ?", genre: "ouiNon" },
     SEXE, EXPERIENCE,
@@ -103,13 +114,14 @@ export const LIBELLE_PROPRIETAIRE: Record<string, string> = {
   ETAB_OP: "Nom du responsable",
   ETAB_BOUCHER: "Noms et prénoms",
   ETAB_PECHEUR: "Nom et prénoms du pêcheur",
+  ETAB_CHIEN: "Nom et prénoms du propriétaire",
 };
 export const libelleProprietaire = (typeCode: string) =>
   LIBELLE_PROPRIETAIRE[typeCode] ?? (CHAMPS_REPERTOIRE[typeCode] ? "Nom et prénoms du promoteur" : "Propriétaire");
 
 /** Le titre court de la colonne, dans la liste du registre. */
 export const enteteProprietaire = (typeCode: string) =>
-  ({ ETAB_OP: "Responsable", ETAB_BOUCHER: "Noms et prénoms", ETAB_PECHEUR: "Pêcheur" } as Record<string, string>)[typeCode] ??
+  ({ ETAB_OP: "Responsable", ETAB_BOUCHER: "Noms et prénoms", ETAB_PECHEUR: "Pêcheur", ETAB_CHIEN: "Propriétaire" } as Record<string, string>)[typeCode] ??
   (CHAMPS_REPERTOIRE[typeCode] ? "Promoteur" : "Propriétaire");
 
 export const champsRepertoire =(typeCode: string): ChampRepertoire[] => CHAMPS_REPERTOIRE[typeCode] ?? [];

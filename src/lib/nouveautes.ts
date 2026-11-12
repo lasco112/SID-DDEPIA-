@@ -47,6 +47,25 @@ const ICI_12 = "/nouveautes/2026-11-12";
 
 export const EDITIONS: Edition[] = [
   {
+    // Après « 2026-11-12 » dans l'ordre des identifiants : vue même par qui a déjà vu celle du matin.
+    id: "2026-11-12-chiens",
+    titre: "Mise à jour du 12 novembre 2026 (suite)",
+    nouveautes: [
+      {
+        id: "repertoire-chiens",
+        titre: "Les propriétaires de chiens au registre",
+        roles: ["DD", "DA", "AGENT_SAISIE"],
+        etapes: [
+          {
+            image: `${ICI_12}/registre-chiens.jpg`,
+            faire: "Établissements → onglet « Propriétaires de chiens » (le dernier). Ajoutez le propriétaire, son village, puis sa fiche : nombre de chiens mâles et femelles, races, vaccination contre la rage et sa date, mode de garde.",
+            obtenir: "Chaque propriétaire de chien est rattaché à son village : utile pour organiser les campagnes de vaccination antirabique et suivre les chiens en liberté.",
+          },
+        ],
+      },
+    ],
+  },
+  {
     id: "2026-11-12",
     titre: "Mise à jour du 12 novembre 2026",
     nouveautes: [

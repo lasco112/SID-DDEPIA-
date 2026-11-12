@@ -17,7 +17,7 @@ test("les types d'acteurs : les quatre du mensuel en tête, les neuf d'origine �
   // 12 novembre 2026 : ajoutées EN FIN de liste, l'ordre connu du personnel ne bouge pas.
   assert.deepEqual(CODES_ACTEURS.slice(9), [
     "ETAB_PORCHERIE", "ETAB_POULET_LOCAL", "ETAB_PETITS_RUMINANTS", "ETAB_BOVINS", "ETAB_NON_CONVENTIONNEL",
-    "ETAB_APICULTEUR", "ETAB_BOUCHER", "ETAB_OP", "ETAB_PECHEUR",
+    "ETAB_APICULTEUR", "ETAB_BOUCHER", "ETAB_OP", "ETAB_PECHEUR", "ETAB_CHIEN",
   ]);
 });
 

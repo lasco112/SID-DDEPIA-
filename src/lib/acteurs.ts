@@ -42,6 +42,8 @@ export const TYPES_ACTEURS: TypeActeur[] = [
   { code: "ETAB_BOUCHER", libelle: "Boucher / charcutier", pluriel: "Bouchers et charcutiers" },
   { code: "ETAB_OP", libelle: "Organisation professionnelle", pluriel: "Organisations professionnelles" },
   { code: "ETAB_PECHEUR", libelle: "Pêcheur", pluriel: "Pêcheurs" },
+  // Demande du Délégué (12 novembre 2026), en fin de liste lui aussi.
+  { code: "ETAB_CHIEN", libelle: "Propriétaire de chien", pluriel: "Propriétaires de chiens" },
 ];
 
 export const CODES_ACTEURS = TYPES_ACTEURS.map((t) => t.code);

@@ -58,6 +58,7 @@ export function typeDeFiliere(titre: string): string | null {
   if (/AQUACULT|PISCICULT/.test(t)) return "ETAB_ETANG";
   if (/PECHEURS?\b/.test(t)) return "ETAB_PECHEUR";
   if (/COUVOIR/.test(t)) return "ETAB_COUVOIR";
+  if (/CHIENS?\b|CANIN/.test(t)) return "ETAB_CHIEN";
   return null;
 }
 
@@ -84,8 +85,11 @@ export function champDeColonne(intitule: string, typeCode: string): string | nul
   if (/TYPE DE PROVENDE/.test(t)) return "typeProvende";
   if (/TYPE DE L'OP|TYPE DE L OP/.test(t)) return "typeOP";
   if (/TYPE ?\/ ?MODE|MODE D'ELEVAGE/.test(t)) return "mode";
-  if (/EFFECTIFS? M$/.test(t)) return "effectifM";
-  if (/EFFECTIFS? F$/.test(t)) return "effectifF";
+  if (/(EFFECTIFS?|CHIENS?) M$/.test(t)) return "effectifM";
+  if (/(EFFECTIFS?|CHIENS?) F$/.test(t)) return "effectifF";
+  if (/DATE.*VACCIN/.test(t)) return "dateVaccin";
+  if (/VACCIN|ANTIRABIQUE/.test(t)) return "vaccinRage";
+  if (/GARDE|DIVAGATION/.test(t)) return "garde";
   if (/RACES|SOUCHES/.test(t)) return "races";
   if (/PROVENANCE DES MATIERES/.test(t)) return "provenanceMatieres";
   if (/PROVENANCE DES GENITEURS|ALEVINS/.test(t)) return "provenanceAlevins";
