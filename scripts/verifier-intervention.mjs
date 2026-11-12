@@ -76,6 +76,12 @@ const inscrire = await appel(jetonAdmin, "/api/section/etablissement-oublie", {
   corps: { templateCode: "T14", periodeId: periodeBam, arrondissementId: arrMenouaFerme, nom: "INTRUS ETANCHEITE", localite: "X", motif: "épreuve d'étanchéité" },
 });
 ok(inscrire.status === 403, `inscrire, depuis les Bamboutos, une ferme dans un arrondissement de la Menoua : refusé (${inscrire.status} ${inscrire.j?.message ?? ""})`);
+// 3 quater (12 novembre 2026). L'import d'un répertoire : jamais dans un arrondissement d'un autre département.
+const importer = await appel(jetonAdmin, "/api/etablissements/repertoire", {
+  intervention: BAM, methode: "POST",
+  corps: { arrondissementId: arrMenouaFerme, fichier: "épreuve", lignes: [{ typeCode: "ETAB_BOVINS", nom: "INTRUS ETANCHEITE", village: null, especes: [], fiche: null }] },
+});
+ok(importer.status === 403, `importer, depuis les Bamboutos, un répertoire dans un arrondissement de la Menoua : refusé (${importer.status} ${importer.j?.message ?? ""})`);
 
 // 4. Écrire dans un arrondissement de la Menoua depuis les Bamboutos : refusé.
 const arrMenoua = (chezMoi.j?.etablissements ?? [])[0]?.arrondissementId;

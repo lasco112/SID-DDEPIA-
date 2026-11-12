@@ -11,6 +11,7 @@
  * près au plus (CaptureGps) — jamais tapée (21 octobre 2026).
  */
 import { ESPECES, QUESTION_ESPECES, type InfosStructurelles } from "@/lib/acteurs";
+import { champsRepertoire, type ChampRepertoire, type FicheRepertoire } from "@/lib/repertoire";
 import CaptureGps from "@/components/CaptureGps";
 
 export default function InfosActeurForm({
@@ -18,12 +19,51 @@ export default function InfosActeurForm({
   valeur,
   onChange,
   desactive = false,
+  fiche = null,
+  onFiche,
 }: {
   typeCode: string;
   valeur: InfosStructurelles;
   onChange: (v: InfosStructurelles) => void;
   desactive?: boolean;
+  /** La fiche du répertoire EPIA de la filière (12 novembre 2026) — src/lib/repertoire.ts. */
+  fiche?: FicheRepertoire | null;
+  onFiche?: (f: FicheRepertoire) => void;
 }) {
+  const champsFiche = onFiche ? champsRepertoire(typeCode) : [];
+  const fixer = (code: string, v: string) => onFiche?.({ ...(fiche ?? {}), [code]: v === "" ? null : v });
+  const classeChamp = "mt-0.5 min-h-[40px] w-full rounded-input border border-gray-300 bg-white px-2 text-sm";
+  const champ = (c: ChampRepertoire) => {
+    const v = fiche?.[c.code];
+    const texte = v == null ? "" : String(v);
+    const id = `rep-${typeCode}-${c.code}`;
+    const options =
+      c.genre === "ouiNon" ? [["OUI", "Oui"], ["NON", "Non"]] : c.genre === "sexe" ? [["M", "M"], ["F", "F"]] : c.genre === "choix" ? (c.options ?? []).map((o) => [o, o]) : null;
+    return (
+      <div key={c.code}>
+        <label htmlFor={id} className="text-[12px] font-semibold text-gray-600">{c.libelle}</label>
+        {options ? (
+          <select id={id} disabled={desactive} value={texte} onChange={(e) => fixer(c.code, e.target.value)} className={classeChamp}>
+            <option value="">—</option>
+            {options.map(([val, lib]) => (
+              <option key={val} value={val}>{lib}</option>
+            ))}
+          </select>
+        ) : (
+          <input
+            id={id}
+            type="text"
+            inputMode={c.genre === "nombre" ? "decimal" : undefined}
+            disabled={desactive}
+            value={texte}
+            placeholder={c.exemple ?? ""}
+            onChange={(e) => fixer(c.code, e.target.value)}
+            className={classeChamp}
+          />
+        )}
+      </div>
+    );
+  };
   // Les marchés ont leur questionnaire (QuestionnaireMarche) : ce formulaire sert aux autres acteurs.
   const questionEspeces = QUESTION_ESPECES[typeCode];
   const basculer = (cle: "especes", code: string) => {
@@ -48,6 +88,13 @@ export default function InfosActeurForm({
 
   return (
     <div className="space-y-3">
+      {champsFiche.length > 0 && (
+        <div data-visite="fiche-repertoire">
+          <p className="mb-1 text-[13px] font-bold text-ink">Répertoire des acteurs EPIA</p>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">{champsFiche.map(champ)}</div>
+        </div>
+      )}
+
       <div>
         <p className="mb-1 text-[13px] font-bold text-ink">Position GPS — prise sur place, avec le téléphone</p>
         <CaptureGps

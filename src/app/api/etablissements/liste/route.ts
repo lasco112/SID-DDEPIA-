@@ -26,6 +26,7 @@ import {
   joursEnClair, libelleDe, lieuxEnClair, typeEnClair, type FicheMarche,
 } from "@/lib/marches";
 import { TYPE_MARCHE, communeDe } from "@/server/etablissements/donnees";
+import { champsRepertoire, libelleProprietaire, valeurEnClair } from "@/lib/repertoire";
 import { listePdf, fichesPdf } from "@/server/etablissements/pdf";
 
 // Les neuf types d'acteurs (20 octobre 2026). Pas exporté : un fichier de
@@ -243,6 +244,30 @@ export async function GET(req: Request) {
         ])
       );
       [6, 16, 28, 20, 22, 18, 22, 22, 40, 40, 40, 40, 50, 14, 14, 26, 12, 12, 12, 8, 40, 13].forEach((w, i) => (fm.getColumn(i + 1).width = w));
+    }
+
+    // Une feuille par filière du RÉPERTOIRE DES ACTEURS EPIA (12 novembre 2026),
+    // aux colonnes du canevas régional.
+    for (const t of TYPES_ACTEURS) {
+      const champs = champsRepertoire(t.code);
+      const ici = lignes.filter((l) => l.typeCode === t.code);
+      if (!champs.length || !ici.length) continue;
+      const fr = classeur.addWorksheet(`Répertoire ${t.pluriel}`.slice(0, 31));
+      fr.addRow([`Répertoire des acteurs EPIA — ${t.pluriel} — ${portee}`]).font = { bold: true, size: 13 };
+      fr.addRow([`${identite.intituleCourt} · état au ${etatAu}${seulementActifs ? " · établissements en activité" : ""}`]);
+      fr.addRow([]);
+      styleEntete(fr.addRow([
+        "N°", "Arrondissement", "Village", "CZV", "Nom de la structure", libelleProprietaire(t.code), "Contacts",
+        ...champs.map((c) => c.libelle), "Latitude", "Longitude", "Observations", "Statut",
+      ]));
+      ici.forEach((l, i) => {
+        const fiche = ((l.fiche as Record<string, string | number | null> | null) ?? {});
+        fr.addRow([
+          i + 1, l.arrondissement.nom, l.localite, l.centre?.nom ?? "", l.nom, l.proprietaire ?? "", l.telephone ?? "",
+          ...champs.map((c) => valeurEnClair(c, fiche[c.code])), l.latitude ?? "", l.longitude ?? "", l.observations ?? "", l.actif ? "En activité" : "Désactivé",
+        ]);
+      });
+      [6, 16, 18, 18, 28, 28, 14, ...champs.map(() => 16), 12, 12, 40, 13].forEach((w, i) => (fr.getColumn(i + 1).width = w));
     }
 
     const decompte = classeur.addWorksheet("Décompte");

@@ -9,10 +9,16 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { CODES_ACTEURS, nettoyerInfos } from "../src/lib/acteurs";
 
-test("les neuf types de la liste de référence, les quatre du mensuel en tête", () => {
-  assert.equal(CODES_ACTEURS.length, 9);
-  assert.deepEqual(CODES_ACTEURS.slice(0, 4), ["ETAB_COUVOIR", "ETAB_FERME_PONTE", "ETAB_FERME_CHAIR", "ETAB_PROVENDERIE"]);
-  assert.ok(CODES_ACTEURS.includes("ETAB_MARCHE"));
+test("les types d'acteurs : les quatre du mensuel en tête, les neuf d'origine à leur place, les filières du répertoire EPIA à la fin", () => {
+  assert.deepEqual(CODES_ACTEURS.slice(0, 9), [
+    "ETAB_COUVOIR", "ETAB_FERME_PONTE", "ETAB_FERME_CHAIR", "ETAB_PROVENDERIE",
+    "ETAB_MARCHE", "ETAB_ABATTOIR", "ETAB_AIRE_ABATTAGE", "ETAB_ETANG", "ETAB_CLINIQUE_PRIVEE",
+  ]);
+  // 12 novembre 2026 : ajoutées EN FIN de liste, l'ordre connu du personnel ne bouge pas.
+  assert.deepEqual(CODES_ACTEURS.slice(9), [
+    "ETAB_PORCHERIE", "ETAB_POULET_LOCAL", "ETAB_PETITS_RUMINANTS", "ETAB_BOVINS", "ETAB_NON_CONVENTIONNEL",
+    "ETAB_APICULTEUR", "ETAB_BOUCHER", "ETAB_OP", "ETAB_PECHEUR",
+  ]);
 });
 
 test("coordonnées GPS : prises par le téléphone à 5 m près au plus, bornes vérifiées", () => {

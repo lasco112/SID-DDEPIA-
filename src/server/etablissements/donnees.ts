@@ -10,6 +10,7 @@
  */
 import type { Prisma } from "@prisma/client";
 import { ESPECES, INFRASTRUCTURES_MARCHE, nettoyerInfos } from "@/lib/acteurs";
+import { nettoyerFicheRepertoire } from "@/lib/repertoire";
 import { nettoyerFicheMarche, equipementsPresents, PETITS_RUMINANTS, PLUSIEURS_ESPECES, type FicheMarche } from "@/lib/marches";
 
 export const TYPE_MARCHE = "ETAB_MARCHE";
@@ -70,8 +71,13 @@ export function preparerEcriture(
     data.sourceGPS = infos.donnees.latitude != null ? contexte.username : null;
   }
 
-  if ("fiche" in body) {
-    if (contexte.typeCode !== TYPE_MARCHE) return { erreur: "Seul un marché porte une fiche de marché." };
+  // Les autres acteurs : la fiche du RÉPERTOIRE EPIA de leur filière (12 novembre 2026).
+  if ("fiche" in body && contexte.typeCode !== TYPE_MARCHE) {
+    const r = nettoyerFicheRepertoire(contexte.typeCode, body.fiche);
+    if ("erreur" in r) return { erreur: r.erreur };
+    // Une fiche vidée s'écrit {} : le journal recopie ces données telles quelles.
+    data.fiche = (r.fiche ?? {}) as Prisma.InputJsonValue;
+  } else if ("fiche" in body) {
     const r = nettoyerFicheMarche(body.fiche, ESPECES.map((x) => x.code), INFRASTRUCTURES_MARCHE.map((x) => x.code), contexte.codeDepartement);
     if ("erreur" in r) return { erreur: r.erreur };
     data.fiche = r.fiche as Prisma.InputJsonValue;

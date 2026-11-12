@@ -26,12 +26,14 @@ import {
 import VisiteGuidee from "@/components/VisiteGuidee";
 import ListeFermes from "@/components/ListeFermes";
 import InfosActeurForm from "@/components/InfosActeurForm";
+import ImportRepertoire from "@/components/ImportRepertoire";
 import QuestionnaireMarche, { type ReponsesMarche } from "@/components/QuestionnaireMarche";
 import ChoixVillage, { LIEU_VIDE, lieuComplet, type Lieu } from "@/components/ChoixVillage";
 import { useUtilisateur } from "@/components/UtilisateurContexte";
 import { Store, MapPin, FileDown } from "lucide-react";
 import { TYPES_ACTEURS, nettoyerInfos, libellesEspeces, type InfosStructurelles } from "@/lib/acteurs";
 import { joursEnClair } from "@/lib/marches";
+import { champsRepertoire, enteteProprietaire, libelleProprietaire, nettoyerFicheRepertoire, type FicheRepertoire } from "@/lib/repertoire";
 
 const MARCHE = "ETAB_MARCHE";
 
@@ -113,6 +115,9 @@ export default function EtablissementsClient({
       .catch(() => undefined);
   }, []);
   const [infosNouveau, setInfosNouveau] = useState<InfosStructurelles>({});
+  /** La fiche du répertoire EPIA de la filière (12 novembre 2026). */
+  const [ficheNouveau, setFicheNouveau] = useState<FicheRepertoire>({});
+  const avecRepertoire = champsRepertoire(typeCode).length > 0;
   const [ajout, setAjout] = useState(false);
   const [aSupprimer, setASupprimer] = useState<{ id: string; nom: string } | null>(null);
 
@@ -155,6 +160,11 @@ export default function EtablissementsClient({
       setMessage(infos.erreur);
       return;
     }
+    const rep = avecRepertoire ? nettoyerFicheRepertoire(typeCode, ficheNouveau) : null;
+    if (rep && "erreur" in rep) {
+      setMessage(rep.erreur);
+      return;
+    }
     setAjout(true);
     try {
       const cree = await creerEtablissement({
@@ -165,8 +175,10 @@ export default function EtablissementsClient({
           ? { localite: lieu.localite, centreId: lieu.centreId, villageId: lieu.villageId, villageAutre: lieu.villageAutre?.trim() || null }
           : {}),
         ...infos.donnees,
+        ...(rep && rep.fiche ? { fiche: rep.fiche as never } : {}),
       });
       setNouveau({ nom: "", localite: "", proprietaire: "", telephone: "" });
+      setFicheNouveau({});
       // Le CZV reste choisi : on enregistre souvent plusieurs fermes d'un même secteur.
       setLieu({ ...LIEU_VIDE, centreId: lieu.centreId });
       setInfosNouveau({});
@@ -274,6 +286,7 @@ export default function EtablissementsClient({
             onClick={() => {
               setTypeCode(t.code);
               setInfosNouveau({});
+              setFicheNouveau({});
             }}
             className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
               typeCode === t.code ? "bg-primary text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
@@ -347,7 +360,7 @@ export default function EtablissementsClient({
             />
           )}
           <input
-            placeholder="Propriétaire (optionnel)"
+            placeholder={`${libelleProprietaire(typeCode)} (optionnel)`}
             value={nouveau.proprietaire}
             onChange={(e) => setNouveau({ ...nouveau, proprietaire: e.target.value })}
             className="rounded-md border border-gray-300 px-3 py-2 text-sm"
@@ -360,12 +373,18 @@ export default function EtablissementsClient({
           />
         </div>
         {/* Les informations structurelles : ouvertes d'emblée pour un marché. */}
-        <details key={typeCode} open={typeCode === "ETAB_MARCHE"} className="mt-3 rounded-input border border-gray-200 bg-white p-3">
+        <details key={typeCode} open={typeCode === "ETAB_MARCHE" || avecRepertoire} className="mt-3 rounded-input border border-gray-200 bg-white p-3">
           <summary className="cursor-pointer text-sm font-semibold text-primary">
-            Informations structurelles : coordonnées GPS{typeCode === "ETAB_MARCHE" ? ", espèces vendues, jours de marché, équipements" : ""}…
+            Informations structurelles : {avecRepertoire ? "répertoire des acteurs EPIA, " : ""}coordonnées GPS{typeCode === "ETAB_MARCHE" ? ", espèces vendues, jours de marché, équipements" : ""}…
           </summary>
           <div className="mt-3">
-            <InfosActeurForm typeCode={typeCode} valeur={infosNouveau} onChange={setInfosNouveau} />
+            <InfosActeurForm
+              typeCode={typeCode}
+              valeur={infosNouveau}
+              onChange={setInfosNouveau}
+              fiche={ficheNouveau}
+              onFiche={avecRepertoire ? setFicheNouveau : undefined}
+            />
           </div>
         </details>
         <button
@@ -397,7 +416,7 @@ export default function EtablissementsClient({
                   <th className="min-w-[200px] border-b border-gray-200 px-3 py-2">Jours de marché</th>
                 ) : (
                   <>
-                    <th className="min-w-[140px] border-b border-gray-200 px-3 py-2">Propriétaire</th>
+                    <th className="min-w-[140px] border-b border-gray-200 px-3 py-2">{enteteProprietaire(typeCode)}</th>
                     <th className="min-w-[120px] border-b border-gray-200 px-3 py-2">Téléphone</th>
                   </>
                 )}
@@ -423,6 +442,16 @@ export default function EtablissementsClient({
             </tbody>
           </table>
         </div>
+      )}
+
+      {/* Importer le répertoire des acteurs EPIA (12 novembre 2026) : en bas, rien ne bouge au-dessus. */}
+      {role !== "AGENT_SAISIE" && arrondissementId && (
+        <ImportRepertoire
+          key={arrondissementId}
+          arrondissementId={arrondissementId}
+          nomArrondissement={arrondissements.find((a) => a.id === arrondissementId)?.nom ?? ""}
+          onFini={charger}
+        />
       )}
     </div>
   );
@@ -474,6 +503,9 @@ function LigneEtablissement({
     localite: etab.localite,
   });
   const [listesVillages, setListesVillages] = useState(false);
+  /** La fiche du répertoire EPIA de la filière (12 novembre 2026) ; un marché a son questionnaire. */
+  const avecRepertoire = !onOuvrirQuestionnaire && champsRepertoire(etab.typeCode).length > 0;
+  const [fiche, setFiche] = useState<FicheRepertoire>(avecRepertoire ? ({ ...((etab.fiche as unknown as FicheRepertoire | null) ?? {}) }) : {});
   const [proprietaire, setProprietaire] = useState(etab.proprietaire ?? "");
   const [telephone, setTelephone] = useState(etab.telephone ?? "");
 
@@ -552,13 +584,22 @@ function LigneEtablissement({
               <ChoixVillage arrondissementId={etab.arrondissementId} valeur={lieu} onChange={setLieu} onDisponible={setListesVillages} />
             </div>
           </div>
-          <InfosActeurForm typeCode={etab.typeCode} valeur={infos} onChange={setInfos} desactive={!etab.actif} />
+          <InfosActeurForm
+            typeCode={etab.typeCode}
+            valeur={infos}
+            onChange={setInfos}
+            desactive={!etab.actif}
+            fiche={fiche}
+            onFiche={avecRepertoire ? setFiche : undefined}
+          />
           <button
             type="button"
             disabled={!etab.actif}
             onClick={() => {
               const r = nettoyerInfos(infos as Record<string, unknown>);
               if ("erreur" in r) return onMessage(r.erreur);
+              const rep = avecRepertoire ? nettoyerFicheRepertoire(etab.typeCode, fiche) : null;
+              if (rep && "erreur" in rep) return onMessage(rep.erreur);
               // Le CZV et le village : seulement s'ils sont complets et ont changé.
               const lieuChange =
                 lieuComplet(lieu) &&
@@ -566,6 +607,7 @@ function LigneEtablissement({
               if (lieu.centreId && !lieuComplet(lieu)) return onMessage("Choisissez le village, ou « Autre village » en le précisant.");
               onModifier({
                 ...r.donnees,
+                ...(rep ? { fiche: rep.fiche as never } : {}),
                 ...(lieuChange ? { centreId: lieu.centreId, villageId: lieu.villageId, villageAutre: lieu.villageAutre?.trim() || null, localite: lieu.localite } : {}),
               });
               onMessage(`Fiche de « ${etab.nom} » enregistrée.`);

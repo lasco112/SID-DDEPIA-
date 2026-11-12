@@ -31,6 +31,17 @@ export const TYPES_ACTEURS: TypeActeur[] = [
   { code: "ETAB_AIRE_ABATTAGE", libelle: "Aire d'abattage aménagée", pluriel: "Aires d'abattage" },
   { code: "ETAB_ETANG", libelle: "Étang piscicole", pluriel: "Étangs piscicoles" },
   { code: "ETAB_CLINIQUE_PRIVEE", libelle: "Clinique vétérinaire privée", pluriel: "Cliniques vétérinaires privées" },
+  // Les autres filières du RÉPERTOIRE DES ACTEURS EPIA de la région (12 novembre
+  // 2026), ajoutées EN FIN de liste : l'ordre connu du personnel ne bouge pas.
+  { code: "ETAB_PORCHERIE", libelle: "Porciculteur", pluriel: "Porciculteurs" },
+  { code: "ETAB_POULET_LOCAL", libelle: "Éleveur de poulets locaux", pluriel: "Poulets locaux" },
+  { code: "ETAB_PETITS_RUMINANTS", libelle: "Éleveur de petits ruminants", pluriel: "Petits ruminants" },
+  { code: "ETAB_BOVINS", libelle: "Boviculteur", pluriel: "Boviculteurs" },
+  { code: "ETAB_NON_CONVENTIONNEL", libelle: "Élevage non conventionnel", pluriel: "Élevages non conventionnels" },
+  { code: "ETAB_APICULTEUR", libelle: "Apiculteur", pluriel: "Apiculteurs" },
+  { code: "ETAB_BOUCHER", libelle: "Boucher / charcutier", pluriel: "Bouchers et charcutiers" },
+  { code: "ETAB_OP", libelle: "Organisation professionnelle", pluriel: "Organisations professionnelles" },
+  { code: "ETAB_PECHEUR", libelle: "Pêcheur", pluriel: "Pêcheurs" },
 ];
 
 export const CODES_ACTEURS = TYPES_ACTEURS.map((t) => t.code);
@@ -43,6 +54,8 @@ export const QUESTION_ESPECES: Record<string, string> = {
   ETAB_AIRE_ABATTAGE: "Espèces abattues",
   ETAB_ETANG: "Espèces élevées",
   ETAB_CLINIQUE_PRIVEE: "Espèces soignées",
+  ETAB_PETITS_RUMINANTS: "Espèces élevées",
+  ETAB_NON_CONVENTIONNEL: "Espèces élevées",
 };
 
 /** Les espèces — vendues sur un marché, élevées, abattues… */

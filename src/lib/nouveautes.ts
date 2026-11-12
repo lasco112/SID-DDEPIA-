@@ -43,8 +43,44 @@ const ICI = "/nouveautes/2026-11-04";
 const CHEFS_ET_DD: RoleNouveaute[] = ["CHEF_BAC", "CHEF_PSA", "CHEF_SSV", "CHEF_SPAIH", "DD"];
 const ICI_06 = "/nouveautes/2026-11-06";
 const ICI_07 = "/nouveautes/2026-11-07";
+const ICI_12 = "/nouveautes/2026-11-12";
 
 export const EDITIONS: Edition[] = [
+  {
+    id: "2026-11-12",
+    titre: "Mise à jour du 12 novembre 2026",
+    nouveautes: [
+      {
+        id: "repertoire-fiche",
+        titre: "Le registre suit le répertoire des acteurs EPIA : nouvelles filières, fiche complète",
+        roles: ["DD", "DA", "AGENT_SAISIE"],
+        etapes: [
+          {
+            image: `${ICI_12}/repertoire-fiche.jpg`,
+            faire: "Établissements : de nouveaux onglets en fin de liste (Porciculteurs, Poulets locaux, Petits ruminants, Boviculteurs, Apiculteurs, Bouchers et charcutiers, Organisations professionnelles, Pêcheurs…). En ajoutant un acteur, remplissez « Répertoire des acteurs EPIA » : homologation, sexe, expérience, mode d'élevage, effectifs mâles et femelles, races, provenance…",
+            obtenir: "Les mêmes colonnes que le répertoire papier de la Délégation régionale, selon la filière. Tout est facultatif et marche sans réseau.",
+          },
+          {
+            image: `${ICI_12}/repertoire-registre.jpg`,
+            faire: "Pour un acteur déjà inscrit : « Fiche » sur sa ligne, complétez, puis « Enregistrer la fiche ».",
+            obtenir: "La liste des acteurs en Excel a une feuille par filière, aux colonnes du répertoire.",
+          },
+        ],
+      },
+      {
+        id: "repertoire-import",
+        titre: "Importer le répertoire Word d'un arrondissement",
+        roles: ["DD", "DA"],
+        etapes: [
+          {
+            image: `${ICI_12}/repertoire-import-lecture.jpg`,
+            faire: "En bas de la page Établissements : « Importer un répertoire des acteurs (fichier Word) », choisissez le fichier, puis « Lire le fichier ». Décochez ce qu'il ne faut pas inscrire, puis « Inscrire les … acteur(s) coché(s) ».",
+            obtenir: "Les acteurs entrent au registre avec leur village et leur fiche ; un acteur déjà inscrit est décoché d'office. Chacun porte « à vérifier par le DA » : celui qui n'est plus en activité se désactive avec « Actif — désactiver ».",
+          },
+        ],
+      },
+    ],
+  },
   {
     id: "2026-11-07",
     titre: "Mise à jour du 7 novembre 2026",
